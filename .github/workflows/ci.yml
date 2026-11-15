@@ -1,0 +1,29 @@
+name: CI
+
+# Pull requests are checked here. Pushes to main are checked by the deploy workflow.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Syntax
+        run: for f in js/*.js sw.js tools/*.mjs tools/lib/*.mjs; do node --check "$f"; done
+      - name: Example trip, offline file list, no private data
+        run: npm run check
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: node tools/build.mjs --out _site

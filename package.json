@@ -1,0 +1,24 @@
+{
+  "name": "travel-in-my-pocket",
+  "version": "1.0.0",
+  "description": "A pocket travel guide that works offline. The app is public, your trip stays on your phone.",
+  "author": "Francesco Falqui",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "serve": "python3 -m http.server 4173",
+    "validate": "node tools/validate-trip.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node tools/validate-trip.mjs examples/demo-trip.json && node tools/check-precache.mjs && node tools/check-repo.mjs",
+    "build": "node tools/build.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Frafal/TIMP.git"
+  },
+  "homepage": "https://frafal.github.io/TIMP/"
+}

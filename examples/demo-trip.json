@@ -1,0 +1,103 @@
+{
+  "format": "travel-in-my-pocket/1",
+  "id": "demo-lisbon",
+  "title": "Lisbon in my pocket (example)",
+  "lang": "en",
+  "timezone": "Europe/Lisbon",
+  "places": {
+    "lisbon": {"name": "Lisboa", "color": "#b8651b", "colorDark": "#e9a25c"},
+    "sintra": {"name": "Sintra", "color": "#2f7d4f", "colorDark": "#6cc58f"}
+  },
+  "stays": {
+    "casa": {
+      "name": "Casa do Exemplo (invented)",
+      "place": "lisbon",
+      "address": "Baixa, Lisboa",
+      "dates": "14 → 17 May",
+      "note": "This hotel does not exist: it shows where the check-in notes go. **Bold** works here too.",
+      "query": "Praça da Figueira Lisboa"
+    }
+  },
+  "days": [
+    {
+      "date": "2027-05-14",
+      "place": "lisbon",
+      "stay": "casa",
+      "title": "Baixa and Alfama on foot",
+      "reminders": [
+        "This is an invented trip, here to show what the app does. Times and descriptions are examples: check everything before a real visit."
+      ],
+      "stops": [
+        {"id": "comercio", "time": "10:00", "title": "Praça do Comércio", "text": "Start at the big square on the river, then walk under the arch into Rua Augusta.", "lat": 38.7075, "lng": -9.1364, "query": "Praça do Comércio Lisboa"},
+        {"id": "se", "time": "11:00", "title": "Lisbon Cathedral", "text": "Ten minutes uphill. The tram line passes right in front of the door.", "lat": 38.7098, "lng": -9.1326, "mapLabel": "Sé", "query": "Sé de Lisboa"},
+        {"id": "santa-luzia", "time": "11:45", "title": "Miradouro de Santa Luzia", "text": "A terrace over the roofs of Alfama. A good place for a break.", "lat": 38.7117, "lng": -9.1303, "query": "Miradouro de Santa Luzia"},
+        {"id": "castelo", "time": "12:30", "title": "Castelo de São Jorge", "text": "The castle on top of the hill. Tickets are sold at the gate.", "lat": 38.7139, "lng": -9.1335, "query": "Castelo de São Jorge", "tag": "Ticket needed"},
+        {"id": "lunch", "time": "14:00", "title": "Lunch in Alfama", "text": "No coordinates on this stop: it has no pin on the map, and that is fine."},
+        {"id": "sunset", "time": "Evening", "title": "Miradouro da Senhora do Monte", "text": "The highest viewpoint in the centre, best at sunset.", "lat": 38.7191, "lng": -9.1327, "query": "Miradouro da Senhora do Monte", "tag": "Optional"}
+      ],
+      "note": "If it rains: swap this day with the next one. **Belém** has more places indoors."
+    },
+    {
+      "date": "2027-05-15",
+      "place": "lisbon",
+      "stay": "casa",
+      "title": "Belém and the river",
+      "stops": [
+        {"id": "jeronimos", "time": "09:30", "title": "Mosteiro dos Jerónimos", "text": "Go early: the queue grows during the morning.", "lat": 38.6979, "lng": -9.2068, "mapLabel": "Jerónimos", "query": "Mosteiro dos Jerónimos", "tag": "Ticket needed"},
+        {"id": "pasteis", "time": "11:00", "title": "Pastéis de Belém", "text": "The custard tarts, still warm. The queue for take-away moves fast.", "lat": 38.6975, "lng": -9.2032, "query": "Pastéis de Belém"},
+        {"id": "torre", "time": "12:00", "title": "Torre de Belém", "text": "A walk along the river to the tower.", "lat": 38.6916, "lng": -9.216, "query": "Torre de Belém"},
+        {"id": "maat", "time": "14:30", "title": "MAAT", "text": "You can walk on the roof of the museum for free.", "lat": 38.6959, "lng": -9.1937, "query": "MAAT Lisboa"},
+        {"id": "lx", "time": "16:30", "title": "LX Factory", "text": "Shops and cafés in an old factory, under the bridge.", "lat": 38.7034, "lng": -9.1789, "query": "LX Factory Lisboa"}
+      ]
+    },
+    {
+      "date": "2027-05-16",
+      "place": "sintra",
+      "from": "lisbon",
+      "stay": "casa",
+      "title": "A day out of town",
+      "reminders": [
+        "A day with two alternative plans: pick one with the buttons below. The app remembers the choice."
+      ],
+      "plans": [
+        {
+          "id": "sintra",
+          "name": "Sintra",
+          "zoneNames": ["Sintra"],
+          "stops": [
+            {"id": "train", "time": "08:40", "title": "Train from Rossio", "text": "About 40 minutes. This stop has no coordinates on purpose."},
+            {"id": "station", "time": "09:30", "title": "Sintra station", "text": "From here a bus climbs to the palaces.", "lat": 38.799, "lng": -9.3859, "query": "Sintra train station"},
+            {"id": "pena", "time": "10:15", "title": "Palácio da Pena", "text": "The coloured palace on top of the hill.", "lat": 38.7876, "lng": -9.3906, "query": "Palácio da Pena", "tag": "Ticket needed"},
+            {"id": "regaleira", "time": "13:30", "title": "Quinta da Regaleira", "text": "Gardens, tunnels and the spiral well.", "lat": 38.7963, "lng": -9.396, "query": "Quinta da Regaleira"},
+            {"id": "town", "time": "15:30", "title": "Sintra old town", "text": "A coffee and a pastry before the train back.", "lat": 38.7976, "lng": -9.3907, "mapLabel": "Old town", "query": "Palácio Nacional de Sintra"}
+          ]
+        },
+        {
+          "id": "cascais",
+          "name": "Cascais",
+          "zoneNames": ["Cascais"],
+          "stops": [
+            {"id": "station", "time": "10:00", "title": "Cascais station", "text": "Train along the coast from Cais do Sodré.", "lat": 38.7005, "lng": -9.4177, "query": "Cascais train station"},
+            {"id": "beach", "time": "10:30", "title": "Praia da Rainha", "text": "A small beach between the rocks, two minutes from the station.", "lat": 38.6977, "lng": -9.4194, "query": "Praia da Rainha Cascais"},
+            {"id": "boca", "time": "12:00", "title": "Boca do Inferno", "text": "A walk along the cliff to the sea arch.", "lat": 38.6913, "lng": -9.4307, "query": "Boca do Inferno Cascais"}
+          ]
+        }
+      ]
+    }
+  ],
+  "info": [
+    {"title": "Getting around", "rows": [
+      {"label": "Card", "text": "One rechargeable card works on metro, trams, buses and trains."},
+      {"label": "Trams", "text": "The historic trams are crowded: board at the first stop."}
+    ]},
+    {"title": "In case of need", "rows": [
+      {"label": "Emergency", "number": "112", "text": "any emergency, across the EU"}
+    ]},
+    {"title": "A few words", "rows": [
+      {"label": "Obrigado / Obrigada", "text": "Thank you"},
+      {"label": "Bom dia", "text": "Good morning"},
+      {"label": "A conta, por favor", "text": "The bill, please"}
+    ]}
+  ],
+  "infoNote": "Everything in this example is invented or approximate. Load your own trip file from «Trips»."
+}

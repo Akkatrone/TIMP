@@ -1,0 +1,24 @@
+name: Idea
+description: Something the app could do better for travellers
+labels: [enhancement]
+body:
+  - type: textarea
+    id: situation
+    attributes:
+      label: The situation
+      description: Where were you, what were you trying to do, what was missing? A real moment from a trip helps more than a feature name.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: checkboxes
+    id: promises
+    attributes:
+      label: The three promises
+      description: Every change has to keep them. See CONTRIBUTING.md.
+      options:
+        - label: The trip stays on the device
+        - label: It works offline
+        - label: Anyone can host it as static files

@@ -1,0 +1,48 @@
+name: Something does not work
+description: The app behaves differently from what you expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please do not attach your real trip file.** It contains your hotels and dates, and issues are public.
+        Reproduce the problem with the example trip, or with a file where names and places have been changed.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you saw instead.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and browser
+      placeholder: iPhone 15, iOS 18.2, Safari
+    validations:
+      required: true
+  - type: dropdown
+    id: installed
+    attributes:
+      label: How was the app opened?
+      options:
+        - From the Home Screen icon (installed)
+        - In the browser
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options:
+        - Online
+        - Offline or airplane mode
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown at the bottom of the Trips page.

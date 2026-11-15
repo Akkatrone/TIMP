@@ -1,0 +1,12 @@
+# Real trips never go in the repository: they live only on the devices that load them.
+/private/
+/originale/
+*.private.json
+
+.DS_Store
+node_modules/
+
+# Build output
+/dist/
+/_site/
+/.build-test-*/
