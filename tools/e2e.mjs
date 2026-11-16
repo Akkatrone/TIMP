@@ -233,7 +233,10 @@ await withApp(async ({run, until, reload}) => {
     await until("the trips page", `document.querySelector('[data-act="save"]')`);
     assert.equal(await run(`return !!document.querySelector(".unsaved");`), true);
     await run(`window.__files = []; const make = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { window.__files.push(b); return make(b); }; HTMLAnchorElement.prototype.click = function(){ window.__name = this.download; };`);
+    // As Chrome on Android does: the share sheet exists, but refuses a .json file.
+    await run(`navigator.canShare = () => true; navigator.share = () => Promise.reject(new DOMException("Permission denied", "NotAllowedError"));`);
     await run(`document.querySelector('[data-act="save"]').click(); await new Promise(r => setTimeout(r, 400));`);
+    assert.equal(await run(`return window.__files.length;`), 1, "refused by the share sheet, the file is downloaded instead");
     saved = JSON.parse(await run(`return await window.__files[0].text();`));
     const name = await run(`return window.__name;`);
     assert.equal(name, `demo-lisbon-${saved.version.id.slice(0, 7)}.json`);

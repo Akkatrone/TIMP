@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.0.2
+
+- "Save the file" works on Android. Chrome offers the share sheet but refuses to share
+  `.json` files in it; the app took that refusal as a failure. It now downloads the file
+  instead (to Downloads), and goes straight to the download for the rest of the session.
+
 ## 2.0.1
 
 - The new icon now shows up after an update. Browsers keep icons by address, apart

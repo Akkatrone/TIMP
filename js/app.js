@@ -253,22 +253,35 @@ function editStop(stopId){
 
 /* ---------- the trip as a file ---------- */
 
-// Hands the file over: the share sheet where the phone has one (WhatsApp, Drive,
-// Files…), a download otherwise. Marks the version as saved once it went out.
+function download(file){
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+// Chrome on Android offers the share sheet but refuses .json files in it
+// (NotAllowedError: the type is not on its list). Once refused, download directly.
+let shareRefused = false;
+
+// Hands the file over: the share sheet where the phone has one and takes the file
+// (WhatsApp, Drive, Files…), a download otherwise. Marks the version as saved.
 async function saveFile(rec){
   const file = new File([fileText(rec.trip)], fileName(rec.trip), {type: "application/json"});
   try{
-    if(navigator.canShare && navigator.canShare({files: [file]})){
-      await navigator.share({files: [file], title: rec.trip.title});
+    if(!shareRefused && navigator.canShare && navigator.canShare({files: [file]})){
+      try{
+        await navigator.share({files: [file], title: rec.trip.title});
+      }catch(e){
+        if(e && e.name === "AbortError") return;   // the traveller closed the share sheet
+        shareRefused = true;
+        download(file);
+      }
     }else{
-      const url = URL.createObjectURL(file);
-      const a = document.createElement("a");
-      a.href = url; a.download = file.name;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      download(file);
     }
   }catch(e){
-    if(e && e.name === "AbortError") return;   // the traveller closed the share sheet
     toast(t("fileFailed"));
     return;
   }

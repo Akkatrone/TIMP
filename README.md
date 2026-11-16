@@ -103,8 +103,9 @@ stop is saved without a pin: its Map and Directions links work all the same.
 
 Each change makes a new version of the trip, with an id like Git's, shown on the
 Trips page (`Version 3f2a9c1`). After a change the app offers to **save the file**:
-on a phone that opens the share sheet (WhatsApp, Drive, Files…), elsewhere it
-downloads `<trip>-<version>.json`. Trips shows a notice until the latest version
+on an iPhone that opens the share sheet (WhatsApp, Drive, Files…); on Android and on
+a computer it downloads `<trip>-<version>.json`, because Chrome does not share `.json`
+files. Send it from Downloads. Trips shows a notice until the latest version
 has been saved.
 
 When someone loads a file of a trip they already have (same trip `id`):
