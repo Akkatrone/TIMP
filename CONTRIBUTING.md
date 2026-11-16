@@ -10,6 +10,8 @@ merged, however useful it is otherwise.
 
 1. **The trip never leaves the device.** No accounts, no server, no analytics, no
    request that carries trip data. Trip files are read locally and stored in IndexedDB.
+   The one exception is looking up a stop's position: its name and address go to
+   Google or OpenStreetMap, only when a stop is added or changed.
 2. **It works offline.** Everything except the interactive map must work in airplane
    mode, on iPhone and Android, after the app has been opened once.
 3. **Anyone can host it.** The app is static files. No build step is needed to run it
@@ -46,11 +48,20 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/trip.js` | The trip file format: validation. No DOM, so Node can run it. |
 | `js/geo.js` | Groups stops into map zones, draws the offline sketch. No DOM. |
 | `js/livemap.js` | The interactive map: Google Maps or Leaflet + OpenStreetMap. |
+| `js/google.js` | Loads Google's script once per page, shared by the map and the address search. |
+| `js/editor.js` | The form to add or change a stop. |
+| `js/edit.js` | Adds, changes, moves and removes stops, in time order. No DOM. |
+| `js/gmaps.js` | Reads Google Maps links and shared text: name, address, position. No DOM. |
+| `js/geocode.js` | Finds the coordinates of an address: Google, then OpenStreetMap. |
+| `js/version.js` | Version ids, like Git's, and how two versions relate. No DOM. |
+| `js/merge.js` | Three-way merge of two versions of a trip. No DOM. |
+| `js/trips.js` | What happens on an edit or a file received: versions, merges, saved marks. No DOM. |
 | `js/store.js` | Storage on the device (IndexedDB, with a memory fallback). |
 | `js/i18n.js` | Interface texts. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
 | `js/icons.js` | Icons for metro, train, plane, boat. No DOM. |
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
+| `icons/` | `icon.svg` and `icon-maskable.svg` are the sources; the PNGs are made from them with `rsvg-convert` (192, 512, the maskable 512, and 180 for the iPhone, on a square without rounded corners). |
 | `sw.js` | Service worker: keeps the app available offline. |
 | `tools/` | Command-line checks, the build used for publishing, the browser check and the screenshots. |
 | `test/` | Unit tests (`node:test`, no dependencies). |
@@ -69,6 +80,11 @@ two minutes.
 from it goes through `esc()` or `rich()` in `js/util.js` before reaching the page, and
 values used in styles or URLs are validated in `js/trip.js`. A new field needs both: a
 rule in the validator and escaping where it is shown.
+
+**Versions and merges must stay deterministic.** Two phones merging the same two
+versions must end with the same trip and the same version id: the merge picks the
+winner of a conflict by version id, never by which phone runs it. `test/versions.test.mjs`
+checks it; keep it passing when you touch `js/version.js`, `js/merge.js` or `js/edit.js`.
 
 **The trip format is a contract.** Files written today must keep loading. Adding an
 optional field is fine. Renaming, removing or changing the meaning of a field is a

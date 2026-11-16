@@ -1,4 +1,4 @@
-# Travel in my pocket
+# TIMP · Travel in my pocket
 
 [![Deploy](https://github.com/Frafal/TIMP/actions/workflows/deploy.yml/badge.svg)](https://github.com/Frafal/TIMP/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -24,6 +24,9 @@ Retake them with <code>node tools/screenshots.mjs</code>.</sub></p>
 - Day-by-day programme: times, descriptions, reminders, alternative plans for a day.
 - Short descriptions: two lines each, tap one to read it all, or open them all at once.
 - Metro, train, plane and boat at a glance: an icon next to the stop and on the map.
+- Add and change stops on the phone: paste what Google Maps shares, or an address.
+- Every change is a version, like a commit in Git. Share the file, and when a friend
+  changed it too, the app joins the two.
 - Tick the stops you have done, or skip the ones you leave out. The app remembers both.
 - A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
   a sketch to scale when you are not. What is behind you is drawn dashed.
@@ -56,6 +59,50 @@ Good to know:
 - **To update a trip**, load the new version of the file from the Trips page. The stops
   already ticked stay ticked.
 - You can keep several trips on the same phone and switch between them from Trips.
+
+## Change the trip on the way
+
+Tap **+** at the bottom right of a day to add a stop, or **Edit** under a stop to change
+it, move it to another day, or delete it.
+
+The quickest way to fill in a stop is to paste what Google Maps gives you. The form
+reads it on the phone:
+
+| You paste | The stop gets |
+|---|---|
+| A link copied from Google Maps in a browser (`google.com/maps/place/…`) | name, address, position |
+| The text the Maps app shares (name, address, link) | name, address; the position is looked up |
+| A full address | the address; the position is looked up |
+| A short link (`maps.app.goo.gl/…`) | the link, which opens the exact place; write the name |
+| Coordinates, `geo:` links, Apple Maps links | the position |
+
+**Android:** once the app is installed, it appears in the Share menu of Google Maps.
+Share a place to it and the form opens already filled in.
+**iPhone:** Safari does not let web apps receive shared content, so in Maps tap Share →
+Copy, then in the app tap + and **Paste**.
+
+When a position has to be looked up, the app asks Google (with a key that has the
+Geocoding API enabled, see below) or OpenStreetMap otherwise. If neither finds it, the
+stop is saved without a pin: its Map and Directions links work all the same.
+
+### Versions and sharing a changed trip
+
+Each change makes a new version of the trip, with an id like Git's, shown on the
+Trips page (`Version 3f2a9c1`). After a change the app offers to **save the file**:
+on a phone that opens the share sheet (WhatsApp, Drive, Files…), elsewhere it
+downloads `<trip>-<version>.json`. Trips shows a notice until the latest version
+has been saved.
+
+When someone loads a file of a trip they already have (same trip `id`):
+
+- **a newer version** made from theirs replaces it;
+- **an older one** changes nothing;
+- **a version that changed separately** is joined with theirs: stops added on either
+  side are kept, a stop changed on one side takes that change, a stop removed on one
+  side and untouched on the other goes. When both changed the same detail, the same
+  side wins on every phone, so two friends who swap files end on the same version.
+
+Ticked and skipped stops are never part of the file: they stay on each phone.
 
 ## Create your own trip
 
@@ -109,12 +156,13 @@ trip file and everyone who receives the file gets the Google map without doing a
 1. Go to the [Google Cloud console](https://console.cloud.google.com/) and create a project.
 2. Enable billing on the project. Google asks for a card even if you stay within the
    free allowance.
-3. In "APIs & Services → Library", enable **Maps JavaScript API**.
+3. In "APIs & Services → Library", enable **Maps JavaScript API**, and **Geocoding API**
+   if you want positions looked up with Google when you add stops.
 4. In "APIs & Services → Credentials", create an **API key**.
 5. Restrict the key. This is what makes it safe to share:
    - Application restriction: **Websites**, with the address of the app, for example
      `https://frafal.github.io/TIMP/*` (or the address of your own copy)
-   - API restriction: **Maps JavaScript API** only.
+   - API restriction: **Maps JavaScript API**, plus **Geocoding API** if you enabled it.
 6. Set a daily limit in "Google Maps Platform → Quotas → Maps JavaScript API": find
    "Map loads per day", untick "Unlimited" and enter 300 or less. At 300 a day the
    month can never exceed the free allowance, so the key cannot cost anything.
@@ -130,7 +178,8 @@ about $7 per 1,000 beyond that (figures from November 2026: check the
 A group of travellers uses a few hundred, and the daily limit of step 6 keeps it at zero.
 
 If Google refuses the key (wrong site, quota reached), the app says so and shows
-OpenStreetMap instead.
+OpenStreetMap instead. Without the Geocoding API, positions are looked up on
+OpenStreetMap.
 
 On each device, the Trips page shows which map is in use and lets you:
 
@@ -151,6 +200,10 @@ real routes and transport times, tap "Directions" on a stop.
 - When you open the interactive map, map images are requested from OpenStreetMap or
   Google, who therefore see your IP address and the area you look at.
 - "Map" and "Directions" links open Google Maps.
+- When you add or change a stop and its position has to be looked up, its name and
+  address are sent to Google (with a key) or to OpenStreetMap. Nothing else of the trip
+  is sent.
+- A saved trip file goes only where you send it.
 
 ## Host your own copy
 

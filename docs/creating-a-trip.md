@@ -88,6 +88,7 @@ For each stop:
 - `query`: the name plus the city, as someone would type it into Google Maps
   ("Colosseum Rome"). It drives the "Map" and "Directions" links.
 - `mapLabel`: when the title is an action and not a place ("Check-out" → the hotel name).
+- `link`: a Google Maps link to the exact place, when the traveller gave you one.
 - `travel`: how the travellers reach this stop, when it is by metro, train, plane or
   boat. It is what they see at a glance, in the list and on the map, so set it every
   time the description says so ("JR to Yotsuya", "the ferry crosses in ten minutes").
@@ -158,6 +159,8 @@ Tell the travellers, briefly:
 ## Updating a file later
 
 - Keep the trip `id`: the app then replaces the trip and keeps the ticked and skipped stops.
+- Leave the `version` block as it is, if the file has one: the app sees the change and
+  makes a new version from it. Never write or change `version` yourself.
 - Keep the `id` of every stop that still exists, even if it is renamed or moved.
 - Change only what was asked. Do not rewrite texts nobody mentioned.
 - Check the file again.

@@ -10,6 +10,8 @@ const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+const HASH = /^[0-9a-f]{16}$/;
+const HTTPS = /^https:\/\/[^\s<>"]+$/;
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string" && v.trim() !== "";
@@ -51,7 +53,22 @@ export function validateTrip(trip){
   reqStr(trip, "title", "trip");
   optStr(trip, "lang", "trip");
   if(trip.timezone !== undefined && (!isStr(trip.timezone) || !validTimezone(trip.timezone))) err("timezone", "must be an IANA time zone such as \"Europe/Rome\"");
-  known(trip, ["format", "id", "title", "lang", "timezone", "places", "stays", "days", "info", "infoNote", "map"], "trip");
+  known(trip, ["format", "id", "version", "title", "lang", "timezone", "places", "stays", "days", "info", "infoNote", "map"], "trip");
+
+  // version: written by the app, see js/version.js
+  if(trip.version !== undefined){
+    const v = trip.version;
+    if(!isObj(v)) err("version", "must be an object");
+    else {
+      if(!HASH.test(v.id)) err("version.id", "must be 16 lowercase hex characters");
+      ["parents", "history"].forEach(k => {
+        if(!Array.isArray(v[k]) || v[k].some(x => !HASH.test(x))) err(`version.${k}`, "must be a list of version ids");
+      });
+      if(Array.isArray(v.parents) && v.parents.length > 2) err("version.parents", "has at most two versions");
+      optStr(v, "date", "version");
+      known(v, ["id", "parents", "history", "date"], "version");
+    }
+  }
 
   // places
   const places = isObj(trip.places) ? trip.places : {};
@@ -92,6 +109,7 @@ export function validateTrip(trip){
       reqStr(s, "time", p);
       reqStr(s, "title", p);
       ["text", "mapLabel", "query", "tag"].forEach(k => optStr(s, k, p));
+      if(s.link !== undefined && (!isStr(s.link) || !HTTPS.test(s.link) || s.link.length > 2000)) err(`${p}.link`, "must be an https:// address");
       if(s.travel !== undefined && !TRAVEL.includes(s.travel)) err(`${p}.travel`, `must be one of ${TRAVEL.map(x => `"${x}"`).join(", ")}`);
       if(s.id !== undefined){
         if(!isStr(s.id) || !ID.test(s.id)) err(`${p}.id`, "must use lowercase letters, digits and dashes");
@@ -103,7 +121,7 @@ export function validateTrip(trip){
       if(hasLat && (!isNum(s.lat) || s.lat < -90 || s.lat > 90)) err(`${p}.lat`, "must be a number between -90 and 90");
       if(hasLng && (!isNum(s.lng) || s.lng < -180 || s.lng > 180)) err(`${p}.lng`, "must be a number between -180 and 180");
       if(!hasLat && s.mapLabel !== undefined) warn(`${p}.mapLabel`, "has no effect without lat/lng");
-      known(s, ["id", "time", "title", "text", "lat", "lng", "mapLabel", "query", "tag", "travel"], p);
+      known(s, ["id", "time", "title", "text", "lat", "lng", "mapLabel", "query", "link", "tag", "travel"], p);
     });
   };
 

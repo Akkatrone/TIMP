@@ -69,6 +69,16 @@ test("coordinates come in pairs and inside the globe", () => {
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].lng = "12.49"; }), "stops[0].lng"));
 });
 
+test("a version written by the app is checked, and a link must be https", () => {
+  const v = {id: "0123456789abcdef", parents: ["fedcba9876543210"], history: ["fedcba9876543210"], date: "2026-11-16T10:00:00Z"};
+  assert.deepEqual(errorsAfter(t => { t.version = v; }), []);
+  assert.ok(hasError(errorsAfter(t => { t.version = {...v, id: "xyz"}; }), "version.id"));
+  assert.ok(hasError(errorsAfter(t => { t.version = {...v, parents: ["a", "b", "c"]}; }), "version.parents"));
+  assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].link = "https://maps.app.goo.gl/AbC"; }), []);
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].link = "javascript:alert(1)"; }), "stops[0].link"));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].link = "http://example.com"; }), "stops[0].link"));
+});
+
 test("travel is one of the four ways the app can draw", () => {
   assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].travel = "train"; }), []);
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "bus"; }), "stops[0].travel"));

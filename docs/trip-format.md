@@ -41,6 +41,7 @@ that passes the checker loads in the app.
 | Field | Required | Meaning |
 |---|---|---|
 | `format` | yes | Always `"travel-in-my-pocket/1"`. |
+| `version` | no | Written by the app. See [Versions](#versions). |
 | `id` | yes | Identifies the trip on the device: lowercase letters, digits, dashes. Loading a file with the same `id` **updates** the trip and keeps the stops already ticked or skipped. A different `id` adds a second trip. |
 | `title` | yes | Shown as the name of the trip. |
 | `lang` | no | Language of the interface while this trip is open: `"en"` or `"it"`. Without it, the device language is used. |
@@ -116,6 +117,7 @@ A list. Each entry is one date. Day 1 is the first entry.
 | `mapLabel` | no | Name used on the map when the title is not a place name (title `"Check-out"`, mapLabel `"Hotel Roma"`). |
 | `query` | no | What to search in Google Maps for the "Map" and "Directions" links. Use the name people would type, with the city. Without it, the coordinates are used. |
 | `tag` | no | A short label: `"Booking needed"`, `"Optional"`. |
+| `link` | no | A Google Maps link to the exact place, `https://` only. When present, "Map" opens it instead of a search. The app keeps the link pasted when a stop is added. |
 | `travel` | no | How you reach this stop: `"metro"`, `"train"`, `"plane"` or `"boat"`. Shown as an icon next to the title and on the map leg that arrives here. Leave it out when you walk, or for any other way (bus, taxi, cable car). See [How the map is built](#how-the-map-is-built). |
 | `id` | recommended | Lowercase letters, digits, dashes; unique within the list. The app uses it to remember that the stop was ticked or skipped. Without it, the position in the list is used, so reordering stops in an updated file would move the ticks. |
 
@@ -237,6 +239,33 @@ How to create the key is in the [README](../README.md#google-maps-optional).
 On each device, the Trips page of the app can also save a key that takes the place
 of the trip's key, or turn Google Maps off and use OpenStreetMap even when a key is
 present.
+
+## Versions
+
+The app writes a `version` into every file it saves:
+
+```json
+"version": {
+  "id": "3f2a9c1e0b7d4a55",
+  "parents": ["a1b2c3d4e5f60718"],
+  "history": ["a1b2c3d4e5f60718", "0f9e8d7c6b5a4938"],
+  "date": "2026-11-16T10:42:00.000Z"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `id` | 16 hex characters: the start of the SHA-256 of the trip's content (without `version`, keys in a fixed order) and of its parents. The same content from the same parents has the same id on every device. |
+| `parents` | The version this one was made from; two after a merge; none for the first. |
+| `history` | Every earlier version, newest first. A device compares it with its own to tell a newer file from an older one or from one that changed separately. |
+| `date` | When the version was made. Not part of the id. |
+
+A file without `version` gets one when it is loaded, computed from its content, so two
+phones loading the same file agree on it.
+
+**Editing a file by hand:** leave `version` as it is. The app notices that the content
+no longer matches the id and makes a new version from the one written in the file, so
+the change is not mistaken for the version it came from.
 
 ## Checks the app makes
 

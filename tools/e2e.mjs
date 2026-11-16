@@ -5,7 +5,11 @@
 // Needs Chrome or Chromium on this computer (see tools/lib/browser.mjs).
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { withApp } from "./lib/browser.mjs";
+import { prepare } from "../js/trips.js";
+import { commit } from "../js/version.js";
+import { addStop } from "../js/edit.js";
 
 let passed = 0;
 async function step(name, fn){
@@ -162,6 +166,105 @@ await withApp(async ({run, until, reload}) => {
     await click('[data-theme-choice="auto"]');
     assert.equal(await run(`return document.documentElement.dataset.theme === undefined;`), true);
     assert.equal(await bg(), light);
+  });
+
+  // Invented place link, in the shape Google Maps gives on a computer: name, address, position.
+  const PLACE = "https://www.google.com/maps/place/Pastelaria+Exemplo,+Rua+Augusta+10,+Lisboa/@38.7101,-9.1375,18z/data=!4m6!3m5!1s0x0:0x0!8m2!3d38.71012!4d-9.13751";
+  const fill = (sel, value) => run(`const el = document.querySelector(${JSON.stringify(sel)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event("change", {bubbles: true}));`);
+  const submit = () => run(`document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+  const stopTitles = () => run(`return [...document.querySelectorAll(".stop h3")].map(h => h.textContent);`);
+  const versionOnPhone = () => run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip.version); }; });`);
+
+  await step("the + button adds a stop from a Google Maps link, in time order, as a new version", async () => {
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelectorAll(".stop").length === 6`);
+    const before = await versionOnPhone();
+    await run(`document.querySelector(".fab").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open]")`);
+    await fill("#stop-src", PLACE);
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
+    assert.match(await run(`return document.querySelector("[data-pos]").textContent;`), /38\.71012, -9\.13751/);
+    await fill("#stop-time", "12:15");
+    await run(`document.querySelector('[data-travel="metro"]').click();`);
+    await submit();
+    assert.deepEqual((await stopTitles()).slice(2, 5), ["Miradouro de Santa Luzia", "Pastelaria Exemplo", "Castelo de São Jorge"]);
+    const after = await versionOnPhone();
+    assert.notEqual(after.id, before.id);
+    assert.deepEqual(after.parents, [before.id]);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Stop added · version [0-9a-f]{7}/);
+    assert.equal(await run(`return document.querySelectorAll(".stop .tvchip").length;`), 1);
+  });
+
+  await step("a stop can be edited, moved to another day with its tick, and deleted", async () => {
+    await click('[data-tick]', 3);   // the new stop, ticked
+    await run(`document.querySelector('[data-edit="pastelaria-exemplo"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open]")`);
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
+    await run(`document.getElementById("stop-day").value = "1"; document.getElementById("stop-day").dispatchEvent(new Event("change"));`);
+    await submit();
+    assert.ok(!(await stopTitles()).includes("Pastelaria Exemplo"));
+    await run(`location.hash = "#day-2";`);
+    await until("day 2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Pastelaria Exemplo")`);
+    assert.equal(await run(`return document.querySelector('[data-edit="pastelaria-exemplo"]').closest(".stop").classList.contains("done");`), true, "the tick moved with it");
+    await run(`document.querySelector('[data-edit="pastelaria-exemplo"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] [data-delete]")`);
+    await run(`document.querySelector("[data-delete]").click();`);
+    assert.equal(await run(`return document.querySelector("dialog.sheet").open;`), true, "the first tap only asks");
+    await run(`document.querySelector("[data-delete]").click(); await new Promise(r => setTimeout(r, 400));`);
+    assert.ok(!(await stopTitles()).includes("Pastelaria Exemplo"));
+  });
+
+  await step("a short link keeps the link, has no position, and says what to add", async () => {
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
+    await run(`document.querySelector(".fab").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open]")`);
+    await fill("#stop-src", "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+    assert.match(await run(`return document.querySelector("[data-src-note]").textContent;`), /Short Google Maps link/);
+    await fill("#stop-title", "Tram 28");
+    await fill("#stop-time", "Evening");
+    await submit();
+    assert.equal(await run(`return [...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent === "Tram 28").querySelector(".maplink").href;`), "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+  });
+
+  let saved = null;
+  await step("the trip is saved as a file with its version, and Trips stops asking", async () => {
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="save"]')`);
+    assert.equal(await run(`return !!document.querySelector(".unsaved");`), true);
+    await run(`window.__files = []; const make = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { window.__files.push(b); return make(b); }; HTMLAnchorElement.prototype.click = function(){ window.__name = this.download; };`);
+    await run(`document.querySelector('[data-act="save"]').click(); await new Promise(r => setTimeout(r, 400));`);
+    saved = JSON.parse(await run(`return await window.__files[0].text();`));
+    const name = await run(`return window.__name;`);
+    assert.equal(name, `demo-lisbon-${saved.version.id.slice(0, 7)}.json`);
+    assert.equal((await versionOnPhone()).id, saved.version.id);
+    assert.equal(await run(`return !!document.querySelector(".unsaved");`), false);
+  });
+
+  await step("a file changed on another phone is joined with this one, and offered for saving", async () => {
+    // The other phone: the same example trip, with its own new stop.
+    const {trip: root} = await prepare(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8")));
+    const other = await commit(addStop(root, {date: "2027-05-15"}, {time: "21:00", title: "Fado evening"}).trip, root);
+    const send = trip => run(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(trip))}], "from-a-friend.json")); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change")); await new Promise(r => setTimeout(r, 600));`);
+    await send(other);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Changes joined: 1 new, 0 changed, 0 removed · version [0-9a-f]{7}/);
+    const merged = await versionOnPhone();
+    assert.deepEqual([...merged.parents].sort(), [saved.version.id, other.version.id].sort());
+    await run(`location.hash = "#day-2";`);
+    await until("day 2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Fado evening")`);
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Tram 28")`);
+    // The same file again: this phone already has everything in it.
+    await send(other);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /older than the trip on this phone/);
+  });
+
+  await step("a place shared from Google Maps on Android opens the form already filled in", async () => {
+    await run(`location.href = location.pathname + "?title=" + encodeURIComponent("Pastelaria Exemplo") + "&text=" + encodeURIComponent(${JSON.stringify(PLACE)});`);
+    await until("the form", `document.querySelector("dialog.sheet[open]")`);
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
+    assert.equal(await run(`return location.search;`), "", "the shared text leaves the address bar");
+    await run(`document.querySelector("dialog.sheet [data-close]").click();`);
   });
 
   await step("a changed Google key is applied, a refused one falls back, Google can be turned off", async () => {

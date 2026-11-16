@@ -5,23 +5,11 @@
 import { esc, mapsUrl, dirUrl } from "./util.js";
 import { legsOf, bridgesOf, midpoint, pinGone, legGone } from "./geo.js";
 import { travelIcon } from "./icons.js";
-import { t, getLang } from "./i18n.js";
+import { t } from "./i18n.js";
+import { loadGoogle, googleRefusedKey, whenGoogleRefuses } from "./google.js";
+export { googleNeedsReload, googleRefusedKey } from "./google.js";
 
 let leafletPromise = null;
-let googlePromise = null;
-let googleRefused = false;          // set when Google rejects the key for this site
-let googleLoadedWith = null;        // {key, lang} of the Google script in this page
-
-// Google's script can be loaded only once per page, with one key and one language.
-// A different key or language, or another try after a refusal, needs a fresh page.
-export function googleNeedsReload(key){
-  return !!(key && googleLoadedWith && (googleLoadedWith.key !== key || googleLoadedWith.lang !== getLang()));
-}
-
-// Whether Google refused this key in this page.
-export function googleRefusedKey(key){
-  return googleRefused && !!googleLoadedWith && googleLoadedWith.key === key;
-}
 const active = new Set();           // live maps currently on screen
 
 function loadLeaflet(){
@@ -41,29 +29,8 @@ function loadLeaflet(){
   return leafletPromise;
 }
 
-function loadGoogle(key){
-  if(googleNeedsReload(key)) return Promise.reject(new Error("google-reload"));
-  if(googleRefused) return Promise.reject(new Error("google-refused"));
-  if(!googlePromise){
-    googleLoadedWith = {key, lang: getLang()};
-    googlePromise = new Promise((resolve, reject) => {
-      window.__timpGoogleReady = () => resolve(window.google.maps);
-      const js = document.createElement("script");
-      js.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(key) +
-        "&v=weekly&loading=async&callback=__timpGoogleReady&language=" + encodeURIComponent(getLang());
-      js.async = true;
-      js.onerror = () => reject(new Error("google-load"));
-      document.head.appendChild(js);
-    }).catch(e => { googlePromise = null; throw e; });
-  }
-  return googlePromise;
-}
-
-// Google calls this global when the key is missing, wrong, or not allowed on this site.
-window.gm_authFailure = () => {
-  googleRefused = true;
-  [...active].forEach(m => m.onGoogleRefused());
-};
+// When Google rejects the key, every map on screen switches to OpenStreetMap.
+whenGoogleRefuses(() => [...active].forEach(m => m.onGoogleRefused()));
 
 // Google shows the title in the popup's own header (`withTitle` false), Leaflet inside it.
 function popupNode(pt, withTitle = true){
@@ -156,7 +123,7 @@ async function drawGoogle(canvas, zones, color, key, dark){
   const gm = await loadGoogle(key);
   const {Map, Polyline, InfoWindow, OverlayView} = await gm.importLibrary("maps");
   const {LatLng, LatLngBounds, ColorScheme} = await gm.importLibrary("core");
-  if(googleRefused) throw new Error("google-refused");
+  if(googleRefusedKey(key)) throw new Error("google-refused");
 
   class Pin extends OverlayView {
     constructor(pos, el, pane = "overlayMouseTarget"){ super(); this.pos = pos; this.el = el; this.pane = pane; }
@@ -296,6 +263,6 @@ export function createLiveMap({zones, color, googleKey, dark, onNotice}){
   };
   active.add(handle);
   // Start after the caller has had the chance to put `el` on the page.
-  Promise.resolve().then(() => { if(!dead) start(!!googleKey && !googleRefused); });
+  Promise.resolve().then(() => { if(!dead) start(!!googleKey && !googleRefusedKey(googleKey)); });
   return handle;
 }

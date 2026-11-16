@@ -6,10 +6,15 @@ import { zonesOf, routeUrl, zoneSVG } from "./geo.js";
 import { travelIcon } from "./icons.js";
 import { createLiveMap, googleNeedsReload, googleRefusedKey } from "./livemap.js";
 import { REPO_URL } from "./config.js";
+import { openStopEditor } from "./editor.js";
+import { addStop, updateStop, removeStop } from "./edit.js";
+import { prepare, saveEdit, receive, moveMarks, fileName, fileText } from "./trips.js";
+import { shortId } from "./version.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const FOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l3.5-3.5M4.5 13.5L8 10l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PLUS = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const S = {
@@ -142,33 +147,139 @@ async function openRecord(rec){
   }
   S.openStops.clear();
   applyLang();
-  document.title = rec ? rec.trip.title : "Travel in my pocket";
+  document.title = rec ? rec.trip.title : "TIMP";
   applyPlaceColors();
 }
 
-async function importText(text, fileName){
+// Saves a trip record and makes it the open one. `exported` is the version the
+// traveller already has as a file: anything newer is offered for saving.
+async function keepRecord(rec){
+  await store.putTrip(rec);
+  S.records = S.records.filter(r => r.id !== rec.id).concat(rec);
+  if(S.rec && S.rec.id === rec.id){ S.rec = rec; applyPlaceColors(); document.title = rec.trip.title; }
+  else await openRecord(rec);
+}
+
+const needsSaving = rec => !!rec && rec.exported !== rec.trip.version.id;
+
+async function importText(text, name){
   let data;
   try{ data = JSON.parse(text); }
   catch(e){ S.importError = {title: t("importFailed"), items: [t("notJson")]}; render(); return; }
   const res = validateTrip(data);
   if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12)}; render(); window.scrollTo(0, 0); return; }
   S.importError = null;
-  const existed = S.records.some(r => r.id === data.id);
-  const rec = {id: data.id, trip: data, importedAt: Date.now(), fileName: fileName || ""};
   try{
-    await store.putTrip(rec);
+    const {trip: incoming} = await prepare(data);
+    const local = S.records.find(r => r.id === incoming.id);
+    let rec, message, offer = false;
+    if(!local){
+      await store.putVersion(incoming);
+      rec = {id: incoming.id, trip: incoming, importedAt: Date.now(), fileName: name || "", exported: incoming.version.id};
+      message = t("imported", {t: incoming.title});
+    }else{
+      const got = await receive(store, local.trip, incoming);
+      const v = shortId(got.trip.version.id);
+      rec = {...local, trip: got.trip, importedAt: Date.now(), fileName: name || local.fileName};
+      if(got.kind === "same") message = t("recvSame", {v});
+      else if(got.kind === "older") message = t("recvOlder", {v});
+      else if(got.kind === "newer"){ rec.exported = got.trip.version.id; message = t("recvNewer", {t: got.trip.title, v}); }
+      else { message = t("recvMerged", {a: got.report.added, c: got.report.changed, r: got.report.removed, v}); offer = true; }
+    }
+    await keepRecord(rec);
+    store.askPersistence();
+    if(location.hash) history.replaceState(null, "", location.pathname + location.search);
+    render();
+    window.scrollTo(0, 0);
+    if(offer) offerSave(rec, message); else toast(message);
   }catch(e){
     S.importError = {title: t("importFailed"), items: [String(e && e.message || e)]};
     render();
+  }
+}
+
+/* ---------- editing stops ---------- */
+
+// Applies an edit to the open trip: a new version, kept on the phone, then offered
+// as a file. `change(trip)` returns {trip, marks?}: marks move ticks with a stop.
+async function applyEdit(change, message){
+  const cur = S.rec.trip;
+  const out = change(cur);
+  const {trip: next, changed} = await saveEdit(store, cur, out.trip);
+  if(!changed) return;
+  if(out.marks){ S.state = moveMarks(S.state, out.marks); saveState(); }
+  const rec = {...S.rec, trip: next};
+  await keepRecord(rec);
+  render();
+  offerSave(rec, t(message, {v: shortId(next.version.id)}));
+}
+
+function currentPlace(){
+  const r = route();
+  if(r.name !== "day") return {dayIndex: Math.max(0, todayIndex()), planId: null};
+  const d = trip().days[r.i];
+  const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
+  return {dayIndex: r.i, planId: plan ? plan.id : null};
+}
+
+function editorBase(){
+  return {trip: trip(), timezone: trip().timezone, googleKey: googleKey()};
+}
+
+// A new stop: on the day on screen, or today when the trip is under way.
+function newStop(prefill){
+  const here = currentPlace(), ti = todayIndex();
+  const dayIndex = route().name === "day" ? here.dayIndex : (ti >= 0 ? ti : 0);
+  openStopEditor({...editorBase(), dayIndex, planId: here.planId, prefill,
+    onSave: ({stop, date, plan}) => applyEdit(tr => addStop(tr, {date, plan}, stop), "stopAdded")
+      .then(() => { const k = trip().days.findIndex(d => d.date === date); if(route().name !== "day" || route().i !== k) location.hash = "#day-" + (k + 1); })
+      .catch(err => toast(String(err.message || err)))});
+}
+
+function editStop(stopId){
+  const here = currentPlace();
+  const d = trip().days[here.dayIndex];
+  const list = d.plans ? d.plans.find(p => p.id === here.planId).stops : d.stops;
+  const stop = list.find(s => s.id === stopId);
+  if(!stop) return;
+  const ref = {date: d.date, plan: here.planId, id: stop.id};
+  openStopEditor({...editorBase(), dayIndex: here.dayIndex, planId: here.planId, stop,
+    onSave: ({stop: next, date, plan}) => applyEdit(tr => {
+      const out = updateStop(tr, ref, next, {date, plan});
+      return {trip: out.trip, marks: [{date: ref.date, plan: ref.plan, from: ref.id, to: out.ref.id, toDate: date, toPlan: plan}]};
+    }, "stopSaved").catch(err => toast(String(err.message || err))),
+    onDelete: () => applyEdit(tr => ({trip: removeStop(tr, ref)}), "stopDeleted").catch(err => toast(String(err.message || err)))});
+}
+
+/* ---------- the trip as a file ---------- */
+
+// Hands the file over: the share sheet where the phone has one (WhatsApp, Drive,
+// Files…), a download otherwise. Marks the version as saved once it went out.
+async function saveFile(rec){
+  const file = new File([fileText(rec.trip)], fileName(rec.trip), {type: "application/json"});
+  try{
+    if(navigator.canShare && navigator.canShare({files: [file]})){
+      await navigator.share({files: [file], title: rec.trip.title});
+    }else{
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+  }catch(e){
+    if(e && e.name === "AbortError") return;   // the traveller closed the share sheet
+    toast(t("fileFailed"));
     return;
   }
-  S.records = S.records.filter(r => r.id !== rec.id).concat(rec);
-  await openRecord(rec);
-  store.askPersistence();
-  if(location.hash) history.replaceState(null, "", location.pathname + location.search);
+  const done = {...rec, exported: rec.trip.version.id};
+  await keepRecord(done);
   render();
-  window.scrollTo(0, 0);
-  toast(t(existed ? "updated" : "imported", {t: data.title}));
+  toast(t("fileSaved", {f: file.name}));
+}
+
+function offerSave(rec, message){
+  toast(message, {label: t("saveFile"), run: () => saveFile(S.records.find(r => r.id === rec.id) || rec)});
 }
 
 async function loadDemo(){
@@ -236,7 +347,8 @@ function renderWelcome(){
   return `
   <section class="hero">
     <img src="icons/icon.svg" width="72" height="72" alt="">
-    <h1>Travel in my pocket</h1>
+    <h1>TIMP</h1>
+    <p class="lead name">Travel in my pocket</p>
     <p class="lead">${esc(t("tagline"))}</p>
     <p class="lead">${esc(t("welcomeLead"))}</p>
   </section>
@@ -260,7 +372,9 @@ function renderTrips(){
     return `<div class="tripcard${cur ? " current" : ""}">
       <div class="t"><span>${esc(r.trip.title)}</span>${cur ? `<span class="badge-on">${esc(t("current"))}</span>` : ""}</div>
       <div class="s">${esc(t("daysCount", {n: r.trip.days.length}))} · ${esc(t("loadedOn", {d: when}))}</div>
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
+      <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
+      ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
+      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
     </div>`;
   }).join("");
   const key = googleKey();
@@ -294,7 +408,7 @@ function renderTrips(){
   ${themePicker()}
   ${installSteps()}
   <section class="sec"><h2>${esc(t("about"))}</h2>
-    <p class="foot">Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
+    <p class="foot">TIMP · Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
     ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}
   </section>`;
 }
@@ -394,8 +508,10 @@ function stopsHTML(day, planId, list, numbered, pins){
     const q = stopQuery(s);
     // Links and the skip button stay outside the part that folds: they are always one tap away.
     const meta = `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${s.tag ? `<span class="tag">${esc(s.tag)}</span>` : ""}` +
-      (q ? `<a class="maplink" href="${esc(mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a><a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
-      (isDone ? "" : `<button type="button" class="skip" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`) + `</div>`;
+      (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
+      (q ? `<a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
+      (isDone ? "" : `<button type="button" class="skip" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`) +
+      (s.id ? `<button type="button" class="skip" data-edit="${esc(s.id)}">${esc(t("editStop"))}</button>` : "") + `</div>`;
     const pn = pins ? pins[s.mapLabel || s.title] : (numbered && s.lat !== undefined ? i + 1 : 0);
     const nb = pn ? `<br><span class="nb">${pn}</span>` : "";
     const tv = s.travel ? `<span class="tvchip" role="img" aria-label="${esc(t("travel_" + s.travel))}" title="${esc(t("travel_" + s.travel))}">${travelIcon(s.travel, 16)}</span>` : "";
@@ -504,9 +620,21 @@ function syncLive(wanted){
   live.handle.setMarks(wanted.gone);
 }
 
+const $fab = document.createElement("button");
+$fab.type = "button";
+$fab.className = "fab";
+$fab.hidden = true;
+$fab.innerHTML = PLUS;
+document.body.appendChild($fab);
+$fab.addEventListener("click", () => newStop());
+
 function render(){
   const r = route();
   renderStrip(r);
+  $fab.hidden = r.name !== "day";
+  $fab.setAttribute("aria-label", t("addStop"));
+  $fab.title = t("addStop");
+  document.body.classList.toggle("has-fab", r.name === "day");
   if(live) live.handle.el.remove(); // keep the map alive while the page is rebuilt
   let wanted = null;
   if(r.name === "welcome") $app.innerHTML = renderWelcome();
@@ -544,6 +672,8 @@ $app.addEventListener("click", e => {
     refocus(`[data-skip="${CSS.escape(id)}"]`);
     return;
   }
+  const edit = e.target.closest("[data-edit]");
+  if(edit){ editStop(edit.dataset.edit); return; }
   const tap = e.target.closest("[data-open]");
   if(tap){ toggleStop(tap.dataset.open); return; }
   if(e.target.closest("[data-expand]")){
@@ -614,6 +744,7 @@ $app.addEventListener("click", e => {
   if(a === "pick"){ $file.value = ""; $file.click(); }
   else if(a === "demo") loadDemo();
   else if(a === "remove") removeRecord(act.dataset.id);
+  else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
   else if(a === "open"){
     const rec = S.records.find(r => r.id === act.dataset.id);
     if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); window.scrollTo(0, 0); });
@@ -695,6 +826,19 @@ async function readVersion(){
   }catch(e){}
 }
 
+// Android: a place shared from Google Maps opens the app as ?title=…&text=…&url=…
+// (see share_target in manifest.webmanifest). The form opens already filled in.
+function takeSharedPlace(){
+  const q = new URLSearchParams(location.search);
+  const parts = ["title", "text", "url"].map(k => q.get(k)).filter(Boolean);
+  if(!parts.length) return;
+  history.replaceState(null, "", location.pathname + location.hash);
+  if(!trip()){ toast(t("shareNeedsTrip")); return; }
+  // The Maps app often repeats the link inside the text: keep each piece once.
+  const text = [...new Set(parts.join("\n").split("\n").map(s => s.trim()).filter(Boolean))].join("\n");
+  newStop(text);
+}
+
 /* ---------- start ---------- */
 
 async function start(){
@@ -702,6 +846,15 @@ async function start(){
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);
+  // Trips saved before versions existed: give them ids and a version, ticks follow.
+  for(const rec of S.records.filter(r => !r.trip.version)){
+    const {trip: ready, renamed} = await prepare(rec.trip);
+    const saved = await store.getKV("state:" + rec.id);
+    if(saved && renamed.length) await store.setKV("state:" + rec.id, moveMarks({done: {}, skipped: {}, plans: {}, ...saved}, renamed));
+    Object.assign(rec, {trip: ready, exported: ready.version.id});
+    await store.putTrip(rec);
+    await store.putVersion(ready);
+  }
   if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ["live", "image", "schema"].includes(ui.mapView) ? ui.mapView : "live", expandAll: !!ui.expandAll};
   if(typeof key === "string") S.deviceKey = key;
   syncThemeColor();
@@ -709,8 +862,9 @@ async function start(){
   await readVersion();
   render();
   setupServiceWorker();
+  takeSharedPlace();
 }
 
 start().catch(e => {
-  $app.innerHTML = `<div class="errbox" role="alert"><b>Travel in my pocket</b><ul><li>${esc(String(e && e.message || e))}</li></ul></div>`;
+  $app.innerHTML = `<div class="errbox" role="alert"><b>TIMP</b><ul><li>${esc(String(e && e.message || e))}</li></ul></div>`;
 });
