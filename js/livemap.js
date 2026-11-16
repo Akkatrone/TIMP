@@ -7,7 +7,6 @@ import { legsOf, bridgesOf, midpoint, pinGone, legGone } from "./geo.js";
 import { travelIcon } from "./icons.js";
 import { t } from "./i18n.js";
 import { loadGoogle, googleRefusedKey, whenGoogleRefuses } from "./google.js";
-export { googleNeedsReload, googleRefusedKey } from "./google.js";
 
 let leafletPromise = null;
 const active = new Set();           // live maps currently on screen

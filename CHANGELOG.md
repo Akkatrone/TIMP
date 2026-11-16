@@ -4,6 +4,25 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.2.0
+
+Versions are kept the way Git keeps them.
+
+- Each version on the phone is a snapshot made of pieces shared with the other versions
+  (a stop, a day, a map picture), each stored once under its SHA-256. A version that
+  changes one stop adds about 2 KB instead of a full copy of the trip: for a trip of
+  100 KB, a hundred changes take about 290 KB instead of 10 MB.
+- The history of a version is rebuilt from its parents instead of being stored with
+  each one, so it does not grow faster than the versions themselves.
+- After a merge, the history lists the versions in the same order on every phone.
+- Deleting a trip now deletes its versions too (2.0 and 2.1 left them behind).
+- Deleting a trip or a stop asks first, in a dialog of the app with Cancel and Delete.
+  It replaces the browser's own box (which claude.ai answers "no" without showing) and
+  the second tap on the stop's Delete button.
+- The browser database moves to version 3; the full copies kept by 2.0 and 2.1 are moved
+  into pieces on first start.
+- Trip files do not change.
+
 ## 2.1.1
 
 - The message at the bottom of the screen ("New version available", "Save the file")

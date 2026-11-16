@@ -1,9 +1,8 @@
 // What happens to a trip when it changes: an edit on this phone, or a file received.
 // It joins the pieces (js/edit.js, js/version.js, js/merge.js) and keeps every version
-// in the store, so a later merge can find the base. No DOM here: the store is passed
-// in, and the tests pass one that lives in memory.
+// (js/objects.js), so a later merge can find the base. No DOM here.
 //
-// store: {putVersion(trip), getVersion(tripId, id), versionIds(tripId)}
+// versions: {put(trip), get(tripId, id), ids(tripId)} — see versionStore in js/objects.js
 
 import { validateTrip } from "./trip.js";
 import { ensureIds } from "./edit.js";
@@ -25,13 +24,13 @@ export async function prepare(trip){
 }
 
 /** An edit made on this phone: a new version made from the current one. */
-export async function saveEdit(store, current, content){
+export async function saveEdit(versions, current, content){
   const next = await commit(content, current);
   if(next === current) return {trip: current, changed: false};
   const check = validateTrip(next);
   if(!check.ok) throw new Error(check.errors[0]);
-  await store.putVersion(current);
-  await store.putVersion(next);
+  await versions.put(current);
+  await versions.put(next);
   return {trip: next, changed: true};
 }
 
@@ -42,21 +41,20 @@ export async function saveEdit(store, current, content){
  *   older:  this phone already has everything in it; nothing changes
  *   merged: both changed; the result is a new version joining the two
  */
-export async function receive(store, local, incoming){
+export async function receive(versions, local, incoming){
   const kind = relation(local, incoming);
-  await store.putVersion(local);
-  await store.putVersion(incoming);
+  await versions.put(local);
+  await versions.put(incoming);
   if(kind === "same" || kind === "older") return {kind, trip: local};
   if(kind === "newer") return {kind, trip: incoming};
 
-  const known = new Set(await store.versionIds(local.id));
-  const baseId = commonBase(local, incoming, known);
-  const base = baseId ? await store.getVersion(local.id, baseId) : null;
+  const baseId = commonBase(local, incoming, new Set(await versions.ids(local.id)));
+  const base = baseId ? await versions.get(local.id, baseId) : null;
   const {trip: content, report} = mergeTrips(base, local, incoming);
   const merged = await commitMerge(content, local, incoming);
   const check = validateTrip(merged);
   if(!check.ok) throw new Error(check.errors[0]);
-  await store.putVersion(merged);
+  await versions.put(merged);
   return {kind: "merged", trip: merged, report, base: !!base};
 }
 

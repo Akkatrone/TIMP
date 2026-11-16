@@ -265,6 +265,14 @@ body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 .sheet-actions .grow{flex:1 1 auto}
 @media (max-width:380px){ .sheet .field.two{grid-template-columns:1fr} }
 
+/* a question with buttons (js/ask.js) */
+.ask{border:0;padding:20px;background:var(--surface);color:var(--ink);border-radius:16px;width:min(420px,calc(100vw - 32px));box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.ask::backdrop{background:rgba(10,12,14,.5)}
+.ask h2{font:700 1.15rem/1.25 var(--f-display);margin:0 0 8px}
+.ask p{margin:0 0 18px;color:var(--muted);font-size:.93rem}
+.ask-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.ask .btn.danger{background:var(--err);border-color:var(--err);color:var(--surface)}
+
 /* versions on the Trips page */
 .tripcard .ver code{font:500 .82rem var(--f-mono);color:var(--ink)}
 .unsaved{font-size:.86rem;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px}

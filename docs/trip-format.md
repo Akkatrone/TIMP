@@ -263,6 +263,12 @@ The app writes a `version` into every file it saves:
 A file without `version` gets one when it is loaded, computed from its content, so two
 phones loading the same file agree on it.
 
+The file carries the ids of earlier versions, not their content. Each phone keeps the
+content of every version it has seen, the way Git does: as pieces shared between
+versions (a stop, a day…), each stored once. A change to one stop costs about 2 KB, so a
+long history takes little space. It is what lets a merge compare both sides with the
+last version they shared.
+
 **Editing a file by hand:** leave `version` as it is. The app notices that the content
 no longer matches the id and makes a new version from the one written in the file, so
 the change is not mistaken for the version it came from.

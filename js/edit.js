@@ -5,7 +5,7 @@
 // A stop is found by the day (its date), the plan (its id, or null) and its own id.
 // ref: {date, plan, id}
 
-export function slug(text){
+function slug(text){
   return String(text).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "stop";
 }

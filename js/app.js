@@ -4,9 +4,12 @@ import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
 import { esc, rich, mapsUrl, dirUrl, stopQuery, dateParts, todayIn } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG } from "./geo.js";
 import { travelIcon } from "./icons.js";
-import { createLiveMap, googleNeedsReload, googleRefusedKey } from "./livemap.js";
+import { createLiveMap } from "./livemap.js";
+import { googleNeedsReload, googleRefusedKey } from "./google.js";
+import { versionStore } from "./objects.js";
 import { REPO_URL } from "./config.js";
 import { openStopEditor } from "./editor.js";
+import { ask } from "./ask.js";
 import { addStop, updateStop, removeStop } from "./edit.js";
 import { prepare, saveEdit, receive, moveMarks, fileName, fileText } from "./trips.js";
 import { shortId } from "./version.js";
@@ -41,6 +44,7 @@ const $file = document.getElementById("file");
 const $toast = document.getElementById("toast");
 
 let live = null;          // {key, handle} — the interactive map survives re-renders
+let versions = null;      // every version of every trip on this phone (js/objects.js), set at start
 let toastTimer = 0;
 
 /* ---------- small helpers ---------- */
@@ -181,11 +185,11 @@ async function importText(text, name){
     const local = S.records.find(r => r.id === incoming.id);
     let rec, message, offer = false;
     if(!local){
-      await store.putVersion(incoming);
+      await versions.put(incoming);
       rec = {id: incoming.id, trip: incoming, importedAt: Date.now(), fileName: name || "", exported: incoming.version.id};
       message = t("imported", {t: incoming.title});
     }else{
-      const got = await receive(store, local.trip, incoming);
+      const got = await receive(versions, local.trip, incoming);
       const v = shortId(got.trip.version.id);
       rec = {...local, trip: got.trip, importedAt: Date.now(), fileName: name || local.fileName};
       if(got.kind === "same") message = t("recvSame", {v});
@@ -212,7 +216,7 @@ async function importText(text, name){
 async function applyEdit(change, message){
   const cur = S.rec.trip;
   const out = change(cur);
-  const {trip: next, changed} = await saveEdit(store, cur, out.trip);
+  const {trip: next, changed} = await saveEdit(versions, cur, out.trip);
   if(!changed) return;
   if(out.marks){ S.state = moveMarks(S.state, out.marks); saveState(); }
   const rec = {...S.rec, trip: next};
@@ -315,9 +319,13 @@ async function loadDemo(){
 
 async function removeRecord(id){
   const rec = S.records.find(r => r.id === id);
-  if(!rec || !confirm(t("removeConfirm", {t: rec.trip.title}))) return;
+  if(!rec) return;
+  const answer = await ask({title: t("removeTripTitle"), text: t("removeConfirm", {t: rec.trip.title}),
+    actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("remove"), kind: "danger"}]});
+  if(answer !== "yes") return;
   await store.deleteTrip(id);
   await store.delKV("state:" + id);
+  await versions.drop(id);
   S.records = S.records.filter(r => r.id !== id);
   if(S.rec && S.rec.id === id) await openRecord(S.records[S.records.length - 1] || null);
   if(!S.rec && location.hash) history.replaceState(null, "", location.pathname + location.search);
@@ -918,6 +926,13 @@ function takeSharedPlace(){
 /* ---------- start ---------- */
 
 async function start(){
+  versions = versionStore(await store.backend());
+  // 2.0 and 2.1 kept each version as a full copy: move them into pieces, once.
+  const legacy = await store.legacyVersions();
+  if(legacy.length){
+    for(const trip of legacy) await versions.put(trip);
+    await store.clearLegacyVersions();
+  }
   const [records, activeId, ui, key, lang, useGoogle] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle")]);
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
@@ -929,7 +944,7 @@ async function start(){
     if(saved && renamed.length) await store.setKV("state:" + rec.id, moveMarks({done: {}, skipped: {}, plans: {}, ...saved}, renamed));
     Object.assign(rec, {trip: ready, exported: ready.version.id});
     await store.putTrip(rec);
-    await store.putVersion(ready);
+    await versions.put(ready);
   }
   if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ["live", "image", "schema"].includes(ui.mapView) ? ui.mapView : "live", expandAll: !!ui.expandAll};
   if(typeof key === "string") S.deviceKey = key;

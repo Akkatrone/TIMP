@@ -8,6 +8,7 @@ import { esc, dateParts } from "./util.js";
 import { parseMapsInput, queryOf } from "./gmaps.js";
 import { geocode } from "./geocode.js";
 import { travelIcon, TRAVEL } from "./icons.js";
+import { ask } from "./ask.js";
 
 let dialog = null;
 
@@ -23,7 +24,7 @@ function ensureDialog(){
 }
 
 // "14:05" in the trip's time zone, for a stop added now.
-export function timeNow(timezone){
+function timeNow(timezone){
   try{
     return new Intl.DateTimeFormat("en-GB", {timeZone: timezone || undefined, hour: "2-digit", minute: "2-digit", hourCycle: "h23"}).format(new Date());
   }catch(e){
@@ -56,8 +57,7 @@ export function openStopEditor(o){
     link: o.stop ? o.stop.link : undefined,
     address: "",
     travel: (o.stop && o.stop.travel) || "",
-    searching: false,
-    deleteArmed: false
+    searching: false
   };
   const s0 = o.stop || {};
 
@@ -209,10 +209,11 @@ export function openStopEditor(o){
     }
     if(e.target.closest("[data-find]")){ findPosition(); return; }
     if(e.target.closest("[data-clear-pos]")){ st.lat = st.lng = undefined; st.source = ""; showPos(); return; }
-    const del = e.target.closest("[data-delete]");
-    if(del){
-      // confirm() does nothing in some viewers: the second tap is the confirmation.
-      if(!st.deleteArmed){ st.deleteArmed = true; del.textContent = t("deleteConfirm"); return; }
+    if(e.target.closest("[data-delete]")){
+      const title = $("#stop-title").value.trim() || s0.title;
+      const answer = await ask({title: t("deleteStopTitle"), text: t("deleteStopText", {t: title}),
+        actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("deleteStop"), kind: "danger"}]});
+      if(answer !== "yes") return;
       dlg.close();
       o.onDelete();
     }

@@ -50,13 +50,15 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/livemap.js` | The interactive map: Google Maps or Leaflet + OpenStreetMap. |
 | `js/google.js` | Loads Google's script once per page, shared by the map and the address search. |
 | `js/editor.js` | The form to add or change a stop. |
+| `js/ask.js` | A question with buttons in a dialog: confirmations and choices. Use it instead of `confirm()`. |
 | `js/edit.js` | Adds, changes, moves and removes stops, in time order. No DOM. |
 | `js/gmaps.js` | Reads Google Maps links and shared text: name, address, position. No DOM. |
 | `js/geocode.js` | Finds the coordinates of an address: Google, then OpenStreetMap. |
 | `js/version.js` | Version ids, like Git's, and how two versions relate. No DOM. |
 | `js/merge.js` | Three-way merge of two versions of a trip. No DOM. |
 | `js/trips.js` | What happens on an edit or a file received: versions, merges, saved marks. No DOM. |
-| `js/store.js` | Storage on the device (IndexedDB, with a memory fallback). |
+| `js/objects.js` | Keeps versions the way Git does: snapshots made of shared pieces, each stored once under its SHA-256. No DOM. |
+| `js/store.js` | Storage on the device: IndexedDB, or the same calls in memory when the browser refuses storage. The tests use the memory one. |
 | `js/i18n.js` | Interface texts. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
 | `js/icons.js` | Icons for metro, train, plane, boat. No DOM. |

@@ -10,7 +10,7 @@
 // whether a file it receives is newer, older, or went its own way.
 // No DOM here: Node runs it in the tests (it needs Web Crypto, in Node 20+).
 
-export const ID_LENGTH = 16;   // hex characters kept from SHA-256
+const ID_LENGTH = 16;          // hex characters kept from SHA-256
 export const SHORT = 7;        // characters shown, as Git does
 
 export const shortId = id => String(id || "").slice(0, SHORT);
@@ -42,7 +42,7 @@ export async function versionId(trip, parents){
 }
 
 // Puts the version right after the trip's id, where a person reading the file looks.
-function withVersion(content, version){
+export function withVersion(content, version){
   const {format, id, ...rest} = contentOf(content);
   return {format, id, version, ...rest};
 }
@@ -72,11 +72,16 @@ export async function isIntact(trip){
   return !!(trip.version && trip.version.id) && await versionId(trip, trip.version.parents || []) === trip.version.id;
 }
 
+// History is always: the parents, then each parent's history, in the parents' order.
+// js/objects.js rebuilds it from the parents with the same rule.
+export const historyFrom = (parents, historyOf) => [...new Set([...parents, ...parents.flatMap(historyOf)])];
+
 // A version joining two others, for the result of a merge.
 export async function commitMerge(content, a, b){
   const parents = [a.version.id, b.version.id].sort();
   const id = await versionId(content, parents);
-  const history = [...new Set([...parents, ...a.version.history, ...b.version.history])];
+  const byId = {[a.version.id]: a.version, [b.version.id]: b.version};
+  const history = historyFrom(parents, p => byId[p].history);
   return withVersion(content, {id, parents, history, date: new Date().toISOString()});
 }
 

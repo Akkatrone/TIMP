@@ -191,16 +191,11 @@ test("stops without an id get one, and the old keys are reported so ticks can fo
 /* ---------- receiving files and editing, as the app does ---------- */
 
 import { prepare, saveEdit, receive, moveMarks, fileName } from "../js/trips.js";
+import { versionStore } from "../js/objects.js";
+import { memoryBackend } from "../js/store.js";
 
-function memoryStore(){
-  const m = new Map();
-  return {
-    putVersion: async t => { m.set(t.id + "@" + t.version.id, JSON.parse(JSON.stringify(t))); },
-    getVersion: async (tid, id) => m.get(tid + "@" + id),
-    versionIds: async tid => [...m.keys()].filter(k => k.startsWith(tid + "@")).map(k => k.slice(tid.length + 1)),
-    forget: () => m.clear()
-  };
-}
+// The real version store, on the memory backend the app uses when storage is refused.
+const memoryStore = () => versionStore(memoryBackend());
 
 test("two phones edit the same trip; each one receiving the other's file ends on the same version", async () => {
   const phoneA = memoryStore(), phoneB = memoryStore();
@@ -228,12 +223,10 @@ test("a newer file replaces, an older one changes nothing", async () => {
 });
 
 test("a merge without the base keeps both sides' stops", async () => {
-  const store = memoryStore();
   const {trip: root} = await prepare(demo());
-  const a = (await saveEdit(store, root, removeStop(root, {date: DAY1, id: "castelo"}))).trip;
+  const a = await commit(removeStop(root, {date: DAY1, id: "castelo"}), root);
   const b = await commit(addStop(root, {date: DAY2}, {time: "13:00", title: "Lunch"}).trip, root);
-  store.forget();
-  const r = await receive(store, a, b);
+  const r = await receive(memoryStore(), a, b);   // a phone that never saw the base
   assert.equal(r.base, false);
   assert.ok(ids(r.trip, DAY1).includes("castelo"), "without the base the removal cannot be told from an addition");
   assert.ok(ids(r.trip, DAY2).includes("lunch"));

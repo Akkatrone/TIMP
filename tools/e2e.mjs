@@ -223,9 +223,16 @@ await withApp(async ({run, until, reload}) => {
     assert.equal(await run(`return document.querySelector('[data-edit="pastelaria-exemplo"]').closest(".stop").classList.contains("done");`), true, "the tick moved with it");
     await run(`document.querySelector('[data-edit="pastelaria-exemplo"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] [data-delete]")`);
+    // Delete asks first: Cancel keeps the stop and the form.
     await run(`document.querySelector("[data-delete]").click();`);
-    assert.equal(await run(`return document.querySelector("dialog.sheet").open;`), true, "the first tap only asks");
-    await run(`document.querySelector("[data-delete]").click(); await new Promise(r => setTimeout(r, 400));`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await run(`return document.querySelector("dialog.ask h2").textContent;`), "Delete this stop?");
+    assert.equal(await run(`return document.activeElement.dataset.answer;`), "no", "the safe button has the focus");
+    await run(`document.querySelector('dialog.ask [data-answer="no"]').click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(await run(`return !document.querySelector("dialog.ask") && document.querySelector("dialog.sheet").open;`), true);
+    await run(`document.querySelector("[data-delete]").click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click(); await new Promise(r => setTimeout(r, 400));`);
     assert.ok(!(await stopTitles()).includes("Pastelaria Exemplo"));
   });
 
@@ -367,6 +374,52 @@ await withApp(async ({run, until, reload}) => {
     await run(`const dt = new DataTransfer(); dt.items.add(new File(['{"format":"travel-in-my-pocket/1","id":"x"}'], "bad.json")); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change"));`);
     await until("the error box", `document.querySelector(".errbox li")`);
     assert.ok(await count(".errbox li") >= 2);
+  });
+
+  await step("deleting a trip asks first; Escape or Cancel keep it", async () => {
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="remove"][data-id="evil"]')`);
+    const remove = `document.querySelector('[data-act="remove"][data-id="evil"]').click();`;
+    await run(remove);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.match(await run(`return document.querySelector("dialog.ask p").textContent;`), /is removed from this phone, with its ticks and its versions/);
+    await run(`document.querySelector("dialog.ask").dispatchEvent(new Event("cancel", {cancelable: true})); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(await count('[data-act="remove"][data-id="evil"]'), 1, "Escape keeps the trip");
+    await run(remove);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click(); await new Promise(r => setTimeout(r, 400));`);
+    assert.equal(await count('[data-act="remove"][data-id="evil"]'), 0);
+  });
+
+  await step("a phone coming from 2.1 moves its full copies of versions into pieces", async () => {
+    // Rebuild the 2.1 database: a trip, and two versions kept as full copies.
+    const {trip: v1} = await prepare(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8")));
+    const v2 = await commit(addStop(v1, {date: "2027-05-14"}, {time: "12:15", title: "Gelato"}).trip, v1);
+    // A page of the same site without the app, so nothing keeps the database open.
+    await run(`location.href = location.origin + "/examples/demo-trip.json";`);
+    await until("a page without the app", `location.pathname === "/examples/demo-trip.json"`);
+    await run(`await new Promise(r => { const d = indexedDB.deleteDatabase("travel-in-my-pocket"); d.onsuccess = d.onerror = d.onblocked = r; });
+      await new Promise((resolve, reject) => {
+        const q = indexedDB.open("travel-in-my-pocket", 2);
+        q.onupgradeneeded = () => { const db = q.result; db.createObjectStore("trips", {keyPath: "id"}); db.createObjectStore("kv"); db.createObjectStore("versions"); };
+        q.onsuccess = () => {
+          const db = q.result, tx = db.transaction(["trips", "versions", "kv"], "readwrite");
+          const v1 = ${JSON.stringify(v1)}, v2 = ${JSON.stringify(v2)};
+          tx.objectStore("trips").put({id: v2.id, trip: v2, importedAt: 1, fileName: "old.json", exported: v1.version.id});
+          tx.objectStore("versions").put(v1, v1.id + "@" + v1.version.id);
+          tx.objectStore("versions").put(v2, v2.id + "@" + v2.version.id);
+          tx.objectStore("kv").put(v2.id, "active");
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => reject(tx.error);
+        };
+      });`);
+    await run(`location.href = location.origin + "/#day-1";`);
+    await until("the trip, opened by 2.2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Gelato")`);
+    const counts = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const db = q.result, tx = db.transaction(["versions", "commits", "objects"]); const out = {version: db.version}; let n = 0; for(const s of ["versions", "commits", "objects"]){ const c = tx.objectStore(s).count(); c.onsuccess = () => { out[s] = c.result; if(++n === 3){ db.close(); r(out); } }; } }; });`);
+    assert.equal(counts.version, 3);
+    assert.equal(counts.versions, 0, "the full copies are gone");
+    assert.equal(counts.commits, 2, "both versions are kept, as commits");
+    assert.ok(counts.objects > 10, `${counts.objects} pieces`);
   });
 }).then(() => {
   console.log(`e2e: OK (${passed} checks)`);

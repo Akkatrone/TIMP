@@ -10,13 +10,13 @@ import { loadGoogle } from "./google.js";
 
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 
-export function nominatimUrl(address, lang){
+function nominatimUrl(address, lang){
   const q = new URLSearchParams({q: address, format: "jsonv2", limit: "1", "accept-language": lang || "en"});
   return NOMINATIM + "?" + q.toString();
 }
 
 // The first result of a Nominatim search, or null.
-export function readNominatim(results){
+function readNominatim(results){
   const r = Array.isArray(results) ? results[0] : null;
   if(!r) return null;
   const lat = +r.lat, lng = +r.lon;

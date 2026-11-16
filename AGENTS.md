@@ -71,13 +71,15 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |
 | `js/editor.js` | The add / edit stop form. |
+| `js/ask.js` | Question dialog for confirmations and choices; never use `confirm()`. |
 | `js/edit.js` | Stop changes, in time order. No DOM. |
 | `js/gmaps.js` | Reads Google Maps links and shared text. No DOM. |
 | `js/geocode.js` | Address to coordinates: Google, then OpenStreetMap. |
 | `js/version.js` | Version ids like Git's, and how versions relate. No DOM. |
 | `js/merge.js` | Deterministic three-way merge of two versions. No DOM. |
 | `js/trips.js` | Edits and received files: versions, merges, marks. No DOM. |
-| `js/store.js` | IndexedDB storage, with a memory fallback. |
+| `js/objects.js` | Versions stored as shared pieces by SHA-256, like Git. No DOM. |
+| `js/store.js` | IndexedDB storage; the same calls in memory (also used by the tests). |
 | `js/i18n.js` | Interface texts, every language. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
 | `js/icons.js` | Icons for metro, train, plane, boat. No DOM. |

@@ -41,7 +41,8 @@ export const STRINGS = {
     whereYouSleep: "Where you sleep",
     yourTrips: "Your trips", current: "open", open: "Open", remove: "Delete",
     updateTrip: "Load or update a trip",
-    removeConfirm: "Delete «{t}» from this device? The stops you marked as done are deleted too.",
+    removeTripTitle: "Delete this trip?",
+    removeConfirm: "«{t}» is removed from this phone, with its ticks and its versions. Files you saved elsewhere are not touched.",
     imported: "«{t}» loaded.", removed: "Trip deleted.",
     addStop: "Add a stop", editStop: "Edit", moreActions: "More",
     newStopTitle: "New stop", editStopTitle: "Edit stop",
@@ -60,7 +61,8 @@ export const STRINGS = {
     posOffline: "You are offline: find the position later, from Edit.",
     shortLinkNote: "Short Google Maps link: it opens the exact place, but carries no name or position. Write the name, and the address if you have it.",
     clipboardDenied: "The phone did not let the app read what you copied: paste it in the field.",
-    deleteStop: "Delete stop", deleteConfirm: "Tap again to delete",
+    deleteStop: "Delete stop", deleteStopTitle: "Delete this stop?",
+    deleteStopText: "«{t}» goes from the trip. The change makes a new version, like any other.",
     cancel: "Cancel", titleRequired: "Write a name for the stop.",
     stopAdded: "Stop added · version {v}", stopSaved: "Stop saved · version {v}", stopDeleted: "Stop deleted · version {v}",
     saveFile: "Save the file", fileSaved: "Saved as {f}.", fileFailed: "The file could not be saved. Try again from Trips.",
@@ -89,8 +91,7 @@ export const STRINGS = {
     save: "Save", saved: "Saved.",
     about: "About", version: "Version {v}",
     updateReady: "New version available.", reload: "Update", close: "Close",
-    offlineReady: "Ready to work offline.",
-    newer: "←", older: "→"
+    offlineReady: "Ready to work offline."
   },
   it: {
     tagline: "Una guida di viaggio tascabile che funziona senza internet.",
@@ -128,7 +129,8 @@ export const STRINGS = {
     whereYouSleep: "Dove dormite",
     yourTrips: "I tuoi viaggi", current: "aperto", open: "Apri", remove: "Elimina",
     updateTrip: "Carica o aggiorna un viaggio",
-    removeConfirm: "Eliminare «{t}» da questo dispositivo? Si perdono anche le tappe segnate come fatte.",
+    removeTripTitle: "Eliminare il viaggio?",
+    removeConfirm: "«{t}» viene tolto da questo telefono, con le spunte e le versioni. I file che hai salvato non vengono toccati.",
     imported: "«{t}» caricato.", removed: "Viaggio eliminato.",
     addStop: "Aggiungi una tappa", editStop: "Modifica", moreActions: "Altro",
     newStopTitle: "Nuova tappa", editStopTitle: "Modifica tappa",
@@ -147,7 +149,8 @@ export const STRINGS = {
     posOffline: "Sei offline: cerca la posizione più tardi, da Modifica.",
     shortLinkNote: "Link breve di Google Maps: apre il luogo esatto, ma non contiene nome né posizione. Scrivi il nome, e l'indirizzo se lo hai.",
     clipboardDenied: "Il telefono non ha permesso di leggere quello che hai copiato: incollalo nel campo.",
-    deleteStop: "Elimina tappa", deleteConfirm: "Tocca di nuovo per eliminare",
+    deleteStop: "Elimina tappa", deleteStopTitle: "Eliminare la tappa?",
+    deleteStopText: "«{t}» esce dal viaggio. La modifica crea una nuova versione, come le altre.",
     cancel: "Annulla", titleRequired: "Scrivi un nome per la tappa.",
     stopAdded: "Tappa aggiunta · versione {v}", stopSaved: "Tappa salvata · versione {v}", stopDeleted: "Tappa eliminata · versione {v}",
     saveFile: "Salva il file", fileSaved: "Salvato come {f}.", fileFailed: "Non sono riuscito a salvare il file. Riprova da Viaggi.",
@@ -176,8 +179,7 @@ export const STRINGS = {
     save: "Salva", saved: "Salvato.",
     about: "Informazioni", version: "Versione {v}",
     updateReady: "Nuova versione disponibile.", reload: "Aggiorna", close: "Chiudi",
-    offlineReady: "Pronta per funzionare offline.",
-    newer: "←", older: "→"
+    offlineReady: "Pronta per funzionare offline."
   }
 };
 
