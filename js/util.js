@@ -17,19 +17,13 @@ export function dirUrl(query){
   return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(query) + "&travelmode=transit";
 }
 
-// What to search for when a stop is opened in Google Maps.
-export function stopQuery(s){
-  if(s.query) return s.query;
-  if(s.lat !== undefined) return s.lat + "," + s.lng;
-  return "";
-}
-
 export function dateParts(iso, lang){
   const d = new Date(iso + "T12:00:00Z");
   const fmt = opts => new Intl.DateTimeFormat(lang, {timeZone: "UTC", ...opts}).format(d);
   const long = fmt({weekday: "long", day: "numeric", month: "long"});
   return {
     dow: fmt({weekday: "short"}).replace(".", ""),
+    short: fmt({day: "numeric", month: "short"}).replace(".", ""),
     long: long.charAt(0).toUpperCase() + long.slice(1)
   };
 }

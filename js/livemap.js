@@ -4,7 +4,7 @@
 
 import { esc, mapsUrl, dirUrl } from "./util.js";
 import { legsOf, bridgesOf, midpoint, pinGone, legGone } from "./geo.js";
-import { travelIcon } from "./icons.js";
+import { icon } from "./icons.js";
 import { t } from "./i18n.js";
 import { loadGoogle, googleRefusedKey, whenGoogleRefuses } from "./google.js";
 
@@ -46,7 +46,7 @@ function travelNode(leg, color){
   const el = document.createElement("span");
   el.className = "tvpin";
   el.style.setProperty("--pc", color);
-  el.innerHTML = travelIcon(leg.travel, 14);
+  el.innerHTML = icon(leg.travel, 14);
   el.setAttribute("role", "img");
   el.setAttribute("aria-label", t("travel_" + leg.travel));
   return el;
@@ -60,18 +60,14 @@ function routeOf(zones){
   return [...legs, ...bridges];
 }
 
+// A numbered pin, with the icon of its kind of place when it has one.
 function pinNode(pt, color){
   const el = document.createElement("span");
-  if(pt.ref){
-    el.className = "pin ref";
-    el.textContent = "▲ " + pt.name;
-  }else{
-    el.className = "pin";
-    el.style.setProperty("--pc", color);
-    el.textContent = pt.nums.join("·");
-    el.setAttribute("role", "button");
-    el.setAttribute("aria-label", pt.name);
-  }
+  el.className = "pin" + (pt.type ? " typed" : "");
+  el.style.setProperty("--pc", color);
+  el.innerHTML = icon(pt.type, 13) + `<span>${esc(pt.nums.join("·"))}</span>`;
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", pt.name);
   return el;
 }
 
@@ -98,9 +94,8 @@ async function drawLeaflet(canvas, zones, color){
   zones.forEach(z => {
     z.pts.forEach(pt => {
       const el = pinNode(pt, color);
-      const icon = L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]});
-      const m = L.marker(pt.ll, {icon, keyboard: !pt.ref, interactive: !pt.ref, title: pt.name}).addTo(map);
-      if(!pt.ref) m.bindPopup(popupNode(pt), {offset: [0, -10], maxWidth: 250});
+      const m = L.marker(pt.ll, {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), title: pt.name}).addTo(map);
+      m.bindPopup(popupNode(pt), {offset: [0, -10], maxWidth: 250});
       pins.push({pt, el});
     });
   });
@@ -173,7 +168,7 @@ async function drawGoogle(canvas, zones, color, key, dark){
     z.pts.forEach(pt => {
       const pos = new LatLng(pt.ll[0], pt.ll[1]);
       const el = pinNode(pt, color);
-      if(!pt.ref) el.addEventListener("click", e => {
+      el.addEventListener("click", e => {
         e.stopPropagation();
         const head = document.createElement("b");
         head.className = "pop-h";

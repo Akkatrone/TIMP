@@ -5,10 +5,7 @@
 // A stop is found by the day (its date), the plan (its id, or null) and its own id.
 // ref: {date, plan, id}
 
-function slug(text){
-  return String(text).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "stop";
-}
+import { FIELDS, slug, tripId } from "./trip.js";
 
 // An id made from the title, unique among `taken`.
 export function newId(title, taken){
@@ -53,12 +50,19 @@ function listIn(trip, date, plan){
 }
 
 /**
- * Gives an id to every stop that has none. Trips written by hand may lack them, and
- * edits and merges need them. Returns the new trip and, for each stop, the old key
- * the app used for it ("#3") and the new id, so ticks can follow.
+ * Gives an id to the trip, and to every plan and stop, that has none. Files written by
+ * hand or by an assistant usually lack them; edits, merges and ticks need them.
+ * Returns the new trip and, for each stop, the old key the app used for it ("#3") and
+ * the new id, so ticks can follow.
  */
 export function ensureIds(trip){
   const out = clone(trip), renamed = [];
+  if(!out.id) out.id = tripId(out);
+  out.days.forEach(d => {
+    if(!d.plans) return;
+    const taken = new Set(d.plans.filter(p => p.id).map(p => p.id));
+    d.plans.forEach(p => { if(!p.id){ p.id = newId(p.name, taken); taken.add(p.id); } });
+  });
   const fix = (stops, date, plan) => {
     const taken = new Set(stops.filter(s => s.id).map(s => s.id));
     stops.forEach((s, i) => {
@@ -117,7 +121,7 @@ function clean(stop){
 }
 
 // Keeps the field order the stop had, so a small edit is a small change in the file.
-const ORDER = ["id", "time", "title", "text", "lat", "lng", "mapLabel", "query", "link", "tag", "travel"];
+const ORDER = ["id", ...Object.keys(FIELDS.stop)];
 function orderLike(old, next){
   const keys = [...new Set([...Object.keys(old), ...ORDER, ...Object.keys(next)])].filter(k => k in next);
   return Object.fromEntries(keys.map(k => [k, next[k]]));

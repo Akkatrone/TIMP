@@ -14,12 +14,14 @@ decide what to do next.
 
 ## What you produce
 
-One JSON file in the format `travel-in-my-pocket/1`, named `<trip-id>.json`.
+One JSON file in the format `travel-in-my-pocket/2`. It says what the trip is: days,
+stops, stays, things to remember. Never how it looks: the app picks colours, draws the
+maps and chooses the icons from the content.
 
 A trip file contains hotels and dates. Treat it as private:
 
-- Inside a copy of this repository, save it in `private/`. Git ignores that folder.
-  Never save a real trip anywhere else in the repository and never commit one.
+- Inside a copy of this repository, save it in `private/<trip-name>.json`. Git ignores
+  that folder. Never save a real trip anywhere else in the repository and never commit one.
 - Anywhere else, give the file to the traveller and nobody else. Do not publish it.
 
 ## 1. Collect the trip
@@ -30,95 +32,79 @@ what is missing and changes the result: travel dates, hotel names, fixed booking
 (flights, trains, timed tickets).
 
 Do not invent bookings, hotels, flight times or reservations. If something is not
-decided, leave it out or present it as an option (`tag: "Optional"`, a `note`, or
-alternative `plans`).
+decided, leave it out or present it as an option (`"tag": "Optional"`, a line in
+`notes`, or alternative `plans`).
 
 If there is only a rough idea ("5 days in Lisbon"), agree on a programme first and
 write the file afterwards. A file is a bad place to negotiate an itinerary.
 
-## 2. Lay out the structure
+## 2. Write the days
 
-- `places`: one entry per city or area where time is spent. A day trip does not need
-  its own place unless you want it to have its own colour.
-- `stays`: one entry per hotel.
-- `days`: one entry per date, from the arrival day to the departure day.
+One entry per date, from the arrival day to the departure day, in date order.
 
-Pick a colour for each place from this list. Each pair is readable in the light and
-in the dark theme:
-
-| `color` | `colorDark` |
-|---|---|
-| `#4f9a2a` | `#86c95a` |
-| `#0c7aa3` | `#45afd8` |
-| `#7a56a8` | `#ad8cdb` |
-| `#d65f22` | `#f2905a` |
-| `#b8651b` | `#e9a25c` |
-| `#2f7d4f` | `#6cc58f` |
-| `#b23a5b` | `#ee88a4` |
-| `#3f63b5` | `#8aa7ee` |
-
-Use `glyph` only when the place has a short name in a non-Latin script that the
-traveller will see on signs (東京, Αθήνα, Київ). Otherwise leave it out.
-
-## 3. Write the days
-
-For each day:
-
+- `city`: where the day is spent ("Lisbon", "Sintra"). Days in the same city share a
+  colour, and a change of city shows on the day ("Lisbon → Porto"). Write it the same
+  way every day.
 - `title`: what the day is about, in a few words ("Baixa and Alfama on foot").
+- `stay`: where the night is spent. The full object (`name`, `address`, `note` with
+  check-in and booking details) on every night in that hotel; a plain name for nights
+  that are not a hotel ("Night train").
+- `notes`: only what would spoil the day if forgotten, and the alternative. "The last
+  ferry back leaves at 17:30." "If it rains, swap with day 4." Zero to three per day.
 - `stops`: in the order they happen. Include the practical ones too: arrival,
   check-in, the train to the next city, the way back to the hotel.
-- `reminders`: only what would spoil the day if forgotten. "The last ferry back
-  leaves at 17:30." "Tickets go on sale 14 days before." Zero to two per day.
-- `note`: the alternative. What to skip if tired, what to do if it rains.
 - `plans` instead of `stops` when the travellers will choose on the spot between two
-  or three different days.
+  or three different days. Each plan has a `name` and its `stops`.
 
-For each stop:
+## 3. Write the stops
 
 - `time`: a clock time when it matters ("09:30"), a word when it does not ("Evening",
-  "Dinner", "Afternoon").
+  "Dinner"). Leave it out when there is no time at all.
 - `title`: the name of the place as written on maps and signs.
+- `type`: what kind of place it is. One of `sight` (monuments, churches, squares),
+  `museum`, `food` (restaurants, cafés, markets to eat at), `park` (parks, gardens,
+  beaches), `view` (viewpoints), `shop`, `walk` (a stroll through a quarter), `hotel`.
+  Leave it out for anything else (a station, a journey).
+- `travel`: how the travellers reach this stop, when it is by `metro`, `bus`, `train`,
+  `plane` or `boat`. Set it every time the description says so ("bus 7 from the
+  station"). Leave it out for walking and anything else. A journey that is a stop of
+  its own ("Train to Kyoto", "Flight to Rome") gets `travel` and no position.
 - `text`: one to three sentences, in this order of usefulness: how to get there from
-  the previous stop (line, direction, minutes), price and opening hours, what to
-  look at, one tip. The app shows only the first two lines until the traveller taps,
-  so put what matters most first. Write in the travellers' language and tone.
+  the previous stop (line, direction, minutes), price and opening hours, what to look
+  at, one tip. The app shows the first two lines until the traveller taps, so put what
+  matters most first. Write in the travellers' language and tone.
 - `tag`: "Booking needed", "Ticket needed", "Optional", in the trip's language.
-- `id`: a short slug (`colosseum`). Always set it: it is how the app remembers that
-  the stop was ticked or skipped when the file is updated later.
-- `query`: the name plus the city, as someone would type it into Google Maps
-  ("Colosseum Rome"). It drives the "Map" and "Directions" links.
-- `mapLabel`: when the title is an action and not a place ("Check-out" → the hotel name).
+- `address`: where it is, as someone would type it into Google Maps: a street address,
+  or the name and the town ("Pantheon, Rome"). It drives the Map and Directions links.
+- `lat`, `lng`: the position, four decimal places. Look it up on a map or on the web
+  whenever you can. From memory, give it only for places you are sure about (major
+  landmarks, main stations). For a small restaurant you cannot verify, leave the
+  position out and write a good `address`: the stop still gets working links.
 - `link`: a Google Maps link to the exact place, when the traveller gave you one.
-- `travel`: how the travellers reach this stop, when it is by metro, bus, train, plane
-  or boat. It is what they see at a glance, in the list and on the map, so set it every
-  time the description says so ("JR to Yotsuya", "bus 7 from the station", "the ferry
-  crosses in ten minutes"). Leave it out for walking and for anything else (taxi, cable
-  car): only these five have an icon. For a journey that is a stop of its own without a
-  place ("Train to Kyoto", "Flight to Rome"), set it on that stop and give it no
-  coordinates.
-- Look coordinates up on a map or on the web whenever you can. Use four decimal places.
-- From memory, give coordinates only for places you are sure about: major landmarks,
-  main stations. For a small restaurant or a hotel you cannot verify, leave `lat` and
-  `lng` out and set a good `query`: the stop still gets working map links.
-- Give no coordinates to stops that are not a place: a train ride, "free afternoon".
-- Tell the traveller which coordinates were not verified.
+- No position for stops that are not a place: a train ride, "free afternoon".
 
-Then check the geometry, in step 6. A typo in a coordinate shows up there as a map
-zone that should not exist, or one that is absurdly wide.
+Tell the traveller which positions were not verified.
 
-## 5. Facts that go out of date
+## 4. Facts that go out of date
 
 Prices, opening hours, closing days, timetables and seasonal closures change.
 Verify them when you can. When you cannot, either leave the detail out or word it as
 something to check ("check the timetable on the day"), and tell the traveller which
 facts were not verified. Never state an unverified price or time as certain.
 
+## 5. The Info page
+
+Keep it to what someone needs in a hurry: emergency numbers, how to pay and get cash,
+how luggage moves between hotels, booking codes, five or six phrases in the local
+language. Each section has a `title` and `items` of `label` and `text`; a text that is
+only a phone number can be tapped to call. The stays are listed there by the app.
+
 ## 6. Check the file
 
 **With Node and a copy of the repository:**
 
 ```bash
-node tools/validate-trip.mjs --map private/<trip-id>.json
+node tools/validate-trip.mjs --map private/<trip-name>.json
 ```
 
 Fix every error. Then read the `--map` lines, one per day:
@@ -127,40 +113,37 @@ Fix every error. Then read the `--map` lines, one per day:
 day 3 2027-05-16: Lisbon: 2 pins, 0.9 km across | Sintra: 4 pins, 1.3 km across
 ```
 
-- Each `|` separates a map zone. A walking day in one city should be one zone, a few
-  km across. A travel day has one zone per city.
-- An unexpected extra zone, or a walking day that is 40 km across, means a coordinate
-  is wrong. Find it and fix it.
-- When a day has several zones, name them with `zoneNames`.
-- If two parts of one day are split when they should not be (or the reverse), adjust
-  `mapSplitKm` for that day. The default is 12.
+- Each `|` separates a map: stops more than 12 km apart are drawn on separate maps. A
+  walking day in one city should be one map, a few km across.
+- An unexpected extra map, or a walking day that is 40 km across, means a position is
+  wrong. Find it and fix it.
 
 **Without Node:** load the file in the app (or paste it: Trips → Paste a trip). It
 runs the same checks and lists every problem with its position in the file, for
 example `days[2].stops[0].lat: must be a number between -90 and 90`. Fix them and load
 it again. When an assistant wrote the file, "Copy for the assistant" copies the list
-with a request to fix it, ready to paste into the chat. Then open the map of
-each day and look for a pin in the wrong place.
+with a request to fix it, ready to paste into the chat. Then open the map of each day
+and look for a pin in the wrong place.
 
 ## 7. Hand it over
 
 Tell the travellers, briefly:
 
-1. Send the file to each phone (chat, AirDrop, Drive).
-2. Open the app **from its Home Screen icon** and choose "Load a trip file", or copy
-   the JSON and choose "Paste a trip". On an iPhone, loading it in Safari instead
-   puts it in a different storage.
+1. Send the file to each phone (chat, AirDrop, Drive), or the JSON to copy.
+2. Open the app **from its Home Screen icon** and choose "Load a trip file", or
+   "Paste a trip". On an iPhone, loading it in Safari instead puts it in a different
+   storage.
 3. Open the app once with a connection before leaving.
-4. What could not be verified: coordinates, prices, hours.
+4. What could not be verified: positions, prices, hours.
 
 ## Updating a file later
 
 - Start from the latest file: travellers change trips in the app too, and save them
   from Trips → Save the file. An older copy loses nothing, because the app merges, but
   starting from the latest one avoids surprises.
-- Keep the trip `id`: the app then replaces the trip and keeps the ticked and skipped stops.
-- Leave the `version` block as it is, if the file has one: the app sees the change and
-  makes a new version from it. Never write or change `version` yourself.
+- Keep the trip `id` and the `version` block exactly as they are, if the file has
+  them: the app then updates the trip, keeps what was ticked, and makes a new version.
+  Never write or change `version` yourself.
 - Keep the `id` of every stop that still exists, even if it is renamed or moved.
 - Change only what was asked. Do not rewrite texts nobody mentioned.
 - Check the file again.
@@ -168,7 +151,7 @@ Tell the travellers, briefly:
 ## The Google Maps key
 
 Optional. Without it the interactive map uses OpenStreetMap. If the traveller has a
-key and wants Google Maps, add `"map": {"googleMapsKey": "..."}`.
+key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 
 - Only use a key the traveller gives you. Never invent one, never reuse one from
   another file.
@@ -176,18 +159,13 @@ key and wants Google Maps, add `"map": {"googleMapsKey": "..."}`.
   a daily quota. The [README](../README.md#google-maps-optional) explains how.
 - A file with a key must not be published.
 
-## What a good Info page contains
-
-Keep it to what someone needs in a hurry: emergency numbers (`number`), how to pay
-and get cash, how luggage moves between hotels, booking codes (`number`), five or six
-phrases in the local language. Hotels are listed automatically from `stays`.
-
 ## Mistakes to avoid
 
-- Coordinates swapped (`lat` is north-south, between -90 and 90).
-- A `stay` or `place` key used in a day but not defined.
+- `"name"` for a stop: it is `"title"`. And `"format": "travel-in-my-pocket/2"` first.
+- Positions swapped (`lat` is north-south, between -90 and 90).
 - Two entries for the same date. Use `plans` for alternatives.
-- A day with both `stops` and `plans`.
+- A day with both `stops` and `plans`, or with neither.
+- Colours, icons or map settings: the file has none.
 - Long paragraphs in `text`. The traveller reads this standing up.
 - Comments or trailing commas in the JSON.
 - HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.

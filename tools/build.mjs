@@ -3,7 +3,11 @@
 // worker stamped with a version and the exact list of files to keep offline.
 //
 //   node tools/build.mjs                         -> dist/
-//   node tools/build.mjs --out _site --repo https://github.com/you/your-fork
+//   node tools/build.mjs --out _site --repo https://github.com/you/your-fork \
+//                        --resolver https://timp-resolve.you.workers.dev
+//
+// --resolver is the address of the link resolver (worker/README.md): it goes in
+// js/config.js and in the Content-Security-Policy, the one place it may be reached.
 //
 // The version is the package version plus a fingerprint of the app's content.
 // Same content, same version: phones are asked to update only when something
@@ -14,6 +18,7 @@ import { createHash } from "node:crypto";
 import { join, dirname, resolve, relative } from "node:path";
 import { ROOT, appFiles, precacheList, stampSw } from "./lib/app-files.mjs";
 import { llmsText } from "./lib/llms.mjs";
+import { tripSchema } from "../js/trip.js";
 
 function option(name, fallback){
   const i = process.argv.indexOf("--" + name);
@@ -22,6 +27,7 @@ function option(name, fallback){
 
 const out = resolve(ROOT, option("out", "dist"));
 const repoUrl = option("repo", "");
+const resolverUrl = option("resolver", "").replace(/\/+$/, "");
 const inside = relative(ROOT, out);
 if(!inside || inside.startsWith("..") || appFiles().some(f => f === inside || f.startsWith(inside + "/"))){
   console.error(`Refusing to build into "${out}": choose an empty folder inside the project, like dist/ or _site/.`);
@@ -31,15 +37,28 @@ if(repoUrl && !/^https:\/\/[\w.-]+\/[\w./-]+$/.test(repoUrl)){
   console.error(`--repo must be an https address, got "${repoUrl}"`);
   process.exit(2);
 }
+if(resolverUrl && !/^https:\/\/[\w.-]+(\/[\w./-]*)?$/.test(resolverUrl)){
+  console.error(`--resolver must be an https address, got "${resolverUrl}"`);
+  process.exit(2);
+}
 
 const files = appFiles();
 const contents = new Map(files.map(f => [f, readFileSync(join(ROOT, f))]));
 
-if(repoUrl){
+// Fills in a setting of js/config.js.
+function configure(name, value){
   const src = contents.get("js/config.js").toString("utf8");
-  const next = src.replace(/export const REPO_URL = "[^"]*";/, `export const REPO_URL = ${JSON.stringify(repoUrl)};`);
-  if(next === src && !src.includes(JSON.stringify(repoUrl))){ console.error("js/config.js: REPO_URL not found"); process.exit(1); }
+  const next = src.replace(new RegExp(`export const ${name} = "[^"]*";`), `export const ${name} = ${JSON.stringify(value)};`);
+  if(!next.includes(`export const ${name} = ${JSON.stringify(value)};`)){ console.error(`js/config.js: ${name} not found`); process.exit(1); }
   contents.set("js/config.js", Buffer.from(next));
+}
+if(repoUrl) configure("REPO_URL", repoUrl);
+if(resolverUrl){
+  configure("RESOLVER_URL", resolverUrl);
+  const html = contents.get("index.html").toString("utf8");
+  const next = html.replace("connect-src 'self'", `connect-src 'self' ${new URL(resolverUrl).origin}`);
+  if(next === html){ console.error("index.html: connect-src not found in the Content-Security-Policy"); process.exit(1); }
+  contents.set("index.html", Buffer.from(next));
 }
 
 const hash = createHash("sha256");
@@ -69,6 +88,7 @@ for(const [f, data] of contents){
 copyFileSync(join(ROOT, "LICENSE"), join(out, "LICENSE"));
 // For AI assistants that read one page: the format, the method and the example.
 // Not part of the app, so not in the version or offline.
-writeFileSync(join(out, "llms.txt"), llmsText());
+writeFileSync(join(out, "llms.txt"), llmsText({resolver: resolverUrl}));
+writeFileSync(join(out, "trip.schema.json"), JSON.stringify(tripSchema(), null, 1) + "\n");
 
 console.log(`Built ${files.length} files into ${relative(ROOT, out)}/ — version ${version}`);

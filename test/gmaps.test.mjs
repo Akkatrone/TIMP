@@ -45,6 +45,13 @@ test("an address shared alone is the name and the text to search, even glued to 
   assert.equal(parseMapsInput(`Pantheon\n${SHORT}`).address, undefined);
 });
 
+test("a link to a street address keeps the house number in the name", () => {
+  const r = parseMapsInput("https://www.google.com/maps/place/Via+Roma,+12,+00184+Roma+RM/data=!4m2!3m1!1s0x0:0x0");
+  assert.equal(r.title, "Via Roma, 12");
+  assert.equal(r.address, "Via Roma, 12, 00184 Roma RM");
+  assert.equal(r.lat, undefined, "this kind of link has no position");
+});
+
 test("search links, query parameters, geo: and plain coordinates", () => {
   assert.deepEqual(pick(parseMapsInput("https://www.google.com/maps/search/?api=1&query=35.6586,139.7454")), [undefined, 35.6586, 139.7454]);
   assert.deepEqual(pick(parseMapsInput("https://maps.google.com/?q=Tokyo+Tower")), ["Tokyo Tower", undefined, undefined]);

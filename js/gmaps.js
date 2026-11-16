@@ -30,8 +30,10 @@ function decode(part){
 }
 
 // "Colosseo, Piazza del Colosseo, 1, 00184 Roma RM" → name and address.
+// A street address has no name: "Via Roma, 3, 00184 Roma" → "Via Roma, 3" and all of it.
 function splitPlace(text){
   const parts = text.split(",").map(s => s.trim()).filter(Boolean);
+  if(parts.length > 1 && /^\d+[a-z]?$/i.test(parts[1])) return {title: parts.slice(0, 2).join(", "), address: parts.join(", ")};
   return {title: parts[0] || "", address: parts.slice(1).join(", ")};
 }
 

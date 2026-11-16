@@ -10,12 +10,15 @@ merged, however useful it is otherwise.
 
 1. **The trip never leaves the device.** No accounts, no server, no analytics, no
    request that carries trip data. Trip files are read locally and stored in IndexedDB.
-   The one exception is looking up a stop's position: its name and address go to
-   Google or OpenStreetMap, only when a stop is added or changed.
+   Two exceptions, only when a stop is added or changed: its name and address go to
+   Google or OpenStreetMap to look up its position, and a Google Maps link pasted or
+   shared goes to the link resolver (`worker/`), which keeps nothing.
 2. **It works offline.** Everything except the interactive map must work in airplane
    mode, on iPhone and Android, after the app has been opened once.
 3. **Anyone can host it.** The app is static files. No build step is needed to run it
-   locally, no server-side code, no dependency to install.
+   locally, no server-side code, no dependency to install. The link resolver is a
+   separate, optional service: a copy without one works, minus the reading of short
+   links.
 
 ## Run it
 
@@ -45,7 +48,7 @@ taps, add a check to `tools/e2e.mjs`.
 |---|---|
 | `index.html`, `css/app.css` | The page and its styles. |
 | `js/app.js` | Screens, navigation, events. The only file that touches the page. |
-| `js/trip.js` | The trip file format: validation. No DOM, so Node can run it. |
+| `js/trip.js` | The trip file format: `FIELDS`, one table for every field, from which come the checks and the JSON Schema; the conversion of format 1; what the app works out (trip id, cities). No DOM. |
 | `js/geo.js` | Groups stops into map zones, draws the offline sketch. No DOM. |
 | `js/livemap.js` | The interactive map: Google Maps or Leaflet + OpenStreetMap. |
 | `js/google.js` | Loads Google's script once per page, shared by the map and the address search. |
@@ -63,10 +66,11 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/store.js` | Storage on the device: IndexedDB, or the same calls in memory when the browser refuses storage. The tests use the memory one. |
 | `js/i18n.js` | Interface texts. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
-| `js/icons.js` | Icons for metro, bus, train, plane, boat. No DOM. |
+| `js/icons.js` | Icons for the kinds of places (`TYPES`) and the ways of travelling (`TRAVEL`). No DOM. |
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `icons/` | `icon.svg` and `icon-maskable.svg` are the sources; the PNGs are made from them with `rsvg-convert` (192, 512, the maskable 512, and 180 for the iPhone, on a square without rounded corners). |
 | `sw.js` | Service worker: keeps the app available offline. |
+| `worker/` | The link resolver, a separate and optional service on Cloudflare Workers: a Google Maps link in, name, address, position and kind of place out. It keeps nothing. How to put it online: `worker/README.md`. |
 | `tools/` | Command-line checks, the build used for publishing, the browser check and the screenshots. |
 | `test/` | Unit tests (`node:test`, no dependencies). |
 | `docs/trip-format.md` | The trip file format, for people who write trips. |
@@ -90,13 +94,18 @@ versions must end with the same trip and the same version id: the merge picks th
 winner of a conflict by version id, never by which phone runs it. `test/versions.test.mjs`
 checks it; keep it passing when you touch `js/version.js`, `js/merge.js` or `js/edit.js`.
 
-**The trip format is a contract.** Files written today must keep loading. Adding an
-optional field is fine. Renaming, removing or changing the meaning of a field is a
-breaking change: it needs a new format version (`travel-in-my-pocket/2`) and code that
-still reads version 1. When you add a field, update:
+**The trip format is a contract, and it is content only.** A trip file says what the
+trip is; how it looks (colours, map zones, labels, icons) is worked out by the app and
+never goes in the file. Files written today must keep loading. Adding an optional field
+is fine. Renaming, removing or changing the meaning of a field is a breaking change: it
+needs a new format version and a conversion in `upgrade()`, the way format 1 becomes 2.
+A value of `type` or `travel` the app does not know is a warning, not an error, so a
+new kind of place needs no new format: add it to `TYPES`, with an icon in
+`js/icons.js` and a name in `js/i18n.js` (tests check both). When you add a field:
 
-1. the validator in `js/trip.js`, with a test in `test/trip.test.mjs`;
-2. `docs/trip-format.md` (a test fails if a field the validator knows is missing there);
+1. one entry in `FIELDS` in `js/trip.js` (the checks and the JSON Schema follow), with
+   a test in `test/trip.test.mjs`;
+2. `docs/trip-format.md` (a test fails if a field of `FIELDS` is missing there);
 3. `docs/creating-a-trip.md`, if the field changes how a trip should be written;
 4. `examples/demo-trip.json`, if the field is worth showing.
 

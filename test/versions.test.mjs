@@ -132,14 +132,14 @@ test("a stop moved to another day on one side moves", async () => {
   assert.ok(ids(trip, DAY2).includes("lunch"));
 });
 
-test("places, stays and plans merge entry by entry", async () => {
+test("a day's city, stay and plans merge field by field", async () => {
   const root = await ensureVersion(demo());
-  const a0 = JSON.parse(JSON.stringify(root)); a0.places.porto = {name: "Porto", color: "#3f63b5"};
-  const b0 = JSON.parse(JSON.stringify(root)); b0.stays.casa.note = "New note"; b0.days[2].plans[1].name = "Cascais and the coast";
+  const a0 = JSON.parse(JSON.stringify(root)); a0.days[1].city = "Belém";
+  const b0 = JSON.parse(JSON.stringify(root)); b0.days[0].stay.note = "New note"; b0.days[2].plans[1].name = "Cascais and the coast";
   const a = await commit(a0, root), b = await commit(b0, root);
   const {trip} = merge(root, a, b);
-  assert.equal(trip.places.porto.name, "Porto");
-  assert.equal(trip.stays.casa.note, "New note");
+  assert.equal(trip.days[1].city, "Belém");
+  assert.equal(trip.days[0].stay.note, "New note");
   assert.equal(trip.days[2].plans[1].name, "Cascais and the coast");
   assert.deepEqual(validateTrip(trip).errors, []);
 });

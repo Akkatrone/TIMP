@@ -12,6 +12,7 @@
 // No DOM here: the backend (js/store.js) is passed in, the tests pass the memory one.
 
 import { canonical, contentOf, withVersion, historyFrom } from "./version.js";
+import { upgrade } from "./trip.js";
 
 const REF = "\u0000";
 const SPLIT = 200;
@@ -78,7 +79,8 @@ async function load(db, root){
 /**
  * The versions of every trip on this device.
  *   put(trip)          keeps the version a trip carries (nothing if already kept)
- *   get(tripId, id)    the trip at that version, or null if this device does not have it
+ *   get(tripId, id)    the trip at that version, or null if this device does not have it;
+ *                      versions kept before format 2 come back converted (upgrade)
  *   ids(tripId)        the versions kept for a trip
  *   drop(tripId)       forgets all the versions of a trip
  */
@@ -135,7 +137,7 @@ export function versionStore(db){
       const commits = await commitsOf(tripId), c = commits.get(id);
       if(!c) return null;
       const version = {id, parents: c.parents, history: c.history || rebuild(c.parents, commits), ...(c.date ? {date: c.date} : {})};
-      try{ return withVersion(build({[REF]: c.root}, await load(db, c.root)), version); }
+      try{ return upgrade(withVersion(build({[REF]: c.root}, await load(db, c.root)), version)); }
       catch(e){ return null; }
     },
     async ids(tripId){

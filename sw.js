@@ -73,6 +73,11 @@ self.addEventListener("fetch", event => {
   const url = new URL(req.url);
   // Map tiles, Google Maps and anything else from other sites go straight to the network.
   if(url.origin !== self.location.origin) return;
+  // Pages of the site that are not the app (llms.txt, LICENSE…) are left to the
+  // browser, as if there were no service worker: answering them with the app, or
+  // failing to, showed an empty page or ERR_CACHE_MISS instead of the text.
+  const scope = new URL(self.registration.scope).pathname;
+  if(req.mode === "navigate" && url.pathname !== scope && url.pathname !== scope + "index.html") return;
 
   event.respondWith((async () => {
     const cache = await caches.open(SHELL);
@@ -85,9 +90,8 @@ self.addEventListener("fetch", event => {
         throw e;
       }
     }
-    if(req.mode === "navigate"){
-      return (await cache.match("index.html")) || fetch(req);
-    }
+    // The app's own page, with or without the ?title=… of a shared place.
+    if(req.mode === "navigate") return (await cache.match("index.html")) || fetch(req);
     const hit = await cache.match(req, {ignoreSearch: true});
     return hit || fetch(req);
   })());

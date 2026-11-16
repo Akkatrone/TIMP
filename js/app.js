@@ -1,9 +1,9 @@
-import { validateTrip } from "./trip.js";
+import { validateTrip, upgrade, citiesOf, stayOf, placeQuery, FORMAT, TRAVEL, TYPES } from "./trip.js";
 import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
-import { esc, rich, mapsUrl, dirUrl, stopQuery, dateParts, todayIn, jsonIn } from "./util.js";
+import { esc, rich, mapsUrl, dirUrl, dateParts, todayIn, jsonIn } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG } from "./geo.js";
-import { travelIcon } from "./icons.js";
+import { icon } from "./icons.js";
 import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
 import { versionStore } from "./objects.js";
@@ -74,11 +74,16 @@ function toast(text, action){
 }
 
 const trip = () => S.rec && S.rec.trip;
-const placeIndex = key => Object.keys(trip().places).indexOf(key);
-const placeVar = key => `var(--p${placeIndex(key)})`;
+// Each city of the trip gets a colour of the palette in css/app.css (--p0…--p7), in
+// the order the cities first appear: the file says nothing about colours.
+const PALETTE = 8;
+const cityIndex = city => Math.max(0, citiesOf(trip()).indexOf(city || "")) % PALETTE;
+const cityVar = city => `var(--p${cityIndex(city)})`;
+// The same colour as a value, for the interactive map, in the theme on screen.
+const cityColor = city => getComputedStyle(document.documentElement).getPropertyValue(`--p${cityIndex(city)}`).trim();
 // The key the interactive map uses: none if Google is turned off on this device;
 // otherwise the key saved on this device, which wins over the one in the trip file.
-const tripKey = () => (trip() && trip().map && trip().map.googleMapsKey) || "";
+const tripKey = () => (trip() && trip().googleMapsKey) || "";
 const googleKey = () => S.useGoogle ? (S.deviceKey || tripKey()) : "";
 
 // After the key, the language or the trip changes: if Google's script is already in
@@ -89,17 +94,6 @@ function applyMapSettings(){
 }
 const saveState = () => { if(S.rec) store.setKV("state:" + S.rec.id, S.state).catch(() => {}); };
 const saveUi = () => { store.setKV("ui", S.ui).catch(() => {}); };
-
-function applyPlaceColors(){
-  let el = document.getElementById("place-colors");
-  if(!el){ el = document.createElement("style"); el.id = "place-colors"; document.head.appendChild(el); }
-  if(!trip()){ el.textContent = ""; return; }
-  const ps = Object.values(trip().places);
-  const dark = ps.map((p, i) => `--p${i}:${p.colorDark || p.color}`).join(";");
-  el.textContent = `:root{${ps.map((p, i) => `--p${i}:${p.color}`).join(";")}}` +
-    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dark}}}` +
-    `:root[data-theme="dark"]{${dark}}`;
-}
 
 function todayIndex(){
   if(!trip()) return -1;
@@ -161,7 +155,6 @@ async function openRecord(rec){
   S.openStops.clear();
   applyLang();
   document.title = rec ? rec.trip.title : "TIMP";
-  applyPlaceColors();
 }
 
 // Saves a trip record and makes it the open one. `exported` is the version the
@@ -169,7 +162,7 @@ async function openRecord(rec){
 async function keepRecord(rec){
   await store.putTrip(rec);
   S.records = S.records.filter(r => r.id !== rec.id).concat(rec);
-  if(S.rec && S.rec.id === rec.id){ S.rec = rec; applyPlaceColors(); document.title = rec.trip.title; }
+  if(S.rec && S.rec.id === rec.id){ S.rec = rec; document.title = rec.trip.title; }
   else await openRecord(rec);
 }
 
@@ -183,6 +176,7 @@ async function importText(text, name){
     S.importError = {title: t("importFailed"), items: [why], all: [why]};
     render(); window.scrollTo(0, 0); return;
   }
+  data = upgrade(data);   // a file in the old format is converted, then checked
   const res = validateTrip(data);
   if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12), all: res.errors}; render(); window.scrollTo(0, 0); return; }
   S.importError = null;
@@ -392,7 +386,7 @@ function renderStrip(r){
   $days.setAttribute("aria-label", trip().title);
   $days.innerHTML = trip().days.map((d, i) => {
     const dp = dateParts(d.date, lang), cur = r.name === "day" && r.i === i;
-    return `<a class="dchip${i === ti ? " today" : ""}" href="#day-${i + 1}" style="--c:${placeVar(d.place)}"${cur ? ' aria-current="page"' : ""} aria-label="${esc(t("day"))} ${i + 1}, ${esc(dp.long)}${i === ti ? ", " + esc(t("today")) : ""}"><span class="n">${i + 1}</span><span class="w">${esc(dp.dow)}</span></a>`;
+    return `<a class="dchip${i === ti ? " today" : ""}" href="#day-${i + 1}" style="--c:${cityVar(d.city)}"${cur ? ' aria-current="page"' : ""} aria-label="${esc(t("day"))} ${i + 1}, ${esc(dp.long)}${i === ti ? ", " + esc(t("today")) : ""}"><span class="n">${i + 1}</span><span class="w">${esc(dp.dow)}</span></a>`;
   }).join("") +
     `<a class="dchip info" href="#info"${r.name === "info" ? ' aria-current="page"' : ""}>${esc(t("info"))}</a>` +
     `<a class="dchip info" href="#trips"${r.name === "trips" ? ' aria-current="page"' : ""}>${esc(t("trips"))}</a>`;
@@ -408,23 +402,34 @@ function errorBox(){
     (e.all ? `<p class="aihelp">${esc(t("aiHelp"))}</p><div class="actions"><button type="button" class="btn small" data-act="copy-errors">${esc(t("copyForAi"))}</button></div>` : "") + `</div>`;
 }
 
+// The page with the whole format for AI assistants: published next to the app by the
+// build (tools/lib/llms.mjs), so every copy of TIMP points to its own.
+const llmsUrl = () => new URL("llms.txt", document.baseURI).href;
+
+// How to have a trip written by an AI assistant: a message to copy and fill in, then
+// Paste a trip. On the first screen, and folded on the Trips page.
+function aiSection(folded){
+  const body = `<ol class="steps"><li>${esc(t("aiStep1"))}</li><li>${esc(t("aiStep2"))}</li></ol>
+    <pre class="prompt" data-prompt>${esc(t("aiPrompt", {url: llmsUrl()}))}</pre>
+    <div class="actions"><button type="button" class="btn small" data-act="copy-prompt">${esc(t("copyPrompt"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>`;
+  return folded
+    ? `<details class="sec aihow"><summary>${esc(t("aiTitle"))}</summary>${body}</details>`
+    : `<section class="sec aihow"><h2>${esc(t("aiTitle"))}</h2>${body}</section>`;
+}
+
+async function copyText(text, done){
+  try{ await navigator.clipboard.writeText(text); toast(done); }
+  catch(e){ await ask({title: t("copyByHand"), text: text.split("\n").filter(Boolean), actions: [{id: "ok", label: t("close")}]}); }
+}
+
 // The problems of a refused file, worded for the assistant that wrote it, with the
 // page that has the whole format (published with the app, see tools/lib/llms.mjs).
 function messageForAi(){
-  const guide = new URL("llms.txt", document.baseURI).href;
-  return t("aiFixPrompt", {url: guide}) + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
+  return t("aiFixPrompt", {url: llmsUrl()}) + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
 }
 
-async function copyErrors(){
-  if(!S.importError || !S.importError.all) return;
-  const text = messageForAi();
-  try{
-    await navigator.clipboard.writeText(text);
-    toast(t("copiedForAi"));
-  }catch(e){
-    // No clipboard here: show the text, to be selected by hand.
-    await ask({title: t("copyByHand"), text: text.split("\n").filter(Boolean), actions: [{id: "ok", label: t("close")}]});
-  }
+function copyErrors(){
+  if(S.importError && S.importError.all) copyText(messageForAi(), t("copiedForAi"));
 }
 
 // A trip pasted as text, as a chat assistant gives it: no file to save on the phone.
@@ -506,6 +511,7 @@ function renderWelcome(){
     <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
     <button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>
   </div>
+  ${aiSection(false)}
   ${installSteps()}
   ${langPicker()}
   ${themePicker()}
@@ -541,6 +547,7 @@ function renderTrips(){
       ${S.records.some(r => r.fileName === "demo-trip.json") ? "" : `<button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>`}
     </div>
   </section>
+  ${aiSection(true)}
   <section class="sec"><h2>${esc(t("mapProvider"))}</h2>
     <div class="seg" role="group" aria-label="${esc(t("mapProvider"))}">
       <button type="button" data-provider="google" aria-pressed="${S.useGoogle}">Google Maps</button>
@@ -563,47 +570,55 @@ function renderTrips(){
   </section>`;
 }
 
+// A line of the Info page that is only a phone number becomes a link to call it.
+const PHONE = /^\+?\d[\d ().-]{1,18}\d$/;
+
+// The places to sleep of the trip, from its days, each with the nights it covers. A
+// stay given as plain text ("Night train") is not a place: it shows on its day only.
+function staysOf(tr){
+  const byName = new Map();
+  tr.days.forEach(d => {
+    if(!d.stay || typeof d.stay !== "object") return;
+    const s = d.stay;
+    const seen = byName.get(s.name);
+    if(seen) seen.last = d.date;
+    else byName.set(s.name, {...s, city: d.city, first: d.date, last: d.date});
+  });
+  return [...byName.values()];
+}
+
 function renderInfo(){
-  const tr = trip();
-  const stays = Object.values(tr.stays || {}).map(h =>
-    `<div class="card" style="--c:${placeVar(h.place)}"><div class="t"><span class="dot"></span>${esc(h.name)}</div>` +
-    ((h.dates || h.address) ? `<div class="s">${esc([h.dates, h.address].filter(Boolean).join(" · "))}</div>` : "") +
+  const tr = trip(), lang = getLang();
+  const nights = h => {
+    const a = dateParts(h.first, lang).short, b = dateParts(h.last, lang).short;
+    return a === b ? a : `${a} → ${b}`;
+  };
+  const stays = staysOf(tr).map(h =>
+    `<div class="card" style="--c:${cityVar(h.city)}"><div class="t"><span class="dot"></span>${esc(h.name)}</div>` +
+    `<div class="s">${esc([nights(h), h.address].filter(Boolean).join(" · "))}</div>` +
     (h.note ? `<div class="s">${rich(h.note)}</div>` : "") +
-    `<div><a class="maplink" href="${esc(mapsUrl(h.query || h.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a></div></div>`
+    `<div><a class="maplink" href="${esc(mapsUrl(h.address || h.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a></div></div>`
   ).join("");
+  const line = text => PHONE.test(text) ? `<a class="num" href="tel:${esc(text.replace(/[^\d+]/g, ""))}">${esc(text)}</a>` : rich(text);
   const sections = (tr.info || []).map(sec =>
-    `<section class="sec"><h2>${esc(sec.title)}</h2><div class="rows">` + sec.rows.map(r =>
-      `<div><span class="k">${esc(r.label)}</span><span class="v">${r.number ? `<span class="num">${esc(r.number)}</span>` : ""}${r.number && r.text ? " · " : ""}${r.text ? rich(r.text) : ""}</span></div>`
+    `<section class="sec"><h2>${esc(sec.title)}</h2><div class="rows">` + sec.items.map(r =>
+      `<div><span class="k">${esc(r.label)}</span><span class="v">${line(r.text)}</span></div>`
     ).join("") + `</div></section>`
   ).join("");
   return `
   <h1>${esc(tr.title)}</h1>
   ${stays ? `<section class="sec"><h2>${esc(t("whereYouSleep"))}</h2>${stays}</section>` : ""}
-  ${sections}
-  ${tr.infoNote ? `<p class="foot">${rich(tr.infoNote)}</p>` : ""}`;
+  ${sections}`;
 }
 
-function imagesOf(day, planId){
-  const all = day.mapImages || [];
-  const own = all.filter(im => im.plan === planId);
-  const list = planId && own.length ? own : all.filter(im => !im.plan);
-  return list.length ? list : null;
+function effectiveView(){
+  return S.ui.mapView === "schema" || !S.online ? "schema" : "live";
 }
 
-function effectiveView(hasImages){
-  let v = S.ui.mapView;
-  if(v === "image" && !hasImages) v = "live";
-  if(v === "live" && !S.online) v = hasImages ? "image" : "schema";
-  return v;
-}
-
-function mapPanel(zs, color, numbered, imgs, view, gone){
-  const zoneLink = z => {
-    const real = z.pts.filter(p => !p.ref);
-    return `<a class="maplink" href="${esc(real.length < 2 ? mapsUrl(real[0].q) : routeUrl(z))}" target="_blank" rel="noopener">${esc(real.length < 2 ? t("mapLink") : t("openInMaps"))}</a>`;
-  };
-  const zoneTitle = z => z.name || (zs.length > 1 ? z.pts[0].name : t("stopsOfDay"));
-  const views = [["live", t("viewLive")]].concat(imgs ? [["image", t("viewImage")]] : [], [["schema", t("viewSchema")]]);
+function mapPanel(zs, color, view, gone){
+  const zoneLink = z => `<a class="maplink" href="${esc(z.pts.length < 2 ? mapsUrl(z.pts[0].q) : routeUrl(z))}" target="_blank" rel="noopener">${esc(z.pts.length < 2 ? t("mapLink") : t("openInMaps"))}</a>`;
+  const zoneTitle = z => zs.length > 1 ? z.pts[0].name : t("stopsOfDay");
+  const views = [["live", t("viewLive")], ["schema", t("viewSchema")]];
 
   let o = `<section class="mapbox" style="--c:${color}" aria-label="${esc(t("dayMap"))}">`;
   o += `<div class="seg" role="group" aria-label="${esc(t("mapType"))}">${views.map(([id, name]) => `<button type="button" data-view="${id}" aria-pressed="${id === view}">${esc(name)}</button>`).join("")}</div>`;
@@ -618,50 +633,42 @@ function mapPanel(zs, color, numbered, imgs, view, gone){
     return o + `<p class="foot">${esc(t("footLive"))}</p></section>`;
   }
 
-  zs.forEach((z, zi) => {
-    const real = z.pts.filter(p => !p.ref);
+  zs.forEach(z => {
     if(z.enter && z.enter.travel){
-      o += `<p class="off move${gone(z.enter.idx) ? " gone" : ""}"><span class="tvchip">${travelIcon(z.enter.travel, 16)}</span><span>${esc(t("travel_" + z.enter.travel))} · ${esc(z.enter.from.name)} → ${esc(zoneTitle(z))}</span></p>`;
+      o += `<p class="off move${gone(z.enter.idx) ? " gone" : ""}"><span class="tvchip">${icon(z.enter.travel, 16)}</span><span>${esc(t("travel_" + z.enter.travel))} · ${esc(z.enter.from.name)} → ${esc(zoneTitle(z))}</span></p>`;
+    }
+    if(z.pts.length < 2){
+      o += `<p class="off"><span class="mb">${z.pts[0].nums.join("·")}</span><span>${esc(z.pts[0].name)} · ${esc(t("offSketch"))}</span>${zoneLink(z)}</p>`;
+      return;
     }
     const head = `<div class="zhead"><span class="zname">${esc(zoneTitle(z))}</span>${zoneLink(z)}</div>`;
-    const im = view === "image" ? imgs.find(x => (x.zone || 0) === zi) : null;
-    if(im){
-      const q = name => { const p = z.pts.find(p => p.name === name); return p ? p.q : name; };
-      o += `<div class="zone">${head}<img class="mapimg" src="${esc(im.src)}" width="${im.width}" height="${im.height}" alt="${esc(zoneTitle(z))}"><ol class="mlegend">${im.pins.map((n, i) => `<li><span class="mb">${i + 1}</span><a href="${esc(mapsUrl(q(n)))}" target="_blank" rel="noopener">${esc(n)}</a></li>`).join("")}</ol></div>`;
-      return;
-    }
-    if(view === "image"){
-      o += `<p class="off"><span>${esc(z.name || real[0].name)} · ${esc(t("onlyInSketch"))}</span>${zoneLink(z)}</p>`;
-      return;
-    }
-    if(real.length < 2){
-      o += `<p class="off"><span class="mb">${real[0].nums.join("·")}</span><span>${esc(real[0].name)} · ${esc(t("offSketch"))}</span>${zoneLink(z)}</p>`;
-      return;
-    }
-    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone)}<ol class="mlegend">${real.map(p => `<li><span class="mb">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
+    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone)}<ol class="mlegend">${z.pts.map(p => `<li><span class="mb">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
   });
-  const credit = view === "image" ? imgs.map(im => im.credit).filter(Boolean)[0] : "";
-  const foot = view === "image"
-    ? t("footImage") + (credit ? " " + credit + "." : "")
-    : t("footSketch") + (numbered ? " " + t("footNumbers") : "");
-  return o + `<p class="foot">${esc(foot)}</p></section>`;
+  return o + `<p class="foot">${esc(t("footSketch") + " " + t("footNumbers"))}</p></section>`;
 }
 
 const stopKey = (day, planId, s, i) => `${day.date}|${planId || ""}|${s.id || "#" + i}`;
 
 const isOpen = id => S.openStops.has(id) ? S.openStops.get(id) : S.ui.expandAll;
 
-function stopsHTML(day, planId, list, numbered, pins){
-  return `<ol class="stops" style="--c:${placeVar(day.place)}">` + list.map((s, i) => {
+// An icon with its name for screen readers, for a value of TRAVEL or TYPES. Values the
+// app does not know (a newer file) get none.
+function chip(kind, value){
+  const known = kind === "travel" ? TRAVEL : TYPES;
+  if(!known.includes(value)) return "";
+  const name = esc(t(kind + "_" + value));
+  return `<span class="${kind === "travel" ? "tvchip" : "tychip"}" role="img" aria-label="${name}" title="${name}">${icon(value, kind === "travel" ? 16 : 15)}</span>`;
+}
+
+function stopsHTML(day, planId, list){
+  return `<ol class="stops" style="--c:${cityVar(day.city)}">` + list.map((s, i) => {
     const id = stopKey(day, planId, s, i);
     const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id], open = isOpen(id);
-    const q = stopQuery(s);
+    const q = placeQuery(s);
     // Left column: when, where on the map, how you get there.
-    const pn = pins ? pins[s.mapLabel || s.title] : (numbered && s.lat !== undefined ? i + 1 : 0);
-    const tv = s.travel ? `<span class="tvchip" role="img" aria-label="${esc(t("travel_" + s.travel))}" title="${esc(t("travel_" + s.travel))}">${travelIcon(s.travel, 16)}</span>` : "";
-    const left = `<div class="time"><span>${esc(s.time)}</span>${pn ? `<span class="nb">${pn}</span>` : ""}${tv}</div>`;
-    // Middle: a label above the title, the title, the description that folds, the links.
-    const titleRow = `<div class="h"><h3>${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>`;
+    const left = `<div class="time"><span>${esc(s.time || "")}</span>${s.lat !== undefined ? `<span class="nb">${i + 1}</span>` : ""}${chip("travel", s.travel)}</div>`;
+    // Middle: a label above the title, the title with its kind, the description that folds, the links.
+    const titleRow = `<div class="h"><h3>${chip("type", s.type)}${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>`;
     const head = s.text
       ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}">${titleRow}<p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p></div>`
       : titleRow;
@@ -690,7 +697,7 @@ function markCut(){
 // Returns the page and, when the interactive map is showing, what it must display.
 function renderDay(i){
   const tr = trip(), d = tr.days[i], lang = getLang();
-  const place = tr.places[d.place], color = placeVar(d.place);
+  const color = cityVar(d.city);
   const prev = tr.days[i - 1], next = tr.days[i + 1];
   const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
   const list = plan ? plan.stops : d.stops;
@@ -699,26 +706,22 @@ function renderDay(i){
   const doneCount = keys.filter(k => S.state.done[k]).length;
   const skipCount = keys.filter(k => !S.state.done[k] && S.state.skipped[k]).length;
   // For the map: is the stop at this position in the list done or skipped?
-  const gone = k => k >= 0 && !!(S.state.done[keys[k]] || S.state.skipped[keys[k]]);
-  const anyText = list.some(s => s.text);
-  const stay = d.stay ? tr.stays[d.stay] : null;
+  const gone = k => !!(S.state.done[keys[k]] || S.state.skipped[keys[k]]);
   const isSkipped = k => !S.state.done[keys[k]] && !!S.state.skipped[keys[k]];
-  const zs = zonesOf(d, plan, list, isSkipped);
-  const imgs = zs.length ? imagesOf(d, pid) : null;
-  const view = effectiveView(!!imgs);
-  const numbered = !d.mapZones;
-  let pins = null;
-  if(imgs && view === "image"){ pins = {}; imgs.forEach(im => im.pins.forEach((p, k) => { if(!pins[p]) pins[p] = k + 1; })); }
+  const anyText = list.some(s => s.text);
+  const stay = stayOf(d.stay);
+  const zs = zonesOf(list, isSkipped);
+  const view = effectiveView();
   const dp = dateParts(d.date, lang), ti = todayIndex();
-  const fromName = d.from ? tr.places[d.from].name : "";
-  const sign = place.glyph
-    ? `<div class="kanji">${esc(place.glyph)}</div><div class="romaji">${esc(fromName ? fromName + " → " + place.name : place.name)}</div>`
-    : `<div class="kanji plain">${esc(place.name)}</div>${fromName ? `<div class="romaji">${esc(fromName + " → " + place.name)}</div>` : ""}`;
+  // The sign at the top: the city, and where the day starts when that is another one.
+  const city = d.city || "";
+  const from = prev && prev.city && city && prev.city !== city ? prev.city : "";
+  const sign = `<div class="kanji">${esc(city || dp.long)}</div>${from ? `<div class="romaji">${esc(from + " → " + city)}</div>` : ""}`;
   const neighbor = (x, k, cls) => {
-    const p = dateParts(x.date, lang), name = esc(tr.places[x.place].name);
+    const p = dateParts(x.date, lang), name = x.city ? " · " + esc(x.city) : "";
     return cls
-      ? `<a class="next" href="#day-${k + 1}">${esc(p.dow)} <b>${k + 1}</b> · ${name} →</a>`
-      : `<a href="#day-${k + 1}">← <b>${k + 1}</b> ${esc(p.dow)} · ${name}</a>`;
+      ? `<a class="next" href="#day-${k + 1}">${esc(p.dow)} <b>${k + 1}</b>${name} →</a>`
+      : `<a href="#day-${k + 1}">← <b>${k + 1}</b> ${esc(p.dow)}${name}</a>`;
   };
 
   let html = `
@@ -734,10 +737,8 @@ function renderDay(i){
     </div>
   </section>
   <div class="headrow">
-    <h1>${esc(d.title)}</h1>
-    <div class="sleep">${stay
-      ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span><a class="maplink" href="${esc(mapsUrl(stay.query || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>`
-      : (d.stayText ? `<span>${esc(t("night"))} · <b>${esc(d.stayText)}</b></span>` : "")}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}</span></div>
+    ${d.title ? `<h1>${esc(d.title)}</h1>` : ""}
+    <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}</span></div>
     ${zs.length || anyText ? `<div class="tools">` +
       (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
       (anyText ? `<button type="button" class="iconbtn" data-expand aria-pressed="${S.ui.expandAll}" aria-label="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}" title="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}">${S.ui.expandAll ? FOLD : UNFOLD}</button>` : "") +
@@ -746,19 +747,18 @@ function renderDay(i){
 
   let wanted = null;
   if(S.ui.mapOpen && zs.length){
-    html += mapPanel(zs, color, numbered, imgs, view, gone);
+    html += mapPanel(zs, color, view, gone);
     const dark = isDark();
     // Skipping a stop changes the route: the map is drawn again.
     const skippedNow = list.map((s, k) => isSkipped(k) ? k : -1).filter(k => k >= 0).join(",");
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark, skippedNow].join("|"), zones: zs, color: dark ? (place.colorDark || place.color) : place.color, dark, gone};
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark, skippedNow].join("|"), zones: zs, color: cityColor(d.city), dark, gone};
   }
-  if(d.reminders) html += d.reminders.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
+  if(d.notes) html += d.notes.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
   if(d.plans){
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
   }
-  html += stopsHTML(d, pid, list, numbered, pins);
-  if(d.note) html += `<p class="alt">${rich(d.note)}</p>`;
+  html += stopsHTML(d, pid, list);
   html += `<p class="foot">${esc(t("footDay"))}</p>`;
   return {html, wanted};
 }
@@ -924,6 +924,7 @@ $app.addEventListener("click", e => {
   if(a === "pick"){ $file.value = ""; $file.click(); }
   else if(a === "paste") pasteTrip();
   else if(a === "copy-errors") copyErrors();
+  else if(a === "copy-prompt") copyText(t("aiPrompt", {url: llmsUrl()}), t("copiedPrompt"));
   else if(a === "demo") loadDemo();
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
@@ -1073,8 +1074,9 @@ async function start(){
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);
-  // Trips saved before versions existed: give them ids and a version, ticks follow.
-  for(const rec of S.records.filter(r => !r.trip.version)){
+  // Trips saved before versions existed, or in format 1: ids, a version, format 2.
+  // A converted trip is a new version made from the old one; ticks follow.
+  for(const rec of S.records.filter(r => !r.trip.version || r.trip.format !== FORMAT)){
     const {trip: ready, renamed} = await prepare(rec.trip);
     const saved = await store.getKV("state:" + rec.id);
     if(saved && renamed.length) await store.setKV("state:" + rec.id, moveMarks({done: {}, skipped: {}, plans: {}, ...saved}, renamed));
@@ -1082,7 +1084,7 @@ async function start(){
     await store.putTrip(rec);
     await versions.put(ready);
   }
-  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ["live", "image", "schema"].includes(ui.mapView) ? ui.mapView : "live", expandAll: !!ui.expandAll};
+  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll};
   if(typeof key === "string") S.deviceKey = key;
   syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);

@@ -1,0 +1,8 @@
+# The link resolver on Cloudflare Workers. See README.md in this folder.
+name = "timp-resolve"
+main = "resolve.js"
+compatibility_date = "2026-11-01"
+
+# Nothing is kept: no logs, no traces of requests.
+[observability]
+enabled = false

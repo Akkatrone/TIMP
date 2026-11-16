@@ -179,6 +179,15 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("day 1", `document.querySelectorAll(".stop").length === 6`);
   });
 
+  await step("each kind of place has its icon, in the list and on the map's pins", async () => {
+    // Day 1: two sights, a view, a sight, food, a view; the train stop has no kind.
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .tychip")].map(e => e.getAttribute("aria-label"));`), ["Sight", "Sight", "View", "Sight", "Food", "View"]);
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    await until("the pins", `document.querySelectorAll(".live .pin").length === 5`);
+    assert.equal(await count(".live .pin.typed svg"), 5);
+    await click("[data-map]");
+  });
+
   await step("the dark theme can be chosen, survives a reload, and darkens the map", async () => {
     const bg = () => run(`return getComputedStyle(document.body).backgroundColor;`);
     const light = await bg();
@@ -276,13 +285,14 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
     // No request leaves the test: Nominatim answers from here.
-    await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.71","lon":"-9.1366"}]'))) : real(u, o);`);
+    await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.71","lon":"-9.1366","category":"tourism","type":"museum"}]'))) : real(u, o);`);
     await run(`document.querySelector(".fab").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open]")`);
     assert.equal(await run(`return getComputedStyle(document.documentElement).overflow;`), "hidden", "the page under the form does not scroll");
     await fill("#stop-src", "Rua Augusta, 24https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Rua Augusta, 24");
     await until("the position", `/38\.71000, -9\.13660 · OpenStreetMap/.test(document.querySelector("[data-pos]").textContent)`);
+    assert.equal(await run(`return document.querySelector('[data-type][aria-checked="true"]').dataset.type;`), "museum", "the kind of place OpenStreetMap gave");
     const url = new URL(await run(`return window.__geo[0];`));
     assert.equal(url.searchParams.get("q"), "Rua Augusta, 24");
     assert.equal(url.searchParams.get("bounded"), "1");
@@ -485,6 +495,11 @@ await withApp(async ({run, until, reload, blocked}) => {
   await step("a trip pasted from a chat loads; a wrong one gives its problems, ready for the assistant", async () => {
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector('[data-act="paste"]')`);
+    // The message to start from is there, with the page of the format on this site.
+    assert.match(await run(`return document.querySelector("details.aihow [data-prompt]").textContent;`), /^Read http:\/\/[^ ]+\/llms\.txt and follow it exactly\./);
+    await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; };`);
+    await run(`document.querySelector("[data-act='copy-prompt']").click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.match(await run(`return window.__copied;`), /\[where, dates or number of days/);
     // What Gemini wrote: "name" instead of "title", no format, no places.
     const wrong = {id: "rome-gemini", title: "Rome", days: [{date: "2027-05-01", place: "rome", title: "Day 1", stops: [{time: "09:00", name: "Colosseum"}]}]};
     await run(`document.querySelector('[data-act="paste"]').click();`);

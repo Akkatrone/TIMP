@@ -66,7 +66,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | Path | What it does |
 |---|---|
 | `js/app.js` | Screens, navigation, events. The only file that touches the page. |
-| `js/trip.js` | Trip format validation. No DOM: also runs under Node. |
+| `js/trip.js` | The trip format: `FIELDS` (one table for every field), checks, JSON Schema, conversion from format 1. No DOM. |
 | `js/geo.js` | Map zones and the offline sketch. No DOM. |
 | `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |
@@ -84,11 +84,12 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/store.js` | IndexedDB storage; the same calls in memory (also used by the tests). |
 | `js/i18n.js` | Interface texts, every language. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
-| `js/icons.js` | Icons for metro, bus, train, plane, boat. No DOM. |
+| `js/icons.js` | Icons for the kinds of places and ways of travelling. No DOM. |
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `sw.js` | Service worker: offline copy of the app. |
 | `tools/`, `test/` | Checks, build, tests. `tools/e2e.mjs` drives a real browser. |
 | `tools/lib/llms.mjs` | Builds `llms.txt` (format for chat assistants) from the docs. Never edit the output. |
+| `worker/` | The optional link resolver (Cloudflare Workers): a Google Maps link in, name, address, position and kind out. Keeps nothing. |
 | `vendor/` | Third-party code, unmodified. Do not edit. |
 
 ### What a change must respect
@@ -97,11 +98,14 @@ The project makes three promises. Do not break them, even if asked for a feature
 seems to need it: say so instead.
 
 1. **The trip never leaves the device.** No accounts, no server, no analytics, no
-   request that carries trip data, except a stop's name and address sent to Google or
-   OpenStreetMap to find its position when a stop is added or changed.
+   request that carries trip data. Two exceptions, both when a stop is added or
+   changed: its name and address go to Google or OpenStreetMap to find its position,
+   and a Google Maps link pasted or shared goes to the link resolver (`worker/`),
+   which keeps nothing.
 2. **It works offline.** Everything except the interactive map, after one online visit.
 3. **Anyone can host it.** Static files only; running it needs no build and no
-   installed dependency.
+   installed dependency. The link resolver is optional: without it the app loses only
+   the reading of short links.
 
 And these rules:
 
@@ -111,11 +115,16 @@ And these rules:
   inline scripts, no `on…=` attributes, never `'unsafe-inline'` in `script-src`. A new
   host goes in the one directive that needs it, in the same change, with a reason in
   the comment above. `npm run e2e` fails if the browser blocks anything.
-- **The trip format is a contract.** Adding an optional field is fine. Renaming,
-  removing or changing the meaning of a field is a breaking change and needs a new
-  format version. A new field needs: a rule in `js/trip.js`, a test in
-  `test/trip.test.mjs`, an entry in `docs/trip-format.md`, and a mention in
-  `docs/creating-a-trip.md` if it changes how a trip should be written.
+- **The trip format is a contract, and it is content only.** A trip file says what the
+  trip is; anything about how it looks (colours, map settings, labels) is worked out by
+  the app and never goes in the format. Adding an optional field is fine. Renaming,
+  removing or changing the meaning of a field needs a new format version and a
+  conversion in `upgrade()`. A new field is one entry in `FIELDS` in `js/trip.js` (the
+  checks and the JSON Schema follow), plus a test in `test/trip.test.mjs`, an entry in
+  `docs/trip-format.md` (a test checks it), and a mention in `docs/creating-a-trip.md`
+  if it changes how a trip should be written. New kinds of places or ways of
+  travelling: add the value to `TYPES` or `TRAVEL`, an icon in `js/icons.js` and a name
+  in `js/i18n.js`; unknown values are warnings, so old apps still load new files.
 - **Versions and merges stay deterministic.** Two phones merging the same two versions
   must end with the same trip and the same version id: conflicts are settled by version
   id, never by which phone runs the merge. `test/versions.test.mjs` checks it.

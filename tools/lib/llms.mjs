@@ -16,48 +16,56 @@ const read = (root, f) => readFileSync(join(root, f), "utf8").trim();
 // page they would lead nowhere, so they become plain names.
 const unlink = md => md.replace(/\[([^\]]+)\]\((?!https?:)[^)]+\)/g, "$1");
 
-export function llmsText({root = ROOT, site = "https://frafal.github.io/TIMP/"} = {}){
+export function llmsText({root = ROOT, site = "https://frafal.github.io/TIMP/", resolver = ""} = {}){
+  const links = resolver ? `
+## Google Maps links
+
+If the traveller gives you Google Maps links (\`https://maps.app.goo.gl/…\`) and you can
+open web addresses, ask the link resolver of this site, one link at a time:
+
+    GET ${resolver}?url=<the link, URL-encoded>
+
+It answers with JSON: \`title\`, \`address\`, \`lat\`, \`lng\`, \`type\` (each only when
+known) and \`link\`. Put them in the stop as they are. It keeps nothing.
+` : "";
   return `# TIMP (Travel in my pocket): how to write a trip file
 
 > For AI assistants asked to make a trip for TIMP. TIMP is a web app (${site}) that
-> shows a day-by-day travel guide on a phone, offline. A trip is ONE JSON file. The app
-> checks it strictly and refuses the whole file if a single rule is broken, so follow
-> the format below exactly: do not invent field names.
+> shows a day-by-day travel guide on a phone, offline. A trip is ONE JSON file that
+> says what the trip is: days, stops, where to sleep, what to remember. Never how it
+> looks: the app picks colours, draws maps and chooses icons. The app refuses the whole
+> file if one rule is broken, so follow the format below exactly and invent no fields.
+> The format as a JSON Schema: ${site}trip.schema.json
 
 ## Checklist: check every point before you hand over the file
 
-1. The first field is \`"format": "travel-in-my-pocket/1"\`.
-2. \`"id"\` is lowercase letters, digits and dashes, like \`"rome-2027"\`.
-3. \`"title"\` is the name of the trip.
-4. \`"places"\` is an object with at least one entry. Each key is lowercase with dashes
-   (\`"rome"\`), and each entry has \`"name"\` AND \`"color"\` as \`"#rrggbb"\`
-   (a medium or dark tone, like \`"#b8451b"\`).
-5. \`"days"\` is a list, one entry per date, dates as \`"YYYY-MM-DD"\` in ascending order.
-   Each day has \`"date"\`, \`"place"\` (one of the keys of "places"), \`"title"\`, and
-   \`"stops"\`.
-6. Each stop has \`"time"\` and \`"title"\` (not "name", not "place"). Give \`"lat"\` and
-   \`"lng"\` as numbers for every stop that is a place, and \`"query"\` (name and town)
-   for the Google Maps link.
-7. Only the fields listed below. Valid JSON: double quotes, no comments, no trailing
-   commas. Hand over the whole file, in one block.
+1. The first field is \`"format": "travel-in-my-pocket/2"\`, then \`"title"\`.
+2. \`"days"\` is a list, one entry per date, \`"date": "YYYY-MM-DD"\`, in date order.
+3. Each day has \`"stops"\` (a list), or \`"plans"\` (two or more, each with \`"name"\` and
+   \`"stops"\`), never both. Give it \`"city"\` and \`"title"\` too.
+4. Each stop has \`"title"\` (not "name", not "place"). Add \`"time"\`, \`"type"\`, \`"address"\`,
+   and \`"lat"\` and \`"lng"\` as numbers when you know the position.
+5. \`"type"\` is one of: sight, museum, food, park, view, shop, walk, hotel.
+   \`"travel"\` (how you get there) is one of: metro, bus, train, plane, boat.
+6. \`"stay"\` is a name, or \`{"name", "address", "note"}\`. \`"info"\` sections have
+   \`"title"\` and \`"items"\` of \`{"label", "text"}\`.
+7. No colours, icons, ids or versions: the app writes those. Only the fields listed
+   below. Valid JSON: double quotes, no comments, no trailing commas. Hand over the
+   whole file, in one block.
 
 The smallest valid file:
 
 \`\`\`json
 {
-  "format": "travel-in-my-pocket/1",
-  "id": "rome-2027",
-  "title": "Rome in my pocket",
-  "places": {
-    "rome": {"name": "Roma", "color": "#b8451b"}
-  },
+  "format": "travel-in-my-pocket/2",
+  "title": "Rome in three days",
   "days": [
     {
       "date": "2027-04-10",
-      "place": "rome",
+      "city": "Rome",
       "title": "The ancient city",
       "stops": [
-        {"time": "09:00", "title": "Colosseum", "lat": 41.8902, "lng": 12.4922, "query": "Colosseum, Rome"}
+        {"time": "09:00", "title": "Colosseum", "type": "sight", "address": "Piazza del Colosseo, Rome", "lat": 41.8902, "lng": 12.4922}
       ]
     }
   ]
@@ -66,11 +74,11 @@ The smallest valid file:
 
 ## How the traveller loads it
 
-They copy the JSON and, in the app, tap Trips → Paste a trip (or save it as a .json
+They copy your answer and, in the app, tap Trips → Paste a trip (or save it as a .json
 file and load it). If the app refuses it, it lists each problem with its position, like
 \`days[0].stops[2].title: is required\`, and a button copies that list to send back to
 you. Fix every problem and hand over the whole file again.
-
+${links}
 ---
 
 ${unlink(read(root, "docs/creating-a-trip.md"))}

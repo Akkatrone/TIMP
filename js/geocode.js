@@ -9,6 +9,8 @@
 // The address leaves the device only here, and only for this.
 
 import { loadGoogle } from "./google.js";
+import { typeFrom, TYPES } from "./trip.js";
+import { RESOLVER_URL } from "./config.js";
 
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 
@@ -27,7 +29,7 @@ function readNominatim(results){
   if(!r) return null;
   const lat = +r.lat, lng = +r.lon;
   if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return {lat: round(lat), lng: round(lng), source: "osm"};
+  return {lat: round(lat), lng: round(lng), source: "osm", type: typeFrom([r.category, r.type])};
 }
 
 const round = v => Math.round(v * 1e5) / 1e5;
@@ -42,7 +44,7 @@ async function viaGoogle(address, key, near){
   const gm = await loadGoogle(key);
   const {Geocoder} = await gm.importLibrary("geocoding");
   const {results} = await new Geocoder().geocode(near ? {address, bounds: near} : {address});
-  const hit = (results || []).map(r => r.geometry.location).map(l => ({lat: round(l.lat()), lng: round(l.lng()), source: "google"})).find(h => inside(h, near));
+  const hit = (results || []).map(r => ({lat: round(r.geometry.location.lat()), lng: round(r.geometry.location.lng()), source: "google", type: typeFrom(r.types || [])})).find(h => inside(h, near));
   return hit || null;
 }
 
@@ -76,7 +78,8 @@ export function areaAround(points, km = 15){
  * @param {string} address
  * @param {{googleKey?: string, lang?: string, near?: {south, west, north, east}|null}} o
  *   near: the area of the trip (areaAround); the search tries there first, then anywhere.
- * @returns {Promise<{lat: number, lng: number, source: "google"|"osm"}|null>}
+ * @returns {Promise<{lat: number, lng: number, source: "google"|"osm", type: string|null}|null>}
+ *   type: the kind of place (TYPES in js/trip.js) when the service says what it is.
  *   null when no service found the address, or the device is offline.
  */
 export async function geocode(address, {googleKey = "", lang = "en", near = null} = {}){
@@ -98,4 +101,26 @@ export async function geocode(address, {googleKey = "", lang = "en", near = null
     }catch(e){ return null; }
   }
   return null;
+}
+
+/**
+ * A Google Maps short link, read by the link resolver (worker/, when this copy of the
+ * app has one): {title, address, lat, lng, type}, each only when known. Null without a
+ * resolver, offline, or when it does not answer within a few seconds. Only the link
+ * is sent.
+ */
+export async function resolveLink(link){
+  if(!RESOLVER_URL || (typeof navigator !== "undefined" && navigator.onLine === false)) return null;
+  try{
+    const res = await fetch(RESOLVER_URL + "?url=" + encodeURIComponent(link), {signal: AbortSignal.timeout(8000), credentials: "omit"});
+    if(!res.ok) return null;
+    const r = await res.json();
+    const text = v => typeof v === "string" && v.trim() ? v.trim().slice(0, 300) : undefined;
+    const num = (v, max) => Number.isFinite(v) && Math.abs(v) <= max ? round(v) : undefined;
+    const out = {title: text(r.title), address: text(r.address), lat: num(r.lat, 90), lng: num(r.lng, 180), type: TYPES.includes(r.type) ? r.type : undefined};
+    if(out.lat === undefined || out.lng === undefined) out.lat = out.lng = undefined;
+    return out.title || out.address || out.lat !== undefined ? out : null;
+  }catch(e){
+    return null;
+  }
 }

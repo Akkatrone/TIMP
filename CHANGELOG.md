@@ -1,8 +1,54 @@
 # Changelog
 
 Versions follow [Semantic Versioning](https://semver.org/). The trip file format has
-its own version (`travel-in-my-pocket/1`), which has not changed: files written for
-1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
+its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
+(1.0 to 2.4) still load: the app converts them.
+
+## 3.0.0
+
+A simpler trip file, kinds of places, and Google Maps short links that work.
+
+**The trip file, format 2.** It says what the trip is, and nothing about how it looks:
+the app picks colours, draws the maps and chooses the icons.
+
+- Required: `format`, `title`, and for each day its `date` and `stops` (or `plans`);
+  for each stop its `title`. Everything else is optional, `time` included.
+- No more cross-references: a day has its `city` as a name and its `stay` inside it
+  (a name, or `{name, address, note}`); `places` and `stays` are gone.
+- Gone, worked out by the app: colours (`color`, `colorDark`), `glyph`, the trip and
+  plan `id` (made from title and date when missing), `from`, `mapZones`, `mapImages`,
+  `zoneNames`, `mapSplitKm`, `mapLabel`, the stays' `dates`.
+- Renamed: `query` → `address`, `reminders` and `note` → `notes`, info `rows` →
+  `items` (`number` folds into `text`: a phone number becomes a link to call),
+  `map.googleMapsKey` → `googleMapsKey`. `infoNote` becomes an Info section.
+- A `type` or `travel` the app does not know yet is a warning, not an error, so newer
+  files load in older apps.
+- One table in `js/trip.js` describes every field. The checks, the JSON Schema
+  (`trip.schema.json`, published with the app for models that follow one) and the
+  reference test of the documentation are made from it.
+- Old files and the trips on the phone are converted on their own, as a new version
+  made from the old one; the same on every phone.
+
+**Kinds of places.** `type`: `sight`, `museum`, `food`, `park`, `view`, `shop`, `walk`,
+`hotel`. Each has an icon by the stop's title and on its pin on the map; the stop form
+has a row to pick one, filled in from OpenStreetMap or Google when a position is looked up.
+
+**Google Maps short links.** The new link resolver (`worker/`, on Cloudflare Workers)
+follows a short link and answers with name, address, position and kind of place. The
+app uses it when a short link is pasted or shared; AI assistants that open web
+addresses can call it too. It keeps nothing. It is optional: the build gets its address
+from the repository variable `RESOLVER_URL` and adds it to the Content-Security-Policy.
+
+Also:
+
+- A link to a street address keeps the house number in the stop's name.
+- `llms.txt` and other pages of the site open in a browser where the app is installed:
+  the service worker answered them with the app, or with ERR_CACHE_MISS.
+- The first screen explains how to have a trip written by an AI assistant, with the
+  message to copy; the Trips page has the same, folded.
+- The Info page lists the places to sleep with their nights, worked out from the days.
+- The map has two views, the interactive map and the sketch: the "Picture" view of
+  embedded map pictures is gone with `mapImages`.
 
 ## 2.4.0
 

@@ -6,9 +6,10 @@
 import { t, getLang } from "./i18n.js";
 import { esc, dateParts } from "./util.js";
 import { parseMapsInput, queryOf } from "./gmaps.js";
-import { geocode, areaAround } from "./geocode.js";
+import { geocode, areaAround, resolveLink } from "./geocode.js";
 import { loadLeaflet } from "./livemap.js";
-import { travelIcon, TRAVEL } from "./icons.js";
+import { icon } from "./icons.js";
+import { TRAVEL, TYPES } from "./trip.js";
 import { ask } from "./ask.js";
 
 let dialog = null;
@@ -56,8 +57,9 @@ export function openStopEditor(o){
     lng: o.stop ? o.stop.lng : undefined,
     source: o.stop && o.stop.lat !== undefined ? "kept" : "",
     link: o.stop ? o.stop.link : undefined,
-    address: "",
+    address: (o.stop && o.stop.address) || "",
     travel: (o.stop && o.stop.travel) || "",
+    type: (o.stop && o.stop.type) || "",
     searching: false
   };
   const s0 = o.stop || {};
@@ -65,8 +67,16 @@ export function openStopEditor(o){
   const days = o.trip.days;
   const dayOptions = days.map((d, i) => {
     const p = dateParts(d.date, lang);
-    return `<option value="${i}"${i === o.dayIndex ? " selected" : ""}>${esc(t("day"))} ${i + 1} · ${esc(p.dow)} ${esc(p.long.split(" ").slice(1).join(" "))} · ${esc(d.title)}</option>`;
+    return `<option value="${i}"${i === o.dayIndex ? " selected" : ""}>${esc(t("day"))} ${i + 1} · ${esc(p.dow)} ${esc(p.long.split(" ").slice(1).join(" "))} ${d.title || d.city ? " · " + esc(d.title || d.city) : ""}</option>`;
   }).join("");
+
+  // A row of buttons to pick one value of TYPES or TRAVEL, or none.
+  const choice = (kind, values, label) => `<div class="field">
+      <span class="label" id="${kind}-label">${esc(label)}</span>
+      <div class="seg wrap" role="radiogroup" aria-labelledby="${kind}-label">
+        ${["", ...values].map(m => `<button type="button" role="radio" data-${kind}="${m}" aria-checked="${st[kind] === m}">${icon(m, 16)}<span>${esc(t(m ? `${kind}_${m}` : `${kind}_none`))}</span></button>`).join("")}
+      </div>
+    </div>`;
 
   dlg.innerHTML = `
   <form method="dialog" class="sheet-form" novalidate>
@@ -104,12 +114,8 @@ export function openStopEditor(o){
       <select id="stop-plan"></select>
     </div>
 
-    <div class="field">
-      <span class="label" id="travel-label">${esc(t("fTravel"))}</span>
-      <div class="seg wrap" role="radiogroup" aria-labelledby="travel-label">
-        ${["", ...TRAVEL].map(m => `<button type="button" role="radio" data-travel="${m}" aria-checked="${st.travel === m}">${m ? travelIcon(m, 16) : ""}<span>${esc(t(m ? "travel_" + m : "travel_none"))}</span></button>`).join("")}
-      </div>
-    </div>
+    ${choice("type", TYPES, t("fType"))}
+    ${choice("travel", TRAVEL, t("fTravel"))}
 
     <div class="field">
       <label for="stop-text">${esc(t("fText"))}</label>
@@ -164,6 +170,11 @@ export function openStopEditor(o){
   }
 
   function note(text){ $("[data-src-note]").textContent = text; }
+
+  function setChoice(kind, value){
+    st[kind] = value;
+    dlg.querySelectorAll(`[data-${kind}]`).forEach(b => b.setAttribute("aria-checked", String(b.dataset[kind] === value)));
+  }
 
   // Where the trip is: the stops of the chosen day, or of the whole trip.
   function area(){
@@ -224,12 +235,27 @@ export function openStopEditor(o){
 
   // What the traveller pasted or typed in the first field.
   let lastRead = null;
-  function readSource(text){
+  async function readSource(text){
     if(text === lastRead) return;   // the same text, read again on blur: nothing new
     lastRead = text;
     fitSource();
     const r = parseMapsInput(text);
     if(r.link) st.link = r.link;
+    // A short link says nothing by itself: the link resolver, when there is one, reads
+    // it and answers with name, address, position and kind of place.
+    if(r.short){
+      st.searching = true; showPos();
+      const found = await resolveLink(r.link);
+      st.searching = false;
+      if(text !== lastRead) return;   // something else was pasted meanwhile
+      if(found){
+        // Its address has the town, which a shared line ("Via Roma, 3") lacks; a name
+        // the traveller shared stays.
+        for(const k of ["address", "lat", "lng"]) if(found[k] !== undefined) r[k] = found[k];
+        if(found.title && !r.title) r.title = found.title;
+        if(found.type && !st.type) setChoice("type", found.type);
+      }
+    }
     if(r.title && !$("#stop-title").value.trim()) $("#stop-title").value = r.title;
     st.address = r.address || (!r.link && looksLikeAddress(text) && r.lat === undefined ? text.trim() : "");
     if(r.lat !== undefined){ st.lat = r.lat; st.lng = r.lng; st.source = "link"; movePick(); }
@@ -242,7 +268,7 @@ export function openStopEditor(o){
   async function findPosition(){
     const day = days[+$("#stop-day").value];
     const title = $("#stop-title").value.trim();
-    const text = st.address ? queryOf({title, address: st.address}) : [title, o.trip.places[day.place].name].filter(Boolean).join(", ");
+    const text = st.address ? queryOf({title, address: st.address}) : [title, day.city].filter(Boolean).join(", ");
     if(!text) return;
     if(navigator.onLine === false){ note(t("posOffline")); return; }
     st.searching = true; showPos();
@@ -250,7 +276,10 @@ export function openStopEditor(o){
     const near = area();
     const hit = (st.address && await geocode(st.address, {googleKey: o.googleKey, lang, near})) || await geocode(text, {googleKey: o.googleKey, lang, near});
     st.searching = false;
-    if(hit){ st.lat = hit.lat; st.lng = hit.lng; st.source = hit.source; movePick(); }
+    if(hit){
+      st.lat = hit.lat; st.lng = hit.lng; st.source = hit.source; movePick();
+      if(hit.type && !st.type) setChoice("type", hit.type);
+    }
     else note(t("posNotFound"));
     showPos();
   }
@@ -258,11 +287,9 @@ export function openStopEditor(o){
   dlg.onclick = async e => {
     if(e.target === dlg) return;
     if(e.target.closest("[data-close]")){ dlg.close(); return; }
-    const tr = e.target.closest("[data-travel]");
-    if(tr){
-      st.travel = tr.dataset.travel;
-      dlg.querySelectorAll("[data-travel]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.travel === st.travel)));
-      return;
+    for(const kind of ["type", "travel"]){
+      const b = e.target.closest(`[data-${kind}]`);
+      if(b){ setChoice(kind, b.dataset[kind]); return; }
     }
     if(e.target.closest("[data-paste]")){
       try{
@@ -309,22 +336,21 @@ export function openStopEditor(o){
       return;
     }
     const day = days[+$("#stop-day").value];
-    const place = o.trip.places[day.place].name;
-    // The search text behind Map and Directions: the address when there is one.
-    const query = st.address ? queryOf({title, address: st.address})
-      : (s0.query && title === s0.title ? s0.query : `${title}, ${place}`);
+    // What Map and Directions search for: the address, or else the name in its town.
+    const address = st.address || (day.city ? `${title}, ${day.city}` : undefined);
     const stop = {
       ...s0,
       time: $("#stop-time").value.trim() || timeNow(o.timezone),
       title,
+      type: st.type || undefined,
+      travel: st.travel || undefined,
       text: $("#stop-text").value.trim() || undefined,
+      address,
       lat: st.lat, lng: st.lng,
-      query,
-      link: st.link,
-      travel: st.travel || undefined
+      link: st.link
     };
     delete stop.id;
-    if(st.lat === undefined){ delete stop.lat; delete stop.lng; delete stop.mapLabel; }
+    if(st.lat === undefined){ delete stop.lat; delete stop.lng; }
     dlg.close();
     o.onSave({stop, date: day.date, plan: day.plans ? $("#stop-plan").value : null});
   });

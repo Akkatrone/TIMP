@@ -13,7 +13,7 @@ the app can be public and open source while your hotels and dates stay private.
 
 <p align="center">
   <img src="docs/screenshots/programme.png" width="24%" alt="The programme of a day: one stop done, one skipped, descriptions folded to two lines">
-  <img src="docs/screenshots/map.png" width="24%" alt="The interactive map of the day: numbered pins, the route with train and ferry icons, the stops already behind you dashed">
+  <img src="docs/screenshots/map.png" width="24%" alt="The interactive map of the day: numbered pins with the icon of each kind of place, the route with train and ferry icons, the stops already behind you dashed">
   <img src="docs/screenshots/sketch.png" width="24%" alt="The sketch to scale that replaces the map offline, with the same icons">
   <img src="docs/screenshots/plans-dark.png" width="24%" alt="A day with two alternative plans, in the dark theme">
 </p>
@@ -29,7 +29,9 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 
 - Day-by-day programme: times, descriptions, reminders, alternative plans for a day.
 - Short descriptions: two lines each, tap one to read it all, or open them all at once.
-- Metro, bus, train, plane and boat at a glance: an icon by each stop and on the map.
+- What each stop is at a glance: an icon for sights, museums, food, parks, views, shops,
+  walks and hotels, by the stop and on its pin; another for metro, bus, train, plane
+  and boat on the way there.
 - Add and change stops on the phone: paste what Google Maps shares, or an address.
 - Every change is a version, like a commit in Git. Share the file, and when a friend
   changed it too, the app joins the two.
@@ -91,8 +93,7 @@ reads it on the phone:
 | A link copied from Google Maps in a browser (`google.com/maps/place/…`) | name, address, position |
 | The text the Maps app shares (name, address, link) | name, address; the position is looked up |
 | A full address | the address; the position is looked up |
-| A short link (`maps.app.goo.gl/…`) | the link, which opens the exact place; write the name |
-| An address with a short link, as Maps shares a street address | the address; the position is looked up |
+| A short link (`maps.app.goo.gl/…`), or the Maps app's text with one | name, address, position and kind of place, through the link resolver (below); without it, the link, and the name and address the text gives |
 | Coordinates, `geo:` links, Apple Maps links | the position |
 
 **Android:** once the app is installed, it appears in the Share menu of Google Maps.
@@ -107,9 +108,15 @@ pin lands in the wrong place, or nothing is found, tap **On the map** and put it
 it belongs. A stop without a position is saved without a pin: its Map and Directions
 links work all the same.
 
-Why the short link gives no position: the browser is not allowed to follow it to the
-place (Google sends no CORS header), and resolving it through a server of ours would
-mean sending your stops to that server.
+When the place is known, its kind (museum, restaurant, park…) is filled in too, from
+OpenStreetMap or Google.
+
+**The link resolver.** A browser is not allowed to follow a short link to the place
+(Google sends no CORS header). So the app asks a tiny service of this project, the
+[link resolver](worker/README.md), which follows the link and answers with name,
+address, position and kind of place. Only the link is sent, and the resolver keeps
+nothing. It is optional: a copy of the app without one reads full links on its own and
+asks for the name of a short one.
 
 ### Versions and sharing a changed trip
 
@@ -147,9 +154,21 @@ Ticked and skipped stops are never part of the file: they stay on each phone.
 > <https://frafal.github.io/TIMP/llms.txt>. It has the exact format, a checklist and a
 > complete example in one page. The app refuses a file that does not follow it.
 
-A trip is a JSON file. [docs/creating-a-trip.md](docs/creating-a-trip.md) explains how
-to write one, [docs/trip-format.md](docs/trip-format.md) lists every field, and
-[examples/demo-trip.json](examples/demo-trip.json) is a complete example.
+A trip is a JSON file that says what the trip is: days, stops, where you sleep, what to
+remember. The app takes care of how it looks (colours, maps, icons). The smallest one:
+
+```json
+{
+  "format": "travel-in-my-pocket/2",
+  "title": "Rome in three days",
+  "days": [{"date": "2027-04-10", "city": "Rome", "stops": [{"time": "09:00", "title": "Colosseum", "type": "sight"}]}]
+}
+```
+
+[docs/creating-a-trip.md](docs/creating-a-trip.md) explains how to write a good one,
+[docs/trip-format.md](docs/trip-format.md) lists every field, and
+[examples/demo-trip.json](examples/demo-trip.json) is a complete example. The same rules
+are published as a JSON Schema, `trip.schema.json`, next to the app.
 
 ### With an AI assistant
 
@@ -178,6 +197,10 @@ Any assistant can write a trip file, because the instructions are two plain docu
   copies that list with a request to fix it. Paste it into the chat and load the new
   answer.
   If the assistant cannot open links, attach the two documents above instead.
+- **A model that follows a JSON Schema** (open models through Ollama, llama.cpp or
+  vLLM, or an API with structured output): give it
+  [trip.schema.json](https://frafal.github.io/TIMP/trip.schema.json) as the output
+  format, and the file comes out well formed by construction.
 
 Whatever you use, look at the map of each day before you leave: a pin in the wrong
 place is the one mistake no automatic check can catch.
@@ -228,7 +251,7 @@ trip file and everyone who receives the file gets the Google map without doing a
 7. Add the key to the trip file:
 
    ```json
-   "map": {"googleMapsKey": "AIza..."}
+   "googleMapsKey": "AIza..."
    ```
 
 Cost: the key itself is free. Google includes 10,000 free map loads a month and charges
@@ -260,8 +283,11 @@ real routes and transport times, tap "Directions" on a stop.
   Google, who therefore see your IP address and the area you look at.
 - "Map" and "Directions" links open Google Maps.
 - When you add or change a stop and its position has to be looked up, its name and
-  address are sent to Google (with a key) or to OpenStreetMap. Nothing else of the trip
-  is sent.
+  address are sent to Google (with a key) or to OpenStreetMap. A Google Maps short link
+  you paste or share is sent to the link resolver, if the app has one. Nothing else of
+  the trip is sent.
+- The link resolver keeps nothing: no storage, no logs. Cloudflare, which runs it, sees
+  the request like any web service. Its code is [worker/resolve.js](worker/resolve.js).
 - A saved trip file goes only where you send it.
 - A Content-Security-Policy in `index.html` lets the page load code only from the app
   itself and from Google's map servers, and send requests only to the map and address

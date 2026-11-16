@@ -1,16 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validateTrip, FORMAT } from "../js/trip.js";
+import { validateTrip, upgrade, tripSchema, tripId, typeFrom, citiesOf, FIELDS, FORMAT, FORMAT_1, TRAVEL, TYPES } from "../js/trip.js";
+import { hasIcon } from "../js/icons.js";
 
 const demo = () => JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
 
+// The smallest file: what an assistant must get right, and nothing more.
 const minimal = () => ({
   format: FORMAT,
-  id: "rome-2027",
   title: "Rome",
-  places: {rome: {name: "Roma", color: "#b8451b"}},
-  days: [{date: "2027-04-10", place: "rome", title: "Day one", stops: [{time: "09:00", title: "Colosseum", lat: 41.8902, lng: 12.4922}]}]
+  days: [{date: "2027-04-10", stops: [{title: "Colosseum", lat: 41.8902, lng: 12.4922}]}]
 });
 
 // Applies a change to a valid trip and returns the errors it causes.
@@ -25,30 +25,21 @@ test("the example trip is valid and has no warnings", () => {
   const res = validateTrip(demo());
   assert.deepEqual(res.errors, []);
   assert.deepEqual(res.warnings, []);
-  assert.equal(res.ok, true);
 });
 
-test("the smallest trip from the documentation is valid", () => {
+test("the smallest file needs only format, title, and days with dated stops that have a title", () => {
   assert.deepEqual(validateTrip(minimal()).errors, []);
+  assert.ok(hasError(errorsAfter(t => { delete t.format; }), "format: is required"));
+  assert.ok(hasError(errorsAfter(t => { t.format = "travel-in-my-pocket/3"; }), "format"));
+  assert.ok(hasError(errorsAfter(t => { delete t.title; }), "title: is required"));
+  assert.ok(hasError(errorsAfter(t => { t.days = []; }), "days: must not be empty"));
+  assert.ok(hasError(errorsAfter(t => { delete t.days[0].stops[0].title; }), "days[0].stops[0].title: is required"));
 });
 
 test("things that are not a trip are refused without throwing", () => {
-  for(const junk of [null, 42, "trip", [], {}, {format: FORMAT}, {days: "tomorrow"}, {format: FORMAT, places: [], days: [null], stays: 3, info: [1]}]){
+  for(const junk of [null, 42, "trip", [], {}, {format: FORMAT}, {days: "tomorrow"}, {format: FORMAT, title: "x", days: [null, {stops: [1]}], info: [1]}]){
     assert.equal(validateTrip(junk).ok, false);
   }
-});
-
-test("format, id and title are required", () => {
-  assert.ok(hasError(errorsAfter(t => { t.format = "travel-in-my-pocket/2"; }), "format"));
-  assert.ok(hasError(errorsAfter(t => { t.id = "Rome 2027"; }), "id"));
-  assert.ok(hasError(errorsAfter(t => { delete t.title; }), "title"));
-});
-
-test("a day must point to places and stays that exist", () => {
-  assert.ok(hasError(errorsAfter(t => { t.days[0].place = "milan"; }), "days[0].place"));
-  assert.ok(hasError(errorsAfter(t => { t.days[0].from = "milan"; }), "days[0].from"));
-  assert.ok(hasError(errorsAfter(t => { t.days[0].stay = "hotel"; }), "days[0].stay"));
-  assert.ok(hasError(errorsAfter(t => { t.stays = {h: {name: "H", place: "milan"}}; }), "stays.h.place"));
 });
 
 test("dates must be real and ascending", () => {
@@ -57,10 +48,19 @@ test("dates must be real and ascending", () => {
   assert.ok(hasError(errorsAfter(t => { t.days.push({...t.days[0]}); }), "days[1].date"));
 });
 
-test("a day has stops or plans, never both and never neither", () => {
-  assert.ok(hasError(errorsAfter(t => { delete t.days[0].stops; }), "either"));
-  assert.ok(hasError(errorsAfter(t => { t.days[0].plans = [{id: "a", name: "A", stops: t.days[0].stops}, {id: "b", name: "B", stops: t.days[0].stops}]; }), "either"));
-  assert.ok(hasError(errorsAfter(t => { t.days[0].plans = [{id: "a", name: "A", stops: t.days[0].stops}]; delete t.days[0].stops; }), "at least two"));
+test("a day has stops or plans, one of the two; plans come at least two", () => {
+  assert.ok(hasError(errorsAfter(t => { delete t.days[0].stops; }), "one of the two"));
+  const plans = t => [{name: "A", stops: t.days[0].stops}, {name: "B", stops: t.days[0].stops}];
+  assert.ok(hasError(errorsAfter(t => { t.days[0].plans = plans(t); }), "one of the two"));
+  assert.deepEqual(errorsAfter(t => { t.days[0].plans = plans(t); delete t.days[0].stops; }), []);
+  assert.ok(hasError(errorsAfter(t => { t.days[0].plans = plans(t).slice(0, 1); delete t.days[0].stops; }), "at least 2"));
+});
+
+test("a stay is a name, or an object with a name", () => {
+  assert.deepEqual(errorsAfter(t => { t.days[0].stay = "Hotel Roma"; }), []);
+  assert.deepEqual(errorsAfter(t => { t.days[0].stay = {name: "Hotel Roma", address: "Via Cavour 1"}; }), []);
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stay = {address: "Via Cavour 1"}; }), "stay.name"));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stay = 3; }), "days[0].stay"));
 });
 
 test("coordinates come in pairs and inside the globe", () => {
@@ -72,49 +72,35 @@ test("coordinates come in pairs and inside the globe", () => {
 test("a version written by the app is checked, and a link must be https", () => {
   const v = {id: "0123456789abcdef", parents: ["fedcba9876543210"], history: ["fedcba9876543210"], date: "2026-11-16T10:00:00Z"};
   assert.deepEqual(errorsAfter(t => { t.version = v; }), []);
-  assert.ok(hasError(errorsAfter(t => { t.version = {...v, id: "xyz"}; }), "version.id"));
-  assert.ok(hasError(errorsAfter(t => { t.version = {...v, parents: ["a", "b", "c"]}; }), "version.parents"));
+  assert.ok(hasError(errorsAfter(t => { t.version = {...v, id: "xyz"}; }), "version"));
   assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].link = "https://maps.app.goo.gl/AbC"; }), []);
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].link = "javascript:alert(1)"; }), "stops[0].link"));
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].link = "http://example.com"; }), "stops[0].link"));
 });
 
-test("travel is one of the five ways the app can draw", () => {
-  assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].travel = "train"; }), []);
-  assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].travel = "bus"; }), []);
-  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "taxi"; }), "stops[0].travel"));
-  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "Train"; }), "stops[0].travel"));
+test("a kind of place or a way of travelling the app does not know is a warning, not an error", () => {
+  const trip = minimal();
+  Object.assign(trip.days[0].stops[0], {type: "nightclub", travel: "taxi"});
+  const res = validateTrip(trip);
+  assert.deepEqual(res.errors, []);
+  assert.ok(res.warnings.some(w => w.startsWith("days[0].stops[0].type")));
+  assert.ok(res.warnings.some(w => w.startsWith("days[0].stops[0].travel")));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].type = ""; }), "stops[0].type"));
 });
 
-test("stop ids are unique within a list", () => {
-  const errors = errorsAfter(t => { t.days[0].stops = [{id: "a", time: "1", title: "A"}, {id: "a", time: "2", title: "B"}]; });
-  assert.ok(hasError(errors, "used twice"));
+test("every kind of place and way of travelling has its icon", () => {
+  for(const v of [...TYPES, ...TRAVEL]) assert.ok(hasIcon(v), v);
 });
 
-test("colours must be #rrggbb: nothing else can reach the page's styles", () => {
-  assert.ok(hasError(errorsAfter(t => { t.places.rome.color = "red"; }), "places.rome.color"));
-  assert.ok(hasError(errorsAfter(t => { t.places.rome.color = "#fff;background:url(//evil)"; }), "places.rome.color"));
-  assert.ok(hasError(errorsAfter(t => { t.places.rome.colorDark = "var(--x)"; }), "places.rome.colorDark"));
+test("ids are written by the app, and stay unique in their list", () => {
+  assert.ok(hasError(errorsAfter(t => { t.id = "Rome 2027"; }), "id"));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops = [{id: "a", title: "A"}, {id: "a", title: "B"}]; }), "used twice"));
+  assert.equal(tripId({title: "Caffè e Colosseo!", days: [{date: "2027-04-10"}]}), "caffe-e-colosseo-2027-04-10");
 });
 
-test("embedded pictures must be png, jpeg or webp data URIs", () => {
-  const image = src => t => { t.days[0].mapImages = [{src, width: 10, height: 10, pins: ["Colosseum"]}]; };
-  assert.deepEqual(errorsAfter(image("data:image/png;base64,iVBORw0KGgo=")), []);
-  assert.ok(hasError(errorsAfter(image("https://example.com/map.png")), "mapImages[0].src"));
-  assert.ok(hasError(errorsAfter(image("data:image/svg+xml;base64,PHN2Zz4=")), "mapImages[0].src"));
-  assert.ok(hasError(errorsAfter(image("javascript:alert(1)")), "mapImages[0].src"));
-});
-
-test("map zones need at least one real point", () => {
-  const zone = points => t => { t.days[0].mapZones = [{name: "Z", points}]; };
-  assert.deepEqual(errorsAfter(zone([{name: "A", lat: 1, lng: 1}, {name: "Ref", lat: 2, lng: 2, reference: true}])), []);
-  assert.ok(hasError(errorsAfter(zone([{name: "Ref", lat: 2, lng: 2, reference: true}])), "not a reference"));
-  assert.ok(hasError(errorsAfter(zone([{name: "A", lat: 1}])), "points[0].lng"));
-});
-
-test("info rows need a label and some content", () => {
-  assert.deepEqual(errorsAfter(t => { t.info = [{title: "Help", rows: [{label: "Police", number: "112"}]}]; }), []);
-  assert.ok(hasError(errorsAfter(t => { t.info = [{title: "Help", rows: [{label: "Police"}]}]; }), "info[0].rows[0]"));
+test("info sections need a title and lines with a label and a text", () => {
+  assert.deepEqual(errorsAfter(t => { t.info = [{title: "Help", items: [{label: "Police", text: "112"}]}]; }), []);
+  assert.ok(hasError(errorsAfter(t => { t.info = [{title: "Help", items: [{label: "Police"}]}]; }), "info[0].items[0].text"));
 });
 
 test("unknown fields and days without a map are warnings, not errors", () => {
@@ -126,4 +112,65 @@ test("unknown fields and days without a map are warnings, not errors", () => {
   assert.equal(res.ok, true);
   assert.ok(res.warnings.some(w => w.includes("days[0].titel")));
   assert.ok(res.warnings.some(w => w.includes("no map")));
+});
+
+test("the kind of a place is read from OpenStreetMap's and Google's tags", () => {
+  assert.equal(typeFrom(["tourism", "museum"]), "museum");
+  assert.equal(typeFrom(["amenity", "restaurant"]), "food");
+  assert.equal(typeFrom(["leisure", "park"]), "park");
+  assert.equal(typeFrom(["tourism", "viewpoint"]), "view");
+  assert.equal(typeFrom(["lodging", "point_of_interest"]), "hotel");
+  assert.equal(typeFrom(["highway", "residential"]), null);
+});
+
+test("cities get their colour in the order they first appear", () => {
+  assert.deepEqual(citiesOf({days: [{city: "Rome"}, {}, {city: "Naples"}, {city: "Rome"}]}), ["Rome", "", "Naples"]);
+});
+
+/* ---------- the JSON Schema ---------- */
+
+test("the JSON Schema has every field of the table, and the same required ones", () => {
+  const schema = tripSchema();
+  assert.deepEqual(Object.keys(schema.properties), Object.keys(FIELDS.trip));
+  assert.deepEqual(schema.required, ["format", "title", "days"]);
+  for(const kind of Object.keys(FIELDS).filter(k => k !== "trip")){
+    assert.deepEqual(Object.keys(schema.$defs[kind].properties), Object.keys(FIELDS[kind]), kind);
+  }
+  assert.equal(schema.properties.format.const, FORMAT);
+  assert.equal(JSON.parse(JSON.stringify(schema)).$defs.stop.properties.lat.maximum, 90);
+});
+
+/* ---------- the old format ---------- */
+
+const old = () => ({
+  format: FORMAT_1, id: "rome-2027", title: "Rome", lang: "it",
+  version: {id: "0123456789abcdef", parents: [], history: []},
+  places: {rome: {name: "Roma", glyph: "R", color: "#b8451b"}, naples: {name: "Napoli", color: "#2f6fb0"}},
+  stays: {h: {name: "Hotel Roma", place: "rome", query: "Hotel Roma, Via Cavour", note: "Check-in 14:00", dates: "10 → 11"}},
+  map: {googleMapsKey: "invented-test-key-old"},
+  days: [
+    {date: "2027-04-10", place: "rome", stay: "h", title: "Day one", reminders: ["Book"], note: "If it rains", zoneNames: ["Z"], mapSplitKm: 5,
+      stops: [{id: "colosseo", time: "09:00", title: "Colosseum", query: "Colosseo, Roma", mapLabel: "C", lat: 41.89, lng: 12.49, tag: "Booked"}]},
+    {date: "2027-04-11", place: "naples", from: "rome", stayText: "Night train", title: "Day two",
+      plans: [{id: "a", name: "A", stops: [{time: "1", title: "X", travel: "train"}]}, {id: "b", name: "B", stops: [{time: "2", title: "Y"}]}]}
+  ],
+  info: [{title: "Help", rows: [{label: "Police", number: "112"}, {label: "Bus", text: "Tickets", number: "+39 06"}]}],
+  infoNote: "Have fun"
+});
+
+test("a file in the old format becomes a valid one, losing only map settings", () => {
+  const t = upgrade(old());
+  assert.deepEqual(validateTrip(t).errors, []);
+  assert.deepEqual(validateTrip(t).warnings, ["days[1]: no stop has lat/lng: this day has no map"]);
+  assert.equal(t.format, FORMAT);
+  assert.deepEqual([t.id, t.version.id, t.googleMapsKey], ["rome-2027", "0123456789abcdef", "invented-test-key-old"]);
+  assert.deepEqual(t.days[0].stay, {name: "Hotel Roma", address: "Hotel Roma, Via Cavour", note: "Check-in 14:00"});
+  assert.deepEqual(t.days[0].notes, ["Book", "If it rains"]);
+  assert.deepEqual(t.days[0].stops[0], {id: "colosseo", time: "09:00", title: "Colosseum", tag: "Booked", address: "Colosseo, Roma", lat: 41.89, lng: 12.49});
+  assert.deepEqual([t.days[1].city, t.days[1].stay, t.days[1].plans[0].id], ["Napoli", "Night train", "a"]);
+  assert.deepEqual(t.info[0].items, [{label: "Police", text: "112"}, {label: "Bus", text: "+39 06 · Tickets"}]);
+  assert.deepEqual(t.info[1], {title: "Note", items: [{label: "Nota", text: "Have fun"}]});
+  assert.deepEqual(upgrade(old()), t, "the same on every device");
+  assert.equal(upgrade(t), t, "a file in the new format is left as it is");
+  assert.ok(hasError(validateTrip(old()).errors, "old format"));
 });

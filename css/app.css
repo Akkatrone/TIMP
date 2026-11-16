@@ -2,6 +2,9 @@
   --bg:#f2f3f1; --surface:#ffffff; --ink:#15181b; --muted:#5b636b; --line:#dcdfdb;
   --link:#1d5ca8; --warn:#9a4a08; --warn-bg:#fbefe1; --ok:#2c7a4c; --accent:#d65f22;
   --err:#a3261c; --err-bg:#fbe9e7;
+  /* The colours of the cities of a trip, in the order they appear (js/app.js, cityVar):
+     medium tones, readable on white. The dark theme has lighter ones. */
+  --p0:#b8451b; --p1:#2f6fb0; --p2:#4f8a2a; --p3:#8a4fb0; --p4:#b0306a; --p5:#0f7f7c; --p6:#a06c12; --p7:#5a6a7a;
   /* System fonts only: nothing to download, identical online and offline. */
   --f-display:"Hiragino Sans","Noto Sans CJK JP","Noto Sans JP",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -15,6 +18,7 @@
     --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
     --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
     --err:#f39b92; --err-bg:#33201e;
+    --p0:#ef8a5f; --p1:#7fb3ec; --p2:#93c96b; --p3:#c49be8; --p4:#ee88b4; --p5:#5fd0cb; --p6:#e3b45e; --p7:#a9b6c3;
     color-scheme:dark;
   }
 }
@@ -22,6 +26,7 @@
     --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
     --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
     --err:#f39b92; --err-bg:#33201e;
+    --p0:#ef8a5f; --p1:#7fb3ec; --p2:#93c96b; --p3:#c49be8; --p4:#ee88b4; --p5:#5fd0cb; --p6:#e3b45e; --p7:#a9b6c3;
     color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -55,8 +60,7 @@ main.gutter{padding-block:16px 56px;display:grid;gap:18px}
 /* day header */
 .sign{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .sign-top{padding:16px 18px 14px;display:flex;justify-content:space-between;align-items:flex-end;gap:14px}
-.kanji{font:700 2.7rem/1 var(--f-display);letter-spacing:.06em}
-.kanji.plain{font-size:1.9rem;letter-spacing:0;line-height:1.1;overflow-wrap:anywhere}
+.kanji{font:700 1.9rem/1.1 var(--f-display);overflow-wrap:anywhere}
 .romaji{font:500 .7rem/1 var(--f-mono);letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:8px}
 .dayno{text-align:right;min-width:0}
 .dayno .g{font:500 .72rem var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
@@ -129,6 +133,10 @@ ol.stops{list-style:none;margin:0;padding:0}
 /* how a stop is travelled: metro, train, plane, boat */
 .tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink))}
 .tvchip svg{display:block}
+/* the kind of place, before the stop's title */
+.tychip{display:inline-block;vertical-align:-2px;margin-right:6px;color:var(--c,var(--ink))}
+.tychip svg{display:block}
+.stop.done .tychip,.stop.skipped .tychip{opacity:.5}
 .tap .h,.body > .h{display:flex;align-items:flex-start;gap:8px}
 .h h3{flex:1 1 auto;min-width:0}
 .body > .h{margin-bottom:0}
@@ -178,8 +186,6 @@ ol.stops{list-style:none;margin:0;padding:0}
 .mapsvg .bt{font:600 11px var(--f-body);fill:var(--ink);text-anchor:middle}
 .mapsvg .sb{stroke:var(--muted);stroke-width:1.5;fill:none}
 .mapsvg .sbt{font:500 10px var(--f-mono);fill:var(--muted)}
-.mapsvg .ref{fill:none;stroke:var(--muted);stroke-width:1.5}
-.mapimg{width:100%;max-width:520px;height:auto;display:block;margin:0 auto;border-radius:10px}
 .mlegend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px 12px;font-size:.84rem}
 .mlegend li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline;min-width:0}
 .mb{display:inline-block;font:600 .7rem var(--f-mono);border:1.5px solid var(--c);border-radius:999px;padding:1px 6px;min-width:22px;text-align:center;color:var(--ink)}
@@ -201,7 +207,10 @@ ol.stops{list-style:none;margin:0;padding:0}
 .pop-h{font:600 14px/1.3 var(--f-body);color:#15181b;padding-top:4px}
 .gm-style .gm-style-iw-d{overflow-x:hidden!important}
 .pin.gone{border-style:dashed;color:#5b636b;background:rgba(255,255,255,.9);box-shadow:none}
-.pin.ref{background:rgba(255,255,255,.85);border:0;border-radius:6px;font-weight:500;font-size:11px;box-shadow:none;cursor:default}
+/* a pin with the icon of its kind of place (js/livemap.js, pinNode) */
+.pin.typed{display:inline-flex;align-items:center;gap:3px;padding:4px 7px 4px 5px}
+.pin.typed svg{color:var(--pc,#15181b);flex:0 0 auto}
+.pin.gone.typed svg{color:#5b636b}
 .pinwrap{background:none;border:0}
 .pop{font:400 13px/1.4 var(--f-body);color:#15181b;display:grid;gap:4px;min-width:150px;max-width:230px}
 .pop b{font-weight:600;font-size:14px}
@@ -235,6 +244,10 @@ ol.stops{list-style:none;margin:0;padding:0}
 .errbox .aihelp{margin:10px 0 8px;font-size:.88rem;color:var(--ink)}
 .errbox .actions{margin:0}
 #paste-text{min-height:180px;font:500 16px/1.45 var(--f-mono);resize:vertical}  /* 16px: iPhones zoom into smaller fields */
+/* how to have a trip written by an AI assistant */
+.prompt{margin:10px 0;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font:500 .82rem/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+.aihow summary{cursor:pointer;font-weight:600;padding:4px 0}
+.aihow .steps{margin-top:8px}
 .errbox b{font-weight:600}
 
 /* the + button: a stop added on the day on screen */
@@ -314,5 +327,5 @@ html:has(dialog[open]){overflow:hidden}
 #toast .x{border:0;background:none;color:var(--bg);opacity:.7;font:400 1.3rem/1 var(--f-body);width:32px;height:32px;border-radius:50%;cursor:pointer;flex:0 0 auto;padding:0}
 #toast .x:hover{opacity:1}
 
-@media (max-width:380px){ .stop{grid-template-columns:3.6rem 1fr auto;gap:10px} .kanji{font-size:2.3rem} .rows > div{grid-template-columns:1fr} }
+@media (max-width:380px){ .stop{grid-template-columns:3.6rem 1fr auto;gap:10px} .rows > div{grid-template-columns:1fr} }
 @media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} .chev{transition:none} }

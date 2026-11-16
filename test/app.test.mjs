@@ -3,10 +3,9 @@ import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { esc, rich, stopQuery, dateParts, mapsUrl, jsonIn } from "../js/util.js";
+import { esc, rich, dateParts, mapsUrl, jsonIn } from "../js/util.js";
 import { zonesOf, routeUrl, zoneSVG, distKm, legsOf, bridgesOf, pinGone } from "../js/geo.js";
-import { TRAVEL as TRAVEL_ICONS } from "../js/icons.js";
-import { TRAVEL as TRAVEL_FORMAT, validateTrip } from "../js/trip.js";
+import { TRAVEL, TYPES, FIELDS, validateTrip, placeQuery } from "../js/trip.js";
 import { STRINGS } from "../js/i18n.js";
 import { ROOT, precacheList, readSw } from "../tools/lib/app-files.mjs";
 import { llmsText } from "../tools/lib/llms.mjs";
@@ -21,9 +20,9 @@ test("text from a trip file cannot become HTML", () => {
 
 test("links to Google Maps encode what they are given", () => {
   assert.equal(mapsUrl(`Colosseum "Rome" & more`), "https://www.google.com/maps/search/?api=1&query=Colosseum%20%22Rome%22%20%26%20more");
-  assert.equal(stopQuery({title: "A", query: "A, Rome"}), "A, Rome");
-  assert.equal(stopQuery({title: "A", lat: 41.9, lng: 12.5}), "41.9,12.5");
-  assert.equal(stopQuery({title: "Free afternoon"}), "");
+  assert.equal(placeQuery({title: "A", address: "A, Rome"}), "A, Rome");
+  assert.equal(placeQuery({title: "A", lat: 41.9, lng: 12.5}), "41.9,12.5");
+  assert.equal(placeQuery({title: "Free afternoon"}), "");
 });
 
 test("a trip pasted from a chat is found in the text around it", () => {
@@ -43,56 +42,47 @@ test("dates are written in the language of the trip", () => {
 
 /* ---------- map zones ---------- */
 
-const stop = (title, lat, lng, extra = {}) => ({time: "10:00", title, lat, lng, ...extra});
+const stop = (title, lat, lng, extra = {}) => ({time: "10:00", title, address: title, lat, lng, ...extra});
 const ROME = [stop("Colosseum", 41.8902, 12.4922), stop("Forum", 41.8925, 12.4853), {time: "13:00", title: "Lunch"}, stop("Pantheon", 41.8986, 12.4769)];
+const FLORENCE = stop("Duomo", 43.7731, 11.256);
 
 test("stops close to each other share one zone, numbered by position in the list", () => {
-  const zones = zonesOf({}, null, ROME);
+  const zones = zonesOf(ROME);
   assert.equal(zones.length, 1);
   assert.deepEqual(zones[0].pts.map(p => p.nums), [[1], [2], [4]]);
   assert.deepEqual(zones[0].path.map(p => p.name), ["Colosseum", "Forum", "Pantheon"]);
 });
 
-test("a long jump starts a new zone, named from zoneNames", () => {
-  const day = {zoneNames: ["Rome", "Florence"]};
-  const zones = zonesOf(day, null, [...ROME, stop("Duomo", 43.7731, 11.256)]);
-  assert.deepEqual(zones.map(z => z.name), ["Rome", "Florence"]);
-  assert.equal(zonesOf({mapSplitKm: 500}, null, [...ROME, stop("Duomo", 43.7731, 11.256)]).length, 1);
+test("a long jump starts a new zone", () => {
+  assert.equal(zonesOf([...ROME, FLORENCE]).length, 2);
 });
 
-test("a place visited twice is one pin with both numbers", () => {
-  const zones = zonesOf({}, null, [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), stop("Back to the hotel", 41.9, 12.5, {mapLabel: "Hotel"})]);
-  assert.deepEqual(zones[0].pts.map(p => p.nums), [[1, 3], [2]]);
+test("a place visited twice is one pin with both numbers, named after the first visit", () => {
+  const zones = zonesOf([stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), stop("Back to the hotel", 41.9, 12.5)]);
+  assert.deepEqual(zones[0].pts.map(p => [p.name, p.nums]), [["Hotel", [1, 3]], ["Forum", [2]]]);
   assert.equal(zones[0].path.length, 3);
 });
 
-test("a plan's zone names win over the day's", () => {
-  const zones = zonesOf({zoneNames: ["Day"]}, {zoneNames: ["Plan"]}, ROME);
-  assert.equal(zones[0].name, "Plan");
-});
-
-test("mapZones replace the stops, and reference points stay out of the route", () => {
-  const day = {mapZones: [{name: "Volcano", points: [{name: "Lake", lat: 10.42, lng: 20.86}, {name: "Summit", lat: 10.36, lng: 20.73, reference: true}]}]};
-  const [zone] = zonesOf(day, null, [{time: "08:00", title: "Bus tour"}]);
-  assert.deepEqual(zone.pts.map(p => p.nums), [[1], []]);
-  assert.deepEqual(zone.path.map(p => p.name), ["Lake"]);
+test("a pin carries the kind of its place, when the app knows it", () => {
+  const [zone] = zonesOf([stop("A", 41.9, 12.5, {type: "museum"}), stop("B", 41.91, 12.51, {type: "nightclub"}), stop("C", 41.92, 12.52)]);
+  assert.deepEqual(zone.pts.map(p => p.type), ["museum", null, null]);
 });
 
 test("a day without coordinates has no zones", () => {
-  assert.deepEqual(zonesOf({}, null, [{time: "08:00", title: "Train"}]), []);
+  assert.deepEqual(zonesOf([{time: "08:00", title: "Train"}]), []);
 });
 
 test("the route link walks short distances and drives long ones", () => {
-  const [walk] = zonesOf({}, null, ROME);
+  const [walk] = zonesOf(ROME);
   assert.match(routeUrl(walk), /origin=Colosseum&destination=Pantheon&waypoints=Forum&travelmode=walking$/);
-  const [drive] = zonesOf({mapSplitKm: 500}, null, [...ROME, stop("Duomo", 43.7731, 11.256)]);
+  const [drive] = zonesOf([...ROME, stop("EUR", 41.83, 12.47)]);
   assert.match(routeUrl(drive), /travelmode=driving$/);
 });
 
 test("each leg of the route knows the stop it arrives at", () => {
   // Hotel, Forum, Lunch (no pin), Pantheon, back to the hotel
-  const list = [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), {time: "13:00", title: "Lunch"}, stop("Pantheon", 41.8986, 12.4769), stop("Back", 41.9, 12.5, {mapLabel: "Hotel"})];
-  const [zone] = zonesOf({}, null, list);
+  const list = [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), {time: "13:00", title: "Lunch"}, stop("Pantheon", 41.8986, 12.4769), stop("Back", 41.9, 12.5)];
+  const [zone] = zonesOf(list);
   assert.deepEqual(zone.pathIdx, [0, 1, 3, 4]);
   assert.deepEqual(legsOf(zone).map(l => [l.from.name, l.to.name, l.idx]), [["Hotel", "Forum", 1], ["Forum", "Pantheon", 3], ["Pantheon", "Hotel", 4]]);
 });
@@ -104,51 +94,49 @@ test("travel marks the leg that arrives at a stop, or the one a journey without 
     stop("Forum", 41.8925, 12.4853),
     {time: "14:00", title: "Train to Florence", travel: "train"},
     {time: "16:00", title: "Coffee"},
-    stop("Duomo", 43.7731, 11.256),
-    stop("Ferry", 43.7712, 11.2531, {travel: "boat"})
+    FLORENCE,
+    stop("Ferry", 43.7712, 11.2531, {travel: "boat"}),
+    stop("Rickshaw", 43.775, 11.259, {travel: "rickshaw"})
   ];
-  const zones = zonesOf({}, null, list);
+  const zones = zonesOf(list);
   assert.equal(zones.length, 2);
   assert.deepEqual(legsOf(zones[0]).map(l => [l.to.name, l.travel]), [["Colosseum", "metro"], ["Forum", null]]);
   assert.deepEqual(bridgesOf(zones).map(b => [b.from.name, b.to.name, b.idx, b.travel]), [["Forum", "Duomo", 5, "train"]]);
-  assert.deepEqual(legsOf(zones[1]).map(l => [l.to.name, l.travel]), [["Ferry", "boat"]]);
+  assert.deepEqual(legsOf(zones[1]).map(l => [l.to.name, l.travel]), [["Ferry", "boat"], ["Rickshaw", null]], "a way the app does not know draws a plain leg");
 });
 
 test("a skipped stop keeps its pin, and the route goes past it", () => {
   const list = [stop("Colosseum", 41.8902, 12.4922), stop("Forum", 41.8925, 12.4853, {travel: "bus"}), stop("Pantheon", 41.8986, 12.4769)];
-  const [zone] = zonesOf({}, null, list, i => i === 1);
+  const [zone] = zonesOf(list, i => i === 1);
   assert.deepEqual(zone.pts.map(p => p.name), ["Colosseum", "Forum", "Pantheon"], "every pin is still there");
   assert.deepEqual(legsOf(zone).map(l => [l.from.name, l.to.name, l.idx, l.travel]), [["Colosseum", "Pantheon", 2, null]], "the bus took you to the Forum, not past it");
   assert.ok(!routeUrl(zone).includes("Forum"));
   // A zone of skipped stops only: its pins, no route into it, a link still made.
-  const far = [...list, {time: "14:00", title: "Train", travel: "train"}, stop("Duomo", 43.7731, 11.256), stop("Back in Rome", 41.9, 12.5)];
-  const zones = zonesOf({}, null, far, i => i === 4);
+  const far = [...list, {time: "14:00", title: "Train", travel: "train"}, FLORENCE, stop("Back in Rome", 41.9, 12.5)];
+  const zones = zonesOf(far, i => i === 4);
   assert.equal(zones.length, 3, "skipping does not move pins between zones");
   assert.deepEqual(zones[1].path, []);
   assert.ok(routeUrl(zones[1]).includes("Duomo"));
   assert.deepEqual(bridgesOf(zones).map(b => [b.from.name, b.to.name]), [["Pantheon", "Back in Rome"]]);
-  assert.deepEqual(zonesOf({}, null, list).map(z => legsOf(z).length), [2], "nothing skipped: the route as before");
+  assert.deepEqual(zonesOf(list).map(z => legsOf(z).length), [2], "nothing skipped: the route as before");
 });
 
 test("the sketch shows how a leg is travelled", () => {
-  const [zone] = zonesOf({}, null, [stop("A", 41.9, 12.5), stop("B", 41.91, 12.51, {travel: "metro"})]);
+  const [zone] = zonesOf([stop("A", 41.9, 12.5), stop("B", 41.91, 12.51, {travel: "metro"})]);
   const svg = zoneSVG(zone, "x");
   assert.equal((svg.match(/class="tv"/g) || []).length, 1);
   assert.ok(zoneSVG(zone, "x", i => i === 1).includes('class="tv gone"'));
 });
 
 test("a pin is behind you only when every stop it stands for is done or skipped", () => {
-  const list = [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), stop("Back", 41.9, 12.5, {mapLabel: "Hotel"})];
-  const [zone] = zonesOf({}, null, list);
-  const hotel = zone.pts[0];
+  const list = [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), stop("Back", 41.9, 12.5)];
+  const hotel = zonesOf(list)[0].pts[0];
   assert.equal(pinGone(hotel, i => i === 0), false, "left the hotel, not back yet");
   assert.equal(pinGone(hotel, i => i === 0 || i === 2), true);
-  const fromZones = zonesOf({mapZones: [{points: [{name: "A", lat: 1, lng: 1}]}]}, null, [])[0];
-  assert.equal(pinGone(fromZones.pts[0], () => true), false, "points drawn from mapZones are not stops");
 });
 
 test("the sketch dashes the legs and pins already behind you", () => {
-  const [zone] = zonesOf({}, null, ROME);
+  const [zone] = zonesOf(ROME);
   const none = zoneSVG(zone, "Rome");
   assert.equal((none.match(/class="route"/g) || []).length, 2);
   assert.ok(!none.includes("gone"));
@@ -162,18 +150,19 @@ test("distances are right to within a few percent", () => {
   assert.ok(km > 225 && km < 240, String(km));
 });
 
-test("the sketch escapes names and draws one badge per pin", () => {
-  const [zone] = zonesOf({mapZones: [{points: [{name: "A", lat: 1, lng: 1}, {name: "B", lat: 1.01, lng: 1.01}, {name: `<b>"ref"</b>`, lat: 1.02, lng: 1, reference: true}]}]}, null, []);
+test("the sketch escapes its label and draws one badge per pin", () => {
+  const [zone] = zonesOf([stop(`<b>"A"</b>`, 1, 1), stop("B", 1.01, 1.01)]);
   const svg = zoneSVG(zone, `Zone "one"`);
   assert.equal((svg.match(/class="badge"/g) || []).length, 2);
-  assert.ok(svg.includes("&lt;b&gt;&quot;ref&quot;&lt;/b&gt;"));
   assert.ok(svg.includes(`aria-label="Zone &quot;one&quot;"`));
   assert.ok(!svg.includes("<b>"));
 });
 
-test("every way of travelling has an icon and a name", () => {
-  assert.deepEqual(TRAVEL_ICONS, TRAVEL_FORMAT);
-  for(const mode of TRAVEL_FORMAT) assert.ok(STRINGS.en["travel_" + mode], mode);
+test("every kind of place and way of travelling has a name in every language", () => {
+  for(const lang of Object.keys(STRINGS)){
+    for(const v of TRAVEL) assert.ok(STRINGS[lang]["travel_" + v], `${lang} travel_${v}`);
+    for(const v of TYPES) assert.ok(STRINGS[lang]["type_" + v], `${lang} type_${v}`);
+  }
 });
 
 /* ---------- interface texts ---------- */
@@ -236,15 +225,15 @@ test("llms.txt gives a chat assistant the whole format in one page, with valid e
     assert.deepEqual(r.errors, [], b.slice(0, 60));
   }
   // The checklist names what chat assistants get wrong first.
-  for(const s of ['"format": "travel-in-my-pocket/1"', '"color"', '`"title"` (not "name"']) assert.ok(text.includes(s), s);
+  for(const s of ['"format": "travel-in-my-pocket/2"', '`"title"` (not "name"', "trip.schema.json", "sight, museum, food"]) assert.ok(text.includes(s), s);
+  // The link resolver is described only on a site that has one.
+  assert.ok(!text.includes("link resolver"));
+  assert.match(llmsText({resolver: "https://resolver.example"}), /GET https:\/\/resolver\.example\?url=/);
 });
 
-test("the format reference mentions every field the validator knows", () => {
-  const validator = readFileSync(join(ROOT, "js/trip.js"), "utf8");
+test("the format reference documents every field of the format", () => {
   const reference = readFileSync(join(ROOT, "docs/trip-format.md"), "utf8");
-  const fields = new Set([...validator.matchAll(/known\([^[\]]*\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/"(\w+)"/g)].map(f => f[1])));
-  assert.ok(fields.size > 30, "field lists not found in js/trip.js");
-  const missing = [...fields].filter(f => !new RegExp("\\b" + f + "\\b").test(reference));
+  const missing = Object.entries(FIELDS).flatMap(([kind, fields]) => Object.keys(fields).filter(f => !reference.includes("`" + f + "`")).map(f => `${kind}.${f}`));
   assert.deepEqual(missing, [], "documented in docs/trip-format.md");
 });
 

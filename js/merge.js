@@ -11,7 +11,7 @@
 // Without a base (the two never shared a version this device still has), nothing
 // counts as removed and every difference is settled by the same winner.
 //
-// Days are matched by date, plans and stops by id, places and stays by key.
+// Days are matched by date, plans and stops by id; anything else field by field.
 // No DOM here.
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -96,19 +96,7 @@ function makeMerger(aWins){
     };
   }
 
-  // Entries of an object (places, stays), each one an object merged field by field.
-  function entries(base, a, b){
-    const out = {};
-    for(const k of new Set([...Object.keys(a), ...Object.keys(b)])){
-      const baseHas = base !== undefined && k in base;
-      const z = baseHas ? base[k] : undefined;
-      const v = (k in a && k in b) ? fields(z, a[k], b[k]) : lonely(baseHas, z, k in a ? a[k] : b[k], null);
-      if(v !== undefined) out[k] = v;
-    }
-    return out;
-  }
-
-  return {fields, list, entries};
+  return {fields, list};
 }
 
 /**
@@ -126,7 +114,7 @@ export function mergeTrips(base, ours, theirs){
   const plans = m.list(p => p.id, (z, a, b) => m.fields(z, a, b, {stops}));
   const days = m.list(d => d.date, (z, a, b) => m.fields(z, a, b, {stops, plans}));
 
-  const trip = m.fields(base ? strip(base) : undefined, strip(ours), strip(theirs), {days, places: m.entries, stays: m.entries});
+  const trip = m.fields(base ? strip(base) : undefined, strip(ours), strip(theirs), {days});
   trip.days.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
   return trip;
 }

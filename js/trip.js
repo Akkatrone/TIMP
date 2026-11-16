@@ -1,15 +1,24 @@
-// Trip file format: validation and small pure helpers.
-// No DOM in this file: it is also used by tools/validate-trip.mjs under Node.
+// The trip file format, travel-in-my-pocket/2: the contract between a trip file and
+// the app. No DOM here: it also runs under Node (tools/, tests) and in the link
+// resolver (worker/).
+//
+// One table, FIELDS, says everything about the format. The checks, the JSON Schema
+// for AI assistants and the reference test of docs/trip-format.md are all made from
+// it: a field is added in one place.
+//
+// The file says what the trip is, nothing about how it looks. Colours, map zones,
+// labels and icons are the app's job, worked out from the content.
 
-export const FORMAT = "travel-in-my-pocket/1";
+export const FORMAT = "travel-in-my-pocket/2";
+export const FORMAT_1 = "travel-in-my-pocket/1";
 
-// How a stop can be travelled. Keep in step with js/icons.js and docs/trip-format.md.
+// How a stop is reached, and what kind of place it is. Keep in step with js/icons.js.
+// A value the app does not know yet is accepted with a warning and drawn as a plain
+// stop, so new kinds can be added without breaking files or older apps.
 export const TRAVEL = ["metro", "bus", "train", "plane", "boat"];
+export const TYPES = ["sight", "museum", "food", "park", "view", "shop", "walk", "hotel"];
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const HEX = /^#[0-9a-fA-F]{6}$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const IMG = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
 const HASH = /^[0-9a-f]{16}$/;
 const HTTPS = /^https:\/\/[^\s<>"]+$/;
 
@@ -17,18 +26,86 @@ const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string" && v.trim() !== "";
 const isNum = v => typeof v === "number" && Number.isFinite(v);
 
-function validDate(s){
-  if(!DATE.test(s)) return false;
+function realDate(s){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(s + "T00:00:00Z");
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
-function validTimezone(tz){
-  try{ new Intl.DateTimeFormat("en", {timeZone: tz}); return true; }catch(e){ return false; }
+function realTimezone(s){
+  try{ new Intl.DateTimeFormat("en", {timeZone: s}); return true; }catch(e){ return false; }
 }
 
+/*
+ * Every field of the format. A field is
+ *   {type, req, doc, ...}
+ * type: "text" | "number" | "list" | "fixed" | "any" | "<name of another entry>"
+ *   list: `of` is the type of the items, `min` the fewest items.
+ *   text: `pattern` + `hint`, or `test` + `hint`, or `values` (one of them).
+ *   number: `min`, `max`.
+ * soft: a value outside `values` is a warning, not an error.
+ * byApp: written by the app; a file may leave it out.
+ * A type can also be a union: "stay" is a text or an object (see `stayOrText`).
+ */
+export const FIELDS = {
+  trip: {
+    format: {type: "fixed", value: FORMAT, req: true, doc: `Always "${FORMAT}".`},
+    title: {type: "text", req: true, doc: "The name of the trip."},
+    days: {type: "list", of: "day", min: 1, req: true, doc: "One entry per date, in date order."},
+    lang: {type: "text", values: ["en", "it"], soft: true, doc: "Language of the app while this trip is open. Without it, the phone's."},
+    timezone: {type: "text", test: realTimezone, hint: "an IANA time zone such as \"Europe/Rome\"", doc: "Time zone of the destination: decides which day is today."},
+    info: {type: "list", of: "section", doc: "Sections of the Info page: useful numbers, words, how to get around."},
+    googleMapsKey: {type: "text", doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
+    id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app. Keep it when you change a file the app saved."},
+    version: {type: "any", byApp: true, doc: "Written by the app. Keep it as it is."}
+  },
+  day: {
+    date: {type: "text", req: true, test: realDate, hint: "a real date as \"YYYY-MM-DD\"", doc: "The date."},
+    city: {type: "text", doc: "Where the day is spent: a city or an area. Days in the same city share a colour."},
+    title: {type: "text", doc: "What the day is about, in a few words."},
+    stay: {type: "stay", doc: "Where the night is spent: a name, or an object with name, address and note."},
+    notes: {type: "list", of: "text", doc: "Things to remember that day, shown at the top."},
+    stops: {type: "list", of: "stop", min: 1, doc: "The stops, in order. A day has `stops` or `plans`."},
+    plans: {type: "list", of: "plan", min: 2, doc: "Alternative plans for the day, each with its own stops."}
+  },
+  plan: {
+    name: {type: "text", req: true, doc: "The name of the plan, shown on its button."},
+    stops: {type: "list", of: "stop", min: 1, req: true, doc: "The stops of this plan, in order."},
+    id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
+  },
+  stop: {
+    title: {type: "text", req: true, doc: "The name of the place or of the activity."},
+    time: {type: "text", doc: "When: \"09:30\", or words like \"Evening\"."},
+    type: {type: "text", values: TYPES, soft: true, doc: "What kind of place it is; it gives the stop its icon and pin."},
+    travel: {type: "text", values: TRAVEL, soft: true, doc: "How you get there from the stop before."},
+    text: {type: "text", doc: "What to know: what to see, what to order, tickets. **bold** is allowed."},
+    tag: {type: "text", doc: "A short label shown on the stop, like \"Booked\" or \"Optional\"."},
+    address: {type: "text", doc: "Where it is, as you would search it in Google Maps: a street address, or name and town."},
+    lat: {type: "number", min: -90, max: 90, doc: "Latitude, with `lng`. Gives the stop its pin on the map."},
+    lng: {type: "number", min: -180, max: 180, doc: "Longitude, with `lat`."},
+    link: {type: "text", pattern: HTTPS, hint: "an https:// address", doc: "A Google Maps link to the exact place."},
+    id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
+  },
+  stay: {
+    name: {type: "text", req: true, doc: "The name of the hotel or flat."},
+    address: {type: "text", doc: "Its address."},
+    note: {type: "text", doc: "Check-in, booking, how to get in."}
+  },
+  section: {
+    title: {type: "text", req: true, doc: "The title of the section."},
+    items: {type: "list", of: "item", min: 1, req: true, doc: "Its lines."}
+  },
+  item: {
+    label: {type: "text", req: true, doc: "What the line is about."},
+    text: {type: "text", req: true, doc: "The line itself. Phone numbers become a link to call."}
+  }
+};
+
+/* ---------- checks ---------- */
+
 /**
- * Checks a parsed trip file.
+ * Checks a parsed trip file against FIELDS, plus the few rules that tie fields
+ * together. Errors stop the file from loading; warnings do not.
  * @returns {{ok: boolean, errors: string[], warnings: string[]}}
  */
 export function validateTrip(trip){
@@ -36,207 +113,196 @@ export function validateTrip(trip){
   const err = (path, msg) => errors.push(`${path}: ${msg}`);
   const warn = (path, msg) => warnings.push(`${path}: ${msg}`);
 
-  if(!isObj(trip)){ return {ok: false, errors: ["The file must contain a JSON object."], warnings}; }
-
-  const optStr = (obj, key, path) => {
-    if(obj[key] !== undefined && typeof obj[key] !== "string") err(`${path}.${key}`, "must be a string");
-  };
-  const reqStr = (obj, key, path) => {
-    if(!isStr(obj[key])) err(`${path}.${key}`, "is required and must be a non-empty string");
-  };
-  const known = (obj, keys, path) => {
-    Object.keys(obj).forEach(k => { if(!keys.includes(k)) warn(`${path}.${k}`, "unknown field, ignored"); });
-  };
-
-  if(trip.format !== FORMAT) err("format", `must be "${FORMAT}"`);
-  if(!isStr(trip.id) || !ID.test(trip.id)) err("id", "is required: lowercase letters, digits and dashes (e.g. \"rome-2027\")");
-  reqStr(trip, "title", "trip");
-  optStr(trip, "lang", "trip");
-  if(trip.timezone !== undefined && (!isStr(trip.timezone) || !validTimezone(trip.timezone))) err("timezone", "must be an IANA time zone such as \"Europe/Rome\"");
-  known(trip, ["format", "id", "version", "title", "lang", "timezone", "places", "stays", "days", "info", "infoNote", "map"], "trip");
-
-  // version: written by the app, see js/version.js
-  if(trip.version !== undefined){
-    const v = trip.version;
-    if(!isObj(v)) err("version", "must be an object");
-    else {
-      if(!HASH.test(v.id)) err("version.id", "must be 16 lowercase hex characters");
-      ["parents", "history"].forEach(k => {
-        if(!Array.isArray(v[k]) || v[k].some(x => !HASH.test(x))) err(`version.${k}`, "must be a list of version ids");
-      });
-      if(Array.isArray(v.parents) && v.parents.length > 2) err("version.parents", "has at most two versions");
-      optStr(v, "date", "version");
-      known(v, ["id", "parents", "history", "date"], "version");
+  function value(v, f, path){
+    switch(f.type){
+      case "fixed": if(v !== f.value) err(path, `must be "${f.value}"`); return;
+      case "any": return;
+      case "number":
+        if(!isNum(v) || v < f.min || v > f.max) err(path, `must be a number between ${f.min} and ${f.max}`);
+        return;
+      case "text":
+        if(!isStr(v)){ err(path, "must be a non-empty text"); return; }
+        if(f.values && !f.values.includes(v)){
+          const msg = `should be one of ${f.values.map(x => `"${x}"`).join(", ")}`;
+          if(f.soft) warn(path, msg + "; shown as a plain one"); else err(path, msg);
+        }
+        if((f.pattern && !f.pattern.test(v)) || (f.test && !f.test(v))) err(path, `must be ${f.hint}`);
+        return;
+      case "list":
+        if(!Array.isArray(v)){ err(path, "must be a list"); return; }
+        if(f.min && v.length < f.min) err(path, f.min === 1 ? "must not be empty" : `needs at least ${f.min} entries`);
+        v.forEach((x, i) => value(x, {type: f.of}, `${path}[${i}]`));
+        return;
+      case "stay":
+        if(typeof v === "string") value(v, {type: "text"}, path); else object(v, "stay", path);
+        return;
+      default:
+        object(v, f.type, path);
     }
   }
 
-  // places
-  const places = isObj(trip.places) ? trip.places : {};
-  if(!isObj(trip.places) || !Object.keys(trip.places).length) err("places", "is required and must contain at least one place");
-  Object.entries(places).forEach(([key, p]) => {
-    const path = `places.${key}`;
-    if(!ID.test(key)) err(path, "key must use lowercase letters, digits and dashes");
-    if(!isObj(p)){ err(path, "must be an object"); return; }
-    reqStr(p, "name", path);
-    optStr(p, "glyph", path);
-    if(!isStr(p.color) || !HEX.test(p.color)) err(`${path}.color`, "is required: a colour like \"#4f9a2a\"");
-    if(p.colorDark !== undefined && (!isStr(p.colorDark) || !HEX.test(p.colorDark))) err(`${path}.colorDark`, "must be a colour like \"#86c95a\"");
-    known(p, ["name", "glyph", "color", "colorDark"], path);
-  });
-  const hasPlace = k => Object.prototype.hasOwnProperty.call(places, k);
-
-  // stays
-  const stays = isObj(trip.stays) ? trip.stays : {};
-  if(trip.stays !== undefined && !isObj(trip.stays)) err("stays", "must be an object");
-  Object.entries(stays).forEach(([key, s]) => {
-    const path = `stays.${key}`;
-    if(!ID.test(key)) err(path, "key must use lowercase letters, digits and dashes");
-    if(!isObj(s)){ err(path, "must be an object"); return; }
-    reqStr(s, "name", path);
-    if(!isStr(s.place) || !hasPlace(s.place)) err(`${path}.place`, "must be one of the keys in \"places\"");
-    ["address", "dates", "note", "query"].forEach(k => optStr(s, k, path));
-    known(s, ["name", "place", "address", "dates", "note", "query"], path);
-  });
-  const hasStay = k => Object.prototype.hasOwnProperty.call(stays, k);
-
-  // stops
-  const checkStops = (list, path) => {
-    if(!Array.isArray(list) || !list.length){ err(path, "must be a non-empty list"); return; }
-    const ids = new Set();
-    list.forEach((s, i) => {
-      const p = `${path}[${i}]`;
-      if(!isObj(s)){ err(p, "must be an object"); return; }
-      reqStr(s, "time", p);
-      reqStr(s, "title", p);
-      ["text", "mapLabel", "query", "tag"].forEach(k => optStr(s, k, p));
-      if(s.link !== undefined && (!isStr(s.link) || !HTTPS.test(s.link) || s.link.length > 2000)) err(`${p}.link`, "must be an https:// address");
-      if(s.travel !== undefined && !TRAVEL.includes(s.travel)) err(`${p}.travel`, `must be one of ${TRAVEL.map(x => `"${x}"`).join(", ")}`);
-      if(s.id !== undefined){
-        if(!isStr(s.id) || !ID.test(s.id)) err(`${p}.id`, "must use lowercase letters, digits and dashes");
-        else if(ids.has(s.id)) err(`${p}.id`, `"${s.id}" is used twice in this list`);
-        else ids.add(s.id);
-      }
-      const hasLat = s.lat !== undefined, hasLng = s.lng !== undefined;
-      if(hasLat !== hasLng) err(p, "\"lat\" and \"lng\" must be given together");
-      if(hasLat && (!isNum(s.lat) || s.lat < -90 || s.lat > 90)) err(`${p}.lat`, "must be a number between -90 and 90");
-      if(hasLng && (!isNum(s.lng) || s.lng < -180 || s.lng > 180)) err(`${p}.lng`, "must be a number between -180 and 180");
-      if(!hasLat && s.mapLabel !== undefined) warn(`${p}.mapLabel`, "has no effect without lat/lng");
-      known(s, ["id", "time", "title", "text", "lat", "lng", "mapLabel", "query", "link", "tag", "travel"], p);
-    });
-  };
-
-  // days
-  if(!Array.isArray(trip.days) || !trip.days.length) err("days", "is required and must be a non-empty list");
-  let prevDate = null;
-  (Array.isArray(trip.days) ? trip.days : []).forEach((d, i) => {
-    const path = `days[${i}]`;
-    if(!isObj(d)){ err(path, "must be an object"); return; }
-    if(!isStr(d.date) || !validDate(d.date)) err(`${path}.date`, "is required: a real date as \"YYYY-MM-DD\"");
-    else {
-      if(prevDate && d.date <= prevDate) err(`${path}.date`, "days must be in ascending date order, one entry per date");
-      prevDate = d.date;
+  function object(o, kind, path){
+    if(!isObj(o)){ err(path, "must be an object"); return; }
+    const fields = FIELDS[kind];
+    for(const [k, f] of Object.entries(fields)){
+      if(o[k] === undefined){ if(f.req) err(path ? `${path}.${k}` : k, "is required"); continue; }
+      value(o[k], f, path ? `${path}.${k}` : k);
     }
-    if(!isStr(d.place) || !hasPlace(d.place)) err(`${path}.place`, "must be one of the keys in \"places\"");
-    if(d.from !== undefined && (!isStr(d.from) || !hasPlace(d.from))) err(`${path}.from`, "must be one of the keys in \"places\"");
-    if(d.stay !== undefined && (!isStr(d.stay) || !hasStay(d.stay))) err(`${path}.stay`, "must be one of the keys in \"stays\"");
-    optStr(d, "stayText", path);
-    reqStr(d, "title", path);
-    optStr(d, "note", path);
-    if(d.reminders !== undefined && (!Array.isArray(d.reminders) || d.reminders.some(r => !isStr(r)))) err(`${path}.reminders`, "must be a list of strings");
-    if(d.zoneNames !== undefined && (!Array.isArray(d.zoneNames) || d.zoneNames.some(z => typeof z !== "string"))) err(`${path}.zoneNames`, "must be a list of strings");
-    if(d.mapSplitKm !== undefined && (!isNum(d.mapSplitKm) || d.mapSplitKm <= 0)) err(`${path}.mapSplitKm`, "must be a positive number");
-
-    const hasStops = d.stops !== undefined, hasPlans = d.plans !== undefined;
-    if(hasStops === hasPlans) err(path, "needs either \"stops\" or \"plans\" (not both)");
-    if(hasStops) checkStops(d.stops, `${path}.stops`);
-    const planIds = new Set();
-    if(hasPlans){
-      if(!Array.isArray(d.plans) || d.plans.length < 2) err(`${path}.plans`, "must list at least two alternative plans");
-      else d.plans.forEach((p, j) => {
-        const pp = `${path}.plans[${j}]`;
-        if(!isObj(p)){ err(pp, "must be an object"); return; }
-        if(!isStr(p.id) || !ID.test(p.id)) err(`${pp}.id`, "is required: lowercase letters, digits and dashes");
-        else if(planIds.has(p.id)) err(`${pp}.id`, `"${p.id}" is used twice`);
-        else planIds.add(p.id);
-        reqStr(p, "name", pp);
-        if(p.zoneNames !== undefined && (!Array.isArray(p.zoneNames) || p.zoneNames.some(z => typeof z !== "string"))) err(`${pp}.zoneNames`, "must be a list of strings");
-        checkStops(p.stops, `${pp}.stops`);
-        known(p, ["id", "name", "zoneNames", "stops"], pp);
-      });
-    }
-
-    if(d.mapZones !== undefined){
-      if(!Array.isArray(d.mapZones) || !d.mapZones.length) err(`${path}.mapZones`, "must be a non-empty list");
-      else d.mapZones.forEach((z, j) => {
-        const zp = `${path}.mapZones[${j}]`;
-        if(!isObj(z)){ err(zp, "must be an object"); return; }
-        optStr(z, "name", zp);
-        if(!Array.isArray(z.points) || !z.points.length){ err(`${zp}.points`, "must be a non-empty list"); return; }
-        z.points.forEach((pt, k) => {
-          const tp = `${zp}.points[${k}]`;
-          if(!isObj(pt)){ err(tp, "must be an object"); return; }
-          reqStr(pt, "name", tp);
-          optStr(pt, "query", tp);
-          if(!isNum(pt.lat) || pt.lat < -90 || pt.lat > 90) err(`${tp}.lat`, "is required: a number between -90 and 90");
-          if(!isNum(pt.lng) || pt.lng < -180 || pt.lng > 180) err(`${tp}.lng`, "is required: a number between -180 and 180");
-          if(pt.reference !== undefined && typeof pt.reference !== "boolean") err(`${tp}.reference`, "must be true or false");
-          known(pt, ["name", "lat", "lng", "query", "reference"], tp);
-        });
-        if(z.points.every(pt => isObj(pt) && pt.reference)) err(`${zp}.points`, "needs at least one point that is not a reference");
-      });
-    }
-
-    if(d.mapImages !== undefined){
-      if(!Array.isArray(d.mapImages)) err(`${path}.mapImages`, "must be a list");
-      else d.mapImages.forEach((im, j) => {
-        const ip = `${path}.mapImages[${j}]`;
-        if(!isObj(im)){ err(ip, "must be an object"); return; }
-        if(!isStr(im.src) || !IMG.test(im.src)) err(`${ip}.src`, "must be an embedded image: \"data:image/jpeg;base64,...\" (png, jpeg or webp)");
-        if(!Number.isInteger(im.width) || im.width <= 0) err(`${ip}.width`, "is required: width in pixels");
-        if(!Number.isInteger(im.height) || im.height <= 0) err(`${ip}.height`, "is required: height in pixels");
-        if(im.zone !== undefined && (!Number.isInteger(im.zone) || im.zone < 0)) err(`${ip}.zone`, "must be a zone index starting from 0");
-        if(im.plan !== undefined && !planIds.has(im.plan)) err(`${ip}.plan`, "must be the id of one of this day's plans");
-        optStr(im, "credit", ip);
-        if(!Array.isArray(im.pins) || im.pins.some(n => !isStr(n))) err(`${ip}.pins`, "is required: the names of the numbered pins in the picture, in order");
-        known(im, ["src", "width", "height", "zone", "plan", "credit", "pins"], ip);
-      });
-    }
-
-    const lists = hasStops && Array.isArray(d.stops) ? [d.stops] : (Array.isArray(d.plans) ? d.plans.map(p => (isObj(p) && Array.isArray(p.stops)) ? p.stops : []) : []);
-    if(!d.mapZones && lists.length && lists.every(l => l.every(s => !isObj(s) || s.lat === undefined))) warn(path, "no stop has coordinates: this day will have no map");
-    known(d, ["date", "place", "from", "stay", "stayText", "title", "note", "reminders", "zoneNames", "mapSplitKm", "stops", "plans", "mapZones", "mapImages"], path);
-  });
-
-  // info
-  if(trip.info !== undefined){
-    if(!Array.isArray(trip.info)) err("info", "must be a list of sections");
-    else trip.info.forEach((sec, i) => {
-      const sp = `info[${i}]`;
-      if(!isObj(sec)){ err(sp, "must be an object"); return; }
-      reqStr(sec, "title", sp);
-      if(!Array.isArray(sec.rows) || !sec.rows.length){ err(`${sp}.rows`, "must be a non-empty list"); return; }
-      sec.rows.forEach((r, j) => {
-        const rp = `${sp}.rows[${j}]`;
-        if(!isObj(r)){ err(rp, "must be an object"); return; }
-        reqStr(r, "label", rp);
-        optStr(r, "text", rp);
-        optStr(r, "number", rp);
-        if(!isStr(r.text) && !isStr(r.number)) err(rp, "needs \"text\" or \"number\"");
-        known(r, ["label", "text", "number"], rp);
-      });
-      known(sec, ["title", "rows"], sp);
-    });
-  }
-  optStr(trip, "infoNote", "trip");
-
-  // map
-  if(trip.map !== undefined){
-    if(!isObj(trip.map)) err("map", "must be an object");
-    else {
-      optStr(trip.map, "googleMapsKey", "map");
-      known(trip.map, ["googleMapsKey"], "map");
-    }
+    for(const k of Object.keys(o)) if(!fields[k]) warn(path ? `${path}.${k}` : k, "unknown field, ignored");
+    RULES[kind] && RULES[kind](o, path, err, warn);
   }
 
+  if(!isObj(trip)) return {ok: false, errors: ["The file must contain one JSON object, starting with {"], warnings};
+  if(trip.format === FORMAT_1) return {ok: false, errors: [`format: "${FORMAT_1}" is the old format: load it in the app, which converts it`], warnings};
+  object(trip, "trip", "");
   return {ok: errors.length === 0, errors, warnings};
+}
+
+// What one field cannot say alone.
+const RULES = {
+  trip(t, path, err){
+    const days = Array.isArray(t.days) ? t.days : [];
+    days.forEach((d, i) => {
+      if(i && isObj(d) && isObj(days[i - 1]) && isStr(d.date) && !(d.date > days[i - 1].date)) err(`days[${i}].date`, "must come after the day before: one entry per date, in order");
+    });
+    if(t.version !== undefined){
+      const v = t.version, ok = isObj(v) && HASH.test(v.id) && ["parents", "history"].every(k => Array.isArray(v[k]) && v[k].every(x => HASH.test(x)));
+      if(!ok) err("version", "is written by the app: keep it as it is, or remove it");
+    }
+  },
+  day(d, path, err, warn){
+    if((d.stops === undefined) === (d.plans === undefined)) err(path, "needs \"stops\" or \"plans\" (one of the two)");
+    const lists = Array.isArray(d.plans) ? d.plans.map(p => isObj(p) && p.stops) : [d.stops];
+    lists.forEach((l, j) => unique(l, `${path}${d.plans ? `.plans[${j}]` : ""}.stops`, err));
+    unique(d.plans, `${path}.plans`, err);
+    const all = lists.flatMap(l => Array.isArray(l) ? l : []);
+    if(all.length && all.every(s => !isObj(s) || s.lat === undefined)) warn(path, "no stop has lat/lng: this day has no map");
+  },
+  stop(s, path, err){
+    if((s.lat === undefined) !== (s.lng === undefined)) err(path, "\"lat\" and \"lng\" go together");
+  }
+};
+
+// Ids written by the app must stay unique in their list.
+function unique(list, path, err){
+  if(!Array.isArray(list)) return;
+  const seen = new Set();
+  list.forEach((x, i) => {
+    if(!isObj(x) || !isStr(x.id)) return;
+    if(seen.has(x.id)) err(`${path}[${i}].id`, `"${x.id}" is used twice`);
+    seen.add(x.id);
+  });
+}
+
+/* ---------- JSON Schema, for assistants and tools that can follow one ---------- */
+
+/** The format as a JSON Schema (draft 2020-12), made from FIELDS. */
+export function tripSchema(){
+  const prop = f => {
+    const doc = {description: f.doc};
+    switch(f.type){
+      case "fixed": return {...doc, const: f.value};
+      case "any": return doc;
+      case "number": return {...doc, type: "number", minimum: f.min, maximum: f.max};
+      case "text": return {...doc, type: "string", minLength: 1, ...(f.values && !f.soft ? {enum: f.values} : {}), ...(f.values && f.soft ? {examples: f.values} : {}), ...(f.pattern ? {pattern: f.pattern.source} : {})};
+      case "list": return {...doc, type: "array", ...(f.min ? {minItems: f.min} : {}), items: f.of === "text" ? {type: "string", minLength: 1} : {$ref: `#/$defs/${f.of}`}};
+      case "stay": return {...doc, anyOf: [{type: "string", minLength: 1}, {$ref: "#/$defs/stay"}]};
+      default: return {...doc, $ref: `#/$defs/${f.type}`};
+    }
+  };
+  const def = kind => {
+    const fields = Object.entries(FIELDS[kind]);
+    return {type: "object", properties: Object.fromEntries(fields.map(([k, f]) => [k, prop(f)])), required: fields.filter(([, f]) => f.req).map(([k]) => k)};
+  };
+  const defs = Object.fromEntries(Object.keys(FIELDS).filter(k => k !== "trip").map(k => [k, def(k)]));
+  defs.day.oneOf = [{required: ["stops"]}, {required: ["plans"]}];
+  defs.stop.dependentRequired = {lat: ["lng"], lng: ["lat"]};
+  return {$schema: "https://json-schema.org/draft/2020-12/schema", title: "TIMP trip file", ...def("trip"), $defs: defs};
+}
+
+/* ---------- what the app works out from the content ---------- */
+
+/** "Caffè Greco" → "caffe-greco": text made fit for an id. */
+export function slug(text, fallback = "stop"){
+  return String(text || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "") || fallback;
+}
+
+/**
+ * The trip's id when the file has none: its title and first date, so a corrected file
+ * an assistant writes again for the same trip updates it instead of adding another.
+ */
+export const tripId = trip => `${slug(trip.title, "trip")}-${trip.days[0].date}`;
+
+/** The cities of a trip, in the order they first appear. A day's colour is its city's. */
+export function citiesOf(trip){
+  return [...new Set(trip.days.map(d => d.city || ""))];
+}
+
+/** A day's stay as an object, whether the file gives a name or {name, address, note}. */
+export const stayOf = s => !s ? null : typeof s === "string" ? {name: s} : s;
+
+/** The place a stop stands for, as text for Google Maps: its address, or its position. */
+export function placeQuery(s){
+  if(s.address) return s.address;
+  if(s.lat !== undefined) return s.lat + "," + s.lng;
+  return "";
+}
+
+/**
+ * The kind of a place, from the tags OpenStreetMap or Google give it. Null when none
+ * of TYPES fits.
+ */
+export function typeFrom(tags){
+  const has = (...xs) => xs.some(x => tags.includes(x));
+  if(has("museum", "gallery", "art_gallery", "arts_centre")) return "museum";
+  if(has("hotel", "hostel", "guest_house", "apartment", "motel", "lodging", "camp_site")) return "hotel";
+  if(has("restaurant", "cafe", "bar", "pub", "fast_food", "ice_cream", "food_court", "bakery", "food", "meal_takeaway", "biergarten")) return "food";
+  if(has("viewpoint", "peak")) return "view";
+  if(has("park", "garden", "nature_reserve", "beach", "zoo", "national_park", "natural_feature")) return "park";
+  if(has("shop", "marketplace", "mall", "store", "shopping_mall", "department_store", "supermarket")) return "shop";
+  if(has("attraction", "artwork", "monument", "memorial", "castle", "ruins", "place_of_worship", "church", "tourist_attraction", "historic", "archaeological_site", "fountain")) return "sight";
+  return null;
+}
+
+/* ---------- the old format ---------- */
+
+const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined && o[k] !== "").map(k => [k, o[k]]));
+
+/**
+ * A travel-in-my-pocket/1 file in the new format; any other value is returned as it
+ * is. Nothing that matters to the traveller is lost: map settings (zones, pictures,
+ * labels, colours) are dropped, the app works them out now. The result is the same on
+ * every device, so the version it becomes is the same too.
+ */
+export function upgrade(trip){
+  if(!isObj(trip) || trip.format !== FORMAT_1) return trip;
+  const places = isObj(trip.places) ? trip.places : {}, stays = isObj(trip.stays) ? trip.stays : {};
+  const stop = s => !isObj(s) ? s : {...pick(s, ["id", "time", "title", "travel", "text", "tag"]), ...(s.query ? {address: s.query} : {}), ...pick(s, ["lat", "lng", "link"])};
+  const stay = d => {
+    const s = d.stay && stays[d.stay];
+    if(!s) return d.stayText || undefined;
+    const address = s.address || s.query;
+    return address || s.note ? {name: s.name, ...(address ? {address} : {}), ...pick(s, ["note"])} : s.name;
+  };
+  const day = d => !isObj(d) ? d : {
+    date: d.date,
+    ...(places[d.place] ? {city: places[d.place].name} : {}),
+    ...pick(d, ["title"]),
+    ...(stay(d) ? {stay: stay(d)} : {}),
+    ...(d.reminders || d.note ? {notes: [...(d.reminders || []), ...(d.note ? [d.note] : [])]} : {}),
+    ...(Array.isArray(d.plans) ? {plans: d.plans.map(p => isObj(p) ? {...pick(p, ["id", "name"]), stops: (p.stops || []).map(stop)} : p)} : {stops: (d.stops || []).map(stop)})
+  };
+  const info = (Array.isArray(trip.info) ? trip.info : []).map(sec => !isObj(sec) ? sec : {
+    title: sec.title,
+    items: (sec.rows || []).map(r => !isObj(r) ? r : {label: r.label, text: [r.number, r.text].filter(Boolean).join(" · ")})
+  });
+  if(trip.infoNote) info.push({title: trip.lang === "it" ? "Note" : "Notes", items: [{label: trip.lang === "it" ? "Nota" : "Note", text: trip.infoNote}]});
+  return {
+    format: FORMAT,
+    ...pick(trip, ["id", "version", "title", "lang", "timezone"]),
+    ...(trip.map && trip.map.googleMapsKey ? {googleMapsKey: trip.map.googleMapsKey} : {}),
+    days: (trip.days || []).map(day),
+    ...(info.length ? {info} : {})
+  };
 }

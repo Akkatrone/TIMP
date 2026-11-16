@@ -1,7 +1,12 @@
 // Groups the stops of a day into map zones and draws the offline sketch.
+// Everything here is worked out from the stops: the file says nothing about the map.
 
 import { esc, mapsUrl } from "./util.js";
-import { travelGlyph } from "./icons.js";
+import { glyph } from "./icons.js";
+import { TRAVEL, TYPES, placeQuery } from "./trip.js";
+
+// Stops further apart than this are drawn on separate maps (a city, then the next one).
+const SPLIT_KM = 12;
 
 function kmXY(ll, lat0){ return [ll[1] * 111.32 * Math.cos(lat0 * Math.PI / 180), -ll[0] * 110.57]; }
 export function distKm(a, b){
@@ -12,11 +17,11 @@ const f1 = v => Math.round(v * 10) / 10;
 
 /**
  * A zone is a group of points close enough to share one map.
- * Each point: {nums, name, ll: [lat, lng], q, ref, items: [{n, idx, time, title}]}
+ * Each point: {nums, name, ll: [lat, lng], q, type, items: [{n, idx, time, title}]}
+ *   (stops less than 30 m apart share a point; its name and type are the first one's)
  * zone.path lists the points in visiting order (a point can repeat), and
- * zone.pathIdx the position in the day's list of the stop behind each of them
- * (-1 when the map is drawn from mapZones, whose points are not stops), and
- * zone.pathTravel how each of them is reached: "metro", "train", "plane", "boat" or null.
+ * zone.pathIdx the position in the day's list of the stop behind each of them, and
+ * zone.pathTravel how each of them is reached: one of TRAVEL, or null.
  *
  * `travel` on a stop says how you reach it, like its description does: the leg that
  * arrives at it is travelled that way. A stop without a pin that is the journey itself
@@ -26,40 +31,30 @@ const f1 = v => Math.round(v * 10) / 10;
  * `skipped(idx)` says which stops the traveller skips: they keep their pin, but the
  * route goes from the stop before them straight to the one after.
  */
-export function zonesOf(day, plan, list, skipped = () => false){
-  if(day.mapZones){
-    return day.mapZones.map(z => {
-      let k = 0;
-      const pts = z.points.map(p => {
-        const n = p.reference ? 0 : ++k;
-        return {nums: n ? [n] : [], name: p.name, ll: [p.lat, p.lng], q: p.query || p.name, ref: !!p.reference, items: n ? [{n, idx: -1, time: "", title: p.name}] : []};
-      });
-      const path = pts.filter(p => !p.ref);
-      return {name: z.name || "", pts, path, pathIdx: path.map(() => -1), pathTravel: path.map(() => null), enter: null};
-    });
-  }
-  const split = day.mapSplitKm || 12, zones = [];
+export function zonesOf(list, skipped = () => false){
+  const zones = [];
   // Zones group every pin, skipped or not, so they do not change when a stop is skipped.
   // The route (path) only takes the stops that are still on.
   let cur = null, prev = null, last = null, lastZone = null, travel = null;
+  const known = (v, values) => values.includes(v) ? v : null;
   list.forEach((s, i) => {
     const off = skipped(i);
     if(s.lat === undefined){
-      if(s.travel && !off) travel = s.travel;
+      if(known(s.travel, TRAVEL) && !off) travel = s.travel;
       return;
     }
     const ll = [s.lat, s.lng];
-    if(!cur || distKm(prev, ll) > split){
+    if(!cur || distKm(prev, ll) > SPLIT_KM){
       cur = {pts: [], path: [], pathIdx: [], pathTravel: [], enter: null};
       zones.push(cur);
     }
     prev = ll;
     let pt = cur.pts.find(p => distKm(p.ll, ll) < 0.03);
-    if(!pt){ pt = {nums: [], name: s.mapLabel || s.title, ll, q: s.query || s.mapLabel || s.title, ref: false, items: []}; cur.pts.push(pt); }
+    if(!pt){ pt = {nums: [], name: s.title, ll, q: placeQuery(s), type: known(s.type, TYPES), items: []}; cur.pts.push(pt); }
     pt.nums.push(i + 1);
     pt.items.push({n: i + 1, idx: i, time: s.time, title: s.title});
     if(off) return;
-    const arriving = s.travel || travel;
+    const arriving = known(s.travel, TRAVEL) || travel;
     travel = null;
     if(last && lastZone !== cur && !cur.path.length) cur.enter = {from: last, idx: i, travel: arriving};
     cur.path.push(pt);
@@ -68,8 +63,6 @@ export function zonesOf(day, plan, list, skipped = () => false){
     last = pt;
     lastZone = cur;
   });
-  const names = (plan && plan.zoneNames) || day.zoneNames || [];
-  zones.forEach((z, i) => { z.name = names[i] || ""; });
   return zones;
 }
 
@@ -106,13 +99,10 @@ export function bridgesOf(zones){
 export const midpoint = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 
 // A pin is behind you when every stop it stands for is done or skipped.
-// Points drawn from mapZones (idx -1) are not stops, so they are never behind you.
-export function pinGone(pt, gone){
-  return pt.items.length > 0 && pt.items.every(it => it.idx >= 0 && gone(it.idx));
-}
+export const pinGone = (pt, gone) => pt.items.every(it => gone(it.idx));
 
 // Same rule for a leg of the route.
-export const legGone = (leg, gone) => leg.idx >= 0 && gone(leg.idx);
+export const legGone = (leg, gone) => gone(leg.idx);
 
 // The offline map: an SVG sketch to scale, with numbered badges pushed apart so they never overlap.
 // `gone(idx)` says whether the stop at that position in the list is done or skipped.
@@ -149,15 +139,13 @@ export function zoneSVG(z, label, gone = () => false){
   legs.filter(leg => leg.travel).forEach(leg => {
     const a = P[pts.indexOf(leg.from)], b = P[pts.indexOf(leg.to)];
     const [x, y] = midpoint(a, b), g = legGone(leg, gone) ? " gone" : "";
-    o += `<g class="tv${g}"><circle class="tvbg" cx="${f1(x)}" cy="${f1(y)}" r="9"/>${travelGlyph(leg.travel, x, y, 12)}</g>`;
+    o += `<g class="tv${g}"><circle class="tvbg" cx="${f1(x)}" cy="${f1(y)}" r="9"/>${glyph(leg.travel, x, y, 12)}</g>`;
   });
   pts.forEach((p, i) => {
     const c = P[i];
-    if(p.ref){ o += `<path class="ref" d="M${f1(c[0])} ${f1(c[1] - 7)}L${f1(c[0] + 7)} ${f1(c[1] + 5)}L${f1(c[0] - 7)} ${f1(c[1] + 5)}Z"/><text class="sbt" x="${f1(c[0] + 11)}" y="${f1(c[1] + 4)}">${esc(p.name)}</text>`; return; }
     if(Math.hypot(B[i][0] - c[0], B[i][1] - c[1]) > 4) o += `<line class="lead" x1="${f1(c[0])}" y1="${f1(c[1])}" x2="${f1(B[i][0])}" y2="${f1(B[i][1])}"/><circle class="pt" cx="${f1(c[0])}" cy="${f1(c[1])}" r="3"/>`;
   });
   pts.forEach((p, i) => {
-    if(p.ref) return;
     const lab = p.nums.join("·"), bw = Math.max(20, 9 + lab.length * 6.5), g = pinGone(p, gone) ? " gone" : "";
     o += `<rect class="badge${g}" x="${f1(B[i][0] - bw / 2)}" y="${f1(B[i][1] - 10)}" width="${f1(bw)}" height="20" rx="10"/><text class="bt${g}" x="${f1(B[i][0])}" y="${f1(B[i][1])}" dy="0.35em">${lab}</text>`;
   });

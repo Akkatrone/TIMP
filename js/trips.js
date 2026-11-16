@@ -4,19 +4,20 @@
 //
 // versions: {put(trip), get(tripId, id), ids(tripId)} — see versionStore in js/objects.js
 
-import { validateTrip } from "./trip.js";
+import { validateTrip, upgrade } from "./trip.js";
 import { ensureIds } from "./edit.js";
 import { ensureVersion, childOf, commit, commitMerge, relation, commonBase, isIntact } from "./version.js";
 import { mergeTrips } from "./merge.js";
 import { diffTrips } from "./diff.js";
 
 /**
- * Makes a trip ready for versions: every stop with an id, a version on the trip.
- * Files without them get both the same way on every device. `renamed` lists the
- * stops that got an id, so ticks saved under their old key can follow.
+ * Makes a trip ready for versions: in format 2, with ids, with a version. Files
+ * without them get them the same way on every device. `renamed` lists the stops that
+ * got an id, so ticks saved under their old key can follow. A file in format 1 keeps
+ * its version as the parent of the converted one.
  */
 export async function prepare(trip){
-  const {trip: withIds, renamed} = ensureIds(trip);
+  const {trip: withIds, renamed} = ensureIds(upgrade(trip));
   if(!withIds.version) return {trip: await ensureVersion(withIds), renamed};
   // A file edited by hand keeps the version it was made from, but its content changed,
   // so the id no longer matches: it becomes a new version made from the one it names.
