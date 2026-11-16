@@ -2,13 +2,14 @@
 // page published with the app (https://frafal.github.io/TIMP/llms.txt).
 //
 // Chat assistants (Gemini, ChatGPT…) read one page when given a link; they do not
-// clone the repository and open docs/. This page is made by the build from the same
-// documents agents read, with a checklist of the mistakes chat assistants make first.
-// Nothing here is written twice: change the documents, not this file.
+// clone the repository and open docs/. This page is made by the build: the format in
+// short (formatBrief in js/trip.js, made from FIELDS, the same text the app copies for
+// an assistant), then the documents agents read. Nothing here is written twice.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./app-files.mjs";
+import { formatBrief } from "../../js/trip.js";
 
 const read = (root, f) => readFileSync(join(root, f), "utf8").trim();
 
@@ -37,39 +38,10 @@ known) and \`link\`. Put them in the stop as they are. It keeps nothing.
 > file if one rule is broken, so follow the format below exactly and invent no fields.
 > The format as a JSON Schema: ${site}trip.schema.json
 
-## Checklist: check every point before you hand over the file
+## The format, in short
 
-1. The first field is \`"format": "travel-in-my-pocket/2"\`, then \`"title"\`.
-2. \`"days"\` is a list, one entry per date, \`"date": "YYYY-MM-DD"\`, in date order.
-3. Each day has \`"stops"\` (a list), or \`"plans"\` (two or more, each with \`"name"\` and
-   \`"stops"\`), never both. Give it \`"city"\` and \`"title"\` too.
-4. Each stop has \`"title"\` (not "name", not "place"). Add \`"time"\`, \`"type"\`, \`"address"\`,
-   and \`"lat"\` and \`"lng"\` as numbers when you know the position.
-5. \`"type"\` is one of: sight, museum, food, park, view, shop, walk, hotel.
-   \`"travel"\` (how you get there) is one of: metro, bus, train, plane, boat.
-6. \`"stay"\` is a name, or \`{"name", "address", "note"}\`. \`"info"\` sections have
-   \`"title"\` and \`"items"\` of \`{"label", "text"}\`.
-7. No colours, icons, ids or versions: the app writes those. Only the fields listed
-   below. Valid JSON: double quotes, no comments, no trailing commas. Hand over the
-   whole file, in one block.
-
-The smallest valid file:
-
-\`\`\`json
-{
-  "format": "travel-in-my-pocket/2",
-  "title": "Rome in three days",
-  "days": [
-    {
-      "date": "2027-04-10",
-      "city": "Rome",
-      "title": "The ancient city",
-      "stops": [
-        {"time": "09:00", "title": "Colosseum", "type": "sight", "address": "Piazza del Colosseo, Rome", "lat": 41.8902, "lng": 12.4922}
-      ]
-    }
-  ]
-}
+\`\`\`text
+${formatBrief()}
 \`\`\`
 
 ## How the traveller loads it

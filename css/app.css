@@ -245,7 +245,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .errbox .actions{margin:0}
 #paste-text{min-height:180px;font:500 16px/1.45 var(--f-mono);resize:vertical}  /* 16px: iPhones zoom into smaller fields */
 /* how to have a trip written by an AI assistant */
-.prompt{margin:10px 0;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font:500 .82rem/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+.prompt{margin:10px 0;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font:500 .82rem/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .aihow summary{cursor:pointer;font-weight:600;padding:4px 0}
 .aihow .steps{margin-top:8px}
 .errbox b{font-weight:600}

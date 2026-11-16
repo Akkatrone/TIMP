@@ -496,10 +496,13 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector('[data-act="paste"]')`);
     // The message to start from is there, with the page of the format on this site.
-    assert.match(await run(`return document.querySelector("details.aihow [data-prompt]").textContent;`), /^Read http:\/\/[^ ]+\/llms\.txt and follow it exactly\./);
+    assert.match(await run(`return document.querySelector("details.aihow [data-prompt]").textContent;`), /^Write a trip file for the TIMP app/);
     await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; };`);
     await run(`document.querySelector("[data-act='copy-prompt']").click(); await new Promise(r => setTimeout(r, 100));`);
-    assert.match(await run(`return window.__copied;`), /\[where, dates or number of days/);
+    const message = await run(`return window.__copied;`);
+    assert.match(message, /\[where, dates or number of days/);
+    assert.match(message, /TIMP trip file, format "travel-in-my-pocket\/2"/, "the format travels with the message: no link to open");
+    assert.ok(!message.includes("llms.txt"));
     // What Gemini wrote: "name" instead of "title", no format, no places.
     const wrong = {id: "rome-gemini", title: "Rome", days: [{date: "2027-05-01", place: "rome", title: "Day 1", stops: [{time: "09:00", name: "Colosseum"}]}]};
     await run(`document.querySelector('[data-act="paste"]').click();`);
@@ -511,7 +514,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; };`);
     await run(`document.querySelector("[data-act='copy-errors']").click(); await new Promise(r => setTimeout(r, 100));`);
     const copied = await run(`return window.__copied;`);
-    assert.match(copied, /llms\.txt/);
+    assert.match(copied, /following the format I gave you/);
     assert.match(copied, /- days\[0\]\.stops\[0\]\.title: /);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Copied/);
     // The corrected answer, pasted with the assistant's words around it.

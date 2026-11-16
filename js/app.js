@@ -1,4 +1,4 @@
-import { validateTrip, upgrade, citiesOf, stayOf, placeQuery, FORMAT, TRAVEL, TYPES } from "./trip.js";
+import { validateTrip, upgrade, citiesOf, stayOf, placeQuery, formatBrief, FORMAT, TRAVEL, TYPES } from "./trip.js";
 import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
 import { esc, rich, mapsUrl, dirUrl, dateParts, todayIn, jsonIn } from "./util.js";
@@ -402,15 +402,15 @@ function errorBox(){
     (e.all ? `<p class="aihelp">${esc(t("aiHelp"))}</p><div class="actions"><button type="button" class="btn small" data-act="copy-errors">${esc(t("copyForAi"))}</button></div>` : "") + `</div>`;
 }
 
-// The page with the whole format for AI assistants: published next to the app by the
-// build (tools/lib/llms.mjs), so every copy of TIMP points to its own.
-const llmsUrl = () => new URL("llms.txt", document.baseURI).href;
-
 // How to have a trip written by an AI assistant: a message to copy and fill in, then
-// Paste a trip. On the first screen, and folded on the Trips page.
+// Paste a trip. On the first screen, and folded on the Trips page. The message carries
+// the format itself (formatBrief), so it works with any assistant, even one that
+// cannot open links; only its first lines are shown.
+const aiMessage = () => t("aiPrompt") + "\n\n" + formatBrief();
+
 function aiSection(folded){
   const body = `<ol class="steps"><li>${esc(t("aiStep1"))}</li><li>${esc(t("aiStep2"))}</li></ol>
-    <pre class="prompt" data-prompt>${esc(t("aiPrompt", {url: llmsUrl()}))}</pre>
+    <pre class="prompt" data-prompt>${esc(t("aiPrompt"))}\n${esc(t("aiPromptMore"))}</pre>
     <div class="actions"><button type="button" class="btn small" data-act="copy-prompt">${esc(t("copyPrompt"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>`;
   return folded
     ? `<details class="sec aihow"><summary>${esc(t("aiTitle"))}</summary>${body}</details>`
@@ -422,10 +422,9 @@ async function copyText(text, done){
   catch(e){ await ask({title: t("copyByHand"), text: text.split("\n").filter(Boolean), actions: [{id: "ok", label: t("close")}]}); }
 }
 
-// The problems of a refused file, worded for the assistant that wrote it, with the
-// page that has the whole format (published with the app, see tools/lib/llms.mjs).
+// The problems of a refused file, worded for the assistant that wrote it.
 function messageForAi(){
-  return t("aiFixPrompt", {url: llmsUrl()}) + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
+  return t("aiFixPrompt") + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
 }
 
 function copyErrors(){
@@ -924,7 +923,7 @@ $app.addEventListener("click", e => {
   if(a === "pick"){ $file.value = ""; $file.click(); }
   else if(a === "paste") pasteTrip();
   else if(a === "copy-errors") copyErrors();
-  else if(a === "copy-prompt") copyText(t("aiPrompt", {url: llmsUrl()}), t("copiedPrompt"));
+  else if(a === "copy-prompt") copyText(aiMessage(), t("copiedPrompt"));
   else if(a === "demo") loadDemo();
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }

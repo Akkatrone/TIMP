@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { esc, rich, dateParts, mapsUrl, jsonIn } from "../js/util.js";
 import { zonesOf, routeUrl, zoneSVG, distKm, legsOf, bridgesOf, pinGone } from "../js/geo.js";
-import { TRAVEL, TYPES, FIELDS, validateTrip, placeQuery } from "../js/trip.js";
+import { TRAVEL, TYPES, FIELDS, validateTrip, placeQuery, formatBrief } from "../js/trip.js";
 import { STRINGS } from "../js/i18n.js";
 import { ROOT, precacheList, readSw } from "../tools/lib/app-files.mjs";
 import { llmsText } from "../tools/lib/llms.mjs";
@@ -217,18 +217,26 @@ test("llms.txt gives a chat assistant the whole format in one page, with valid e
     assert.ok(text.includes(title), doc);
   }
   assert.ok(!/\]\((?!https?:)[^)]+\)/.test(text), "no links to files of the repository");
-  const blocks = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => m[1]);
-  const whole = blocks.filter(b => b.trim().startsWith("{") && b.includes('"format"'));
-  assert.ok(whole.length >= 2, "the smallest file and the complete example");
-  for(const b of whole){
-    const r = validateTrip(JSON.parse(b));
-    assert.deepEqual(r.errors, [], b.slice(0, 60));
-  }
-  // The checklist names what chat assistants get wrong first.
-  for(const s of ['"format": "travel-in-my-pocket/2"', '`"title"` (not "name"', "trip.schema.json", "sight, museum, food"]) assert.ok(text.includes(s), s);
+  assert.ok(text.includes(formatBrief()), "the format in short, the same text the app copies");
+  assert.ok(text.includes("trip.schema.json"));
+  const blocks = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => m[1]).filter(b => b.trim().startsWith("{") && b.includes('"format"'));
+  assert.ok(blocks.length >= 1, "the complete example");
+  for(const b of blocks) assert.deepEqual(validateTrip(JSON.parse(b)).errors, [], b.slice(0, 60));
   // The link resolver is described only on a site that has one.
   assert.ok(!text.includes("link resolver"));
   assert.match(llmsText({resolver: "https://resolver.example"}), /GET https:\/\/resolver\.example\?url=/);
+});
+
+test("the format in short has every field an assistant writes, a valid example, and no key", () => {
+  const brief = formatBrief();
+  for(const [kind, fields] of Object.entries(FIELDS)){
+    for(const [name, f] of Object.entries(fields)){
+      const listed = new RegExp(`^  ${name}( \\(required\\))?:`, "m").test(brief.split(`\n${kind}:\n`)[1] || "");
+      assert.equal(listed, !f.byApp && !f.private, `${kind}.${name}`);
+    }
+  }
+  assert.deepEqual(validateTrip(JSON.parse(brief.split("\n").pop())).errors, []);
+  assert.ok(brief.length < 4000, "short enough to paste on a phone: " + brief.length);
 });
 
 test("the format reference documents every field of the format", () => {

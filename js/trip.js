@@ -45,6 +45,7 @@ function realTimezone(s){
  *   number: `min`, `max`.
  * soft: a value outside `values` is a warning, not an error.
  * byApp: written by the app; a file may leave it out.
+ * private: never written by an assistant (left out of formatBrief).
  * A type can also be a union: "stay" is a text or an object (see `stayOrText`).
  */
 export const FIELDS = {
@@ -55,7 +56,7 @@ export const FIELDS = {
     lang: {type: "text", values: ["en", "it"], soft: true, doc: "Language of the app while this trip is open. Without it, the phone's."},
     timezone: {type: "text", test: realTimezone, hint: "an IANA time zone such as \"Europe/Rome\"", doc: "Time zone of the destination: decides which day is today."},
     info: {type: "list", of: "section", doc: "Sections of the Info page: useful numbers, words, how to get around."},
-    googleMapsKey: {type: "text", doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
+    googleMapsKey: {type: "text", private: true, doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app. Keep it when you change a file the app saved."},
     version: {type: "any", byApp: true, doc: "Written by the app. Keep it as it is."}
   },
@@ -218,6 +219,50 @@ export function tripSchema(){
   defs.day.oneOf = [{required: ["stops"]}, {required: ["plans"]}];
   defs.stop.dependentRequired = {lat: ["lng"], lng: ["lat"]};
   return {$schema: "https://json-schema.org/draft/2020-12/schema", title: "TIMP trip file", ...def("trip"), $defs: defs};
+}
+
+/* ---------- the format in a few lines, for any AI assistant ---------- */
+
+// The smallest useful file, shown in the brief: one of everything an assistant must get right.
+const EXAMPLE = {
+  format: FORMAT,
+  title: "Rome in three days",
+  lang: "en",
+  days: [{
+    date: "2027-04-10", city: "Rome", title: "The ancient city",
+    stay: {name: "Hotel Example", address: "Via Cavour 1, Rome"},
+    notes: ["Colosseum tickets booked for 9:00"],
+    stops: [
+      {time: "09:00", title: "Colosseum", type: "sight", text: "Enter from the Via Sacra side.", address: "Piazza del Colosseo, Rome", lat: 41.8902, lng: 12.4922},
+      {time: "13:00", title: "Lunch in Monti", type: "food", travel: "metro"}
+    ]
+  }],
+  info: [{title: "In case of need", items: [{label: "Emergency", text: "112"}]}]
+};
+
+/**
+ * The whole format in about forty lines of plain text, made from FIELDS: what a
+ * person pastes into any chat, so the assistant needs no link and no browsing.
+ */
+export function formatBrief(){
+  const kind = (k, name) => {
+    const f = FIELDS[k][name];
+    if(f.type === "fixed") return `  ${name} (required): ${JSON.stringify(f.value)}`;
+    const what = f.type === "list" ? `list of ${f.of}` : f.type === "stay" ? "text or stay"
+      : f.type === "number" ? `number from ${f.min} to ${f.max}` : f.values ? f.values.join("|") : f.hint || f.type;
+    return `  ${name}${f.req ? " (required)" : ""}: ${what}. ${f.doc}`;
+  };
+  const block = k => `${k}:\n` + Object.entries(FIELDS[k]).filter(([, f]) => !f.byApp && !f.private).map(([n]) => kind(k, n)).join("\n");
+  return [
+    `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block: double quotes, no comments, no trailing commas. Use only these fields; invent none.`,
+    "",
+    ...["trip", "day", "plan", "stop", "stay", "section", "item"].map(block),
+    "",
+    "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings or hotels. Give lat/lng only for places you are sure about; otherwise an address.",
+    "",
+    "Example:",
+    JSON.stringify(EXAMPLE)
+  ].join("\n");
 }
 
 /* ---------- what the app works out from the content ---------- */

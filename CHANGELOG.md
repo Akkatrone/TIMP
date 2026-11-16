@@ -4,6 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.0.1
+
+- The message to give an AI assistant (first screen, and Trips) now carries the whole
+  format, about forty lines made from the table of fields: the assistant needs no link.
+  Gemini could not open llms.txt. The message for the problems of a refused file no
+  longer points to a link either.
+- llms.txt starts with the same short format.
+
 ## 3.0.0
 
 A simpler trip file, kinds of places, and Google Maps short links that work.

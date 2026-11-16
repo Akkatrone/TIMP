@@ -181,22 +181,21 @@ Any assistant can write a trip file, because the instructions are two plain docu
   *"Create a trip file for my week in Portugal, here is the plan…"*. The agent finds
   its instructions in [AGENTS.md](AGENTS.md), writes the file into `private/` (a folder
   Git ignores) and checks it.
-- **A chat assistant** (Gemini, ChatGPT, Claude and others): give it the link to
-  [llms.txt](https://frafal.github.io/TIMP/llms.txt), the whole format in one page,
-  and describe your trip. A prompt to copy:
+- **A chat assistant** (Gemini, ChatGPT, Claude, an open model): in the app, on the
+  first screen or in **Trips → Have an AI assistant write the trip**, tap **Copy the
+  message**. It carries the whole format, about forty lines made from the same table
+  the app checks with, so the assistant needs no link (Gemini, for one, often cannot
+  open them). Paste it into the chat, replace the part in brackets with your trip, and
+  send.
 
-  ```text
-  Read https://frafal.github.io/TIMP/llms.txt and follow it exactly.
-  Then write a TIMP trip file for: 3 days in Rome in April, first time there,
-  museums and food, walking and metro. Check every point of its checklist,
-  then give me the whole JSON in one block.
-  ```
-
-  In the app tap **Trips → Paste a trip** and paste the answer. If something is wrong,
+  Then copy the whole answer and tap **Trips → Paste a trip**. If something is wrong,
   the app lists each problem with its position in the file; **Copy for the assistant**
-  copies that list with a request to fix it. Paste it into the chat and load the new
-  answer.
-  If the assistant cannot open links, attach the two documents above instead.
+  copies that list with a request to fix it. Paste it into the same chat and load the
+  new answer.
+
+  Assistants that can open links can also read
+  [llms.txt](https://frafal.github.io/TIMP/llms.txt): the same format, with the whole
+  guide and a complete example.
 - **A model that follows a JSON Schema** (open models through Ollama, llama.cpp or
   vLLM, or an API with structured output): give it
   [trip.schema.json](https://frafal.github.io/TIMP/trip.schema.json) as the output
