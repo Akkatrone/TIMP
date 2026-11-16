@@ -135,10 +135,11 @@ day 3 2027-05-16: Lisbon: 2 pins, 0.9 km across | Sintra: 4 pins, 1.3 km across
 - If two parts of one day are split when they should not be (or the reverse), adjust
   `mapSplitKm` for that day. The default is 12.
 
-**Without Node:** load the file in the app. It runs the same checks and lists every
-problem with its position in the file, for example
-`days[2].stops[0].lat: must be a number between -90 and 90`. Fix them (or paste them
-back to the assistant that wrote the file) and load it again. Then open the map of
+**Without Node:** load the file in the app (or paste it: Trips → Paste a trip). It
+runs the same checks and lists every problem with its position in the file, for
+example `days[2].stops[0].lat: must be a number between -90 and 90`. Fix them and load
+it again. When an assistant wrote the file, "Copy for the assistant" copies the list
+with a request to fix it, ready to paste into the chat. Then open the map of
 each day and look for a pin in the wrong place.
 
 ## 7. Hand it over
@@ -146,8 +147,9 @@ each day and look for a pin in the wrong place.
 Tell the travellers, briefly:
 
 1. Send the file to each phone (chat, AirDrop, Drive).
-2. Open the app **from its Home Screen icon** and choose "Load a trip file". On an
-   iPhone, loading it in Safari instead puts it in a different storage.
+2. Open the app **from its Home Screen icon** and choose "Load a trip file", or copy
+   the JSON and choose "Paste a trip". On an iPhone, loading it in Safari instead
+   puts it in a different storage.
 3. Open the app once with a connection before leaving.
 4. What could not be verified: coordinates, prices, hours.
 

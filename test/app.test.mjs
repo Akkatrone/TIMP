@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { esc, rich, stopQuery, dateParts, mapsUrl } from "../js/util.js";
+import { esc, rich, stopQuery, dateParts, mapsUrl, jsonIn } from "../js/util.js";
 import { zonesOf, routeUrl, zoneSVG, distKm, legsOf, bridgesOf, pinGone } from "../js/geo.js";
 import { TRAVEL as TRAVEL_ICONS } from "../js/icons.js";
-import { TRAVEL as TRAVEL_FORMAT } from "../js/trip.js";
+import { TRAVEL as TRAVEL_FORMAT, validateTrip } from "../js/trip.js";
 import { STRINGS } from "../js/i18n.js";
 import { ROOT, precacheList, readSw } from "../tools/lib/app-files.mjs";
+import { llmsText } from "../tools/lib/llms.mjs";
 
 /* ---------- text from trip files is never trusted ---------- */
 
@@ -23,6 +24,15 @@ test("links to Google Maps encode what they are given", () => {
   assert.equal(stopQuery({title: "A", query: "A, Rome"}), "A, Rome");
   assert.equal(stopQuery({title: "A", lat: 41.9, lng: 12.5}), "41.9,12.5");
   assert.equal(stopQuery({title: "Free afternoon"}), "");
+});
+
+test("a trip pasted from a chat is found in the text around it", () => {
+  const trip = '{"format": "travel-in-my-pocket/1", "id": "x"}';
+  assert.equal(jsonIn(trip), trip);
+  assert.equal(jsonIn("Here is your trip:\n```json\n" + trip + "\n```\nEnjoy!"), trip);
+  assert.equal(jsonIn("Here is your trip:\n```\n" + trip + "\n```"), trip);
+  assert.equal(jsonIn("Sure! " + trip + " Have a nice trip."), trip);
+  assert.equal(jsonIn("  nothing here  "), "nothing here");
 });
 
 test("dates are written in the language of the trip", () => {
@@ -203,12 +213,31 @@ test("the build publishes only the app, stamped with a version", () => {
     assert.ok(manifest.icons.length > 0 && manifest.icons.every(i => i.src.endsWith(`?v=${v}`)), "manifest icons");
     for(const i of manifest.icons) assert.ok(existsSync(join(out, i.src.split("?")[0])), i.src);
     for(const f of ["README.md", "package.json", "tools", "test", "private", ".claude", ".github"]) assert.ok(!existsSync(join(out, f)), f);
+    assert.ok(readFileSync(join(out, "llms.txt"), "utf8").startsWith("# TIMP"), "llms.txt for AI assistants");
   }finally{
     rmSync(out, {recursive: true, force: true});
   }
 });
 
 /* ---------- documentation ---------- */
+
+test("llms.txt gives a chat assistant the whole format in one page, with valid examples", () => {
+  const text = llmsText();
+  for(const doc of ["docs/creating-a-trip.md", "docs/trip-format.md"]){
+    const title = readFileSync(join(ROOT, doc), "utf8").split("\n")[0];
+    assert.ok(text.includes(title), doc);
+  }
+  assert.ok(!/\]\((?!https?:)[^)]+\)/.test(text), "no links to files of the repository");
+  const blocks = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => m[1]);
+  const whole = blocks.filter(b => b.trim().startsWith("{") && b.includes('"format"'));
+  assert.ok(whole.length >= 2, "the smallest file and the complete example");
+  for(const b of whole){
+    const r = validateTrip(JSON.parse(b));
+    assert.deepEqual(r.errors, [], b.slice(0, 60));
+  }
+  // The checklist names what chat assistants get wrong first.
+  for(const s of ['"format": "travel-in-my-pocket/1"', '"color"', '`"title"` (not "name"']) assert.ok(text.includes(s), s);
+});
 
 test("the format reference mentions every field the validator knows", () => {
   const validator = readFileSync(join(ROOT, "js/trip.js"), "utf8");

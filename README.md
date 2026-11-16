@@ -143,6 +143,10 @@ Ticked and skipped stops are never part of the file: they stay on each phone.
 
 ## Create your own trip
 
+> **AI assistant reading this page:** before you write a trip file, read
+> <https://frafal.github.io/TIMP/llms.txt>. It has the exact format, a checklist and a
+> complete example in one page. The app refuses a file that does not follow it.
+
 A trip is a JSON file. [docs/creating-a-trip.md](docs/creating-a-trip.md) explains how
 to write one, [docs/trip-format.md](docs/trip-format.md) lists every field, and
 [examples/demo-trip.json](examples/demo-trip.json) is a complete example.
@@ -158,10 +162,22 @@ Any assistant can write a trip file, because the instructions are two plain docu
   *"Create a trip file for my week in Portugal, here is the plan…"*. The agent finds
   its instructions in [AGENTS.md](AGENTS.md), writes the file into `private/` (a folder
   Git ignores) and checks it.
-- **A chat assistant** (ChatGPT, Claude, Gemini and others): attach the two documents
-  above and your notes, and ask for a trip file. Load the result in the app: if
-  something is wrong, the app lists each problem with its position in the file. Paste
-  that list back into the chat and ask for a corrected file.
+- **A chat assistant** (Gemini, ChatGPT, Claude and others): give it the link to
+  [llms.txt](https://frafal.github.io/TIMP/llms.txt), the whole format in one page,
+  and describe your trip. A prompt to copy:
+
+  ```text
+  Read https://frafal.github.io/TIMP/llms.txt and follow it exactly.
+  Then write a TIMP trip file for: 3 days in Rome in April, first time there,
+  museums and food, walking and metro. Check every point of its checklist,
+  then give me the whole JSON in one block.
+  ```
+
+  In the app tap **Trips → Paste a trip** and paste the answer. If something is wrong,
+  the app lists each problem with its position in the file; **Copy for the assistant**
+  copies that list with a request to fix it. Paste it into the chat and load the new
+  answer.
+  If the assistant cannot open links, attach the two documents above instead.
 
 Whatever you use, look at the map of each day before you leave: a pin in the wrong
 place is the one mistake no automatic check can catch.

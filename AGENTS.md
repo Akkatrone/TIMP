@@ -88,6 +88,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `sw.js` | Service worker: offline copy of the app. |
 | `tools/`, `test/` | Checks, build, tests. `tools/e2e.mjs` drives a real browser. |
+| `tools/lib/llms.mjs` | Builds `llms.txt` (format for chat assistants) from the docs. Never edit the output. |
 | `vendor/` | Third-party code, unmodified. Do not edit. |
 
 ### What a change must respect

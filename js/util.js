@@ -41,3 +41,13 @@ export function todayIn(timezone){
     return "";
   }
 }
+
+// The JSON in a text pasted from a chat: the ```json block, or what lies between the
+// first "{" and the last "}". Assistants wrap the file in a sentence or two.
+export function jsonIn(text){
+  const s = String(text || "");
+  const fence = /```[a-z]*[ \t]*\r?\n([\s\S]*?)```/i.exec(s);
+  if(fence && fence[1].includes("{")) return fence[1].trim();
+  const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  return a >= 0 && b > a ? s.slice(a, b + 1) : s.trim();
+}

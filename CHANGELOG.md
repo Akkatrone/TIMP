@@ -4,6 +4,24 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.4.0
+
+Trips written by chat assistants (Gemini, ChatGPT…), which read one page and not the
+repository.
+
+- `llms.txt` is published with the app (https://frafal.github.io/TIMP/llms.txt): the
+  whole format in one page, with a checklist of the mistakes chat assistants make
+  first (no "format", "name" instead of "title", places without a colour) and a
+  complete example. The build makes it from the documents, so it never falls behind.
+- The README tells an assistant reading it to start from that page, and has a prompt
+  to copy.
+- **Paste a trip**, on the Trips page and the first screen: paste what the assistant
+  answered, even with its sentences and the ```json fences around the file. No file
+  to save on the phone.
+- When a file is refused, **Copy for the assistant** copies every problem with a
+  request to fix them following llms.txt, ready to paste into the chat. A text that
+  is not JSON says where it breaks.
+
 ## 2.3.2
 
 - With the interactive map open, tapping ⋯ or Edit on a stop no longer scrolls the

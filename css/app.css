@@ -232,6 +232,9 @@ ol.stops{list-style:none;margin:0;padding:0}
 .field input{font:500 .9rem var(--f-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);width:100%;min-height:44px}
 .errbox{background:var(--err-bg);color:var(--err);border-radius:10px;padding:10px 12px;font-size:.88rem;display:grid;gap:6px}
 .errbox ul{margin:0;padding-left:1.1rem;font:500 .8rem/1.5 var(--f-mono);overflow-wrap:anywhere}
+.errbox .aihelp{margin:10px 0 8px;font-size:.88rem;color:var(--ink)}
+.errbox .actions{margin:0}
+#paste-text{min-height:180px;font:500 16px/1.45 var(--f-mono);resize:vertical}  /* 16px: iPhones zoom into smaller fields */
 .errbox b{font-weight:600}
 
 /* the + button: a stop added on the day on screen */

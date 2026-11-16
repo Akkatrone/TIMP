@@ -1,7 +1,7 @@
 import { validateTrip } from "./trip.js";
 import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
-import { esc, rich, mapsUrl, dirUrl, stopQuery, dateParts, todayIn } from "./util.js";
+import { esc, rich, mapsUrl, dirUrl, stopQuery, dateParts, todayIn, jsonIn } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG } from "./geo.js";
 import { travelIcon } from "./icons.js";
 import { createLiveMap } from "./livemap.js";
@@ -34,7 +34,7 @@ const S = {
   menuFor: null,          // the stop whose ⋯ menu is open
   deviceKey: "",
   useGoogle: true,        // false: always OpenStreetMap, even with a key (saves Google map loads)
-  importError: null,      // {title, items}
+  importError: null,      // {title, items, all}: items shown, all copied for an assistant
   online: navigator.onLine !== false,
   version: ""
 };
@@ -178,9 +178,13 @@ const needsSaving = rec => !!rec && rec.exported !== rec.trip.version.id;
 async function importText(text, name){
   let data;
   try{ data = JSON.parse(text); }
-  catch(e){ S.importError = {title: t("importFailed"), items: [t("notJson")]}; render(); return; }
+  catch(e){
+    const why = t("notJson") + " " + String(e && e.message || "");
+    S.importError = {title: t("importFailed"), items: [why], all: [why]};
+    render(); window.scrollTo(0, 0); return;
+  }
   const res = validateTrip(data);
-  if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12)}; render(); window.scrollTo(0, 0); return; }
+  if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12), all: res.errors}; render(); window.scrollTo(0, 0); return; }
   S.importError = null;
   try{
     const {trip: incoming} = await prepare(data);
@@ -397,8 +401,78 @@ function renderStrip(r){
 }
 
 function errorBox(){
-  if(!S.importError) return "";
-  return `<div class="errbox" role="alert"><b>${esc(S.importError.title)}</b><ul>${S.importError.items.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>`;
+  const e = S.importError;
+  if(!e) return "";
+  const more = e.all && e.all.length > e.items.length ? `<li>${esc(t("moreProblems", {n: e.all.length - e.items.length}))}</li>` : "";
+  return `<div class="errbox" role="alert"><b>${esc(e.title)}</b><ul>${e.items.map(x => `<li>${esc(x)}</li>`).join("")}${more}</ul>` +
+    (e.all ? `<p class="aihelp">${esc(t("aiHelp"))}</p><div class="actions"><button type="button" class="btn small" data-act="copy-errors">${esc(t("copyForAi"))}</button></div>` : "") + `</div>`;
+}
+
+// The problems of a refused file, worded for the assistant that wrote it, with the
+// page that has the whole format (published with the app, see tools/lib/llms.mjs).
+function messageForAi(){
+  const guide = new URL("llms.txt", document.baseURI).href;
+  return t("aiFixPrompt", {url: guide}) + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
+}
+
+async function copyErrors(){
+  if(!S.importError || !S.importError.all) return;
+  const text = messageForAi();
+  try{
+    await navigator.clipboard.writeText(text);
+    toast(t("copiedForAi"));
+  }catch(e){
+    // No clipboard here: show the text, to be selected by hand.
+    await ask({title: t("copyByHand"), text: text.split("\n").filter(Boolean), actions: [{id: "ok", label: t("close")}]});
+  }
+}
+
+// A trip pasted as text, as a chat assistant gives it: no file to save on the phone.
+let pasteDialog = null;
+function pasteTrip(){
+  if(!pasteDialog){
+    pasteDialog = document.createElement("dialog");
+    pasteDialog.className = "sheet";
+    pasteDialog.setAttribute("aria-labelledby", "paste-title");
+    document.body.appendChild(pasteDialog);
+    pasteDialog.addEventListener("click", e => { if(e.target === pasteDialog) pasteDialog.close(); });
+  }
+  const d = pasteDialog;
+  d.innerHTML = `<form class="sheet-form" novalidate>
+    <div class="sheet-head"><h2 id="paste-title">${esc(t("pasteTrip"))}</h2><button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button></div>
+    <p class="foot">${esc(t("pasteHelp"))}</p>
+    <textarea id="paste-text" rows="8" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder='{"format": "travel-in-my-pocket/1", …}'></textarea>
+    <p class="errbox" data-error role="alert" hidden></p>
+    <div class="sheet-actions">
+      <button type="button" class="btn small" data-paste>${esc(t("paste"))}</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
+      <button type="submit" class="btn primary">${esc(t("pasteLoad"))}</button>
+    </div>
+  </form>`;
+  const area = d.querySelector("#paste-text");
+  d.onclick = async e => {
+    if(e.target.closest("[data-close]")){ d.close(); return; }
+    if(e.target.closest("[data-paste]")){
+      try{ area.value = await navigator.clipboard.readText(); }
+      catch(err){ area.focus(); }
+    }
+  };
+  d.querySelector("form").onsubmit = async e => {
+    e.preventDefault();
+    const text = jsonIn(area.value);
+    if(!text){
+      const box = d.querySelector("[data-error]");
+      box.textContent = t("pasteEmpty");
+      box.hidden = false;
+      return;
+    }
+    d.close();
+    try{ await importText(text, "pasted.json"); }
+    catch(err){ S.importError = {title: t("importFailed"), items: [String(err && err.message || err)]}; render(); }
+  };
+  d.showModal();
+  area.focus();
 }
 
 function installSteps(){
@@ -429,6 +503,7 @@ function renderWelcome(){
   ${errorBox()}
   <div class="actions">
     <button type="button" class="btn primary" data-act="pick">${esc(t("loadTrip"))}</button>
+    <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
     <button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>
   </div>
   ${installSteps()}
@@ -462,6 +537,7 @@ function renderTrips(){
   <section class="sec">${cards}
     <div class="actions">
       <button type="button" class="btn primary" data-act="pick">${esc(t("updateTrip"))}</button>
+      <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
       ${S.records.some(r => r.fileName === "demo-trip.json") ? "" : `<button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>`}
     </div>
   </section>
@@ -846,6 +922,8 @@ $app.addEventListener("click", e => {
   if(!act) return;
   const a = act.dataset.act;
   if(a === "pick"){ $file.value = ""; $file.click(); }
+  else if(a === "paste") pasteTrip();
+  else if(a === "copy-errors") copyErrors();
   else if(a === "demo") loadDemo();
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }

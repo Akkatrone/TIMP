@@ -105,6 +105,11 @@ method in `docs/creating-a-trip.md`, the rules of the repository in `AGENTS.md`.
 The skill and `CLAUDE.md` only point to them. Please do not copy their content
 into tool-specific files.
 
+Chat assistants (Gemini, ChatGPT…) read one page, not the repository: the build
+publishes `llms.txt` next to the app, made by `tools/lib/llms.mjs` from the two
+documents and the example, with a short checklist on top. It is never written by
+hand. When chat assistants keep making the same mistake, add it to that checklist.
+
 **New files must be available offline.** If you add or remove a file of the app, run
 `node tools/check-precache.mjs --fix` to update the list in `sw.js`. You never need
 to touch the version: the build computes it from the content.

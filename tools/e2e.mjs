@@ -482,6 +482,34 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.ok(await count(".errbox li") >= 2);
   });
 
+  await step("a trip pasted from a chat loads; a wrong one gives its problems, ready for the assistant", async () => {
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="paste"]')`);
+    // What Gemini wrote: "name" instead of "title", no format, no places.
+    const wrong = {id: "rome-gemini", title: "Rome", days: [{date: "2027-05-01", place: "rome", title: "Day 1", stops: [{time: "09:00", name: "Colosseum"}]}]};
+    await run(`document.querySelector('[data-act="paste"]').click();`);
+    await until("the paste form", `document.querySelector("#paste-text")`);
+    await run(`document.querySelector("#paste-text").value = "Here is your trip!\\n\\u0060\\u0060\\u0060json\\n" + ${JSON.stringify(JSON.stringify(wrong, null, 2))} + "\\n\\u0060\\u0060\\u0060\\nEnjoy Rome."; document.querySelector("#paste-text").closest("form").requestSubmit();`);
+    await until("the problems", `document.querySelector(".errbox [data-act='copy-errors']")`);
+    const items = await run(`return [...document.querySelectorAll(".errbox li")].map(li => li.textContent);`);
+    assert.ok(items.some(x => x.startsWith("format:")) && items.some(x => x.startsWith("days[0].stops[0].title:")), items.join(" | "));
+    await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; };`);
+    await run(`document.querySelector("[data-act='copy-errors']").click(); await new Promise(r => setTimeout(r, 100));`);
+    const copied = await run(`return window.__copied;`);
+    assert.match(copied, /llms\.txt/);
+    assert.match(copied, /- days\[0\]\.stops\[0\]\.title: /);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Copied/);
+    // The corrected answer, pasted with the assistant's words around it.
+    const right = {format: "travel-in-my-pocket/1", id: "rome-gemini", title: "Rome", places: {rome: {name: "Roma", color: "#b8451b"}}, days: [{date: "2027-05-01", place: "rome", title: "Day 1", stops: [{time: "09:00", title: "Colosseum", lat: 41.8902, lng: 12.4922}]}]};
+    await run(`document.querySelector('[data-act="paste"]').click();`);
+    await until("the paste form", `document.querySelector("#paste-text") && document.querySelector("dialog.sheet[open]")`);
+    await run(`document.querySelector("#paste-text").value = "Corrected: " + ${JSON.stringify(JSON.stringify(right))}; document.querySelector("#paste-text").closest("form").requestSubmit();`);
+    await until("the new trip", `document.title === "Rome"`);
+    assert.equal(await count("#app .errbox"), 0, "the problems are gone");
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="remove"]')`);
+  });
+
   await step("deleting a trip asks first; Escape or Cancel keep it", async () => {
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector('[data-act="remove"][data-id="evil"]')`);

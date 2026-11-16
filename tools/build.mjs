@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync } from "no
 import { createHash } from "node:crypto";
 import { join, dirname, resolve, relative } from "node:path";
 import { ROOT, appFiles, precacheList, stampSw } from "./lib/app-files.mjs";
+import { llmsText } from "./lib/llms.mjs";
 
 function option(name, fallback){
   const i = process.argv.indexOf("--" + name);
@@ -66,5 +67,8 @@ for(const [f, data] of contents){
   writeFileSync(target, data);
 }
 copyFileSync(join(ROOT, "LICENSE"), join(out, "LICENSE"));
+// For AI assistants that read one page: the format, the method and the example.
+// Not part of the app, so not in the version or offline.
+writeFileSync(join(out, "llms.txt"), llmsText());
 
 console.log(`Built ${files.length} files into ${relative(ROOT, out)}/ — version ${version}`);
