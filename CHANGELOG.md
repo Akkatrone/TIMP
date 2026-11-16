@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.0.2
+
+- The message to give an AI assistant is short again (three lines). It points to
+  `llms.txt` in the GitHub repository, which assistants open more readily than the
+  app's site; the copy there is checked by `npm run check` and never falls behind.
+- For an assistant that opens no link at all, a second button copies the message with
+  the whole format.
+- At the bottom of Trips, "With an AI assistant": the message to write a new trip, and
+  **Have an AI assistant change this trip**, three steps and one button that copies the
+  message together with the trip. The answer comes back through Paste a trip, as a new
+  version merged like any changed file.
+
 ## 3.0.1
 
 - The message to give an AI assistant (first screen, and Trips) now carries the whole

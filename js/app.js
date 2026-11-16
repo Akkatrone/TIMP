@@ -402,24 +402,47 @@ function errorBox(){
     (e.all ? `<p class="aihelp">${esc(t("aiHelp"))}</p><div class="actions"><button type="button" class="btn small" data-act="copy-errors">${esc(t("copyForAi"))}</button></div>` : "") + `</div>`;
 }
 
-// How to have a trip written by an AI assistant: a message to copy and fill in, then
-// Paste a trip. On the first screen, and folded on the Trips page. The message carries
-// the format itself (formatBrief), so it works with any assistant, even one that
-// cannot open links; only its first lines are shown.
-const aiMessage = () => t("aiPrompt") + "\n\n" + formatBrief();
+// How to have a trip written by an AI assistant: a short message to copy and fill in,
+// then Paste a trip. On the first screen, and folded on the Trips page.
+// The message points to llms.txt in the project's repository: chat assistants open
+// github.com pages more readily than a small site (tools/check-llms.mjs keeps it up to
+// date). For an assistant that opens no link at all, the second button copies the
+// format itself (formatBrief), about forty lines.
+const llmsUrl = () => REPO_URL ? `${REPO_URL}/blob/main/llms.txt` : new URL("llms.txt", document.baseURI).href;
+const aiMessage = () => t("aiPrompt", {url: llmsUrl()});
+const aiMessageFull = () => t("aiPromptFull") + "\n\n" + formatBrief();
 
 function aiSection(folded){
   const body = `<ol class="steps"><li>${esc(t("aiStep1"))}</li><li>${esc(t("aiStep2"))}</li></ol>
-    <pre class="prompt" data-prompt>${esc(t("aiPrompt"))}\n${esc(t("aiPromptMore"))}</pre>
-    <div class="actions"><button type="button" class="btn small" data-act="copy-prompt">${esc(t("copyPrompt"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>`;
+    <pre class="prompt" data-prompt>${esc(aiMessage())}</pre>
+    <div class="actions"><button type="button" class="btn small" data-act="copy-prompt">${esc(t("copyPrompt"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
+    <p class="foot">${esc(t("aiNoLinks"))} <button type="button" class="linkbtn" data-act="copy-prompt-full">${esc(t("copyPromptFull"))}</button></p>`;
   return folded
-    ? `<details class="sec aihow"><summary>${esc(t("aiTitle"))}</summary>${body}</details>`
+    ? `<details class="aihow"><summary>${esc(t("aiTitle"))}</summary>${body}</details>`
     : `<section class="sec aihow"><h2>${esc(t("aiTitle"))}</h2>${body}</section>`;
 }
 
+// How to have the open trip changed by an AI assistant: the message carries the trip
+// itself, so nothing has to be saved and attached; the answer comes back through
+// Paste a trip, and the app treats it like any changed file (a new version, merged).
+const aiEditMessage = () => t("aiEditPrompt", {url: llmsUrl()}) + "\n\n" + fileText(S.rec.trip);
+
+function aiEditSection(){
+  return `<details class="aihow"><summary>${esc(t("aiEditTitle"))}</summary>
+    <ol class="steps"><li>${esc(t("aiEdit1"))}</li><li>${esc(t("aiEdit2"))}</li><li>${esc(t("aiEdit3"))}</li></ol>
+    <pre class="prompt">${esc(t("aiEditPrompt", {url: llmsUrl()}))}\n${esc(t("aiEditMore", {t: S.rec.trip.title}))}</pre>
+    <div class="actions"><button type="button" class="btn small" data-act="copy-edit">${esc(t("copyEdit"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
+  </details>`;
+}
+
+// Copies a message for an assistant. Without a clipboard a short one is shown to copy
+// by hand; a long one (a whole trip) cannot be, so the file is the way instead.
 async function copyText(text, done){
   try{ await navigator.clipboard.writeText(text); toast(done); }
-  catch(e){ await ask({title: t("copyByHand"), text: text.split("\n").filter(Boolean), actions: [{id: "ok", label: t("close")}]}); }
+  catch(e){
+    if(text.length > 4000){ toast(t("copyTooLong")); return; }
+    await ask({title: t("copyByHand"), text: text.split("\n").filter(Boolean), actions: [{id: "ok", label: t("close")}]});
+  }
 }
 
 // The problems of a refused file, worded for the assistant that wrote it.
@@ -546,7 +569,6 @@ function renderTrips(){
       ${S.records.some(r => r.fileName === "demo-trip.json") ? "" : `<button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>`}
     </div>
   </section>
-  ${aiSection(true)}
   <section class="sec"><h2>${esc(t("mapProvider"))}</h2>
     <div class="seg" role="group" aria-label="${esc(t("mapProvider"))}">
       <button type="button" data-provider="google" aria-pressed="${S.useGoogle}">Google Maps</button>
@@ -563,6 +585,10 @@ function renderTrips(){
   ${langPicker()}
   ${themePicker()}
   ${installSteps()}
+  <section class="sec"><h2>${esc(t("aiTitleShort"))}</h2>
+    ${aiSection(true)}
+    ${S.rec ? aiEditSection() : ""}
+  </section>
   <section class="sec"><h2>${esc(t("about"))}</h2>
     <p class="foot">TIMP · Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
     ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}
@@ -924,6 +950,8 @@ $app.addEventListener("click", e => {
   else if(a === "paste") pasteTrip();
   else if(a === "copy-errors") copyErrors();
   else if(a === "copy-prompt") copyText(aiMessage(), t("copiedPrompt"));
+  else if(a === "copy-prompt-full") copyText(aiMessageFull(), t("copiedPrompt"));
+  else if(a === "copy-edit" && S.rec) copyText(aiEditMessage(), t("copiedEdit"));
   else if(a === "demo") loadDemo();
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }

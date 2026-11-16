@@ -1,0 +1,775 @@
+# TIMP (Travel in my pocket): how to write a trip file
+
+> For AI assistants asked to make a trip for TIMP. TIMP is a web app (https://frafal.github.io/TIMP/) that
+> shows a day-by-day travel guide on a phone, offline. A trip is ONE JSON file that
+> says what the trip is: days, stops, where to sleep, what to remember. Never how it
+> looks: the app picks colours, draws maps and chooses icons. The app refuses the whole
+> file if one rule is broken, so follow the format below exactly and invent no fields.
+> The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
+
+## The format, in short
+
+```text
+TIMP trip file, format "travel-in-my-pocket/2". Answer with ONE JSON object in one code block: double quotes, no comments, no trailing commas. Use only these fields; invent none.
+
+trip:
+  format (required): "travel-in-my-pocket/2"
+  title (required): text. The name of the trip.
+  days (required): list of day. One entry per date, in date order.
+  lang: en|it. Language of the app while this trip is open. Without it, the phone's.
+  timezone: an IANA time zone such as "Europe/Rome". Time zone of the destination: decides which day is today.
+  info: list of section. Sections of the Info page: useful numbers, words, how to get around.
+day:
+  date (required): a real date as "YYYY-MM-DD". The date.
+  city: text. Where the day is spent: a city or an area. Days in the same city share a colour.
+  title: text. What the day is about, in a few words.
+  stay: text or stay. Where the night is spent: a name, or an object with name, address and note.
+  notes: list of text. Things to remember that day, shown at the top.
+  stops: list of stop. The stops, in order. A day has `stops` or `plans`.
+  plans: list of plan. Alternative plans for the day, each with its own stops.
+plan:
+  name (required): text. The name of the plan, shown on its button.
+  stops (required): list of stop. The stops of this plan, in order.
+stop:
+  title (required): text. The name of the place or of the activity.
+  time: text. When: "09:30", or words like "Evening".
+  type: sight|museum|food|park|view|shop|walk|hotel. What kind of place it is; it gives the stop its icon and pin.
+  travel: metro|bus|train|plane|boat. How you get there from the stop before.
+  text: text. What to know: what to see, what to order, tickets. **bold** is allowed.
+  tag: text. A short label shown on the stop, like "Booked" or "Optional".
+  address: text. Where it is, as you would search it in Google Maps: a street address, or name and town.
+  lat: number from -90 to 90. Latitude, with `lng`. Gives the stop its pin on the map.
+  lng: number from -180 to 180. Longitude, with `lat`.
+  link: an https:// address. A Google Maps link to the exact place.
+stay:
+  name (required): text. The name of the hotel or flat.
+  address: text. Its address.
+  note: text. Check-in, booking, how to get in.
+section:
+  title (required): text. The title of the section.
+  items (required): list of item. Its lines.
+item:
+  label (required): text. What the line is about.
+  text (required): text. The line itself. Phone numbers become a link to call.
+
+Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings or hotels. Give lat/lng only for places you are sure about; otherwise an address.
+
+Example:
+{"format":"travel-in-my-pocket/2","title":"Rome in three days","lang":"en","days":[{"date":"2027-04-10","city":"Rome","title":"The ancient city","stay":{"name":"Hotel Example","address":"Via Cavour 1, Rome"},"notes":["Colosseum tickets booked for 9:00"],"stops":[{"time":"09:00","title":"Colosseum","type":"sight","text":"Enter from the Via Sacra side.","address":"Piazza del Colosseo, Rome","lat":41.8902,"lng":12.4922},{"time":"13:00","title":"Lunch in Monti","type":"food","travel":"metro"}]}],"info":[{"title":"In case of need","items":[{"label":"Emergency","text":"112"}]}]}
+```
+
+## How the traveller loads it
+
+They copy your answer and, in the app, tap Trips → Paste a trip (or save it as a .json
+file and load it). If the app refuses it, it lists each problem with its position, like
+`days[0].stops[2].title: is required`, and a button copies that list to send back to
+you. Fix every problem and hand over the whole file again.
+
+---
+
+# Creating a trip file
+
+How to turn a trip plan into a file for TIMP (Travel in my pocket). This guide is for whoever
+writes the file: a person, or an AI assistant working for one. It says how to write a
+*good* file; the list of fields and what is valid is in trip-format.md.
+
+**If you are an AI assistant:** read this page and trip-format.md
+before writing anything, and follow the steps in order. If you cannot see
+trip-format.md, ask for it: do not write the file from memory.
+
+The reader of the result is someone standing in a street abroad with a phone in one
+hand, often without a connection. Everything in the file should help that person
+decide what to do next.
+
+## What you produce
+
+One JSON file in the format `travel-in-my-pocket/2`. It says what the trip is: days,
+stops, stays, things to remember. Never how it looks: the app picks colours, draws the
+maps and chooses the icons from the content.
+
+A trip file contains hotels and dates. Treat it as private:
+
+- Inside a copy of this repository, save it in `private/<trip-name>.json`. Git ignores
+  that folder. Never save a real trip anywhere else in the repository and never commit one.
+- Anywhere else, give the file to the traveller and nobody else. Do not publish it.
+
+## 1. Collect the trip
+
+You need: the dates, the places, where the travellers sleep each night, and what they
+do each day. Read everything you were given before asking anything. Then ask only for
+what is missing and changes the result: travel dates, hotel names, fixed bookings
+(flights, trains, timed tickets).
+
+Do not invent bookings, hotels, flight times or reservations. If something is not
+decided, leave it out or present it as an option (`"tag": "Optional"`, a line in
+`notes`, or alternative `plans`).
+
+If there is only a rough idea ("5 days in Lisbon"), agree on a programme first and
+write the file afterwards. A file is a bad place to negotiate an itinerary.
+
+## 2. Write the days
+
+One entry per date, from the arrival day to the departure day, in date order.
+
+- `city`: where the day is spent ("Lisbon", "Sintra"). Days in the same city share a
+  colour, and a change of city shows on the day ("Lisbon → Porto"). Write it the same
+  way every day.
+- `title`: what the day is about, in a few words ("Baixa and Alfama on foot").
+- `stay`: where the night is spent. The full object (`name`, `address`, `note` with
+  check-in and booking details) on every night in that hotel; a plain name for nights
+  that are not a hotel ("Night train").
+- `notes`: only what would spoil the day if forgotten, and the alternative. "The last
+  ferry back leaves at 17:30." "If it rains, swap with day 4." Zero to three per day.
+- `stops`: in the order they happen. Include the practical ones too: arrival,
+  check-in, the train to the next city, the way back to the hotel.
+- `plans` instead of `stops` when the travellers will choose on the spot between two
+  or three different days. Each plan has a `name` and its `stops`.
+
+## 3. Write the stops
+
+- `time`: a clock time when it matters ("09:30"), a word when it does not ("Evening",
+  "Dinner"). Leave it out when there is no time at all.
+- `title`: the name of the place as written on maps and signs.
+- `type`: what kind of place it is. One of `sight` (monuments, churches, squares),
+  `museum`, `food` (restaurants, cafés, markets to eat at), `park` (parks, gardens,
+  beaches), `view` (viewpoints), `shop`, `walk` (a stroll through a quarter), `hotel`.
+  Leave it out for anything else (a station, a journey).
+- `travel`: how the travellers reach this stop, when it is by `metro`, `bus`, `train`,
+  `plane` or `boat`. Set it every time the description says so ("bus 7 from the
+  station"). Leave it out for walking and anything else. A journey that is a stop of
+  its own ("Train to Kyoto", "Flight to Rome") gets `travel` and no position.
+- `text`: one to three sentences, in this order of usefulness: how to get there from
+  the previous stop (line, direction, minutes), price and opening hours, what to look
+  at, one tip. The app shows the first two lines until the traveller taps, so put what
+  matters most first. Write in the travellers' language and tone.
+- `tag`: "Booking needed", "Ticket needed", "Optional", in the trip's language.
+- `address`: where it is, as someone would type it into Google Maps: a street address,
+  or the name and the town ("Pantheon, Rome"). It drives the Map and Directions links.
+- `lat`, `lng`: the position, four decimal places. Look it up on a map or on the web
+  whenever you can. From memory, give it only for places you are sure about (major
+  landmarks, main stations). For a small restaurant you cannot verify, leave the
+  position out and write a good `address`: the stop still gets working links.
+- `link`: a Google Maps link to the exact place, when the traveller gave you one.
+- No position for stops that are not a place: a train ride, "free afternoon".
+
+Tell the traveller which positions were not verified.
+
+## 4. Facts that go out of date
+
+Prices, opening hours, closing days, timetables and seasonal closures change.
+Verify them when you can. When you cannot, either leave the detail out or word it as
+something to check ("check the timetable on the day"), and tell the traveller which
+facts were not verified. Never state an unverified price or time as certain.
+
+## 5. The Info page
+
+Keep it to what someone needs in a hurry: emergency numbers, how to pay and get cash,
+how luggage moves between hotels, booking codes, five or six phrases in the local
+language. Each section has a `title` and `items` of `label` and `text`; a text that is
+only a phone number can be tapped to call. The stays are listed there by the app.
+
+## 6. Check the file
+
+**With Node and a copy of the repository:**
+
+```bash
+node tools/validate-trip.mjs --map private/<trip-name>.json
+```
+
+Fix every error. Then read the `--map` lines, one per day:
+
+```
+day 3 2027-05-16: Lisbon: 2 pins, 0.9 km across | Sintra: 4 pins, 1.3 km across
+```
+
+- Each `|` separates a map: stops more than 12 km apart are drawn on separate maps. A
+  walking day in one city should be one map, a few km across.
+- An unexpected extra map, or a walking day that is 40 km across, means a position is
+  wrong. Find it and fix it.
+
+**Without Node:** load the file in the app (or paste it: Trips → Paste a trip). It
+runs the same checks and lists every problem with its position in the file, for
+example `days[2].stops[0].lat: must be a number between -90 and 90`. Fix them and load
+it again. When an assistant wrote the file, "Copy for the assistant" copies the list
+with a request to fix it, ready to paste into the chat. Then open the map of each day
+and look for a pin in the wrong place.
+
+## 7. Hand it over
+
+Tell the travellers, briefly:
+
+1. Send the file to each phone (chat, AirDrop, Drive), or the JSON to copy.
+2. Open the app **from its Home Screen icon** and choose "Load a trip file", or
+   "Paste a trip". On an iPhone, loading it in Safari instead puts it in a different
+   storage.
+3. Open the app once with a connection before leaving.
+4. What could not be verified: positions, prices, hours.
+
+## Updating a file later
+
+- Start from the latest file: travellers change trips in the app too, and save them
+  from Trips → Save the file. An older copy loses nothing, because the app merges, but
+  starting from the latest one avoids surprises.
+- Keep the trip `id` and the `version` block exactly as they are, if the file has
+  them: the app then updates the trip, keeps what was ticked, and makes a new version.
+  Never write or change `version` yourself.
+- Keep the `id` of every stop that still exists, even if it is renamed or moved.
+- Change only what was asked. Do not rewrite texts nobody mentioned.
+- Check the file again.
+
+## The Google Maps key
+
+Optional. Without it the interactive map uses OpenStreetMap. If the traveller has a
+key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
+
+- Only use a key the traveller gives you. Never invent one, never reuse one from
+  another file.
+- The key must be restricted to the app's address and to the Maps JavaScript API, with
+  a daily quota. The README explains how.
+- A file with a key must not be published.
+
+## Mistakes to avoid
+
+- `"name"` for a stop: it is `"title"`. And `"format": "travel-in-my-pocket/2"` first.
+- Positions swapped (`lat` is north-south, between -90 and 90).
+- Two entries for the same date. Use `plans` for alternatives.
+- A day with both `stops` and `plans`, or with neither.
+- Colours, icons or map settings: the file has none.
+- Long paragraphs in `text`. The traveller reads this standing up.
+- Comments or trailing commas in the JSON.
+- HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.
+- Saving the real trip in a folder Git tracks.
+
+---
+
+# The trip file
+
+A trip is one JSON file, in the format `travel-in-my-pocket/2`. The app reads it,
+checks it, and keeps it on the device. Nothing in it is ever sent to a server.
+
+The file says **what the trip is**: days, stops, where you sleep, what to remember. It
+says nothing about how the app looks: colours, map zones, labels and icons are worked
+out by the app from the content. How to write a *good* trip is in
+creating-a-trip.md.
+
+- Working example: `examples/demo-trip.json`
+- Check a file: `node tools/validate-trip.mjs --map my-trip.json`
+- The same rules as a JSON Schema, for tools and AI assistants that can follow one:
+  `trip.schema.json`, published next to the app (for example
+  https://frafal.github.io/TIMP/trip.schema.json).
+
+The checker, the schema and the app are all made from one table in
+`js/trip.js` (`FIELDS`): what passes the checker loads in the app.
+
+## Smallest valid file
+
+```json
+{
+  "format": "travel-in-my-pocket/2",
+  "title": "Rome in three days",
+  "days": [
+    {"date": "2027-04-10", "stops": [{"title": "Colosseum"}]}
+  ]
+}
+```
+
+A useful one gives each day a `city` and a `title`, and each stop a `time`, a `type`,
+an `address` and its position (`lat`, `lng`):
+
+```json
+{
+  "format": "travel-in-my-pocket/2",
+  "title": "Rome in three days",
+  "lang": "en",
+  "timezone": "Europe/Rome",
+  "days": [
+    {
+      "date": "2027-04-10",
+      "city": "Rome",
+      "title": "The ancient city",
+      "stay": {"name": "Hotel Example", "address": "Via Cavour 1, Rome"},
+      "notes": ["Colosseum tickets booked for 9:00"],
+      "stops": [
+        {"time": "09:00", "title": "Colosseum", "type": "sight", "tag": "Booked",
+         "text": "Enter from the Via Sacra side.", "address": "Piazza del Colosseo, Rome",
+         "lat": 41.8902, "lng": 12.4922},
+        {"time": "13:00", "title": "Lunch in Monti", "type": "food"},
+        {"time": "15:00", "title": "Capitoline Museums", "type": "museum", "travel": "bus",
+         "address": "Piazza del Campidoglio 1, Rome", "lat": 41.8930, "lng": 12.4828}
+      ]
+    }
+  ],
+  "info": [
+    {"title": "In case of need", "items": [{"label": "Emergency", "text": "112"}]}
+  ]
+}
+```
+
+## The trip
+
+| Field | Required | Meaning |
+|---|---|---|
+| `format` | yes | Always `"travel-in-my-pocket/2"`. |
+| `title` | yes | The name of the trip. |
+| `days` | yes | One entry per date, in date order. |
+| `lang` | no | Language of the app while this trip is open: `"en"` or `"it"`. Without it, the phone's. |
+| `timezone` | no | IANA time zone of the destination, like `"Europe/Rome"`: decides which day is "today". Without it, the phone's. |
+| `info` | no | Sections of the Info page. |
+| `googleMapsKey` | no | A Google Maps key for everyone who loads the trip. See Google Maps key. |
+| `id` | written by the app | Identifies the trip on the phone. Without it the app makes one from the title and the first date, so a corrected file for the same trip updates it. Keep it when you change a file the app saved. |
+| `version` | written by the app | See Versions. Keep it as it is. |
+
+## A day
+
+| Field | Required | Meaning |
+|---|---|---|
+| `date` | yes | `"YYYY-MM-DD"`. |
+| `stops` | one of the two | The stops, in order. |
+| `plans` | one of the two | Two or more alternative plans for the day, each with a `name` (on its button) and its `stops`. The traveller picks one. |
+| `city` | no | Where the day is spent: a city or an area. Days in the same city share a colour; a day in another city than the day before shows "Rome → Naples". |
+| `title` | no | What the day is about, in a few words. |
+| `stay` | no | Where the night is spent: an object with `name` (required), `address` and `note`, listed with its nights on the Info page; or plain text for a night that is not a place to sleep (`"Night train"`), shown on its day only. |
+| `notes` | no | Things to remember that day, shown at the top: tickets, what to bring, what to do if it rains. |
+
+## A stop
+
+| Field | Required | Meaning |
+|---|---|---|
+| `title` | yes | The name of the place or of the activity. |
+| `time` | no | `"09:30"`, or words like `"Evening"`. Clock times keep new stops in order. |
+| `type` | no | What kind of place it is: `sight`, `museum`, `food`, `park`, `view`, `shop`, `walk`, `hotel`. It gives the stop its icon, in the list and on the map pin. |
+| `travel` | no | How you get there from the stop before: `metro`, `bus`, `train`, `plane`, `boat`. Drawn on the leg of the map that arrives at the stop. |
+| `text` | no | What to know: what to see, what to order, tickets. |
+| `tag` | no | A short label above the title, like `"Booked"` or `"Optional"`. |
+| `address` | no | Where it is, as you would search it in Google Maps: a street address, or name and town (`"Pantheon, Rome"`). Used by the Map and Directions links. |
+| `lat`, `lng` | no | The position, both or neither. Gives the stop its pin on the map. |
+| `link` | no | A Google Maps link (`https://…`) to the exact place. The Map link opens it. |
+| `id` | written by the app | Lets ticks, edits and merges follow the stop. |
+
+A stop without a position is still shown, without a pin. A journey can be a stop of its
+own ("Train to Naples", `"travel": "train"`, no position): it marks the leg from the
+pin before it to the pin after it.
+
+A `type` or `travel` the app does not know yet is accepted with a warning and drawn as
+a plain stop: files written for a newer app still load.
+
+## Info
+
+```json
+"info": [
+  {"title": "In case of need", "items": [
+    {"label": "Emergency", "text": "112"},
+    {"label": "Ferry booking", "text": "AB12CD, show it at the gate"}
+  ]},
+  {"title": "Words", "items": [{"label": "Thank you", "text": "Grazie"}]}
+]
+```
+
+Each section has a `title` and `items`; each item a `label` and a `text`. A text that is
+only a phone number becomes a link to call it.
+
+## Text formatting
+
+Texts are plain text. The only formatting is `**bold**`, in a stop's `text`, in
+`notes`, in a stay's `note` and in info items. HTML is shown as written, never run.
+
+## How the app draws the map
+
+The file gives positions; the app does the rest.
+
+- **Online**: an interactive map with a pin per stop (its number, and the icon of its
+  `type`), a straight line from stop to stop, and a card for each pin.
+- **Offline**: a sketch to scale, with the same numbers.
+- Stops more than 12 km apart are drawn on separate maps (a day in Rome, then Naples).
+- Stops less than 30 m apart share a pin, named after the first one.
+- Skipped stops keep their pin, greyed; the line goes past them.
+
+## Google Maps key
+
+Without a key, the interactive map uses OpenStreetMap. With `googleMapsKey`, it uses
+Google Maps, for everyone who loads the file. Restrict the key to the address of the
+app and to the Maps JavaScript API, set a daily quota, and never put a file with a key
+in a public repository. How to create one is in the
+README. Each phone can also save its own key, or
+turn Google Maps off, on the Trips page.
+
+## Versions
+
+The app writes a `version` into every file it saves:
+
+```json
+"version": {
+  "id": "3f2a9c1e0b7d4a55",
+  "parents": ["a1b2c3d4e5f60718"],
+  "history": ["a1b2c3d4e5f60718", "0f9e8d7c6b5a4938"],
+  "date": "2026-11-16T10:42:00.000Z"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `id` | 16 hex characters: the start of the SHA-256 of the trip's content (without `version`, keys in a fixed order) and of its parents. The same content from the same parents has the same id on every device. |
+| `parents` | The version this one was made from; two after a merge; none for the first. |
+| `history` | Every earlier version, newest first. It tells a newer file from an older one, or from one that changed separately. |
+| `date` | When the version was made. Not part of the id. |
+
+A file without `version` gets one when it is loaded, computed from its content, so two
+phones loading the same file agree on it. Each phone keeps the content of every version
+it has seen, the way Git does, as pieces shared between versions.
+
+**Changing a file by hand or with an assistant:** leave `id` and `version` as they are.
+The app sees that the content no longer matches the version and makes a new version
+from it, then joins it with what changed on other phones.
+
+## The old format
+
+Files in `travel-in-my-pocket/1` (TIMP 1.0 to 2.4) still load: the app converts them
+once, as a new version made from the old one. Map settings of the old format
+(`places` colours, `glyph`, `mapZones`, `mapImages`, `zoneNames`, `mapSplitKm`,
+`mapLabel`) are dropped; the app works them out now.
+
+## Checks the app makes
+
+The app refuses a file, and lists every problem with its position, when: it is not JSON,
+`format` is wrong, `title`, `days`, a day's `date` or a stop's `title` is missing, a day
+has neither `stops` nor `plans` (or both), dates are not real or not in order,
+coordinates are out of range or not in pairs, a `link` is not `https://`, or an `id` is
+used twice in a list.
+
+Unknown fields, an unknown `type` or `travel`, and days without any position are
+warnings: the file loads, and the command-line checker shows them.
+
+---
+
+# A complete example
+
+```json
+{
+ "format": "travel-in-my-pocket/2",
+ "id": "demo-lisbon",
+ "title": "Lisbon in my pocket (example)",
+ "lang": "en",
+ "timezone": "Europe/Lisbon",
+ "days": [
+  {
+   "date": "2027-05-14",
+   "city": "Lisboa",
+   "title": "Baixa and Alfama on foot",
+   "stay": {
+    "name": "Casa do Exemplo (invented)",
+    "address": "Baixa, Lisboa",
+    "note": "This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."
+   },
+   "notes": [
+    "This is an invented trip, here to show what the app does. Times and descriptions are examples: check everything before a real visit.",
+    "If it rains: swap this day with the next one. **Belém** has more places indoors."
+   ],
+   "stops": [
+    {
+     "id": "comercio",
+     "time": "10:00",
+     "title": "Praça do Comércio",
+     "type": "sight",
+     "text": "Start at the big square on the river, then walk under the arch into Rua Augusta.",
+     "address": "Praça do Comércio Lisboa",
+     "lat": 38.7075,
+     "lng": -9.1364
+    },
+    {
+     "id": "se",
+     "time": "11:00",
+     "title": "Lisbon Cathedral",
+     "type": "sight",
+     "text": "Ten minutes uphill. The tram line passes right in front of the door.",
+     "address": "Sé de Lisboa",
+     "lat": 38.7098,
+     "lng": -9.1326
+    },
+    {
+     "id": "santa-luzia",
+     "time": "11:45",
+     "title": "Miradouro de Santa Luzia",
+     "type": "view",
+     "text": "A terrace over the roofs of Alfama. A good place for a break.",
+     "address": "Miradouro de Santa Luzia",
+     "lat": 38.7117,
+     "lng": -9.1303
+    },
+    {
+     "id": "castelo",
+     "time": "12:30",
+     "title": "Castelo de São Jorge",
+     "type": "sight",
+     "text": "The castle on top of the hill. Tickets are sold at the gate.",
+     "tag": "Ticket needed",
+     "address": "Castelo de São Jorge",
+     "lat": 38.7139,
+     "lng": -9.1335
+    },
+    {
+     "id": "lunch",
+     "time": "14:00",
+     "title": "Lunch in Alfama",
+     "type": "food",
+     "text": "No coordinates on this stop: it has no pin on the map, and that is fine."
+    },
+    {
+     "id": "sunset",
+     "time": "Evening",
+     "title": "Miradouro da Senhora do Monte",
+     "type": "view",
+     "text": "The highest viewpoint in the centre, best at sunset.",
+     "tag": "Optional",
+     "address": "Miradouro da Senhora do Monte",
+     "lat": 38.7191,
+     "lng": -9.1327
+    }
+   ]
+  },
+  {
+   "date": "2027-05-15",
+   "city": "Lisboa",
+   "title": "Belém and the river",
+   "stay": {
+    "name": "Casa do Exemplo (invented)",
+    "address": "Baixa, Lisboa",
+    "note": "This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."
+   },
+   "stops": [
+    {
+     "id": "jeronimos",
+     "time": "09:30",
+     "title": "Mosteiro dos Jerónimos",
+     "type": "museum",
+     "text": "Go early: the queue grows during the morning.",
+     "tag": "Ticket needed",
+     "address": "Mosteiro dos Jerónimos",
+     "lat": 38.6979,
+     "lng": -9.2068
+    },
+    {
+     "id": "pasteis",
+     "time": "11:00",
+     "title": "Pastéis de Belém",
+     "type": "food",
+     "text": "The custard tarts, still warm. The queue for take-away moves fast.",
+     "address": "Pastéis de Belém",
+     "lat": 38.6975,
+     "lng": -9.2032
+    },
+    {
+     "id": "torre",
+     "time": "12:00",
+     "title": "Torre de Belém",
+     "type": "sight",
+     "text": "A walk along the river to the tower.",
+     "address": "Torre de Belém",
+     "lat": 38.6916,
+     "lng": -9.216
+    },
+    {
+     "id": "maat",
+     "time": "14:30",
+     "title": "MAAT",
+     "type": "museum",
+     "text": "You can walk on the roof of the museum for free.",
+     "address": "MAAT Lisboa",
+     "lat": 38.6959,
+     "lng": -9.1937
+    },
+    {
+     "id": "lx",
+     "time": "16:30",
+     "title": "LX Factory",
+     "type": "shop",
+     "text": "Shops and cafés in an old factory, under the bridge.",
+     "address": "LX Factory Lisboa",
+     "lat": 38.7034,
+     "lng": -9.1789
+    },
+    {
+     "id": "cais-do-sodre",
+     "time": "18:00",
+     "title": "Cais do Sodré",
+     "travel": "train",
+     "text": "Back towards the centre on the Cascais line from Alcântara-Mar, a few minutes.",
+     "address": "Cais do Sodré station",
+     "lat": 38.7056,
+     "lng": -9.1446
+    },
+    {
+     "id": "cacilhas",
+     "time": "18:30",
+     "title": "Dinner in Cacilhas",
+     "type": "food",
+     "travel": "boat",
+     "text": "The ferry crosses the river in about ten minutes. Fish restaurants along the quay, and the city lit up across the water.",
+     "address": "Cacilhas ferry terminal",
+     "lat": 38.6873,
+     "lng": -9.1475
+    }
+   ]
+  },
+  {
+   "date": "2027-05-16",
+   "city": "Sintra",
+   "title": "A day out of town",
+   "stay": {
+    "name": "Casa do Exemplo (invented)",
+    "address": "Baixa, Lisboa",
+    "note": "This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."
+   },
+   "notes": [
+    "A day with two alternative plans: pick one with the buttons below. The app remembers the choice."
+   ],
+   "plans": [
+    {
+     "id": "sintra",
+     "name": "Sintra",
+     "stops": [
+      {
+       "id": "train",
+       "time": "08:40",
+       "title": "Train from Rossio",
+       "travel": "train",
+       "text": "About 40 minutes. This stop has no coordinates on purpose."
+      },
+      {
+       "id": "station",
+       "time": "09:30",
+       "title": "Sintra station",
+       "text": "From here a bus climbs to the palaces.",
+       "address": "Sintra train station",
+       "lat": 38.799,
+       "lng": -9.3859
+      },
+      {
+       "id": "pena",
+       "time": "10:15",
+       "title": "Palácio da Pena",
+       "type": "sight",
+       "text": "The coloured palace on top of the hill.",
+       "tag": "Ticket needed",
+       "address": "Palácio da Pena",
+       "lat": 38.7876,
+       "lng": -9.3906
+      },
+      {
+       "id": "regaleira",
+       "time": "13:30",
+       "title": "Quinta da Regaleira",
+       "type": "park",
+       "text": "Gardens, tunnels and the spiral well.",
+       "address": "Quinta da Regaleira",
+       "lat": 38.7963,
+       "lng": -9.396
+      },
+      {
+       "id": "town",
+       "time": "15:30",
+       "title": "Sintra old town",
+       "type": "walk",
+       "text": "A coffee and a pastry before the train back.",
+       "address": "Palácio Nacional de Sintra",
+       "lat": 38.7976,
+       "lng": -9.3907
+      }
+     ]
+    },
+    {
+     "id": "cascais",
+     "name": "Cascais",
+     "stops": [
+      {
+       "id": "coast-train",
+       "time": "09:20",
+       "title": "Train from Cais do Sodré",
+       "travel": "train",
+       "text": "About 40 minutes along the coast. Sit on the left for the sea."
+      },
+      {
+       "id": "station",
+       "time": "10:00",
+       "title": "Cascais station",
+       "text": "From here the beach is a two-minute walk.",
+       "address": "Cascais train station",
+       "lat": 38.7005,
+       "lng": -9.4177
+      },
+      {
+       "id": "beach",
+       "time": "10:30",
+       "title": "Praia da Rainha",
+       "type": "park",
+       "text": "A small beach between the rocks.",
+       "address": "Praia da Rainha Cascais",
+       "lat": 38.6977,
+       "lng": -9.4194
+      },
+      {
+       "id": "boca",
+       "time": "12:00",
+       "title": "Boca do Inferno",
+       "type": "view",
+       "text": "A walk along the cliff to the sea arch.",
+       "address": "Boca do Inferno Cascais",
+       "lat": 38.6913,
+       "lng": -9.4307
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "info": [
+  {
+   "title": "Getting around",
+   "items": [
+    {
+     "label": "Card",
+     "text": "One rechargeable card works on metro, trams, buses and trains."
+    },
+    {
+     "label": "Trams",
+     "text": "The historic trams are crowded: board at the first stop."
+    }
+   ]
+  },
+  {
+   "title": "In case of need",
+   "items": [
+    {
+     "label": "Emergency",
+     "text": "112 · any emergency, across the EU"
+    }
+   ]
+  },
+  {
+   "title": "A few words",
+   "items": [
+    {
+     "label": "Obrigado / Obrigada",
+     "text": "Thank you"
+    },
+    {
+     "label": "Bom dia",
+     "text": "Good morning"
+    },
+    {
+     "label": "A conta, por favor",
+     "text": "The bill, please"
+    }
+   ]
+  },
+  {
+   "title": "Notes",
+   "items": [
+    {
+     "label": "Note",
+     "text": "Everything in this example is invented or approximate. Load your own trip file from «Trips»."
+    }
+   ]
+  }
+ ]
+}
+```

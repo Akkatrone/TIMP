@@ -114,12 +114,15 @@ method in `docs/creating-a-trip.md`, the rules of the repository in `AGENTS.md`.
 The skill and `CLAUDE.md` only point to them. Please do not copy their content
 into tool-specific files.
 
-Chat assistants (Gemini, ChatGPT…) do not read the repository, and many cannot open
-links at all. So the format also exists in short: `formatBrief()` in `js/trip.js`,
-about forty lines made from `FIELDS`. The app copies it with the message for an
-assistant, and the build puts it at the top of `llms.txt`, followed by the two
-documents and the example. None of it is written by hand. When assistants keep making
-the same mistake, add a line to the rules in `formatBrief()`.
+Chat assistants (Gemini, ChatGPT…) do not clone the repository: they read one page,
+if they can open it at all. That page is `llms.txt`, made by `tools/lib/llms.mjs`: the
+format in short (`formatBrief()` in `js/trip.js`, about forty lines made from `FIELDS`),
+then the two documents and the example. It is published with the site and kept at the
+root of the repository, because assistants open github.com pages more readily than a
+small site; the app's message for an assistant points there. Never edit it by hand: run
+`node tools/check-llms.mjs --fix` after changing `docs/`, `js/trip.js` or the example
+(`npm run check` fails until you do). When assistants keep making the same mistake, add
+a line to the rules in `formatBrief()`.
 
 **New files must be available offline.** If you add or remove a file of the app, run
 `node tools/check-precache.mjs --fix` to update the list in `sw.js`. You never need

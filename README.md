@@ -151,7 +151,7 @@ Ticked and skipped stops are never part of the file: they stay on each phone.
 ## Create your own trip
 
 > **AI assistant reading this page:** before you write a trip file, read
-> <https://frafal.github.io/TIMP/llms.txt>. It has the exact format, a checklist and a
+> [llms.txt](llms.txt) in this repository. It has the exact format, the method and a
 > complete example in one page. The app refuses a file that does not follow it.
 
 A trip is a JSON file that says what the trip is: days, stops, where you sleep, what to
@@ -181,21 +181,25 @@ Any assistant can write a trip file, because the instructions are two plain docu
   *"Create a trip file for my week in Portugal, here is the plan…"*. The agent finds
   its instructions in [AGENTS.md](AGENTS.md), writes the file into `private/` (a folder
   Git ignores) and checks it.
-- **A chat assistant** (Gemini, ChatGPT, Claude, an open model): in the app, on the
-  first screen or in **Trips → Have an AI assistant write the trip**, tap **Copy the
-  message**. It carries the whole format, about forty lines made from the same table
-  the app checks with, so the assistant needs no link (Gemini, for one, often cannot
-  open them). Paste it into the chat, replace the part in brackets with your trip, and
-  send.
+- **A chat assistant** (Gemini, ChatGPT, Claude and others): give it
+  [llms.txt](llms.txt), the whole format in one page, kept in this repository. The app
+  has the message ready, on the first screen and in **Trips → Have an AI assistant
+  write the trip**:
+
+  ```text
+  Read https://github.com/Frafal/TIMP/blob/main/llms.txt and follow it exactly.
+  Then write a TIMP trip file for: [where, dates or number of days, who travels,
+  what you like, how you get around].
+  Give me the whole JSON in one block.
+  ```
 
   Then copy the whole answer and tap **Trips → Paste a trip**. If something is wrong,
   the app lists each problem with its position in the file; **Copy for the assistant**
   copies that list with a request to fix it. Paste it into the same chat and load the
   new answer.
 
-  Assistants that can open links can also read
-  [llms.txt](https://frafal.github.io/TIMP/llms.txt): the same format, with the whole
-  guide and a complete example.
+  An assistant that cannot open the link at all: the app's **Copy the message with the
+  whole format** puts the format itself, about forty lines, in the message.
 - **A model that follows a JSON Schema** (open models through Ollama, llama.cpp or
   vLLM, or an API with structured output): give it
   [trip.schema.json](https://frafal.github.io/TIMP/trip.schema.json) as the output
@@ -205,10 +209,12 @@ Whatever you use, look at the map of each day before you leave: a pin in the wro
 place is the one mistake no automatic check can catch.
 
 **Changing a trip you already use:** small changes are quicker in the app (+ and Edit).
-For bigger ones, give the assistant the latest file the app saved (Trips → Save the
-file), not an older copy. It keeps the trip `id`, the stop ids and the `version` block;
-the app then turns its work into a new version, and joins it with what changed on the
-other phones.
+For bigger ones, at the bottom of **Trips** open **Have an AI assistant change this
+trip**: one button copies a message with the trip in it, you write what to change, and
+the answer goes back with **Paste a trip**. The app keeps the trip `id`, the stop ids
+and the `version` block, turns the result into a new version, and joins it with what
+changed on the other phones. A coding agent works the same way from the latest file the
+app saved (Trips → Save the file).
 
 ### By hand
 
