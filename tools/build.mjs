@@ -50,6 +50,15 @@ const version = option("version", `${pkg.version}+${hash.digest("hex").slice(0, 
 
 contents.set("sw.js", Buffer.from(stampSw(contents.get("sw.js").toString("utf8"), version, precacheList())));
 
+// Browsers keep icons by address, for a long time and apart from the page: the same
+// address would show the old icon after an update. Each version gets its own.
+const tag = "?v=" + encodeURIComponent(version.split("+").pop());
+contents.set("index.html", Buffer.from(contents.get("index.html").toString("utf8")
+  .replace(/(<link rel="(?:icon|apple-touch-icon)" href=")(icons\/[\w.-]+)"/g, `$1$2${tag}"`)));
+const manifest = JSON.parse(contents.get("manifest.webmanifest").toString("utf8"));
+manifest.icons = manifest.icons.map(i => ({...i, src: i.src + tag}));
+contents.set("manifest.webmanifest", Buffer.from(JSON.stringify(manifest, null, 2) + "\n"));
+
 rmSync(out, {recursive: true, force: true});
 for(const [f, data] of contents){
   const target = join(out, f);

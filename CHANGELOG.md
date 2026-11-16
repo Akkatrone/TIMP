@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.0.1
+
+- The new icon now shows up after an update. Browsers keep icons by address, apart
+  from the page, so the same address kept showing the 1.x icon in the tab and in the
+  manifest. The published copy now gives the icons an address per version.
+
 ## 2.0.0
 
 Trips can now change on the phone and travel between friends. The app is now called

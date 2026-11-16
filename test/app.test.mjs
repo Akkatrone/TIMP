@@ -178,6 +178,14 @@ test("the build publishes only the app, stamped with a version", () => {
     assert.match(version, /^\d+\.\d+\.\d+\+[0-9a-f]{8}$/);
     for(const f of files.filter(f => f !== "./")) assert.ok(existsSync(join(out, f)), f);
     assert.ok(readFileSync(join(out, "js/config.js"), "utf8").includes(`"https://github.com/someone/fork"`));
+    // Icons get an address per version, so browsers do not keep showing an old one.
+    const v = version.split("+").pop();
+    const html = readFileSync(join(out, "index.html"), "utf8");
+    assert.ok(html.includes(`<link rel="icon" href="icons/icon.svg?v=${v}"`), "favicon");
+    assert.ok(html.includes(`<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=${v}"`), "iPhone icon");
+    const manifest = JSON.parse(readFileSync(join(out, "manifest.webmanifest"), "utf8"));
+    assert.ok(manifest.icons.length > 0 && manifest.icons.every(i => i.src.endsWith(`?v=${v}`)), "manifest icons");
+    for(const i of manifest.icons) assert.ok(existsSync(join(out, i.src.split("?")[0])), i.src);
     for(const f of ["README.md", "package.json", "tools", "test", "private", ".claude", ".github"]) assert.ok(!existsSync(join(out, f)), f);
   }finally{
     rmSync(out, {recursive: true, force: true});
