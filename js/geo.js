@@ -11,8 +11,10 @@ const f1 = v => Math.round(v * 10) / 10;
 
 /**
  * A zone is a group of points close enough to share one map.
- * Each point: {nums, name, ll: [lat, lng], q, ref, items: [{n, time, title}]}
- * zone.path lists the points in visiting order (a point can repeat).
+ * Each point: {nums, name, ll: [lat, lng], q, ref, items: [{n, idx, time, title}]}
+ * zone.path lists the points in visiting order (a point can repeat), and
+ * zone.pathIdx the position in the day's list of the stop behind each of them
+ * (-1 when the map is drawn from mapZones, whose points are not stops).
  */
 export function zonesOf(day, plan, list){
   if(day.mapZones){
@@ -20,9 +22,10 @@ export function zonesOf(day, plan, list){
       let k = 0;
       const pts = z.points.map(p => {
         const n = p.reference ? 0 : ++k;
-        return {nums: n ? [n] : [], name: p.name, ll: [p.lat, p.lng], q: p.query || p.name, ref: !!p.reference, items: n ? [{n, time: "", title: p.name}] : []};
+        return {nums: n ? [n] : [], name: p.name, ll: [p.lat, p.lng], q: p.query || p.name, ref: !!p.reference, items: n ? [{n, idx: -1, time: "", title: p.name}] : []};
       });
-      return {name: z.name || "", pts, path: pts.filter(p => !p.ref)};
+      const path = pts.filter(p => !p.ref);
+      return {name: z.name || "", pts, path, pathIdx: path.map(() => -1)};
     });
   }
   const split = day.mapSplitKm || 12, zones = [];
@@ -30,12 +33,13 @@ export function zonesOf(day, plan, list){
   list.forEach((s, i) => {
     if(s.lat === undefined) return;
     const ll = [s.lat, s.lng];
-    if(!cur || distKm(prev, ll) > split){ cur = {pts: [], path: []}; zones.push(cur); }
+    if(!cur || distKm(prev, ll) > split){ cur = {pts: [], path: [], pathIdx: []}; zones.push(cur); }
     let pt = cur.pts.find(p => distKm(p.ll, ll) < 0.03);
     if(!pt){ pt = {nums: [], name: s.mapLabel || s.title, ll, q: s.query || s.mapLabel || s.title, ref: false, items: []}; cur.pts.push(pt); }
     pt.nums.push(i + 1);
-    pt.items.push({n: i + 1, time: s.time, title: s.title});
+    pt.items.push({n: i + 1, idx: i, time: s.time, title: s.title});
     cur.path.push(pt);
+    cur.pathIdx.push(i);
     prev = ll;
   });
   const names = (plan && plan.zoneNames) || day.zoneNames || [];
@@ -56,8 +60,28 @@ export function routeUrl(z){
   return u + "&travelmode=" + (far > 6 ? "driving" : "walking");
 }
 
+// The legs of a zone's route: from each point of the path to the next one.
+// `idx` is the stop the leg arrives at, so a leg can be drawn as already travelled.
+export function legsOf(z){
+  const legs = [];
+  for(let j = 1; j < z.path.length; j++){
+    if(z.path[j] !== z.path[j - 1]) legs.push({from: z.path[j - 1], to: z.path[j], idx: z.pathIdx[j]});
+  }
+  return legs;
+}
+
+// A pin is behind you when every stop it stands for is done or skipped.
+// Points drawn from mapZones (idx -1) are not stops, so they are never behind you.
+export function pinGone(pt, gone){
+  return pt.items.length > 0 && pt.items.every(it => it.idx >= 0 && gone(it.idx));
+}
+
+// Same rule for a leg of the route.
+export const legGone = (leg, gone) => leg.idx >= 0 && gone(leg.idx);
+
 // The offline map: an SVG sketch to scale, with numbered badges pushed apart so they never overlap.
-export function zoneSVG(z, label){
+// `gone(idx)` says whether the stop at that position in the list is done or skipped.
+export function zoneSVG(z, label, gone = () => false){
   const pts = z.pts, lat0 = pts.reduce((a, p) => a + p.ll[0], 0) / pts.length;
   const xy = pts.map(p => kmXY(p.ll, lat0));
   const xs = xy.map(p => p[0]), ys = xy.map(p => p[1]);
@@ -81,7 +105,10 @@ export function zoneSVG(z, label){
     B.forEach(b => { b[0] = Math.min(W - 16, Math.max(16, b[0])); b[1] = Math.min(H - 13, Math.max(13, b[1])); });
   }
   let o = `<svg class="mapsvg" viewBox="0 0 ${W} ${H + FOOT}" role="img" aria-label="${esc(label)}">`;
-  if(z.path.length > 1) o += `<path class="route" d="${z.path.map((p, i) => { const c = P[pts.indexOf(p)]; return (i ? "L" : "M") + f1(c[0]) + " " + f1(c[1]); }).join(" ")}"/>`;
+  legsOf(z).forEach(leg => {
+    const a = P[pts.indexOf(leg.from)], b = P[pts.indexOf(leg.to)];
+    o += `<path class="route${legGone(leg, gone) ? " gone" : ""}" d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}"/>`;
+  });
   pts.forEach((p, i) => {
     const c = P[i];
     if(p.ref){ o += `<path class="ref" d="M${f1(c[0])} ${f1(c[1] - 7)}L${f1(c[0] + 7)} ${f1(c[1] + 5)}L${f1(c[0] - 7)} ${f1(c[1] + 5)}Z"/><text class="sbt" x="${f1(c[0] + 11)}" y="${f1(c[1] + 4)}">${esc(p.name)}</text>`; return; }
@@ -89,8 +116,8 @@ export function zoneSVG(z, label){
   });
   pts.forEach((p, i) => {
     if(p.ref) return;
-    const lab = p.nums.join("·"), bw = Math.max(20, 9 + lab.length * 6.5);
-    o += `<rect class="badge" x="${f1(B[i][0] - bw / 2)}" y="${f1(B[i][1] - 10)}" width="${f1(bw)}" height="20" rx="10"/><text class="bt" x="${f1(B[i][0])}" y="${f1(B[i][1])}" dy="0.35em">${lab}</text>`;
+    const lab = p.nums.join("·"), bw = Math.max(20, 9 + lab.length * 6.5), g = pinGone(p, gone) ? " gone" : "";
+    o += `<rect class="badge${g}" x="${f1(B[i][0] - bw / 2)}" y="${f1(B[i][1] - 10)}" width="${f1(bw)}" height="20" rx="10"/><text class="bt${g}" x="${f1(B[i][0])}" y="${f1(B[i][1])}" dy="0.35em">${lab}</text>`;
   });
   const nice = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
   let sb = nice[0];

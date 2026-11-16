@@ -30,9 +30,12 @@ There is nothing to install. Node 20 or later is needed only for the checks:
 ```bash
 npm run check   # example trip, offline file list, no private data in the repository
 npm test        # unit tests
+npm run e2e     # the app in headless Chrome, with the example trip
 ```
 
-Both run on every pull request.
+All three run on every pull request. `npm run e2e` needs Chrome or Chromium; set
+`CHROME=/path/to/chrome` if it is not found. When you change what a traveller sees or
+taps, add a check to `tools/e2e.mjs`.
 
 ## How it is organised
 
@@ -47,7 +50,7 @@ Both run on every pull request.
 | `js/i18n.js` | Interface texts. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
 | `sw.js` | Service worker: keeps the app available offline. |
-| `tools/` | Command-line checks and the build used for publishing. |
+| `tools/` | Command-line checks, the build used for publishing, the browser check and the screenshots. |
 | `test/` | Unit tests (`node:test`, no dependencies). |
 | `docs/trip-format.md` | The trip file format, for people who write trips. |
 | `docs/creating-a-trip.md` | How to write a good trip file, for people and AI assistants. |
@@ -125,7 +128,7 @@ much better than silence.
 - Screenshots for visual changes, at phone width. If the change is visible in the
   pictures of the README, retake them with `node tools/screenshots.mjs` (it needs
   Chrome or Chromium, and only ever loads the example trip).
-- `npm run check` and `npm test` pass.
+- `npm run check`, `npm test` and `npm run e2e` pass.
 
 ## Reporting a problem
 

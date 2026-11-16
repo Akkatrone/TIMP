@@ -4,7 +4,7 @@ import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { esc, rich, stopQuery, dateParts, mapsUrl } from "../js/util.js";
-import { zonesOf, routeUrl, zoneSVG, distKm } from "../js/geo.js";
+import { zonesOf, routeUrl, zoneSVG, distKm, legsOf, pinGone } from "../js/geo.js";
 import { STRINGS } from "../js/i18n.js";
 import { ROOT, precacheList, readSw } from "../tools/lib/app-files.mjs";
 
@@ -75,6 +75,34 @@ test("the route link walks short distances and drives long ones", () => {
   assert.match(routeUrl(walk), /origin=Colosseum&destination=Pantheon&waypoints=Forum&travelmode=walking$/);
   const [drive] = zonesOf({mapSplitKm: 500}, null, [...ROME, stop("Duomo", 43.7731, 11.256)]);
   assert.match(routeUrl(drive), /travelmode=driving$/);
+});
+
+test("each leg of the route knows the stop it arrives at", () => {
+  // Hotel, Forum, Lunch (no pin), Pantheon, back to the hotel
+  const list = [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), {time: "13:00", title: "Lunch"}, stop("Pantheon", 41.8986, 12.4769), stop("Back", 41.9, 12.5, {mapLabel: "Hotel"})];
+  const [zone] = zonesOf({}, null, list);
+  assert.deepEqual(zone.pathIdx, [0, 1, 3, 4]);
+  assert.deepEqual(legsOf(zone).map(l => [l.from.name, l.to.name, l.idx]), [["Hotel", "Forum", 1], ["Forum", "Pantheon", 3], ["Pantheon", "Hotel", 4]]);
+});
+
+test("a pin is behind you only when every stop it stands for is done or skipped", () => {
+  const list = [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), stop("Back", 41.9, 12.5, {mapLabel: "Hotel"})];
+  const [zone] = zonesOf({}, null, list);
+  const hotel = zone.pts[0];
+  assert.equal(pinGone(hotel, i => i === 0), false, "left the hotel, not back yet");
+  assert.equal(pinGone(hotel, i => i === 0 || i === 2), true);
+  const fromZones = zonesOf({mapZones: [{points: [{name: "A", lat: 1, lng: 1}]}]}, null, [])[0];
+  assert.equal(pinGone(fromZones.pts[0], () => true), false, "points drawn from mapZones are not stops");
+});
+
+test("the sketch dashes the legs and pins already behind you", () => {
+  const [zone] = zonesOf({}, null, ROME);
+  const none = zoneSVG(zone, "Rome");
+  assert.equal((none.match(/class="route"/g) || []).length, 2);
+  assert.ok(!none.includes("gone"));
+  const some = zoneSVG(zone, "Rome", i => i <= 1); // Colosseum and Forum done
+  assert.equal((some.match(/class="route gone"/g) || []).length, 1, "the leg arriving at the Forum");
+  assert.equal((some.match(/class="badge gone"/g) || []).length, 2);
 });
 
 test("distances are right to within a few percent", () => {

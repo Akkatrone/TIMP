@@ -10,8 +10,10 @@
     "serve": "python3 -m http.server 4173",
     "validate": "node tools/validate-trip.mjs",
     "test": "node --test test/*.test.mjs",
+    "e2e": "node tools/e2e.mjs",
     "check": "node tools/validate-trip.mjs examples/demo-trip.json && node tools/check-precache.mjs && node tools/check-repo.mjs",
-    "build": "node tools/build.mjs"
+    "build": "node tools/build.mjs",
+    "screenshots": "node tools/screenshots.mjs"
   },
   "engines": {
     "node": ">=20"

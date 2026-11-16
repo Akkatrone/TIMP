@@ -41,7 +41,7 @@ that passes the checker loads in the app.
 | Field | Required | Meaning |
 |---|---|---|
 | `format` | yes | Always `"travel-in-my-pocket/1"`. |
-| `id` | yes | Identifies the trip on the device: lowercase letters, digits, dashes. Loading a file with the same `id` **updates** the trip and keeps the stops already ticked. A different `id` adds a second trip. |
+| `id` | yes | Identifies the trip on the device: lowercase letters, digits, dashes. Loading a file with the same `id` **updates** the trip and keeps the stops already ticked or skipped. A different `id` adds a second trip. |
 | `title` | yes | Shown as the name of the trip. |
 | `lang` | no | Language of the interface while this trip is open: `"en"` or `"it"`. Without it, the device language is used. |
 | `timezone` | no | IANA time zone of the destination, e.g. `"Europe/Lisbon"`. Decides which day is "today". Without it, the phone's own time zone is used. |
@@ -111,12 +111,12 @@ A list. Each entry is one date. Day 1 is the first entry.
 |---|---|---|
 | `time` | yes | Free text: `"09:30"`, `"Evening"`, `"Dinner"`. |
 | `title` | yes | Name of the stop. |
-| `text` | no | The description: how to get there, price, opening hours, what to look at. |
+| `text` | no | The description: how to get there, price, opening hours, what to look at. The app shows the first two lines and the rest on a tap. |
 | `lat`, `lng` | no, but together | Coordinates in decimal degrees. A stop with coordinates gets a numbered pin; a stop without them (a train ride, "free afternoon") has no pin. |
 | `mapLabel` | no | Name used on the map when the title is not a place name (title `"Check-out"`, mapLabel `"Hotel Roma"`). |
 | `query` | no | What to search in Google Maps for the "Map" and "Directions" links. Use the name people would type, with the city. Without it, the coordinates are used. |
 | `tag` | no | A short label: `"Booking needed"`, `"Optional"`. |
-| `id` | recommended | Lowercase letters, digits, dashes; unique within the list. The app uses it to remember that the stop was ticked. Without it, the position in the list is used, so reordering stops in an updated file would move the ticks. |
+| `id` | recommended | Lowercase letters, digits, dashes; unique within the list. The app uses it to remember that the stop was ticked or skipped. Without it, the position in the list is used, so reordering stops in an updated file would move the ticks. |
 
 ### Plans
 

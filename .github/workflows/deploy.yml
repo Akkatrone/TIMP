@@ -27,6 +27,10 @@ jobs:
           node-version: 22
       - name: Checks and tests
         run: npm run check && npm test
+      - name: In a browser
+        env:
+          CHROME: google-chrome
+        run: npm run e2e
       - name: Build
         run: node tools/build.mjs --out _site --repo "${{ github.server_url }}/${{ github.repository }}"
       - uses: actions/configure-pages@v5

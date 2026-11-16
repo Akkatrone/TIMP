@@ -3,6 +3,7 @@
 // Both draw the same things: numbered pins, a straight line along the route, a small card per pin.
 
 import { esc, mapsUrl, dirUrl } from "./util.js";
+import { legsOf, pinGone, legGone } from "./geo.js";
 import { t, getLang } from "./i18n.js";
 
 let leafletPromise = null;
@@ -80,21 +81,31 @@ async function drawLeaflet(canvas, zones, color){
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
   }).addTo(map);
+  const legs = [], pins = [];
   zones.forEach(z => {
-    if(z.path.length > 1) L.polyline(z.path.map(p => p.ll), {color, weight: 4, opacity: 0.75, interactive: false}).addTo(map);
+    legsOf(z).forEach(leg => {
+      legs.push({idx: leg.idx, line: L.polyline([leg.from.ll, leg.to.ll], {color, weight: 4, opacity: 0.75, interactive: false}).addTo(map)});
+    });
     z.pts.forEach(pt => {
-      const icon = L.divIcon({className: "pinwrap", html: pinNode(pt, color), iconSize: [0, 0]});
+      const el = pinNode(pt, color);
+      const icon = L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]});
       const m = L.marker(pt.ll, {icon, keyboard: !pt.ref, interactive: !pt.ref, title: pt.name}).addTo(map);
       if(!pt.ref) m.bindPopup(popupNode(pt), {offset: [0, -10], maxWidth: 250});
+      pins.push({pt, el});
     });
   });
+  // Legs and pins of stops that are done or skipped turn dashed.
+  const mark = gone => {
+    legs.forEach(l => l.line.setStyle(legGone(l, gone) ? {dashArray: "5 10", opacity: 0.6} : {dashArray: null, opacity: 0.75}));
+    pins.forEach(p => p.el.classList.toggle("gone", pinGone(p.pt, gone)));
+  };
   const fit = zi => {
     const pts = (zi == null ? zones : [zones[zi]]).flatMap(z => z.pts);
     if(pts.length === 1) map.setView(pts[0].ll, 15);
     else map.fitBounds(L.latLngBounds(pts.map(p => p.ll)), {padding: [36, 36], maxZoom: 16});
   };
   fit(null);
-  return {fit, refresh: () => map.invalidateSize(), destroy: () => map.remove()};
+  return {fit, mark, refresh: () => map.invalidateSize(), destroy: () => map.remove()};
 }
 
 async function drawGoogle(canvas, zones, color, key){
@@ -128,9 +139,16 @@ async function drawGoogle(canvas, zones, color, key){
     clickableIcons: false
   });
   const info = new InfoWindow();
-  const drawn = [];
+  const drawn = [], legs = [], pins = [];
+  // Google has no dashed lines: a dashed leg is an invisible line that repeats a short stroke.
+  const SOLID = {strokeOpacity: 0.75, icons: []};
+  const DASHED = {strokeOpacity: 0, icons: [{icon: {path: "M 0,-1 0,1", strokeOpacity: 0.6, strokeWeight: 4, scale: 1.5}, offset: "0", repeat: "13px"}]};
   zones.forEach(z => {
-    if(z.path.length > 1) drawn.push(new Polyline({map, path: z.path.map(p => ({lat: p.ll[0], lng: p.ll[1]})), strokeColor: color, strokeOpacity: 0.75, strokeWeight: 4, clickable: false}));
+    legsOf(z).forEach(leg => {
+      const line = new Polyline({map, path: [leg.from, leg.to].map(p => ({lat: p.ll[0], lng: p.ll[1]})), strokeColor: color, strokeWeight: 4, clickable: false, ...SOLID});
+      drawn.push(line);
+      legs.push({idx: leg.idx, line});
+    });
     z.pts.forEach(pt => {
       const pos = new LatLng(pt.ll[0], pt.ll[1]);
       const el = pinNode(pt, color);
@@ -144,6 +162,7 @@ async function drawGoogle(canvas, zones, color, key){
       const pin = new Pin(pos, el);
       pin.setMap(map);
       drawn.push(pin);
+      pins.push({pt, el});
     });
   });
   const fit = zi => {
@@ -155,7 +174,11 @@ async function drawGoogle(canvas, zones, color, key){
     gm.event.addListenerOnce(map, "idle", () => { if(map.getZoom() > 16) map.setZoom(16); });
   };
   fit(null);
-  return {fit, refresh: () => {}, destroy: () => { info.close(); drawn.forEach(d => d.setMap(null)); }};
+  const mark = gone => {
+    legs.forEach(l => l.line.setOptions(legGone(l, gone) ? DASHED : SOLID));
+    pins.forEach(p => p.el.classList.toggle("gone", pinGone(p.pt, gone)));
+  };
+  return {fit, mark, refresh: () => {}, destroy: () => { info.close(); drawn.forEach(d => d.setMap(null)); }};
 }
 
 /**
@@ -166,6 +189,7 @@ export function createLiveMap({zones, color, googleKey, onNotice}){
   const el = document.createElement("div");
   el.className = "live";
   let canvas = null, impl = null, dead = false;
+  let gone = () => false;   // which stops are done or skipped; kept so a map that loads late still shows them
 
   const message = text => {
     el.innerHTML = `<div class="msg">${esc(text)}</div>`;
@@ -186,6 +210,7 @@ export function createLiveMap({zones, color, googleKey, onNotice}){
       if(msg) msg.remove();
       canvas = fresh;
       impl = made;
+      impl.mark(gone);
     }catch(e){
       fresh.remove();
       if(dead) return;
@@ -201,6 +226,7 @@ export function createLiveMap({zones, color, googleKey, onNotice}){
     el,
     fit: zi => { if(impl) impl.fit(zi); },
     refresh: () => { if(impl) impl.refresh(); },
+    setMarks: fn => { gone = fn; if(impl) impl.mark(gone); },
     onGoogleRefused: () => { if(!dead){ onNotice("googleKeyBad"); start(false); } },
     destroy: () => {
       dead = true;

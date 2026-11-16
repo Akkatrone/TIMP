@@ -89,6 +89,22 @@ ol.stops{list-style:none;margin:0;padding:0}
 .stop.done .tick{background:var(--ok);border-color:var(--ok);color:#fff}
 .stop.done .body h3,.stop.done .time{opacity:.5}
 .stop.done .body h3{text-decoration:line-through;text-decoration-thickness:1px}
+/* a description folds to two lines; the links under it never fold */
+.tap{cursor:pointer;border-radius:8px}
+.tap .h{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.chev{flex:0 0 auto;display:none;color:var(--muted);margin-top:4px;transition:transform .15s}
+.chev svg{width:14px;height:14px;display:block}
+.stop.cut .chev,.stop.open .chev{display:block}
+.stop.open .chev{transform:rotate(180deg)}
+.desc.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.skip{border:0;background:none;padding:2px 0;font:500 .8rem var(--f-body);color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.tag.off{background:var(--line);color:var(--muted)}
+.stop.skipped .body h3,.stop.skipped .time,.stop.skipped .desc{opacity:.5}
+.stop.skipped .body h3{text-decoration:line-through;text-decoration-thickness:1px}
+.tools{display:flex;align-items:center;gap:8px}
+.iconbtn{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.iconbtn svg{width:18px;height:18px}
+.iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .alt{font-size:.88rem;color:var(--muted);margin:0}
 .alt b{color:var(--ink);font-weight:600}
 .nb{display:inline-block;margin-top:5px;font:600 .68rem var(--f-mono);border:1.5px solid var(--c,var(--line));border-radius:999px;padding:0 6px;color:var(--ink)}
@@ -117,6 +133,9 @@ ol.stops{list-style:none;margin:0;padding:0}
 .zname{font:500 .72rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .mapsvg{width:100%;max-width:520px;height:auto;display:block;margin:0 auto;background:var(--bg);border-radius:10px}
 .mapsvg .route{fill:none;stroke:var(--c);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;opacity:.7}
+.mapsvg .route.gone{stroke-dasharray:5 6;opacity:.45}
+.mapsvg .badge.gone{stroke-dasharray:3 3}
+.mapsvg .bt.gone{fill:var(--muted)}
 .mapsvg .pt{fill:var(--c)}
 .mapsvg .lead{stroke:var(--c);stroke-width:1}
 .mapsvg .badge{fill:var(--surface);stroke:var(--c);stroke-width:2}
@@ -139,6 +158,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .live .canvas{position:absolute;inset:0}
 .live .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:var(--muted);font-size:.88rem}
 .pin{position:absolute;transform:translate(-50%,-50%);font:600 12px/1 var(--f-body);color:#15181b;background:#fff;border:2.5px solid var(--pc,#15181b);border-radius:999px;padding:5px 7px;min-width:26px;text-align:center;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer}
+.pin.gone{border-style:dashed;color:#5b636b;background:rgba(255,255,255,.9);box-shadow:none}
 .pin.ref{background:rgba(255,255,255,.85);border:0;border-radius:6px;font-weight:500;font-size:11px;box-shadow:none;cursor:default}
 .pinwrap{background:none;border:0}
 .pop{font:400 13px/1.4 var(--f-body);color:#15181b;display:grid;gap:4px;min-width:150px;max-width:230px}
@@ -176,4 +196,4 @@ ol.stops{list-style:none;margin:0;padding:0}
 #toast button{border:0;background:var(--bg);color:var(--ink);font:600 .82rem var(--f-body);padding:6px 12px;border-radius:999px;cursor:pointer;flex:0 0 auto}
 
 @media (max-width:380px){ .stop{grid-template-columns:3.6rem 1fr auto;gap:10px} .kanji{font-size:2.3rem} .rows > div{grid-template-columns:1fr} }
-@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} }
+@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} .chev{transition:none} }

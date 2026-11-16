@@ -44,11 +44,13 @@ Someone wants their itinerary turned into a file for the app. No code changes.
 python3 -m http.server 4173      # run it: http://localhost:4173/ (any static server works)
 npm run check                    # example trip, offline file list, no private data
 npm test                         # unit tests (node:test, no dependencies)
+npm run e2e                      # the app in headless Chrome, with the example trip
 node tools/check-precache.mjs --fix   # after adding or removing a file of the app
-node tools/screenshots.mjs       # retake the README pictures (needs Chrome or Chromium)
+npm run screenshots              # retake the README pictures
 ```
 
-Nothing needs installing. Node 20+ is used only by the checks and tools.
+Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` and
+`screenshots` also need Chrome or Chromium (`CHROME=/path/to/chrome` if not found).
 
 ### Where things are
 
@@ -62,7 +64,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools.
 | `js/i18n.js` | Interface texts, every language. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
 | `sw.js` | Service worker: offline copy of the app. |
-| `tools/`, `test/` | Checks, build, tests. |
+| `tools/`, `test/` | Checks, build, tests. `tools/e2e.mjs` drives a real browser. |
 | `vendor/` | Third-party code, unmodified. Do not edit. |
 
 ### What a change must respect
@@ -93,8 +95,10 @@ And these rules:
 
 ### Before you finish
 
-- `npm run check` and `npm test` pass.
-- You tried the change in a browser at phone width, in the light and the dark theme,
-  and with the server stopped if it touches storage or the service worker.
+- `npm run check`, `npm test` and `npm run e2e` pass. If you changed what a traveller
+  sees or taps, `tools/e2e.mjs` checks it.
+- You looked at the change at phone width, in the light and the dark theme, and with
+  the server stopped if it touches storage or the service worker.
+- If the pictures in the README no longer match the app, retake them.
 - You say plainly what you could not test. Real iPhones and Android phones behave
   differently from a desktop browser, and you probably did not have one.

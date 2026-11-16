@@ -12,8 +12,8 @@ load into the app: it stays on your phone and is never uploaded anywhere. That i
 the app can be public and open source while your hotels and dates stay private.
 
 <p align="center">
-  <img src="docs/screenshots/programme.png" width="24%" alt="The programme of a day, with two stops ticked as done">
-  <img src="docs/screenshots/map.png" width="24%" alt="The interactive map of the day, with numbered pins and the route">
+  <img src="docs/screenshots/programme.png" width="24%" alt="The programme of a day: one stop done, one skipped, descriptions folded to two lines">
+  <img src="docs/screenshots/map.png" width="24%" alt="The interactive map of the day: numbered pins, the route, the stops already behind you dashed">
   <img src="docs/screenshots/sketch.png" width="24%" alt="The sketch to scale that replaces the map offline">
   <img src="docs/screenshots/plans-dark.png" width="24%" alt="A day with two alternative plans, in the dark theme">
 </p>
@@ -22,13 +22,14 @@ the app can be public and open source while your hotels and dates stay private.
 Retake them with <code>node tools/screenshots.mjs</code>.</sub></p>
 
 - Day-by-day programme: times, descriptions, reminders, alternative plans for a day.
-- Tick the stops you have done. The app remembers them.
+- Short descriptions: two lines each, tap one to read it all, or open them all at once.
+- Tick the stops you have done, or skip the ones you leave out. The app remembers both.
 - A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
-  a sketch to scale when you are not.
+  a sketch to scale when you are not. What is behind you is drawn dashed.
 - One tap to open any stop in Google Maps, with directions.
 - An Info page for hotels, phone numbers, money, useful phrases.
 - Works on iPhone and Android. Installs on the Home Screen, no app store.
-- Interface in English and Italian.
+- Interface in English and Italian: it follows the trip file, or the language you choose.
 
 ## Use it
 
@@ -187,6 +188,14 @@ npm run check
 ```bash
 npm test
 ```
+
+```bash
+npm run e2e
+```
+
+The last one opens the app in headless Chrome or Chromium with the example trip and
+checks what unit tests cannot see: folding, skipping, the dashed map, the language,
+a hostile trip file. It needs Chrome or Chromium installed.
 
 On `localhost` the service worker always serves the files on disk, so every reload
 shows your changes; it uses its copy only when the server is off. On the published

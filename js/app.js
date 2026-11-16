@@ -1,18 +1,23 @@
 import { validateTrip } from "./trip.js";
 import * as store from "./store.js";
-import { t, setLang, deviceLang, getLang } from "./i18n.js";
+import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
 import { esc, rich, mapsUrl, dirUrl, stopQuery, dateParts, todayIn } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG } from "./geo.js";
 import { createLiveMap } from "./livemap.js";
 import { REPO_URL } from "./config.js";
 
+const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const FOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l3.5-3.5M4.5 13.5L8 10l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const S = {
   records: [],            // [{id, trip, importedAt, fileName}]
   rec: null,              // the open one
-  state: {done: {}, plans: {}},
-  ui: {mapOpen: false, mapView: "live"},
+  state: {done: {}, skipped: {}, plans: {}},
+  ui: {mapOpen: false, mapView: "live", expandAll: false},
+  langPref: "auto",       // "auto" follows the trip, or a language chosen on this device
+  openStops: new Map(),   // descriptions opened or closed one by one, until the page is closed
   deviceKey: "",
   importError: null,      // {title, items}
   online: navigator.onLine !== false,
@@ -80,19 +85,25 @@ function route(){
   return {name: "day", i: ti >= 0 ? ti : 0};
 }
 
+// The interface follows the trip's language, unless one was chosen on this device.
+function applyLang(){
+  setLang(S.langPref !== "auto" ? S.langPref : ((trip() && trip().lang) || deviceLang()));
+}
+
 /* ---------- loading and switching trips ---------- */
 
 async function openRecord(rec){
   S.rec = rec || null;
-  S.state = {done: {}, plans: {}};
+  S.state = {done: {}, skipped: {}, plans: {}};
   if(rec){
     const saved = await store.getKV("state:" + rec.id);
-    if(saved && typeof saved === "object") S.state = {done: saved.done || {}, plans: saved.plans || {}};
+    if(saved && typeof saved === "object") S.state = {done: saved.done || {}, skipped: saved.skipped || {}, plans: saved.plans || {}};
     await store.setKV("active", rec.id);
   }else{
     await store.delKV("active");
   }
-  setLang(rec ? (rec.trip.lang || deviceLang()) : deviceLang());
+  S.openStops.clear();
+  applyLang();
   document.title = rec ? rec.trip.title : "Travel in my pocket";
   applyPlaceColors();
 }
@@ -171,6 +182,12 @@ function installSteps(){
   return `<section class="sec"><h2>${esc(t("installTitle"))}</h2><ol class="steps"><li>${rich(t("installIos"))}</li><li>${rich(t("installAndroid"))}</li><li>${rich(t("installOnce"))}</li></ol></section>`;
 }
 
+function langPicker(){
+  const options = [["auto", t("langAuto")], ...Object.entries(LANGS)];
+  return `<section class="sec"><h2>${esc(t("language"))}</h2><div class="seg" role="group" aria-label="${esc(t("language"))}">${options.map(([id, name]) =>
+    `<button type="button" data-lang="${esc(id)}" aria-pressed="${S.langPref === id}">${esc(name)}</button>`).join("")}</div></section>`;
+}
+
 function renderWelcome(){
   return `
   <section class="hero">
@@ -185,6 +202,7 @@ function renderWelcome(){
     <button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>
   </div>
   ${installSteps()}
+  ${langPicker()}
   ${REPO_URL ? `<p class="foot"><a href="${esc(REPO_URL)}#create-your-own-trip" target="_blank" rel="noopener">${esc(t("makeYourOwn"))} ↗</a></p>` : ""}
   ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}`;
 }
@@ -217,6 +235,7 @@ function renderTrips(){
       <div class="actions"><button type="submit" class="btn small">${esc(t("save"))}</button></div>
     </form>
   </section>
+  ${langPicker()}
   ${installSteps()}
   <section class="sec"><h2>${esc(t("about"))}</h2>
     <p class="foot">Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
@@ -258,7 +277,7 @@ function effectiveView(hasImages){
   return v;
 }
 
-function mapPanel(zs, color, numbered, imgs, view){
+function mapPanel(zs, color, numbered, imgs, view, gone){
   const zoneLink = z => {
     const real = z.pts.filter(p => !p.ref);
     return `<a class="maplink" href="${esc(real.length < 2 ? mapsUrl(real[0].q) : routeUrl(z))}" target="_blank" rel="noopener">${esc(real.length < 2 ? t("mapLink") : t("openInMaps"))}</a>`;
@@ -296,7 +315,7 @@ function mapPanel(zs, color, numbered, imgs, view){
       o += `<p class="off"><span class="mb">${real[0].nums.join("·")}</span><span>${esc(real[0].name)} · ${esc(t("offSketch"))}</span>${zoneLink(z)}</p>`;
       return;
     }
-    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z))}<ol class="mlegend">${real.map(p => `<li><span class="mb">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
+    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone)}<ol class="mlegend">${real.map(p => `<li><span class="mb">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
   });
   const credit = view === "image" ? imgs.map(im => im.credit).filter(Boolean)[0] : "";
   const foot = view === "image"
@@ -307,16 +326,31 @@ function mapPanel(zs, color, numbered, imgs, view){
 
 const stopKey = (day, planId, s, i) => `${day.date}|${planId || ""}|${s.id || "#" + i}`;
 
+const isOpen = id => S.openStops.has(id) ? S.openStops.get(id) : S.ui.expandAll;
+
 function stopsHTML(day, planId, list, numbered, pins){
   return `<ol class="stops" style="--c:${placeVar(day.place)}">` + list.map((s, i) => {
     const id = stopKey(day, planId, s, i);
-    const isDone = !!S.state.done[id];
+    const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id], open = isOpen(id);
     const q = stopQuery(s);
-    const meta = (s.tag || q) ? `<div class="meta">${s.tag ? `<span class="tag">${esc(s.tag)}</span>` : ""}${q ? `<a class="maplink" href="${esc(mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a><a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : ""}</div>` : "";
+    // Links and the skip button stay outside the part that folds: they are always one tap away.
+    const meta = `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${s.tag ? `<span class="tag">${esc(s.tag)}</span>` : ""}` +
+      (q ? `<a class="maplink" href="${esc(mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a><a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
+      (isDone ? "" : `<button type="button" class="skip" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`) + `</div>`;
     const pn = pins ? pins[s.mapLabel || s.title] : (numbered && s.lat !== undefined ? i + 1 : 0);
     const nb = pn ? `<br><span class="nb">${pn}</span>` : "";
-    return `<li class="stop${isDone ? " done" : ""}"><div class="time">${esc(s.time)}${nb}</div><div class="body"><h3>${esc(s.title)}</h3>${s.text ? `<p>${rich(s.text)}</p>` : ""}${meta}</div><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button></li>`;
+    const head = s.text
+      ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}"><div class="h"><h3>${esc(s.title)}</h3><span class="chev">${CHEVRON}</span></div><p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p></div>`
+      : `<h3>${esc(s.title)}</h3>`;
+    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}"><div class="time">${esc(s.time)}${nb}</div><div class="body">${head}${meta}</div><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button></li>`;
   }).join("") + `</ol>`;
+}
+
+// Shows the little arrow only on descriptions that are really cut short.
+function markCut(){
+  document.querySelectorAll(".stop:not(.open) .desc").forEach(p => {
+    p.closest(".stop").classList.toggle("cut", p.scrollHeight - p.clientHeight > 1);
+  });
 }
 
 // Returns the page and, when the interactive map is showing, what it must display.
@@ -327,7 +361,12 @@ function renderDay(i){
   const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
   const list = plan ? plan.stops : d.stops;
   const pid = plan ? plan.id : null;
-  const doneCount = list.filter((s, k) => S.state.done[stopKey(d, pid, s, k)]).length;
+  const keys = list.map((s, k) => stopKey(d, pid, s, k));
+  const doneCount = keys.filter(k => S.state.done[k]).length;
+  const skipCount = keys.filter(k => !S.state.done[k] && S.state.skipped[k]).length;
+  // For the map: is the stop at this position in the list done or skipped?
+  const gone = k => k >= 0 && !!(S.state.done[keys[k]] || S.state.skipped[keys[k]]);
+  const anyText = list.some(s => s.text);
   const stay = d.stay ? tr.stays[d.stay] : null;
   const zs = zonesOf(d, plan, list);
   const imgs = zs.length ? imagesOf(d, pid) : null;
@@ -363,14 +402,17 @@ function renderDay(i){
     <h1>${esc(d.title)}</h1>
     <div class="sleep">${stay
       ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span><a class="maplink" href="${esc(mapsUrl(stay.query || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>`
-      : (d.stayText ? `<span>${esc(t("night"))} · <b>${esc(d.stayText)}</b></span>` : "")}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}</span></div>
-    ${zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : ""}
+      : (d.stayText ? `<span>${esc(t("night"))} · <b>${esc(d.stayText)}</b></span>` : "")}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}</span></div>
+    ${zs.length || anyText ? `<div class="tools">` +
+      (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
+      (anyText ? `<button type="button" class="iconbtn" data-expand aria-pressed="${S.ui.expandAll}" aria-label="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}" title="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}">${S.ui.expandAll ? FOLD : UNFOLD}</button>` : "") +
+      `</div>` : ""}
   </div>`;
 
   let wanted = null;
   if(S.ui.mapOpen && zs.length){
-    html += mapPanel(zs, color, numbered, imgs, view);
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey()].join("|"), zones: zs, color: place.color};
+    html += mapPanel(zs, color, numbered, imgs, view, gone);
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang].join("|"), zones: zs, color: place.color, gone};
   }
   if(d.reminders) html += d.reminders.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
   if(d.plans){
@@ -395,6 +437,7 @@ function syncLive(wanted){
   }
   slot.appendChild(live.handle.el);
   live.handle.refresh();
+  live.handle.setMarks(wanted.gone);
 }
 
 function render(){
@@ -407,6 +450,7 @@ function render(){
   else if(r.name === "info") $app.innerHTML = renderInfo();
   else { const out = renderDay(r.i); $app.innerHTML = out.html; wanted = out.wanted; }
   syncLive(wanted);
+  markCut();
 }
 
 /* ---------- events ---------- */
@@ -420,10 +464,39 @@ $app.addEventListener("click", e => {
   const tick = e.target.closest("[data-tick]");
   if(tick){
     const id = tick.dataset.tick;
-    if(S.state.done[id]) delete S.state.done[id]; else S.state.done[id] = 1;
+    if(S.state.done[id]) delete S.state.done[id];
+    else { S.state.done[id] = 1; delete S.state.skipped[id]; }
     saveState();
     render();
     refocus(`[data-tick="${CSS.escape(id)}"]`);
+    return;
+  }
+  const skip = e.target.closest("[data-skip]");
+  if(skip){
+    const id = skip.dataset.skip;
+    if(S.state.skipped[id]) delete S.state.skipped[id]; else S.state.skipped[id] = 1;
+    saveState();
+    render();
+    refocus(`[data-skip="${CSS.escape(id)}"]`);
+    return;
+  }
+  const tap = e.target.closest("[data-open]");
+  if(tap){ toggleStop(tap.dataset.open); return; }
+  if(e.target.closest("[data-expand]")){
+    S.ui.expandAll = !S.ui.expandAll;
+    S.openStops.clear();
+    saveUi();
+    render();
+    refocus("[data-expand]");
+    return;
+  }
+  const langBtn = e.target.closest("[data-lang]");
+  if(langBtn){
+    S.langPref = langBtn.dataset.lang;
+    (S.langPref === "auto" ? store.delKV("lang") : store.setKV("lang", S.langPref)).catch(() => {});
+    applyLang();
+    render();
+    refocus(`[data-lang="${CSS.escape(S.langPref)}"]`);
     return;
   }
   if(e.target.closest("[data-map]")){
@@ -465,6 +538,21 @@ $app.addEventListener("click", e => {
   }
 });
 
+function toggleStop(id){
+  S.openStops.set(id, !isOpen(id));
+  render();
+  refocus(`[data-open="${CSS.escape(id)}"]`);
+}
+
+// The description is a button for the keyboard too.
+$app.addEventListener("keydown", e => {
+  if(e.key !== "Enter" && e.key !== " ") return;
+  const tap = e.target.closest && e.target.closest("[data-open]");
+  if(!tap || e.target !== tap) return;
+  e.preventDefault();
+  toggleStop(tap.dataset.open);
+});
+
 $app.addEventListener("submit", e => {
   const form = e.target.closest('[data-form="key"]');
   if(!form) return;
@@ -485,6 +573,7 @@ $file.addEventListener("change", async () => {
 });
 
 window.addEventListener("hashchange", () => { S.importError = null; render(); window.scrollTo(0, 0); });
+window.addEventListener("resize", markCut);
 window.addEventListener("online", () => { S.online = true; render(); });
 window.addEventListener("offline", () => { S.online = false; render(); });
 
@@ -521,10 +610,10 @@ async function readVersion(){
 /* ---------- start ---------- */
 
 async function start(){
-  setLang(deviceLang());
-  const [records, activeId, ui, key] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey")]);
+  const [records, activeId, ui, key, lang] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang")]);
+  if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);
-  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ["live", "image", "schema"].includes(ui.mapView) ? ui.mapView : "live"};
+  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ["live", "image", "schema"].includes(ui.mapView) ? ui.mapView : "live", expandAll: !!ui.expandAll};
   if(typeof key === "string") S.deviceKey = key;
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);
   await readVersion();

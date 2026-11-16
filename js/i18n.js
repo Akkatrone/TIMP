@@ -1,6 +1,9 @@
 // Interface strings. The trip's own texts come from the trip file.
 // To add a language: copy the "en" block, translate it, add it to STRINGS.
 
+// Languages the interface can be shown in, by their own name.
+export const LANGS = {en: "English", it: "Italiano"};
+
 export const STRINGS = {
   en: {
     tagline: "A pocket travel guide that works without internet.",
@@ -28,8 +31,11 @@ export const STRINGS = {
     mapLoading: "Loading the map…",
     mapFailed: "The map could not be loaded. Use the sketch, or try again with a connection.",
     googleKeyBad: "Google Maps refused the key for this site: showing OpenStreetMap instead.",
-    footDay: "Times are indicative. Tap the circle to mark a stop as done: it is saved on this phone.",
+    footDay: "Times are indicative. Tap a description to read it all. Tap the circle to mark a stop as done, or «Skip» if you leave it out: both are saved on this phone.",
     markDone: "Mark as done", markUndone: "Mark as not done",
+    skip: "Skip", unskip: "Restore", skipped: "Skipped", skippedOne: "1 skipped", skippedCount: "{n} skipped",
+    expandAll: "Show all descriptions in full", collapseAll: "Shorten all descriptions",
+    language: "Language", langAuto: "Automatic",
     whereYouSleep: "Where you sleep",
     yourTrips: "Your trips", current: "open", open: "Open", remove: "Delete",
     updateTrip: "Load or update a trip",
@@ -74,8 +80,11 @@ export const STRINGS = {
     mapLoading: "Carico la mappa…",
     mapFailed: "Non sono riuscito a caricare la mappa. Usa lo schema, o riprova con la rete.",
     googleKeyBad: "Google Maps ha rifiutato la chiave per questo sito: uso OpenStreetMap.",
-    footDay: "Gli orari sono indicativi. Toccate il cerchio per segnare una tappa fatta: resta salvato su questo telefono.",
+    footDay: "Gli orari sono indicativi. Toccate una descrizione per leggerla tutta. Toccate il cerchio per segnare una tappa fatta, o «Salta» se la lasciate fuori: resta salvato su questo telefono.",
     markDone: "Segna come fatta", markUndone: "Segna come da fare",
+    skip: "Salta", unskip: "Ripristina", skipped: "Saltata", skippedOne: "1 saltata", skippedCount: "{n} saltate",
+    expandAll: "Mostra tutte le descrizioni per intero", collapseAll: "Accorcia tutte le descrizioni",
+    language: "Lingua", langAuto: "Automatica",
     whereYouSleep: "Dove dormite",
     yourTrips: "I tuoi viaggi", current: "aperto", open: "Apri", remove: "Elimina",
     updateTrip: "Carica o aggiorna un viaggio",

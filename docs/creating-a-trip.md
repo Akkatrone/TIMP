@@ -80,10 +80,11 @@ For each stop:
 - `title`: the name of the place as written on maps and signs.
 - `text`: one to three sentences, in this order of usefulness: how to get there from
   the previous stop (line, direction, minutes), price and opening hours, what to
-  look at, one tip. Write in the travellers' language and tone.
+  look at, one tip. The app shows only the first two lines until the traveller taps,
+  so put what matters most first. Write in the travellers' language and tone.
 - `tag`: "Booking needed", "Ticket needed", "Optional", in the trip's language.
 - `id`: a short slug (`colosseum`). Always set it: it is how the app remembers that
-  the stop was ticked when the file is updated later.
+  the stop was ticked or skipped when the file is updated later.
 - `query`: the name plus the city, as someone would type it into Google Maps
   ("Colosseum Rome"). It drives the "Map" and "Directions" links.
 - `mapLabel`: when the title is an action and not a place ("Check-out" → the hotel name).
@@ -150,7 +151,7 @@ Tell the travellers, briefly:
 
 ## Updating a file later
 
-- Keep the trip `id`: the app then replaces the trip and keeps the ticked stops.
+- Keep the trip `id`: the app then replaces the trip and keeps the ticked and skipped stops.
 - Keep the `id` of every stop that still exists, even if it is renamed or moved.
 - Change only what was asked. Do not rewrite texts nobody mentioned.
 - Check the file again.

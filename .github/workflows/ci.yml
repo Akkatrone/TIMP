@@ -25,5 +25,10 @@ jobs:
         run: npm run check
       - name: Tests
         run: npm test
+      - name: In a browser
+        # The runner image ships Google Chrome. No connection is needed: map tiles are not checked here.
+        env:
+          CHROME: google-chrome
+        run: npm run e2e
       - name: Build
         run: node tools/build.mjs --out _site
