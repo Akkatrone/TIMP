@@ -63,6 +63,8 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/store.js` | IndexedDB storage, with a memory fallback. |
 | `js/i18n.js` | Interface texts, every language. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
+| `js/icons.js` | Icons for metro, train, plane, boat. No DOM. |
+| `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `sw.js` | Service worker: offline copy of the app. |
 | `tools/`, `test/` | Checks, build, tests. `tools/e2e.mjs` drives a real browser. |
 | `vendor/` | Third-party code, unmodified. Do not edit. |

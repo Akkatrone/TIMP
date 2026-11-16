@@ -13,8 +13,8 @@ the app can be public and open source while your hotels and dates stay private.
 
 <p align="center">
   <img src="docs/screenshots/programme.png" width="24%" alt="The programme of a day: one stop done, one skipped, descriptions folded to two lines">
-  <img src="docs/screenshots/map.png" width="24%" alt="The interactive map of the day: numbered pins, the route, the stops already behind you dashed">
-  <img src="docs/screenshots/sketch.png" width="24%" alt="The sketch to scale that replaces the map offline">
+  <img src="docs/screenshots/map.png" width="24%" alt="The interactive map of the day: numbered pins, the route with train and ferry icons, the stops already behind you dashed">
+  <img src="docs/screenshots/sketch.png" width="24%" alt="The sketch to scale that replaces the map offline, with the same icons">
   <img src="docs/screenshots/plans-dark.png" width="24%" alt="A day with two alternative plans, in the dark theme">
 </p>
 
@@ -23,6 +23,7 @@ Retake them with <code>node tools/screenshots.mjs</code>.</sub></p>
 
 - Day-by-day programme: times, descriptions, reminders, alternative plans for a day.
 - Short descriptions: two lines each, tap one to read it all, or open them all at once.
+- Metro, train, plane and boat at a glance: an icon next to the stop and on the map.
 - Tick the stops you have done, or skip the ones you leave out. The app remembers both.
 - A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
   a sketch to scale when you are not. What is behind you is drawn dashed.
@@ -30,6 +31,7 @@ Retake them with <code>node tools/screenshots.mjs</code>.</sub></p>
 - An Info page for hotels, phone numbers, money, useful phrases.
 - Works on iPhone and Android. Installs on the Home Screen, no app store.
 - Interface in English and Italian: it follows the trip file, or the language you choose.
+- Light and dark theme: it follows the phone, or the one you choose. Maps follow it too.
 
 ## Use it
 
@@ -128,7 +130,13 @@ about $7 per 1,000 beyond that (figures from November 2026: check the
 A group of travellers uses a few hundred, and the daily limit of step 6 keeps it at zero.
 
 If Google refuses the key (wrong site, quota reached), the app says so and shows
-OpenStreetMap instead. A key can also be saved on a single device from the Trips page.
+OpenStreetMap instead.
+
+On each device, the Trips page shows which map is in use and lets you:
+
+- save a key that applies to every trip on that device, in place of the trip's key;
+- turn Google Maps off and use OpenStreetMap even when a key is present, to save
+  map loads when you do not need Google's map.
 
 What the map cannot do: Google does not allow its maps to be saved for offline use, so
 without a connection the app shows the sketch. Lines between stops are straight; for

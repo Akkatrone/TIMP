@@ -10,3 +10,6 @@ node_modules/
 /dist/
 /_site/
 /.build-test-*/
+
+# Local working notes
+/plan.md

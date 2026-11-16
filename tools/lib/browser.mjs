@@ -104,7 +104,8 @@ export async function withApp(work){
     const until = async (what, condition, ms = 20000) => {
       const end = Date.now() + ms;
       while(Date.now() < end){
-        if(await run(`return !!(${condition});`)) return;
+        // While the page reloads there is nothing to ask: try again.
+        try{ if(await run(`return !!(${condition});`)) return; }catch(e){}
         await new Promise(r => setTimeout(r, 100));
       }
       throw new Error("timed out waiting for: " + what);

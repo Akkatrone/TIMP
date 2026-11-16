@@ -32,8 +32,10 @@ await withApp(async ({run, until, theme, capture}) => {
   await run(`document.querySelectorAll("[data-tick]")[0].click(); document.querySelectorAll("[data-skip]")[0].click(); document.querySelectorAll("[data-open]")[2].click(); scrollTo(0, 0);`);
   await shoot("programme.png");
 
-  // 2. The interactive map: the legs already travelled are dashed.
-  await run(`document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+  // 2. The interactive map of day 2: train and ferry icons, two stops behind you dashed.
+  await run(`location.hash = "#day-2";`);
+  await until("day 2", `document.querySelectorAll(".stop").length === 7`);
+  await run(`for(const i of [0, 1]) document.querySelectorAll("[data-tick]")[i].click(); document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
   await until("the map tiles", `document.querySelectorAll(".leaflet-tile").length > 0 && document.querySelectorAll(".leaflet-tile").length === document.querySelectorAll(".leaflet-tile-loaded").length`, 40000);
   await run(scrollToTitle);
   await new Promise(r => setTimeout(r, 600)); // tiles fade in

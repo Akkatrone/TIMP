@@ -4,7 +4,9 @@ import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { esc, rich, stopQuery, dateParts, mapsUrl } from "../js/util.js";
-import { zonesOf, routeUrl, zoneSVG, distKm, legsOf, pinGone } from "../js/geo.js";
+import { zonesOf, routeUrl, zoneSVG, distKm, legsOf, bridgesOf, pinGone } from "../js/geo.js";
+import { TRAVEL as TRAVEL_ICONS } from "../js/icons.js";
+import { TRAVEL as TRAVEL_FORMAT } from "../js/trip.js";
 import { STRINGS } from "../js/i18n.js";
 import { ROOT, precacheList, readSw } from "../tools/lib/app-files.mjs";
 
@@ -85,6 +87,30 @@ test("each leg of the route knows the stop it arrives at", () => {
   assert.deepEqual(legsOf(zone).map(l => [l.from.name, l.to.name, l.idx]), [["Hotel", "Forum", 1], ["Forum", "Pantheon", 3], ["Pantheon", "Hotel", 4]]);
 });
 
+test("travel marks the leg that arrives at a stop, or the one a journey without a pin spans", () => {
+  const list = [
+    stop("Hotel", 41.9, 12.5),
+    stop("Colosseum", 41.8902, 12.4922, {travel: "metro"}),
+    stop("Forum", 41.8925, 12.4853),
+    {time: "14:00", title: "Train to Florence", travel: "train"},
+    {time: "16:00", title: "Coffee"},
+    stop("Duomo", 43.7731, 11.256),
+    stop("Ferry", 43.7712, 11.2531, {travel: "boat"})
+  ];
+  const zones = zonesOf({}, null, list);
+  assert.equal(zones.length, 2);
+  assert.deepEqual(legsOf(zones[0]).map(l => [l.to.name, l.travel]), [["Colosseum", "metro"], ["Forum", null]]);
+  assert.deepEqual(bridgesOf(zones).map(b => [b.from.name, b.to.name, b.idx, b.travel]), [["Forum", "Duomo", 5, "train"]]);
+  assert.deepEqual(legsOf(zones[1]).map(l => [l.to.name, l.travel]), [["Ferry", "boat"]]);
+});
+
+test("the sketch shows how a leg is travelled", () => {
+  const [zone] = zonesOf({}, null, [stop("A", 41.9, 12.5), stop("B", 41.91, 12.51, {travel: "metro"})]);
+  const svg = zoneSVG(zone, "x");
+  assert.equal((svg.match(/class="tv"/g) || []).length, 1);
+  assert.ok(zoneSVG(zone, "x", i => i === 1).includes('class="tv gone"'));
+});
+
 test("a pin is behind you only when every stop it stands for is done or skipped", () => {
   const list = [stop("Hotel", 41.9, 12.5), stop("Forum", 41.8925, 12.4853), stop("Back", 41.9, 12.5, {mapLabel: "Hotel"})];
   const [zone] = zonesOf({}, null, list);
@@ -117,6 +143,11 @@ test("the sketch escapes names and draws one badge per pin", () => {
   assert.ok(svg.includes("&lt;b&gt;&quot;ref&quot;&lt;/b&gt;"));
   assert.ok(svg.includes(`aria-label="Zone &quot;one&quot;"`));
   assert.ok(!svg.includes("<b>"));
+});
+
+test("every way of travelling has an icon and a name", () => {
+  assert.deepEqual(TRAVEL_ICONS, TRAVEL_FORMAT);
+  for(const mode of TRAVEL_FORMAT) assert.ok(STRINGS.en["travel_" + mode], mode);
 });
 
 /* ---------- interface texts ---------- */

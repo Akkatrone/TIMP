@@ -69,6 +69,12 @@ test("coordinates come in pairs and inside the globe", () => {
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].lng = "12.49"; }), "stops[0].lng"));
 });
 
+test("travel is one of the four ways the app can draw", () => {
+  assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].travel = "train"; }), []);
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "bus"; }), "stops[0].travel"));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "Train"; }), "stops[0].travel"));
+});
+
 test("stop ids are unique within a list", () => {
   const errors = errorsAfter(t => { t.days[0].stops = [{id: "a", time: "1", title: "A"}, {id: "a", time: "2", title: "B"}]; });
   assert.ok(hasError(errors, "used twice"));

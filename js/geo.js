@@ -1,6 +1,7 @@
 // Groups the stops of a day into map zones and draws the offline sketch.
 
 import { esc, mapsUrl } from "./util.js";
+import { travelGlyph } from "./icons.js";
 
 function kmXY(ll, lat0){ return [ll[1] * 111.32 * Math.cos(lat0 * Math.PI / 180), -ll[0] * 110.57]; }
 export function distKm(a, b){
@@ -14,7 +15,13 @@ const f1 = v => Math.round(v * 10) / 10;
  * Each point: {nums, name, ll: [lat, lng], q, ref, items: [{n, idx, time, title}]}
  * zone.path lists the points in visiting order (a point can repeat), and
  * zone.pathIdx the position in the day's list of the stop behind each of them
- * (-1 when the map is drawn from mapZones, whose points are not stops).
+ * (-1 when the map is drawn from mapZones, whose points are not stops), and
+ * zone.pathTravel how each of them is reached: "metro", "train", "plane", "boat" or null.
+ *
+ * `travel` on a stop says how you reach it, like its description does: the leg that
+ * arrives at it is travelled that way. A stop without a pin that is the journey itself
+ * ("Train to Kyoto") marks the leg from the previous pin to the next one.
+ * zone.enter, when set, is the jump from the previous zone: {from, idx, travel}.
  */
 export function zonesOf(day, plan, list){
   if(day.mapZones){
@@ -25,22 +32,32 @@ export function zonesOf(day, plan, list){
         return {nums: n ? [n] : [], name: p.name, ll: [p.lat, p.lng], q: p.query || p.name, ref: !!p.reference, items: n ? [{n, idx: -1, time: "", title: p.name}] : []};
       });
       const path = pts.filter(p => !p.ref);
-      return {name: z.name || "", pts, path, pathIdx: path.map(() => -1)};
+      return {name: z.name || "", pts, path, pathIdx: path.map(() => -1), pathTravel: path.map(() => null), enter: null};
     });
   }
   const split = day.mapSplitKm || 12, zones = [];
-  let cur = null, prev = null;
+  let cur = null, prev = null, prevPt = null, travel = null;
   list.forEach((s, i) => {
-    if(s.lat === undefined) return;
+    if(s.lat === undefined){
+      if(s.travel) travel = s.travel;
+      return;
+    }
     const ll = [s.lat, s.lng];
-    if(!cur || distKm(prev, ll) > split){ cur = {pts: [], path: [], pathIdx: []}; zones.push(cur); }
+    const arriving = s.travel || travel;
+    travel = null;
+    if(!cur || distKm(prev, ll) > split){
+      cur = {pts: [], path: [], pathIdx: [], pathTravel: [], enter: prevPt ? {from: prevPt, idx: i, travel: arriving} : null};
+      zones.push(cur);
+    }
     let pt = cur.pts.find(p => distKm(p.ll, ll) < 0.03);
     if(!pt){ pt = {nums: [], name: s.mapLabel || s.title, ll, q: s.query || s.mapLabel || s.title, ref: false, items: []}; cur.pts.push(pt); }
     pt.nums.push(i + 1);
     pt.items.push({n: i + 1, idx: i, time: s.time, title: s.title});
     cur.path.push(pt);
     cur.pathIdx.push(i);
+    cur.pathTravel.push(cur.path.length > 1 ? arriving : null);
     prev = ll;
+    prevPt = pt;
   });
   const names = (plan && plan.zoneNames) || day.zoneNames || [];
   zones.forEach((z, i) => { z.name = names[i] || ""; });
@@ -61,14 +78,22 @@ export function routeUrl(z){
 }
 
 // The legs of a zone's route: from each point of the path to the next one.
-// `idx` is the stop the leg arrives at, so a leg can be drawn as already travelled.
+// `idx` is the stop the leg arrives at, so a leg can be drawn as already travelled;
+// `travel` is how it is travelled, or null.
 export function legsOf(z){
   const legs = [];
   for(let j = 1; j < z.path.length; j++){
-    if(z.path[j] !== z.path[j - 1]) legs.push({from: z.path[j - 1], to: z.path[j], idx: z.pathIdx[j]});
+    if(z.path[j] !== z.path[j - 1]) legs.push({from: z.path[j - 1], to: z.path[j], idx: z.pathIdx[j], travel: z.pathTravel[j] || null});
   }
   return legs;
 }
+
+// The jumps between consecutive zones of a day, shaped like legs.
+export function bridgesOf(zones){
+  return zones.filter(z => z.enter).map(z => ({from: z.enter.from, to: z.path[0], idx: z.enter.idx, travel: z.enter.travel}));
+}
+
+export const midpoint = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 
 // A pin is behind you when every stop it stands for is done or skipped.
 // Points drawn from mapZones (idx -1) are not stops, so they are never behind you.
@@ -105,9 +130,16 @@ export function zoneSVG(z, label, gone = () => false){
     B.forEach(b => { b[0] = Math.min(W - 16, Math.max(16, b[0])); b[1] = Math.min(H - 13, Math.max(13, b[1])); });
   }
   let o = `<svg class="mapsvg" viewBox="0 0 ${W} ${H + FOOT}" role="img" aria-label="${esc(label)}">`;
-  legsOf(z).forEach(leg => {
+  const legs = legsOf(z);
+  legs.forEach(leg => {
     const a = P[pts.indexOf(leg.from)], b = P[pts.indexOf(leg.to)];
     o += `<path class="route${legGone(leg, gone) ? " gone" : ""}" d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}"/>`;
+  });
+  // How a leg is travelled: an icon in the middle of it, under the numbered badges.
+  legs.filter(leg => leg.travel).forEach(leg => {
+    const a = P[pts.indexOf(leg.from)], b = P[pts.indexOf(leg.to)];
+    const [x, y] = midpoint(a, b), g = legGone(leg, gone) ? " gone" : "";
+    o += `<g class="tv${g}"><circle class="tvbg" cx="${f1(x)}" cy="${f1(y)}" r="9"/>${travelGlyph(leg.travel, x, y, 12)}</g>`;
   });
   pts.forEach((p, i) => {
     const c = P[i];

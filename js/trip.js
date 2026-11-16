@@ -3,6 +3,9 @@
 
 export const FORMAT = "travel-in-my-pocket/1";
 
+// How a stop can be travelled. Keep in step with js/icons.js and docs/trip-format.md.
+export const TRAVEL = ["metro", "train", "plane", "boat"];
+
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -89,6 +92,7 @@ export function validateTrip(trip){
       reqStr(s, "time", p);
       reqStr(s, "title", p);
       ["text", "mapLabel", "query", "tag"].forEach(k => optStr(s, k, p));
+      if(s.travel !== undefined && !TRAVEL.includes(s.travel)) err(`${p}.travel`, `must be one of ${TRAVEL.map(x => `"${x}"`).join(", ")}`);
       if(s.id !== undefined){
         if(!isStr(s.id) || !ID.test(s.id)) err(`${p}.id`, "must use lowercase letters, digits and dashes");
         else if(ids.has(s.id)) err(`${p}.id`, `"${s.id}" is used twice in this list`);
@@ -99,7 +103,7 @@ export function validateTrip(trip){
       if(hasLat && (!isNum(s.lat) || s.lat < -90 || s.lat > 90)) err(`${p}.lat`, "must be a number between -90 and 90");
       if(hasLng && (!isNum(s.lng) || s.lng < -180 || s.lng > 180)) err(`${p}.lng`, "must be a number between -180 and 180");
       if(!hasLat && s.mapLabel !== undefined) warn(`${p}.mapLabel`, "has no effect without lat/lng");
-      known(s, ["id", "time", "title", "text", "lat", "lng", "mapLabel", "query", "tag"], p);
+      known(s, ["id", "time", "title", "text", "lat", "lng", "mapLabel", "query", "tag", "travel"], p);
     });
   };
 

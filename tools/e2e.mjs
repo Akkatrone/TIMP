@@ -117,6 +117,109 @@ await withApp(async ({run, until, reload}) => {
     assert.equal(await run(`return document.documentElement.lang;`), "en");
   });
 
+  await step("stops reached by metro, train, plane or boat show it, in the list and on both maps", async () => {
+    await run(`location.hash = "#day-2";`);
+    await until("day 2", `document.querySelectorAll(".stop").length === 7`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .tvchip")].map(e => e.getAttribute("aria-label"));`), ["Train", "Boat"]);
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="schema"]').click();`);
+    await until("the sketch", `document.querySelector(".mapsvg")`);
+    assert.equal(await count(".mapsvg .tv"), 2);
+    await click('[data-view="live"]');
+    await until("the map", `document.querySelectorAll(".live .tvpin").length === 2`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".live .tvpin")].map(e => e.getAttribute("aria-label")).sort();`), ["Boat", "Train"]);
+    await click("[data-map]");
+  });
+
+  await step("a journey without a pin shows its icon in the list", async () => {
+    await run(`location.hash = "#day-3";`);
+    await until("day 3", `document.querySelector('[data-plan="cascais"]')`);
+    await click('[data-plan="cascais"]');
+    assert.equal(await run(`return document.querySelector(".stop .tvchip").getAttribute("aria-label");`), "Train");
+    await click('[data-plan="sintra"]');
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelectorAll(".stop").length === 6`);
+  });
+
+  await step("the dark theme can be chosen, survives a reload, and darkens the map", async () => {
+    const bg = () => run(`return getComputedStyle(document.body).backgroundColor;`);
+    const light = await bg();
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-theme-choice="dark"]')`);
+    await click('[data-theme-choice="dark"]');
+    assert.equal(await run(`return document.documentElement.dataset.theme;`), "dark");
+    const dark = await bg();
+    assert.notEqual(dark, light);
+    await reload();
+    assert.equal(await run(`return document.documentElement.dataset.theme;`), "dark");
+    assert.equal(await bg(), dark);
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector("[data-map]")`);
+    await run(`document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    await until("a dark map", `document.querySelector(".live.dark .leaflet-container")`);
+    await click("[data-map]");
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-theme-choice="auto"]')`);
+    await click('[data-theme-choice="auto"]');
+    assert.equal(await run(`return document.documentElement.dataset.theme === undefined;`), true);
+    assert.equal(await bg(), light);
+  });
+
+  await step("a changed Google key is applied, a refused one falls back, Google can be turned off", async () => {
+    // Needs a connection to Google, which refuses these invented keys.
+    const KEY_A = "invented-test-key-one", KEY_B = "invented-test-key-two";
+    // The keys of the Google scripts the app added (Google then adds its own, without a key).
+    const googleScripts = `[...document.querySelectorAll('script[src*="maps.googleapis.com/maps/api/js"]')].map(s => new URL(s.src).searchParams.get("key")).filter(Boolean)`;
+    const status = () => run(`return document.querySelector("[data-map-status]").dataset.mapStatus;`);
+    const saveKey = async key => run(`document.getElementById("gkey").value = ${JSON.stringify(key)}; document.querySelector('[data-form="key"]').requestSubmit();`);
+    const openLiveMap = async () => {
+      await run(`location.hash = "#day-1";`);
+      await until("day 1", `document.querySelector("[data-map]")`);
+      await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    };
+
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.getElementById("gkey")`);
+    assert.equal(await status(), "statusNoKey");
+    await saveKey(KEY_A);
+    await until("the new status", `document.querySelector('[data-map-status="statusGoogleDevice"]')`);
+
+    await openLiveMap();
+    await until("Google to refuse key A and the map to fall back", `document.querySelector(".live .leaflet-container")`, 30000);
+    assert.deepEqual(await run(`return ${googleScripts};`), [KEY_A]);
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector("[data-map-status]")`);
+    assert.equal(await status(), "statusRefused");
+
+    // The bug this guards against: the page kept using the first key it loaded.
+    await run(`window.__samePage = true;`);
+    await saveKey(KEY_B);
+    await until("a fresh page", `!window.__samePage && document.querySelector("[data-map-status]")`);
+    assert.equal(await status(), "statusGoogleDevice");
+    await openLiveMap();
+    await until("Google to refuse key B", `document.querySelector(".live .leaflet-container")`, 30000);
+    assert.deepEqual(await run(`return ${googleScripts};`), [KEY_B]);
+
+    // Turned off: no request to Google at all, even with a key.
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-provider="osm"]')`);
+    await click('[data-provider="osm"]');
+    await until("the status", `document.querySelector('[data-map-status="statusOsmChosen"]')`);
+    await reload();
+    await openLiveMap();
+    await until("OpenStreetMap", `document.querySelector(".live .leaflet-container")`);
+    assert.deepEqual(await run(`return ${googleScripts};`), []);
+
+    // Leave the device as it was.
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-provider="google"]')`);
+    await click('[data-provider="google"]');
+    await saveKey("");
+    await until("no key", `document.querySelector('[data-map-status="statusNoKey"]')`);
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector("[data-map]")`);
+    if(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded") === "true";`)) await click("[data-map]");
+  });
+
   await step("a hostile trip file cannot run code or add elements", async () => {
     const evil = {
       format: "travel-in-my-pocket/1", id: "evil", title: `<img src=x onerror="window.__pwned=1">`,

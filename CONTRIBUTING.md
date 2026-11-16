@@ -49,6 +49,8 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/store.js` | Storage on the device (IndexedDB, with a memory fallback). |
 | `js/i18n.js` | Interface texts. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
+| `js/icons.js` | Icons for metro, train, plane, boat. No DOM. |
+| `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `sw.js` | Service worker: keeps the app available offline. |
 | `tools/` | Command-line checks, the build used for publishing, the browser check and the screenshots. |
 | `test/` | Unit tests (`node:test`, no dependencies). |

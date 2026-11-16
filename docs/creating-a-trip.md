@@ -88,6 +88,12 @@ For each stop:
 - `query`: the name plus the city, as someone would type it into Google Maps
   ("Colosseum Rome"). It drives the "Map" and "Directions" links.
 - `mapLabel`: when the title is an action and not a place ("Check-out" → the hotel name).
+- `travel`: how the travellers reach this stop, when it is by metro, train, plane or
+  boat. It is what they see at a glance, in the list and on the map, so set it every
+  time the description says so ("JR to Yotsuya", "the ferry crosses in ten minutes").
+  Leave it out for walking and for anything else (bus, taxi, cable car): only these
+  four have an icon. For a journey that is a stop of its own without a place ("Train
+  to Kyoto", "Flight to Rome"), set it on that stop and give it no coordinates.
 
 ## 4. Coordinates
 

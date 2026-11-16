@@ -116,6 +116,7 @@ A list. Each entry is one date. Day 1 is the first entry.
 | `mapLabel` | no | Name used on the map when the title is not a place name (title `"Check-out"`, mapLabel `"Hotel Roma"`). |
 | `query` | no | What to search in Google Maps for the "Map" and "Directions" links. Use the name people would type, with the city. Without it, the coordinates are used. |
 | `tag` | no | A short label: `"Booking needed"`, `"Optional"`. |
+| `travel` | no | How you reach this stop: `"metro"`, `"train"`, `"plane"` or `"boat"`. Shown as an icon next to the title and on the map leg that arrives here. Leave it out when you walk, or for any other way (bus, taxi, cable car). See [How the map is built](#how-the-map-is-built). |
 | `id` | recommended | Lowercase letters, digits, dashes; unique within the list. The app uses it to remember that the stop was ticked or skipped. Without it, the position in the list is used, so reordering stops in an updated file would move the ticks. |
 
 ### Plans
@@ -150,6 +151,13 @@ Stops are grouped into **zones**. A new zone starts when a stop is more than
 `mapSplitKm` km from the previous one. A day in Lisbon is one zone; a day that starts in
 Lisbon and ends in Porto has two. Zones get their names from `zoneNames`, in order.
 Each zone has its own sketch and its own "Open in Google Maps" link with the whole route.
+
+**How legs are travelled.** A stop with `travel` marks the leg that arrives at it: the
+icon is drawn in the middle of that leg, on the interactive map and in the sketch. A
+stop without coordinates that is the journey itself ("Train to Kyoto", `travel: "train"`)
+marks the leg from the previous pin to the next one. When that leg jumps from one zone
+to the next (Hakone → Kyoto), the interactive map draws it as a thinner line, and the
+sketch writes it between the two zones: "Train · Odawara → Kyoto".
 
 ### `mapZones`
 
@@ -226,7 +234,9 @@ without doing anything. Keep these three things in mind:
 3. Never put a file with a key in a public repository.
 
 How to create the key is in the [README](../README.md#google-maps-optional).
-A key can also be saved on a single device from the Trips page of the app.
+On each device, the Trips page of the app can also save a key that takes the place
+of the trip's key, or turn Google Maps off and use OpenStreetMap even when a key is
+present.
 
 ## Checks the app makes
 

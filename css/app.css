@@ -8,13 +8,21 @@
   --f-mono:ui-monospace,SFMono-Regular,Menlo,"Roboto Mono",monospace;
   color-scheme:light;
 }
+/* Dark: when the phone is dark and no theme was chosen, or when "dark" was chosen.
+   Keep the two blocks identical. */
 @media (prefers-color-scheme: dark){
-  :root{
+  :root:not([data-theme="light"]){
     --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
     --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
     --err:#f39b92; --err-bg:#33201e;
     color-scheme:dark;
   }
+}
+:root[data-theme="dark"]{
+    --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
+    --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
+    --err:#f39b92; --err-bg:#33201e;
+    color-scheme:dark;
 }
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -105,6 +113,21 @@ ol.stops{list-style:none;margin:0;padding:0}
 .iconbtn{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
 .iconbtn svg{width:18px;height:18px}
 .iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+/* how a stop is travelled: metro, train, plane, boat */
+.tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink));margin-top:-1px}
+.tvchip svg{display:block}
+.tap .h,.body > .h{display:flex;align-items:flex-start;gap:8px}
+.h h3{flex:1 1 auto;min-width:0}
+.body > .h{margin-bottom:0}
+.stop.done .tvchip,.stop.skipped .tvchip{opacity:.5}
+.off.move{color:var(--ink);font-weight:500;align-items:center}
+.off.move.gone{opacity:.55}
+.mapsvg .tv{color:var(--c)}
+.mapsvg .tvbg{fill:var(--surface);stroke:var(--c);stroke-width:1.5}
+.mapsvg .tv.gone{opacity:.5}
+.mapsvg .tv.gone .tvbg{stroke-dasharray:3 3}
+.tvpin{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#fff;color:var(--pc,#15181b);border:2px solid var(--pc,#15181b);box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none}
+.tvpin.gone{border-style:dashed;opacity:.7;box-shadow:none}
 .alt{font-size:.88rem;color:var(--muted);margin:0}
 .alt b{color:var(--ink);font-weight:600}
 .nb{display:inline-block;margin-top:5px;font:600 .68rem var(--f-mono);border:1.5px solid var(--c,var(--line));border-radius:999px;padding:0 6px;color:var(--ink)}
@@ -158,6 +181,12 @@ ol.stops{list-style:none;margin:0;padding:0}
 .live .canvas{position:absolute;inset:0}
 .live .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:var(--muted);font-size:.88rem}
 .pin{position:absolute;transform:translate(-50%,-50%);font:600 12px/1 var(--f-body);color:#15181b;background:#fff;border:2.5px solid var(--pc,#15181b);border-radius:999px;padding:5px 7px;min-width:26px;text-align:center;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer}
+/* dark theme: OpenStreetMap tiles are darkened; pins stay light, they read well on it */
+.live.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
+.live.dark .leaflet-container{background:#1b1f23}
+/* the popup's title, when Google shows it in its own header */
+.pop-h{font:600 14px/1.3 var(--f-body);color:#15181b;padding-top:4px}
+.gm-style .gm-style-iw-d{overflow-x:hidden!important}
 .pin.gone{border-style:dashed;color:#5b636b;background:rgba(255,255,255,.9);box-shadow:none}
 .pin.ref{background:rgba(255,255,255,.85);border:0;border-radius:6px;font-weight:500;font-size:11px;box-shadow:none;cursor:default}
 .pinwrap{background:none;border:0}

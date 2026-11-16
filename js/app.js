@@ -3,7 +3,8 @@ import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
 import { esc, rich, mapsUrl, dirUrl, stopQuery, dateParts, todayIn } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG } from "./geo.js";
-import { createLiveMap } from "./livemap.js";
+import { travelIcon } from "./icons.js";
+import { createLiveMap, googleNeedsReload, googleRefusedKey } from "./livemap.js";
 import { REPO_URL } from "./config.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -17,8 +18,10 @@ const S = {
   state: {done: {}, skipped: {}, plans: {}},
   ui: {mapOpen: false, mapView: "live", expandAll: false},
   langPref: "auto",       // "auto" follows the trip, or a language chosen on this device
+  theme: document.documentElement.dataset.theme || "auto",   // set early by js/theme.js
   openStops: new Map(),   // descriptions opened or closed one by one, until the page is closed
   deviceKey: "",
+  useGoogle: true,        // false: always OpenStreetMap, even with a key (saves Google map loads)
   importError: null,      // {title, items}
   online: navigator.onLine !== false,
   version: ""
@@ -55,7 +58,17 @@ function toast(text, action){
 const trip = () => S.rec && S.rec.trip;
 const placeIndex = key => Object.keys(trip().places).indexOf(key);
 const placeVar = key => `var(--p${placeIndex(key)})`;
-const googleKey = () => (trip() && trip().map && trip().map.googleMapsKey) || S.deviceKey || "";
+// The key the interactive map uses: none if Google is turned off on this device;
+// otherwise the key saved on this device, which wins over the one in the trip file.
+const tripKey = () => (trip() && trip().map && trip().map.googleMapsKey) || "";
+const googleKey = () => S.useGoogle ? (S.deviceKey || tripKey()) : "";
+
+// After the key, the language or the trip changes: if Google's script is already in
+// the page with other settings, only a fresh page can apply the new ones.
+function applyMapSettings(){
+  if(googleNeedsReload(googleKey())){ location.reload(); return true; }
+  return false;
+}
 const saveState = () => { if(S.rec) store.setKV("state:" + S.rec.id, S.state).catch(() => {}); };
 const saveUi = () => { store.setKV("ui", S.ui).catch(() => {}); };
 
@@ -64,8 +77,10 @@ function applyPlaceColors(){
   if(!el){ el = document.createElement("style"); el.id = "place-colors"; document.head.appendChild(el); }
   if(!trip()){ el.textContent = ""; return; }
   const ps = Object.values(trip().places);
+  const dark = ps.map((p, i) => `--p${i}:${p.colorDark || p.color}`).join(";");
   el.textContent = `:root{${ps.map((p, i) => `--p${i}:${p.color}`).join(";")}}` +
-    `@media (prefers-color-scheme: dark){:root{${ps.map((p, i) => `--p${i}:${p.colorDark || p.color}`).join(";")}}}`;
+    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dark}}}` +
+    `:root[data-theme="dark"]{${dark}}`;
 }
 
 function todayIndex(){
@@ -83,6 +98,29 @@ function route(){
   if(m && +m[1] >= 1 && +m[1] <= trip().days.length) return {name: "day", i: +m[1] - 1};
   const ti = todayIndex();
   return {name: "day", i: ti >= 0 ? ti : 0};
+}
+
+/* ---------- theme ---------- */
+
+const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+const isDark = () => S.theme === "dark" || (S.theme === "auto" && !!darkQuery && darkQuery.matches);
+
+// "auto" follows the phone; "light" and "dark" are a choice made on this device.
+// The choice is kept in localStorage so js/theme.js can apply it before the page is drawn.
+function setTheme(value){
+  S.theme = value;
+  try{ value === "auto" ? localStorage.removeItem("timp-theme") : localStorage.setItem("timp-theme", value); }catch(e){}
+  if(value === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = value;
+  syncThemeColor();
+}
+
+// The colour of the phone's status bar follows the theme in use.
+function syncThemeColor(){
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+    if(!m.dataset.auto) m.dataset.auto = m.getAttribute("content");
+    m.setAttribute("content", S.theme === "auto" ? m.dataset.auto : (S.theme === "dark" ? "#101316" : "#f2f3f1"));
+  });
 }
 
 // The interface follows the trip's language, unless one was chosen on this device.
@@ -188,6 +226,12 @@ function langPicker(){
     `<button type="button" data-lang="${esc(id)}" aria-pressed="${S.langPref === id}">${esc(name)}</button>`).join("")}</div></section>`;
 }
 
+function themePicker(){
+  const options = [["auto", t("themeAuto")], ["light", t("themeLight")], ["dark", t("themeDark")]];
+  return `<section class="sec"><h2>${esc(t("theme"))}</h2><div class="seg" role="group" aria-label="${esc(t("theme"))}">${options.map(([id, name]) =>
+    `<button type="button" data-theme-choice="${id}" aria-pressed="${S.theme === id}">${esc(name)}</button>`).join("")}</div></section>`;
+}
+
 function renderWelcome(){
   return `
   <section class="hero">
@@ -203,6 +247,7 @@ function renderWelcome(){
   </div>
   ${installSteps()}
   ${langPicker()}
+  ${themePicker()}
   ${REPO_URL ? `<p class="foot"><a href="${esc(REPO_URL)}#create-your-own-trip" target="_blank" rel="noopener">${esc(t("makeYourOwn"))} ↗</a></p>` : ""}
   ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}`;
 }
@@ -218,7 +263,11 @@ function renderTrips(){
       <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
     </div>`;
   }).join("");
-  const fromTrip = !!(trip().map && trip().map.googleMapsKey);
+  const key = googleKey();
+  const status = !S.useGoogle ? "statusOsmChosen"
+    : !key ? "statusNoKey"
+    : googleRefusedKey(key) ? "statusRefused"
+    : S.deviceKey ? "statusGoogleDevice" : "statusGoogleTrip";
   return `
   <h1>${esc(t("yourTrips"))}</h1>
   ${errorBox()}
@@ -228,14 +277,21 @@ function renderTrips(){
       ${S.records.some(r => r.fileName === "demo-trip.json") ? "" : `<button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>`}
     </div>
   </section>
-  <section class="sec"><h2>${esc(t("googleKeyTitle"))}</h2>
+  <section class="sec"><h2>${esc(t("mapProvider"))}</h2>
+    <div class="seg" role="group" aria-label="${esc(t("mapProvider"))}">
+      <button type="button" data-provider="google" aria-pressed="${S.useGoogle}">Google Maps</button>
+      <button type="button" data-provider="osm" aria-pressed="${!S.useGoogle}">OpenStreetMap</button>
+    </div>
+    <p class="foot" data-map-status="${status}"><b>${esc(t(status))}</b> ${esc(t("providerHelp"))}</p>
     <form class="field" data-form="key">
-      <label for="gkey" class="foot">${esc(t("googleKeyHelp"))}${fromTrip ? " " + esc(t("googleKeyFromTrip")) : ""}</label>
+      <label for="gkey">${esc(t("googleKeyTitle"))}</label>
+      <p class="foot">${esc(t("googleKeyHelp"))}${tripKey() ? " " + esc(t("googleKeyFromTrip")) : ""}</p>
       <input id="gkey" name="gkey" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(S.deviceKey)}" placeholder="AIza…">
       <div class="actions"><button type="submit" class="btn small">${esc(t("save"))}</button></div>
     </form>
   </section>
   ${langPicker()}
+  ${themePicker()}
   ${installSteps()}
   <section class="sec"><h2>${esc(t("about"))}</h2>
     <p class="foot">Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
@@ -300,6 +356,9 @@ function mapPanel(zs, color, numbered, imgs, view, gone){
 
   zs.forEach((z, zi) => {
     const real = z.pts.filter(p => !p.ref);
+    if(z.enter && z.enter.travel){
+      o += `<p class="off move${gone(z.enter.idx) ? " gone" : ""}"><span class="tvchip">${travelIcon(z.enter.travel, 16)}</span><span>${esc(t("travel_" + z.enter.travel))} · ${esc(z.enter.from.name)} → ${esc(zoneTitle(z))}</span></p>`;
+    }
     const head = `<div class="zhead"><span class="zname">${esc(zoneTitle(z))}</span>${zoneLink(z)}</div>`;
     const im = view === "image" ? imgs.find(x => (x.zone || 0) === zi) : null;
     if(im){
@@ -339,9 +398,11 @@ function stopsHTML(day, planId, list, numbered, pins){
       (isDone ? "" : `<button type="button" class="skip" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`) + `</div>`;
     const pn = pins ? pins[s.mapLabel || s.title] : (numbered && s.lat !== undefined ? i + 1 : 0);
     const nb = pn ? `<br><span class="nb">${pn}</span>` : "";
+    const tv = s.travel ? `<span class="tvchip" role="img" aria-label="${esc(t("travel_" + s.travel))}" title="${esc(t("travel_" + s.travel))}">${travelIcon(s.travel, 16)}</span>` : "";
+    const titleRow = `<div class="h">${tv}<h3>${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>`;
     const head = s.text
-      ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}"><div class="h"><h3>${esc(s.title)}</h3><span class="chev">${CHEVRON}</span></div><p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p></div>`
-      : `<h3>${esc(s.title)}</h3>`;
+      ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}">${titleRow}<p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p></div>`
+      : titleRow;
     return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}"><div class="time">${esc(s.time)}${nb}</div><div class="body">${head}${meta}</div><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button></li>`;
   }).join("") + `</ol>`;
 }
@@ -412,7 +473,8 @@ function renderDay(i){
   let wanted = null;
   if(S.ui.mapOpen && zs.length){
     html += mapPanel(zs, color, numbered, imgs, view, gone);
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang].join("|"), zones: zs, color: place.color, gone};
+    const dark = isDark();
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark].join("|"), zones: zs, color: dark ? (place.colorDark || place.color) : place.color, dark, gone};
   }
   if(d.reminders) html += d.reminders.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
   if(d.plans){
@@ -431,9 +493,11 @@ function syncLive(wanted){
     if(live){ live.handle.destroy(); live = null; }
     return;
   }
+  // A key that changed in another way (a trip loaded, an update) is caught here.
+  if(applyMapSettings()) return;
   if(!live || live.key !== wanted.key){
     if(live) live.handle.destroy();
-    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), onNotice: k => toast(t(k))})};
+    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), dark: wanted.dark, onNotice: k => toast(t(k))})};
   }
   slot.appendChild(live.handle.el);
   live.handle.refresh();
@@ -490,11 +554,29 @@ $app.addEventListener("click", e => {
     refocus("[data-expand]");
     return;
   }
+  const themeBtn = e.target.closest("[data-theme-choice]");
+  if(themeBtn){
+    setTheme(themeBtn.dataset.themeChoice);
+    render();
+    refocus(`[data-theme-choice="${themeBtn.dataset.themeChoice}"]`);
+    return;
+  }
+  const provider = e.target.closest("[data-provider]");
+  if(provider){
+    S.useGoogle = provider.dataset.provider === "google";
+    store.setKV("useGoogle", S.useGoogle).catch(() => {}).then(() => {
+      if(applyMapSettings()) return;
+      render();
+      refocus(`[data-provider="${provider.dataset.provider}"]`);
+    });
+    return;
+  }
   const langBtn = e.target.closest("[data-lang]");
   if(langBtn){
     S.langPref = langBtn.dataset.lang;
     (S.langPref === "auto" ? store.delKV("lang") : store.setKV("lang", S.langPref)).catch(() => {});
     applyLang();
+    if(applyMapSettings()) return;
     render();
     refocus(`[data-lang="${CSS.escape(S.langPref)}"]`);
     return;
@@ -534,7 +616,7 @@ $app.addEventListener("click", e => {
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "open"){
     const rec = S.records.find(r => r.id === act.dataset.id);
-    if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); render(); window.scrollTo(0, 0); });
+    if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); window.scrollTo(0, 0); });
   }
 });
 
@@ -558,7 +640,11 @@ $app.addEventListener("submit", e => {
   if(!form) return;
   e.preventDefault();
   S.deviceKey = form.elements.gkey.value.trim();
-  (S.deviceKey ? store.setKV("googleKey", S.deviceKey) : store.delKV("googleKey")).then(() => toast(t("saved")));
+  (S.deviceKey ? store.setKV("googleKey", S.deviceKey) : store.delKV("googleKey")).then(() => {
+    if(applyMapSettings()) return;
+    render();
+    toast(t("saved"));
+  });
 });
 
 $file.addEventListener("change", async () => {
@@ -574,6 +660,8 @@ $file.addEventListener("change", async () => {
 
 window.addEventListener("hashchange", () => { S.importError = null; render(); window.scrollTo(0, 0); });
 window.addEventListener("resize", markCut);
+// When the phone switches between light and dark, maps follow it.
+if(darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if(S.theme === "auto") render(); });
 window.addEventListener("online", () => { S.online = true; render(); });
 window.addEventListener("offline", () => { S.online = false; render(); });
 
@@ -610,11 +698,13 @@ async function readVersion(){
 /* ---------- start ---------- */
 
 async function start(){
-  const [records, activeId, ui, key, lang] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang")]);
+  const [records, activeId, ui, key, lang, useGoogle] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle")]);
+  if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);
   if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ["live", "image", "schema"].includes(ui.mapView) ? ui.mapView : "live", expandAll: !!ui.expandAll};
   if(typeof key === "string") S.deviceKey = key;
+  syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);
   await readVersion();
   render();
