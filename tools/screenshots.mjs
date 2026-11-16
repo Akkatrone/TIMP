@@ -46,10 +46,26 @@ await withApp(async ({run, until, theme, capture}) => {
   await until("the sketch", `document.querySelector(".mapsvg")`);
   await shoot("sketch.png");
 
-  // 4. A day with alternative plans, in the dark theme.
+  // 4. A stop added from a Google Maps link (an invented place), with how you get there.
+  const PLACE = "https://www.google.com/maps/place/Pastelaria+Exemplo,+Rua+Augusta+10,+Lisboa/@38.7101,-9.1375,18z/data=!4m6!3m5!1s0x0:0x0!8m2!3d38.71012!4d-9.13751";
+  await run(`document.querySelector("[data-map]").click(); location.hash = "#day-1";`);
+  await until("day 1", `document.querySelectorAll(".stop").length === 6`);
+  await run(`document.querySelector(".fab").click();`);
+  await until("the form", `document.querySelector("dialog.sheet[open]")`);
+  await run(`const el = document.getElementById("stop-src"); el.value = ${JSON.stringify(PLACE)}; el.dispatchEvent(new Event("change")); document.getElementById("stop-time").value = "12:15"; document.querySelector('[data-travel="metro"]').click(); document.getElementById("stop-text").value = "Custard tarts at the counter, three minutes from the square.";`);
+  await shoot("new-stop.png");
+  await run(`document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+
+  // 5. A day with alternative plans, in the dark theme.
   await theme("dark");
-  await run(`document.querySelector("[data-map]").click(); location.hash = "#day-3";`);
+  await run(`location.hash = "#day-3";`);   // the map was closed before the new stop
   await until("day 3", `document.querySelector("[data-plan]")`);
   await run(`scrollTo(0, 0);`);
   await shoot("plans-dark.png");
+
+  // 6. Trips, in the dark theme: the version, and the reminder to save the changed trip.
+  await run(`location.hash = "#trips";`);
+  await until("the trips page", `document.querySelector(".unsaved")`);
+  await run(`scrollTo(0, 0);`);
+  await shoot("trips-dark.png");
 }).catch(e => { console.error(e.message); process.exit(1); });

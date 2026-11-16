@@ -3,9 +3,12 @@
 Instructions for AI coding agents working in this repository.
 People: start from [README.md](README.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Travel in my pocket is a static web app (a PWA, no framework, no build step to run it)
-that shows a day-by-day travel guide on a phone and works offline. The app is generic
-and public. Each trip is a private JSON file that a traveller loads on their own device.
+TIMP (Travel in my pocket) is a static web app (a PWA, no framework, no build step to
+run it) that shows a day-by-day travel guide on a phone and works offline. The app is
+generic and public. Each trip is a private JSON file that a traveller loads on their own
+device. Since 2.0 travellers also add and change stops in the app: every change is a
+version of the trip, like a Git commit, and copies changed on different phones are
+merged when a file is loaded.
 
 You will get one of two kinds of request here. Work out which one before you start.
 
@@ -27,6 +30,12 @@ Someone wants their itinerary turned into a file for the app. No code changes.
 2. Use [docs/trip-format.md](docs/trip-format.md) as the reference for every field,
    and [examples/demo-trip.json](examples/demo-trip.json) as a model.
 3. Save the file as `private/<trip-id>.json`.
+   **Updating a trip that already exists:** start from the latest file the app saved
+   (the person finds it in Trips → Save the file). Keep the trip `id`, every stop `id`,
+   and the `version` block exactly as they are: never write or change `version`. The
+   app sees that the content changed and makes a new version from it, then merges it
+   with the copies on other phones. Starting from an older copy works too, but the
+   changes made in the app since then come back only through that merge.
 4. Check it and read the map summary:
 
    ```bash
@@ -98,6 +107,9 @@ And these rules:
   format version. A new field needs: a rule in `js/trip.js`, a test in
   `test/trip.test.mjs`, an entry in `docs/trip-format.md`, and a mention in
   `docs/creating-a-trip.md` if it changes how a trip should be written.
+- **Versions and merges stay deterministic.** Two phones merging the same two versions
+  must end with the same trip and the same version id: conflicts are settled by version
+  id, never by which phone runs the merge. `test/versions.test.mjs` checks it.
 - **Interface texts** go in `js/i18n.js`, in every language. A test compares the keys.
 - **No new dependencies, bundlers or frameworks.** No third-party scripts, fonts or
   requests at startup.

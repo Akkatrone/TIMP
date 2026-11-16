@@ -1,6 +1,6 @@
 # Creating a trip file
 
-How to turn a trip plan into a file for Travel in my pocket. This guide is for whoever
+How to turn a trip plan into a file for TIMP (Travel in my pocket). This guide is for whoever
 writes the file: a person, or an AI assistant working for one. It says how to write a
 *good* file; the list of fields and what is valid is in [trip-format.md](trip-format.md).
 
@@ -158,6 +158,9 @@ Tell the travellers, briefly:
 
 ## Updating a file later
 
+- Start from the latest file: travellers change trips in the app too, and save them
+  from Trips → Save the file. An older copy loses nothing, because the app merges, but
+  starting from the latest one avoids surprises.
 - Keep the trip `id`: the app then replaces the trip and keeps the ticked and skipped stops.
 - Leave the `version` block as it is, if the file has one: the app sees the change and
   makes a new version from it. Never write or change `version` yourself.

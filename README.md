@@ -18,8 +18,14 @@ the app can be public and open source while your hotels and dates stay private.
   <img src="docs/screenshots/plans-dark.png" width="24%" alt="A day with two alternative plans, in the dark theme">
 </p>
 
-<p align="center"><sub>The example trip: programme of the day, interactive map, offline sketch, alternative plans in the dark theme.<br>
-Retake them with <code>node tools/screenshots.mjs</code>.</sub></p>
+<p align="center">
+  <img src="docs/screenshots/new-stop.png" width="24%" alt="The form to add a stop, filled in from a Google Maps link: name, day, time, how you get there, position">
+  <img src="docs/screenshots/trips-dark.png" width="24%" alt="The Trips page in the dark theme: the trip's version and a reminder to save the changed trip as a file">
+</p>
+
+<p align="center"><sub>The example trip: programme of the day, interactive map, offline sketch, alternative plans in the dark theme;
+a stop added from a Google Maps link, and the trip's version on the Trips page.<br>
+Retake them with <code>npm run screenshots</code>.</sub></p>
 
 - Day-by-day programme: times, descriptions, reminders, alternative plans for a day.
 - Short descriptions: two lines each, tap one to read it all, or open them all at once.
@@ -59,6 +65,14 @@ Good to know:
 - **To update a trip**, load the new version of the file from the Trips page. The stops
   already ticked stay ticked.
 - You can keep several trips on the same phone and switch between them from Trips.
+
+### Coming from 1.x
+
+Nothing to do for the trips: on first start 2.0 gives each of them a version, and the
+ticked stops stay. The new name, the new icon and the Share menu on Android come from
+the app's manifest, which phones read when the app is installed: Android refreshes them
+within a few days, an iPhone never. To get them now, save your trips as files from
+Trips, remove the app from the Home Screen, add it again and load the files.
 
 ## Change the trip on the way
 
@@ -128,6 +142,12 @@ Any assistant can write a trip file, because the instructions are two plain docu
 
 Whatever you use, look at the map of each day before you leave: a pin in the wrong
 place is the one mistake no automatic check can catch.
+
+**Changing a trip you already use:** small changes are quicker in the app (+ and Edit).
+For bigger ones, give the assistant the latest file the app saved (Trips → Save the
+file), not an older copy. It keeps the trip `id`, the stop ids and the `version` block;
+the app then turns its work into a new version, and joins it with what changed on the
+other phones.
 
 ### By hand
 
@@ -255,8 +275,10 @@ npm run e2e
 ```
 
 The last one opens the app in headless Chrome or Chromium with the example trip and
-checks what unit tests cannot see: folding, skipping, the dashed map, the language,
-a hostile trip file. It needs Chrome or Chromium installed.
+checks what unit tests cannot see: folding, skipping, the dashed map, the theme, the
+language, adding and editing stops, saving the file, a file from another phone joined
+with this one, a place shared from Google Maps, a hostile trip file. It needs Chrome or
+Chromium installed, and a connection for the Google key check.
 
 On `localhost` the service worker always serves the files on disk, so every reload
 shows your changes; it uses its copy only when the server is off. On the published

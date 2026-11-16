@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for wanting to improve Travel in my pocket. This page explains how the
+Thank you for wanting to improve TIMP (Travel in my pocket). This page explains how the
 project is put together and what a change needs before it can be merged.
 
 ## What the project promises
@@ -124,7 +124,12 @@ request that touches the interface, storage or the service worker, please try:
 - iPhone Safari and the app installed on the Home Screen (they behave differently);
 - Android Chrome, installed;
 - airplane mode, after one online visit;
-- light and dark theme.
+- light and dark theme;
+- if you touched stops, versions or files: add a stop with +, save the file, load it on
+  a second phone, change it on both, swap the files, and check both end on the same
+  version (Trips shows it);
+- if you touched the manifest or the stop form: on Android, share a place from Google
+  Maps to the installed app.
 
 To reach your computer from a phone you need HTTPS (service workers require it
 everywhere except `localhost`). The easiest way is to push your branch to your fork

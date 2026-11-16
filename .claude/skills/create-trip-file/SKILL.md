@@ -1,9 +1,9 @@
 ---
 name: create-trip-file
-description: Create or update a trip file (.json) for the "Travel in my pocket" web app from an itinerary, notes, bookings or a conversation. Use when the user wants to turn a trip plan into a file they can load on their phone, asks for a "trip file", a "pocket guide" or a "travel in my pocket" file, or wants to change, extend or fix an existing trip file.
+description: Create or update a trip file (.json) for TIMP, the "Travel in my pocket" web app, from an itinerary, notes, bookings or a conversation. Use when the user wants to turn a trip plan into a file they can load on their phone, asks for a "trip file", a "pocket guide", a "TIMP" or "travel in my pocket" file, or wants to change, extend or fix an existing trip file.
 ---
 
-# Create a trip file for Travel in my pocket
+# Create a trip file for TIMP (Travel in my pocket)
 
 The instructions for this task are the same for every assistant and live in the
 project's documentation, so that they exist in one place only. Read them before
@@ -17,6 +17,9 @@ Then:
 
 - Save the file as `private/<trip-id>.json`. Git ignores that folder. Never save a
   real trip anywhere else in the repository and never commit one.
+- Changing a trip that already exists: start from the latest file the app saved. Keep
+  the trip `id`, every stop `id` and the `version` block as they are; never write or
+  change `version`. The app makes a new version from your work.
 - Check it, and read the map summary it prints:
 
   ```bash
