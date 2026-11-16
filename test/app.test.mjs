@@ -104,6 +104,22 @@ test("travel marks the leg that arrives at a stop, or the one a journey without 
   assert.deepEqual(legsOf(zones[1]).map(l => [l.to.name, l.travel]), [["Ferry", "boat"]]);
 });
 
+test("a skipped stop keeps its pin, and the route goes past it", () => {
+  const list = [stop("Colosseum", 41.8902, 12.4922), stop("Forum", 41.8925, 12.4853, {travel: "bus"}), stop("Pantheon", 41.8986, 12.4769)];
+  const [zone] = zonesOf({}, null, list, i => i === 1);
+  assert.deepEqual(zone.pts.map(p => p.name), ["Colosseum", "Forum", "Pantheon"], "every pin is still there");
+  assert.deepEqual(legsOf(zone).map(l => [l.from.name, l.to.name, l.idx, l.travel]), [["Colosseum", "Pantheon", 2, null]], "the bus took you to the Forum, not past it");
+  assert.ok(!routeUrl(zone).includes("Forum"));
+  // A zone of skipped stops only: its pins, no route into it, a link still made.
+  const far = [...list, {time: "14:00", title: "Train", travel: "train"}, stop("Duomo", 43.7731, 11.256), stop("Back in Rome", 41.9, 12.5)];
+  const zones = zonesOf({}, null, far, i => i === 4);
+  assert.equal(zones.length, 3, "skipping does not move pins between zones");
+  assert.deepEqual(zones[1].path, []);
+  assert.ok(routeUrl(zones[1]).includes("Duomo"));
+  assert.deepEqual(bridgesOf(zones).map(b => [b.from.name, b.to.name]), [["Pantheon", "Back in Rome"]]);
+  assert.deepEqual(zonesOf({}, null, list).map(z => legsOf(z).length), [2], "nothing skipped: the route as before");
+});
+
 test("the sketch shows how a leg is travelled", () => {
   const [zone] = zonesOf({}, null, [stop("A", 41.9, 12.5), stop("B", 41.91, 12.51, {travel: "metro"})]);
   const svg = zoneSVG(zone, "x");

@@ -280,7 +280,7 @@ function currentPlace(){
 }
 
 function editorBase(){
-  return {trip: trip(), timezone: trip().timezone, googleKey: googleKey()};
+  return {trip: trip(), timezone: trip().timezone, googleKey: googleKey(), dark: isDark()};
 }
 
 // A new stop: on the day on screen, or today when the trip is under way.
@@ -626,7 +626,8 @@ function renderDay(i){
   const gone = k => k >= 0 && !!(S.state.done[keys[k]] || S.state.skipped[keys[k]]);
   const anyText = list.some(s => s.text);
   const stay = d.stay ? tr.stays[d.stay] : null;
-  const zs = zonesOf(d, plan, list);
+  const isSkipped = k => !S.state.done[keys[k]] && !!S.state.skipped[keys[k]];
+  const zs = zonesOf(d, plan, list, isSkipped);
   const imgs = zs.length ? imagesOf(d, pid) : null;
   const view = effectiveView(!!imgs);
   const numbered = !d.mapZones;
@@ -671,7 +672,9 @@ function renderDay(i){
   if(S.ui.mapOpen && zs.length){
     html += mapPanel(zs, color, numbered, imgs, view, gone);
     const dark = isDark();
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark].join("|"), zones: zs, color: dark ? (place.colorDark || place.color) : place.color, dark, gone};
+    // Skipping a stop changes the route: the map is drawn again.
+    const skippedNow = list.map((s, k) => isSkipped(k) ? k : -1).filter(k => k >= 0).join(",");
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark, skippedNow].join("|"), zones: zs, color: dark ? (place.colorDark || place.color) : place.color, dark, gone};
   }
   if(d.reminders) html += d.reminders.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
   if(d.plans){

@@ -80,7 +80,8 @@ Trips, remove the app from the Home Screen, add it again and load the files.
 
 Tap **+** at the bottom right of a day to add a stop. Each stop has a **⋯** button under
 its tick: **Edit** changes it, moves it to another day or deletes it; **Skip** marks a
-stop you leave out.
+stop you leave out. On the map a skipped stop keeps its pin, greyed, and the route goes
+from the stop before it straight to the one after.
 
 The quickest way to fill in a stop is to paste what Google Maps gives you. The form
 reads it on the phone:
@@ -91,6 +92,7 @@ reads it on the phone:
 | The text the Maps app shares (name, address, link) | name, address; the position is looked up |
 | A full address | the address; the position is looked up |
 | A short link (`maps.app.goo.gl/…`) | the link, which opens the exact place; write the name |
+| An address with a short link, as Maps shares a street address | the address; the position is looked up |
 | Coordinates, `geo:` links, Apple Maps links | the position |
 
 **Android:** once the app is installed, it appears in the Share menu of Google Maps.
@@ -99,8 +101,15 @@ Share a place to it and the form opens already filled in.
 Copy, then in the app tap + and **Paste**.
 
 When a position has to be looked up, the app asks Google (with a key that has the
-Geocoding API enabled, see below) or OpenStreetMap otherwise. If neither finds it, the
-stop is saved without a pin: its Map and Directions links work all the same.
+Geocoding API enabled, see below) or OpenStreetMap otherwise. It searches around the
+stops of that day first, because Maps often shares an address without its town. If the
+pin lands in the wrong place, or nothing is found, tap **On the map** and put it where
+it belongs. A stop without a position is saved without a pin: its Map and Directions
+links work all the same.
+
+Why the short link gives no position: the browser is not allowed to follow it to the
+place (Google sends no CORS header), and resolving it through a server of ours would
+mean sending your stops to that server.
 
 ### Versions and sharing a changed trip
 

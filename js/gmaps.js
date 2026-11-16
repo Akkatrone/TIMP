@@ -94,10 +94,12 @@ export function parseMapsInput(input){
   if(!out.short) Object.assign(out, fromUrl(link));
 
   // The lines around the link, as the Maps app shares them: name first, then the address.
-  const lines = text.replace(urlMatch[0], "").split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const lines = text.replace(urlMatch[0], "\n").split(/\n+/).map(s => s.trim()).filter(Boolean);
   if(lines.length && !out.title){
     out.title = lines[0];
     if(lines.length > 1 && !out.address) out.address = lines.slice(1).join(", ");
+    // An address shared on its own ("Via Roma, 3") is both the name and what to search.
+    else if(lines.length === 1 && !out.address && out.lat === undefined && /\d/.test(lines[0])) out.address = lines[0];
   }
   return out;
 }

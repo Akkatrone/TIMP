@@ -92,25 +92,32 @@ await withApp(async ({run, until, reload, blocked}) => {
     await click(".stop:nth-child(2) [data-skip]"); // now: stops 1 and 3 done, stop 2 skipped
   });
 
-  await step("the sketch draws done and skipped stops dashed", async () => {
+  await step("the sketch draws done stops dashed and takes skipped ones off the route", async () => {
     await click("[data-map]");
     await click('[data-view="schema"]');
     await until("the sketch", `document.querySelector(".mapsvg")`);
     assert.equal(await count(".mapsvg .badge"), 5);
     assert.equal(await count(".mapsvg .badge.gone"), 3);   // pins 1, 2, 3
-    assert.equal(await count(".mapsvg .route"), 4);        // 1→2, 2→3, 3→4, 4→6
-    assert.equal(await count(".mapsvg .route.gone"), 2);   // the legs arriving at 2 and at 3
+    assert.equal(await count(".mapsvg .route"), 3);        // 1→3 (2 is skipped), 3→4, 4→6
+    assert.equal(await count(".mapsvg .route.gone"), 1);   // the leg arriving at 3, done
   });
 
   await step("the interactive map does the same, and keeps the map when a stop is ticked", async () => {
     await click('[data-view="live"]');
     await until("the map", `document.querySelector(".live .leaflet-container") && document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await count(".live .pin.gone"), 3);
-    assert.equal(await run(`return [...document.querySelectorAll(".live path.leaflet-interactive, .live .leaflet-overlay-pane path")].filter(p => p.getAttribute("stroke-dasharray")).length;`), 2);
+    const lines = `[...document.querySelectorAll(".live .leaflet-overlay-pane path")]`;
+    assert.equal(await run(`return ${lines}.length;`), 3);
+    assert.equal(await run(`return ${lines}.filter(p => p.getAttribute("stroke-dasharray")).length;`), 1);
     await run(`window.__map = document.querySelector(".live");`);
     await click("[data-tick]", 3);
     assert.equal(await run(`return window.__map === document.querySelector(".live");`), true);
     assert.equal(await count(".live .pin.gone"), 4);
+    // Restoring the skipped stop puts it back on the route: the map is drawn again.
+    await click(".stop.skipped [data-skip]");
+    await until("the route through stop 2", `${lines}.length === 4`);
+    await click(".stop:nth-child(2) [data-skip]");
+    await until("the route past stop 2", `${lines}.length === 3`);
     await click("[data-map]");
   });
 
@@ -250,6 +257,32 @@ await withApp(async ({run, until, reload, blocked}) => {
     await fill("#stop-time", "Evening");
     await submit();
     assert.equal(await run(`return [...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent === "Tram 28").querySelector(".maplink").href;`), "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+  });
+
+  await step("an address shared on its own is searched around the trip; the pin can be put on a map", async () => {
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
+    // No request leaves the test: Nominatim answers from here.
+    await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.71","lon":"-9.1366"}]'))) : real(u, o);`);
+    await run(`document.querySelector(".fab").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open]")`);
+    assert.equal(await run(`return getComputedStyle(document.documentElement).overflow;`), "hidden", "the page under the form does not scroll");
+    await fill("#stop-src", "Rua Augusta, 24https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Rua Augusta, 24");
+    await until("the position", `/38\.71000, -9\.13660 · OpenStreetMap/.test(document.querySelector("[data-pos]").textContent)`);
+    const url = new URL(await run(`return window.__geo[0];`));
+    assert.equal(url.searchParams.get("q"), "Rua Augusta, 24");
+    assert.equal(url.searchParams.get("bounded"), "1");
+    const [w, n, e, so] = url.searchParams.get("viewbox").split(",").map(Number);
+    assert.ok(w < -9.14 && e > -9.13 && so < 38.71 && n > 38.72, "the box is around the day's stops in Lisbon");
+    await run(`document.querySelector("[data-pick]").click();`);
+    await until("the map in the form", `document.querySelector(".live.pick.leaflet-container") && document.querySelector(".live.pick .pickpin")`);
+    await run(`const m = document.querySelector(".live.pick"), r = m.getBoundingClientRect(); m.dispatchEvent(new MouseEvent("click", {bubbles: true, clientX: r.left + r.width / 2 + 40, clientY: r.top + r.height / 2 + 30}));`);
+    await until("a position put by hand", `/placed on the map/.test(document.querySelector("[data-pos]").textContent)`);
+    assert.notEqual(await run(`return document.querySelector("[data-pos]").textContent;`), "38.71000, -9.13660 · placed on the map");
+    await run(`document.querySelector("dialog.sheet [data-close]").click();`);
+    assert.equal(await run(`return getComputedStyle(document.documentElement).overflow;`), "visible");
+    await reload();
   });
 
   let saved = null;

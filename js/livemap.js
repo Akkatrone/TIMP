@@ -11,7 +11,8 @@ import { loadGoogle, googleRefusedKey, whenGoogleRefuses } from "./google.js";
 let leafletPromise = null;
 const active = new Set();           // live maps currently on screen
 
-function loadLeaflet(){
+// Leaflet, loaded once, the first time a map needs it (also the editor's map to pick a point).
+export function loadLeaflet(){
   if(!leafletPromise){
     leafletPromise = new Promise((resolve, reject) => {
       const css = document.createElement("link");

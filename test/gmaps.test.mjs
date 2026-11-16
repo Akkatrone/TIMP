@@ -34,6 +34,17 @@ test("the text the Maps app shares gives name and address from its lines", () =>
   assert.equal(r.lat, undefined);
 });
 
+test("an address shared alone is the name and the text to search, even glued to the link", () => {
+  for(const text of [`Via Roma, 12\n${SHORT}`, `Via Roma, 12${SHORT}`]){
+    const r = parseMapsInput(text);
+    assert.equal(r.title, "Via Roma, 12");
+    assert.equal(r.address, "Via Roma, 12");
+    assert.equal(r.link, SHORT);
+  }
+  // A name without a number is not taken for an address.
+  assert.equal(parseMapsInput(`Pantheon\n${SHORT}`).address, undefined);
+});
+
 test("search links, query parameters, geo: and plain coordinates", () => {
   assert.deepEqual(pick(parseMapsInput("https://www.google.com/maps/search/?api=1&query=35.6586,139.7454")), [undefined, 35.6586, 139.7454]);
   assert.deepEqual(pick(parseMapsInput("https://maps.google.com/?q=Tokyo+Tower")), ["Tokyo Tower", undefined, undefined]);

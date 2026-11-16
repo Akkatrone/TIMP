@@ -254,7 +254,16 @@ body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 .sheet label,.sheet .label{font-weight:600;font-size:.88rem}
 .sheet input,.sheet select,.sheet textarea{font:500 .95rem var(--f-body);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%;min-height:44px;min-width:0}
 .sheet textarea{resize:vertical;min-height:72px;line-height:1.45}
-.sheet .row{display:flex;gap:8px}
+.sheet #stop-src{resize:none;min-height:44px;line-height:1.4;overflow-y:auto}
+/* the map in the stop form, to put the pin by hand */
+.pickwrap{display:grid;gap:8px;min-width:0}
+.pickwrap .foot{margin:0}
+.live.pick{height:min(46vh,280px)}
+.pin.pickpin{--pc:#fff;background:#c0392b;color:#fff;font-size:18px;font-weight:700;padding:4px 10px;cursor:grab}
+/* a dialog open: the page under it stays still (no scrolling through the sheet) */
+html:has(dialog[open]){overflow:hidden}
+.sheet,.ask{overscroll-behavior:contain}
+.sheet .row{display:flex;gap:8px;align-items:flex-start}
 .sheet .row input{flex:1 1 auto}
 .sheet .seg.wrap{display:flex;flex-wrap:wrap;border-radius:12px}
 .sheet .seg.wrap button{flex:0 1 auto;display:inline-flex;align-items:center;gap:6px;border-radius:10px}

@@ -22,8 +22,11 @@ const f1 = v => Math.round(v * 10) / 10;
  * arrives at it is travelled that way. A stop without a pin that is the journey itself
  * ("Train to Kyoto") marks the leg from the previous pin to the next one.
  * zone.enter, when set, is the jump from the previous zone: {from, idx, travel}.
+ *
+ * `skipped(idx)` says which stops the traveller skips: they keep their pin, but the
+ * route goes from the stop before them straight to the one after.
  */
-export function zonesOf(day, plan, list){
+export function zonesOf(day, plan, list, skipped = () => false){
   if(day.mapZones){
     return day.mapZones.map(z => {
       let k = 0;
@@ -36,28 +39,34 @@ export function zonesOf(day, plan, list){
     });
   }
   const split = day.mapSplitKm || 12, zones = [];
-  let cur = null, prev = null, prevPt = null, travel = null;
+  // Zones group every pin, skipped or not, so they do not change when a stop is skipped.
+  // The route (path) only takes the stops that are still on.
+  let cur = null, prev = null, last = null, lastZone = null, travel = null;
   list.forEach((s, i) => {
+    const off = skipped(i);
     if(s.lat === undefined){
-      if(s.travel) travel = s.travel;
+      if(s.travel && !off) travel = s.travel;
       return;
     }
     const ll = [s.lat, s.lng];
-    const arriving = s.travel || travel;
-    travel = null;
     if(!cur || distKm(prev, ll) > split){
-      cur = {pts: [], path: [], pathIdx: [], pathTravel: [], enter: prevPt ? {from: prevPt, idx: i, travel: arriving} : null};
+      cur = {pts: [], path: [], pathIdx: [], pathTravel: [], enter: null};
       zones.push(cur);
     }
+    prev = ll;
     let pt = cur.pts.find(p => distKm(p.ll, ll) < 0.03);
     if(!pt){ pt = {nums: [], name: s.mapLabel || s.title, ll, q: s.query || s.mapLabel || s.title, ref: false, items: []}; cur.pts.push(pt); }
     pt.nums.push(i + 1);
     pt.items.push({n: i + 1, idx: i, time: s.time, title: s.title});
+    if(off) return;
+    const arriving = s.travel || travel;
+    travel = null;
+    if(last && lastZone !== cur && !cur.path.length) cur.enter = {from: last, idx: i, travel: arriving};
     cur.path.push(pt);
     cur.pathIdx.push(i);
     cur.pathTravel.push(cur.path.length > 1 ? arriving : null);
-    prev = ll;
-    prevPt = pt;
+    last = pt;
+    lastZone = cur;
   });
   const names = (plan && plan.zoneNames) || day.zoneNames || [];
   zones.forEach((z, i) => { z.name = names[i] || ""; });
@@ -67,6 +76,7 @@ export function zonesOf(day, plan, list){
 // A Google Maps link with the whole zone as a route.
 export function routeUrl(z){
   const seq = z.path.filter((p, i, a) => i === 0 || p !== a[i - 1]);
+  if(!seq.length) return mapsUrl(z.pts[0].q);   // every stop of the zone skipped
   if(seq.length < 2) return mapsUrl(seq[0].q);
   let mid = seq.slice(1, -1);
   if(mid.length > 8){ const step = mid.length / 8; mid = Array.from({length: 8}, (_, i) => mid[Math.floor(i * step)]); }

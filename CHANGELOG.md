@@ -4,6 +4,24 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.3.1
+
+Adding a stop from Google Maps, and the route on the map.
+
+- A street address shared from the Maps app on Android ("Via Roma, 3" and a short
+  link) becomes the stop's name and is looked up, instead of being glued to the link
+  with no position.
+- Positions are searched around the stops of that day first, then anywhere: an
+  address without its town is found in the right town. OpenStreetMap is asked at most
+  once a second, as its rules want.
+- **On the map**, in the stop form: a small map to put the pin by hand, by tapping or
+  dragging, when the search got it wrong.
+- The field for what Maps shares shows it on several lines.
+- A skipped stop leaves the route: the line goes from the stop before it to the one
+  after, on the interactive map, on the sketch and in "Open in Google Maps". Its pin
+  stays, greyed.
+- While a form or a question is open, the page under it no longer scrolls.
+
 ## 2.3.0
 
 History, choices when files disagree, and a Content-Security-Policy.

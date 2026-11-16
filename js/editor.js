@@ -6,7 +6,8 @@
 import { t, getLang } from "./i18n.js";
 import { esc, dateParts } from "./util.js";
 import { parseMapsInput, queryOf } from "./gmaps.js";
-import { geocode } from "./geocode.js";
+import { geocode, areaAround } from "./geocode.js";
+import { loadLeaflet } from "./livemap.js";
 import { travelIcon, TRAVEL } from "./icons.js";
 import { ask } from "./ask.js";
 
@@ -42,7 +43,7 @@ const looksLikeAddress = s => /,|\d/.test(String(s || ""));
  *   trip, dayIndex, planId     where the stop is, or goes by default
  *   stop                        the stop to change (absent: a new stop)
  *   prefill                     text to read as if pasted (a shared place)
- *   timezone, googleKey
+ *   timezone, googleKey, dark
  *   onSave({stop, date, plan})  the stop as filled in, and where it goes
  *   onDelete()                  remove the stop being changed
  */
@@ -77,7 +78,7 @@ export function openStopEditor(o){
     <div class="field">
       <label for="stop-src">${esc(t("fAddress"))}</label>
       <div class="row">
-        <input id="stop-src" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t("fAddressPh"))}">
+        <textarea id="stop-src" rows="1" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t("fAddressPh"))}"></textarea>
         <button type="button" class="btn small" data-paste>${esc(t("paste"))}</button>
       </div>
       <p class="foot" data-src-note>${esc(t("fAddressHelp"))}</p>
@@ -120,7 +121,12 @@ export function openStopEditor(o){
       <p class="pos" data-pos></p>
       <div class="actions">
         <button type="button" class="btn small" data-find>${esc(t("posSearch"))}</button>
+        <button type="button" class="btn small" data-pick aria-expanded="false">${esc(t("posPick"))}</button>
         <button type="button" class="btn small" data-clear-pos>${esc(t("posClear"))}</button>
+      </div>
+      <div class="pickwrap" data-pick-box hidden>
+        <p class="foot">${esc(t("posPickHelp"))}</p>
+        <div class="live pick${o.dark ? " dark" : ""}"><div class="msg">${esc(t("mapLoading"))}</div></div>
       </div>
     </div>
 
@@ -149,7 +155,7 @@ export function openStopEditor(o){
   function showPos(){
     const has = st.lat !== undefined;
     const label = st.searching ? t("posSearching")
-      : has ? `${st.lat.toFixed(5)}, ${st.lng.toFixed(5)}` + (st.source === "link" ? " · " + t("posFromLink") : st.source === "google" ? " · Google" : st.source === "osm" ? " · OpenStreetMap" : "")
+      : has ? `${st.lat.toFixed(5)}, ${st.lng.toFixed(5)}` + (st.source === "link" ? " · " + t("posFromLink") : st.source === "map" ? " · " + t("posFromMap") : st.source === "google" ? " · Google" : st.source === "osm" ? " · OpenStreetMap" : "")
       : t("posNone");
     $("[data-pos]").textContent = label;
     $("[data-pos]").classList.toggle("muted", !has);
@@ -159,13 +165,74 @@ export function openStopEditor(o){
 
   function note(text){ $("[data-src-note]").textContent = text; }
 
+  // Where the trip is: the stops of the chosen day, or of the whole trip.
+  function area(){
+    const day = days[+$("#stop-day").value];
+    const stopsOf = d => d.plans ? d.plans.flatMap(p => p.stops) : d.stops;
+    return areaAround(stopsOf(day)) || areaAround(days.flatMap(stopsOf));
+  }
+
+  // The source field grows with what is pasted or shared (name, address, link).
+  function fitSource(){
+    const el = $("#stop-src");
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight + 2, 104) + "px";   // about three lines, then it scrolls
+  }
+
+  // A small map to put the pin where it belongs, when the search got it wrong.
+  let pick = null;
+  async function openPicker(){
+    const box = $("[data-pick-box]");
+    if(!box.hidden){ closePicker(); return; }
+    if(navigator.onLine === false){ note(t("posOffline")); return; }
+    box.hidden = false;
+    $("[data-pick]").setAttribute("aria-expanded", "true");
+    const el = box.querySelector(".live");
+    try{
+      const L = await loadLeaflet();
+      if(box.hidden || !dlg.open) return;
+      el.innerHTML = "";
+      const a = area();
+      const start = st.lat !== undefined ? [st.lat, st.lng] : a ? [(a.south + a.north) / 2, (a.west + a.east) / 2] : [0, 0];
+      const map = L.map(el, {zoomControl: true});
+      map.attributionControl.setPrefix(false);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);
+      map.setView(start, st.lat !== undefined ? 17 : a ? 14 : 2);
+      const icon = L.divIcon({className: "pinwrap", html: `<span class="pin pickpin">+</span>`, iconSize: [0, 0]});
+      const marker = L.marker(start, {icon, draggable: true, keyboard: false}).addTo(map);
+      const put = ll => { st.lat = Math.round(ll.lat * 1e5) / 1e5; st.lng = Math.round(ll.lng * 1e5) / 1e5; st.source = "map"; showPos(); };
+      marker.on("dragend", () => put(marker.getLatLng()));
+      map.on("click", e => { marker.setLatLng(e.latlng); put(e.latlng); });
+      pick = {map, marker};
+      el.scrollIntoView({block: "nearest", behavior: "smooth"});
+    }catch(err){
+      el.innerHTML = `<div class="msg">${esc(t("mapFailed"))}</div>`;
+    }
+  }
+  function closePicker(){
+    if(pick){ pick.map.remove(); pick = null; }
+    const box = $("[data-pick-box]");
+    box.hidden = true;
+    box.querySelector(".live").innerHTML = `<div class="msg">${esc(t("mapLoading"))}</div>`;
+    $("[data-pick]").setAttribute("aria-expanded", "false");
+  }
+  // A position found or pasted moves the pin on the open map.
+  function movePick(){
+    if(pick && st.lat !== undefined){ pick.marker.setLatLng([st.lat, st.lng]); pick.map.setView([st.lat, st.lng], Math.max(pick.map.getZoom(), 16)); }
+  }
+
   // What the traveller pasted or typed in the first field.
+  let lastRead = null;
   function readSource(text){
+    if(text === lastRead) return;   // the same text, read again on blur: nothing new
+    lastRead = text;
+    fitSource();
     const r = parseMapsInput(text);
     if(r.link) st.link = r.link;
     if(r.title && !$("#stop-title").value.trim()) $("#stop-title").value = r.title;
     st.address = r.address || (!r.link && looksLikeAddress(text) && r.lat === undefined ? text.trim() : "");
-    if(r.lat !== undefined){ st.lat = r.lat; st.lng = r.lng; st.source = "link"; }
+    if(r.lat !== undefined){ st.lat = r.lat; st.lng = r.lng; st.source = "link"; movePick(); }
     note(r.short && !r.title ? t("shortLinkNote") : t("fAddressHelp"));
     showPos();
     // A position is searched only for something that looks like an address, once.
@@ -180,9 +247,10 @@ export function openStopEditor(o){
     if(navigator.onLine === false){ note(t("posOffline")); return; }
     st.searching = true; showPos();
     // With a name and an address, the address alone is the more reliable search.
-    const hit = (st.address && await geocode(st.address, {googleKey: o.googleKey, lang})) || await geocode(text, {googleKey: o.googleKey, lang});
+    const near = area();
+    const hit = (st.address && await geocode(st.address, {googleKey: o.googleKey, lang, near})) || await geocode(text, {googleKey: o.googleKey, lang, near});
     st.searching = false;
-    if(hit){ st.lat = hit.lat; st.lng = hit.lng; st.source = hit.source; }
+    if(hit){ st.lat = hit.lat; st.lng = hit.lng; st.source = hit.source; movePick(); }
     else note(t("posNotFound"));
     showPos();
   }
@@ -208,6 +276,7 @@ export function openStopEditor(o){
       return;
     }
     if(e.target.closest("[data-find]")){ findPosition(); return; }
+    if(e.target.closest("[data-pick]")){ openPicker(); return; }
     if(e.target.closest("[data-clear-pos]")){ st.lat = st.lng = undefined; st.source = ""; showPos(); return; }
     if(e.target.closest("[data-delete]")){
       const title = $("#stop-title").value.trim() || s0.title;
@@ -221,6 +290,12 @@ export function openStopEditor(o){
 
   $("#stop-src").addEventListener("change", e => readSource(e.target.value));
   $("#stop-src").addEventListener("paste", e => setTimeout(() => readSource(e.target.value), 0));
+  $("#stop-src").addEventListener("input", fitSource);
+  // Enter reads what was typed, as in a one-line field; Shift+Enter starts a new line.
+  $("#stop-src").addEventListener("keydown", e => {
+    if(e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); readSource(e.target.value); }
+  });
+  dlg.addEventListener("close", closePicker, {once: true});
   $("#stop-day").addEventListener("change", fillPlans);
 
   form.addEventListener("submit", e => {
