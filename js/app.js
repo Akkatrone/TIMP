@@ -47,13 +47,18 @@ let toastTimer = 0;
 
 let pendingOffer = null;  // a toast with a button waits behind short messages instead of being lost
 
+// A short message at the bottom. With an action it stays, with its button and a ✕,
+// until the traveller answers; messages without one go after four seconds.
 function toast(text, action){
   clearTimeout(toastTimer);
-  $toast.innerHTML = `<span>${esc(text)}</span>${action ? `<button type="button">${esc(action.label)}</button>` : ""}`;
+  $toast.innerHTML = `<span class="msg">${esc(text)}</span>` + (action
+    ? `<button type="button" class="act">${esc(action.label)}</button><button type="button" class="x" aria-label="${esc(t("close"))}">×</button>`
+    : "");
   $toast.hidden = false;
   if(action){
     pendingOffer = {text, action};
-    $toast.querySelector("button").onclick = () => { pendingOffer = null; $toast.hidden = true; action.run(); };
+    $toast.querySelector(".act").onclick = () => { pendingOffer = null; $toast.hidden = true; action.run(); };
+    $toast.querySelector(".x").onclick = () => { pendingOffer = null; $toast.hidden = true; };
   }else{
     toastTimer = setTimeout(() => {
       $toast.hidden = true;
@@ -875,6 +880,11 @@ function setupServiceWorker(){
       if(sw) sw.addEventListener("statechange", () => { if(sw.state === "installed" && hadController) offer(sw); });
     });
     if(!hadController) navigator.serviceWorker.ready.then(() => toast(t("offlineReady")));
+    // The browser looks for a new version when the app opens. An app left open in the
+    // background is checked again when it comes back, and once an hour while open.
+    const check = () => { reg.update().catch(() => {}); };
+    document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") check(); });
+    setInterval(check, 60 * 60 * 1000);
   }).catch(() => {});
   let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {

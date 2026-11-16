@@ -4,6 +4,15 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.1.1
+
+- The message at the bottom of the screen ("New version available", "Save the file")
+  uses the whole width: its text no longer wraps one word per line. Messages with a
+  button also have a × to close them.
+- An app left open in the background looks for a new version when you come back to
+  it, and once an hour while it is open, not only when it starts.
+- Italian: the merge message reads "tappe nuove 1" instead of "1 nuove".
+
 ## 2.1.0
 
 A more compact stop, so more of the day fits on the screen.

@@ -88,7 +88,7 @@ export const STRINGS = {
     googleKeyFromTrip: "The open trip carries its own key.",
     save: "Save", saved: "Saved.",
     about: "About", version: "Version {v}",
-    updateReady: "A new version is ready.", reload: "Update",
+    updateReady: "New version available.", reload: "Update", close: "Close",
     offlineReady: "Ready to work offline.",
     newer: "←", older: "→"
   },
@@ -156,7 +156,7 @@ export const STRINGS = {
     recvSame: "Hai già questa versione ({v}).",
     recvOlder: "Questo file è più vecchio del viaggio sul telefono: nessuna modifica (versione {v}).",
     recvNewer: "«{t}» aggiornato alla versione {v}.",
-    recvMerged: "Modifiche unite: {a} nuove, {c} cambiate, {r} tolte · versione {v}",
+    recvMerged: "Modifiche unite · tappe nuove {a}, cambiate {c}, tolte {r} · versione {v}",
     shareNeedsTrip: "Prima carica un viaggio, poi condividi di nuovo il luogo.",
 
     importFailed: "Questo file non si può usare",
@@ -175,7 +175,7 @@ export const STRINGS = {
     googleKeyFromTrip: "Il viaggio aperto ha già la sua chiave.",
     save: "Salva", saved: "Salvato.",
     about: "Informazioni", version: "Versione {v}",
-    updateReady: "È pronta una nuova versione.", reload: "Aggiorna",
+    updateReady: "Nuova versione disponibile.", reload: "Aggiorna", close: "Chiudi",
     offlineReady: "Pronta per funzionare offline.",
     newer: "←", older: "→"
   }
