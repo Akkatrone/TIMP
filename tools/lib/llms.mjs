@@ -13,9 +13,18 @@ import { formatBrief } from "../../js/trip.js";
 
 const read = (root, f) => readFileSync(join(root, f), "utf8").trim();
 
-// Links between the documents point at files in the repository; on the published
-// page they would lead nowhere, so they become plain names.
-const unlink = md => md.replace(/\[([^\]]+)\]\((?!https?:)[^)]+\)/g, "$1");
+// The two documents point at each other and at files of the repository. Here they are
+// both in one page, so those pointers are rewritten: an assistant that follows them
+// finds nothing (a 404) and stops to ask for a file it already has.
+const ELSEWHERE = /\*\*If you are an AI assistant:\*\*[\s\S]*?\n\n/;
+function forOnePage(md){
+  return md
+    .replace(ELSEWHERE, "")
+    .replace(/\[([^\]]+)\]\((?!https?:)[^)]+\)/g, "$1")
+    .replace(/\btrip-format\.md\b/g, "the format reference (further down this page)")
+    .replace(/\bcreating-a-trip\.md\b/g, "the guide (earlier in this page)")
+    .replace(/`?examples\/demo-trip\.json`?/g, "the complete example (at the end of this page)");
+}
 
 export function llmsText({root = ROOT, site = "https://frafal.github.io/TIMP/", resolver = ""} = {}){
   const links = resolver ? `
@@ -36,6 +45,8 @@ known) and \`link\`. Put them in the stop as they are. It keeps nothing.
 > says what the trip is: days, stops, where to sleep, what to remember. Never how it
 > looks: the app picks colours, draws maps and chooses icons. The app refuses the whole
 > file if one rule is broken, so follow the format below exactly and invent no fields.
+> This page is complete: the format, the guide and a full example are all here. Do not
+> look for other files.
 > The format as a JSON Schema: ${site}trip.schema.json
 
 ## The format, in short
@@ -53,11 +64,11 @@ you. Fix every problem and hand over the whole file again.
 ${links}
 ---
 
-${unlink(read(root, "docs/creating-a-trip.md"))}
+${forOnePage(read(root, "docs/creating-a-trip.md"))}
 
 ---
 
-${unlink(read(root, "docs/trip-format.md"))}
+${forOnePage(read(root, "docs/trip-format.md"))}
 
 ---
 

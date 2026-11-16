@@ -217,6 +217,9 @@ test("llms.txt gives a chat assistant the whole format in one page, with valid e
     assert.ok(text.includes(title), doc);
   }
   assert.ok(!/\]\((?!https?:)[^)]+\)/.test(text), "no links to files of the repository");
+  // It is one complete page: nothing sends the assistant to look for another file.
+  assert.ok(!/trip-format\.md|creating-a-trip\.md|demo-trip\.json|ask for it/.test(text), "no pointer to a file the page already contains");
+  assert.match(text, /This page is complete/);
   assert.ok(text.includes(formatBrief()), "the format in short, the same text the app copies");
   assert.ok(text.includes("trip.schema.json"));
   const blocks = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => m[1]).filter(b => b.trim().startsWith("{") && b.includes('"format"'));

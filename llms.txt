@@ -5,6 +5,8 @@
 > says what the trip is: days, stops, where to sleep, what to remember. Never how it
 > looks: the app picks colours, draws maps and chooses icons. The app refuses the whole
 > file if one rule is broken, so follow the format below exactly and invent no fields.
+> This page is complete: the format, the guide and a full example are all here. Do not
+> look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
 ## The format, in short
@@ -71,11 +73,7 @@ you. Fix every problem and hand over the whole file again.
 
 How to turn a trip plan into a file for TIMP (Travel in my pocket). This guide is for whoever
 writes the file: a person, or an AI assistant working for one. It says how to write a
-*good* file; the list of fields and what is valid is in trip-format.md.
-
-**If you are an AI assistant:** read this page and trip-format.md
-before writing anything, and follow the steps in order. If you cannot see
-trip-format.md, ask for it: do not write the file from memory.
+*good* file; the list of fields and what is valid is in the format reference (further down this page).
 
 The reader of the result is someone standing in a street abroad with a phone in one
 hand, often without a connection. Everything in the file should help that person
@@ -250,9 +248,9 @@ checks it, and keeps it on the device. Nothing in it is ever sent to a server.
 The file says **what the trip is**: days, stops, where you sleep, what to remember. It
 says nothing about how the app looks: colours, map zones, labels and icons are worked
 out by the app from the content. How to write a *good* trip is in
-creating-a-trip.md.
+the guide (earlier in this page).
 
-- Working example: `examples/demo-trip.json`
+- Working example: the complete example (at the end of this page)
 - Check a file: `node tools/validate-trip.mjs --map my-trip.json`
 - The same rules as a JSON Schema, for tools and AI assistants that can follow one:
   `trip.schema.json`, published next to the app (for example
