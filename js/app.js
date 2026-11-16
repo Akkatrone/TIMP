@@ -719,6 +719,12 @@ function render(){
   $fab.setAttribute("aria-label", t("addStop"));
   $fab.title = t("addStop");
   document.body.classList.toggle("has-fab", r.name === "day");
+  // While the page is rebuilt the interactive map is out of it, and the page is shorter
+  // by its height: a browser that lays the page out in that moment pulls the scroll up
+  // (a tap on ⋯ or Edit under an open map jumped by the map's height). The page keeps
+  // its height until the map is back.
+  const y = window.scrollY;
+  $app.style.minHeight = $app.offsetHeight + "px";
   if(live) live.handle.el.remove(); // keep the map alive while the page is rebuilt
   let wanted = null;
   if(r.name === "welcome") $app.innerHTML = renderWelcome();
@@ -727,6 +733,8 @@ function render(){
   else { const out = renderDay(r.i); $app.innerHTML = out.html; wanted = out.wanted; }
   syncLive(wanted);
   markCut();
+  $app.style.minHeight = "";
+  if(window.scrollY !== y) window.scrollTo(0, y);
 }
 
 /* ---------- events ---------- */
@@ -764,7 +772,7 @@ $app.addEventListener("click", e => {
     S.menuFor = S.menuFor === more.dataset.more ? null : more.dataset.more;
     render();
     const menu = S.menuFor && document.querySelector(`[data-more="${CSS.escape(S.menuFor)}"] + .menu`);
-    if(menu){ placeMenu(menu); menu.querySelector("[role=menuitem]").focus(); }
+    if(menu){ placeMenu(menu); menu.querySelector("[role=menuitem]").focus({preventScroll: true}); }
     else refocus(`[data-more="${CSS.escape(more.dataset.more)}"]`);
     return;
   }

@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.3.2
+
+- With the interactive map open, tapping ⋯ or Edit on a stop no longer scrolls the
+  page up by the height of the map. The page was rebuilt with the map taken out for a
+  moment; it now keeps its height until the map is back.
+
 ## 2.3.1
 
 Adding a stop from Google Maps, and the route on the map.

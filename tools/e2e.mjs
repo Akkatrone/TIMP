@@ -118,6 +118,19 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("the route through stop 2", `${lines}.length === 4`);
     await click(".stop:nth-child(2) [data-skip]");
     await until("the route past stop 2", `${lines}.length === 3`);
+    // Under the open map, ⋯ and Edit leave the page where it is: it used to jump up by
+    // the map's height, from the second time on.
+    for(let round = 0; round < 3; round++){
+      await run(`const b = [...document.querySelectorAll("[data-more]")].pop(); b.scrollIntoView({block: "center"}); await new Promise(r => setTimeout(r, 150)); window.__y = window.scrollY;`);
+      assert.ok(await run(`return window.__y > 0;`), "the page is scrolled");
+      await run(`[...document.querySelectorAll("[data-more]")].pop().click(); await new Promise(r => setTimeout(r, 300));`);
+      assert.equal(await run(`return window.scrollY - window.__y;`), 0, "⋯ does not scroll the page");
+      await run(`document.querySelector(".menu:not([hidden]) [data-edit]").click(); await new Promise(r => setTimeout(r, 400));`);
+      assert.equal(await run(`return window.scrollY - window.__y;`), 0, "Edit does not scroll the page");
+      await run(`document.querySelector("dialog.sheet [data-close]").click(); await new Promise(r => setTimeout(r, 300));`);
+      assert.equal(await run(`return window.scrollY - window.__y;`), 0, "closing the form does not scroll the page");
+    }
+    await run(`window.scrollTo(0, 0);`);
     await click("[data-map]");
   });
 
