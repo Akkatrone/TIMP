@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.1.0
+
+A more compact stop, so more of the day fits on the screen.
+
+- The way you get there (metro, train, plane, boat) moves to the left column, under the
+  time and the pin number. The title starts at the edge and has the whole line.
+- Labels like "Booking needed" sit above the title, small, and no longer push the links
+  onto a second line.
+- Skip and Edit move into a ⋯ menu under the tick. The links row keeps only Map and
+  Directions, on one line. The menu works with the keyboard, closes with Escape or a tap
+  outside, and opens upwards when there is no room below.
+
 ## 2.0.2
 
 - "Save the file" works on Android. Chrome offers the share sheet but refuses to share

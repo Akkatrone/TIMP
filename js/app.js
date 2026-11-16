@@ -15,6 +15,7 @@ const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const FOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l3.5-3.5M4.5 13.5L8 10l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PLUS = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+const DOTS = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="12.5" cy="8" r="1.5" fill="currentColor"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const S = {
@@ -25,6 +26,7 @@ const S = {
   langPref: "auto",       // "auto" follows the trip, or a language chosen on this device
   theme: document.documentElement.dataset.theme || "auto",   // set early by js/theme.js
   openStops: new Map(),   // descriptions opened or closed one by one, until the page is closed
+  menuFor: null,          // the stop whose ⋯ menu is open
   deviceKey: "",
   useGoogle: true,        // false: always OpenStreetMap, even with a key (saves Google map loads)
   importError: null,      // {title, items}
@@ -519,20 +521,27 @@ function stopsHTML(day, planId, list, numbered, pins){
     const id = stopKey(day, planId, s, i);
     const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id], open = isOpen(id);
     const q = stopQuery(s);
-    // Links and the skip button stay outside the part that folds: they are always one tap away.
-    const meta = `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${s.tag ? `<span class="tag">${esc(s.tag)}</span>` : ""}` +
-      (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
-      (q ? `<a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
-      (isDone ? "" : `<button type="button" class="skip" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`) +
-      (s.id ? `<button type="button" class="skip" data-edit="${esc(s.id)}">${esc(t("editStop"))}</button>` : "") + `</div>`;
+    // Left column: when, where on the map, how you get there.
     const pn = pins ? pins[s.mapLabel || s.title] : (numbered && s.lat !== undefined ? i + 1 : 0);
-    const nb = pn ? `<br><span class="nb">${pn}</span>` : "";
     const tv = s.travel ? `<span class="tvchip" role="img" aria-label="${esc(t("travel_" + s.travel))}" title="${esc(t("travel_" + s.travel))}">${travelIcon(s.travel, 16)}</span>` : "";
-    const titleRow = `<div class="h">${tv}<h3>${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>`;
+    const left = `<div class="time"><span>${esc(s.time)}</span>${pn ? `<span class="nb">${pn}</span>` : ""}${tv}</div>`;
+    // Middle: a label above the title, the title, the description that folds, the links.
+    const titleRow = `<div class="h"><h3>${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>`;
     const head = s.text
       ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}">${titleRow}<p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p></div>`
       : titleRow;
-    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}"><div class="time">${esc(s.time)}${nb}</div><div class="body">${head}${meta}</div><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button></li>`;
+    const links = (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
+      (q ? `<a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "");
+    const meta = isSkipped || links ? `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${links}</div>` : "";
+    const eyebrow = s.tag ? `<span class="eyebrow">${esc(s.tag)}</span>` : "";
+    // Right: the tick, and the ⋯ menu with the actions used less often.
+    const menuOpen = S.menuFor === id;
+    const items = (s.id ? `<button type="button" role="menuitem" data-edit="${esc(s.id)}">${esc(t("editStop"))}</button>` : "") +
+      (isDone ? "" : `<button type="button" role="menuitem" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`);
+    const side = `<div class="side"><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button>` +
+      (items ? `<button class="more" type="button" data-more="${esc(id)}" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="${esc(t("moreActions"))}: ${esc(s.title)}">${DOTS}</button>` +
+        `<div class="menu" role="menu"${menuOpen ? "" : " hidden"}>${items}</div>` : "") + `</div>`;
+    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}">${left}<div class="body">${eyebrow}${head}${meta}</div>${side}</li>`;
   }).join("") + `</ol>`;
 }
 
@@ -666,6 +675,8 @@ function refocus(selector){
 }
 
 $app.addEventListener("click", e => {
+  // Any tap outside the open ⋯ menu closes it first (its own button toggles it below).
+  if(S.menuFor && !e.target.closest(".menu") && !e.target.closest("[data-more]")) hideMenu();
   const tick = e.target.closest("[data-tick]");
   if(tick){
     const id = tick.dataset.tick;
@@ -679,14 +690,24 @@ $app.addEventListener("click", e => {
   const skip = e.target.closest("[data-skip]");
   if(skip){
     const id = skip.dataset.skip;
+    S.menuFor = null;
     if(S.state.skipped[id]) delete S.state.skipped[id]; else S.state.skipped[id] = 1;
     saveState();
     render();
     refocus(`[data-skip="${CSS.escape(id)}"]`);
     return;
   }
+  const more = e.target.closest("[data-more]");
+  if(more){
+    S.menuFor = S.menuFor === more.dataset.more ? null : more.dataset.more;
+    render();
+    const menu = S.menuFor && document.querySelector(`[data-more="${CSS.escape(S.menuFor)}"] + .menu`);
+    if(menu){ placeMenu(menu); menu.querySelector("[role=menuitem]").focus(); }
+    else refocus(`[data-more="${CSS.escape(more.dataset.more)}"]`);
+    return;
+  }
   const edit = e.target.closest("[data-edit]");
-  if(edit){ editStop(edit.dataset.edit); return; }
+  if(edit){ S.menuFor = null; render(); editStop(edit.dataset.edit); return; }
   const tap = e.target.closest("[data-open]");
   if(tap){ toggleStop(tap.dataset.open); return; }
   if(e.target.closest("[data-expand]")){
@@ -770,6 +791,35 @@ function toggleStop(id){
   refocus(`[data-open="${CSS.escape(id)}"]`);
 }
 
+// The ⋯ menu opens upwards when there is no room below it (the + button is there).
+function placeMenu(menu){
+  menu.classList.toggle("up", menu.getBoundingClientRect().bottom > window.innerHeight - 76);
+}
+
+// Closes the menu where it is, without redrawing the page.
+function hideMenu(){
+  S.menuFor = null;
+  document.querySelectorAll(".menu").forEach(m => { m.hidden = true; });
+  document.querySelectorAll("[data-more]").forEach(b => b.setAttribute("aria-expanded", "false"));
+}
+
+function closeMenu(){
+  const id = S.menuFor;
+  hideMenu();
+  if(id) refocus(`[data-more="${CSS.escape(id)}"]`);
+}
+
+// Menu keys: Escape closes it, arrows move between its items.
+document.addEventListener("keydown", e => {
+  if(!S.menuFor) return;
+  if(e.key === "Escape"){ e.preventDefault(); closeMenu(); return; }
+  const items = [...document.querySelectorAll(".menu:not([hidden]) [role=menuitem]")];
+  const at = items.indexOf(document.activeElement);
+  if(at < 0 || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+  e.preventDefault();
+  items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+});
+
 // The description is a button for the keyboard too.
 $app.addEventListener("keydown", e => {
   if(e.key !== "Enter" && e.key !== " ") return;
@@ -802,7 +852,10 @@ $file.addEventListener("change", async () => {
   }
 });
 
-window.addEventListener("hashchange", () => { S.importError = null; render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { S.importError = null; S.menuFor = null; render(); window.scrollTo(0, 0); });
+// A tap outside the app's content (the strip of days, the + button) closes the menu.
+// The path is the one at the time of the tap: the page may have been redrawn since.
+document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().includes($app)) closeMenu(); });
 window.addEventListener("resize", markCut);
 // When the phone switches between light and dark, maps follow it.
 if(darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if(S.theme === "auto") render(); });

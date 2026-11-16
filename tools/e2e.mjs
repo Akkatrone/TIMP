@@ -37,7 +37,8 @@ await withApp(async ({run, until, reload}) => {
   await step("descriptions are folded, links stay visible", async () => {
     assert.equal(await count(".desc.clamp"), await count(".desc"));
     assert.ok(await count(".stop.cut") > 0, "at least one description is cut short at phone width");
-    assert.equal(await run(`return [...document.querySelectorAll(".stop .maplink, .stop .skip")].every(e => e.offsetParent !== null);`), true);
+    assert.equal(await run(`return [...document.querySelectorAll(".stop .maplink, .stop .more, .stop .tick")].every(e => e.offsetParent !== null);`), true);
+    assert.equal(await run(`return [...document.querySelectorAll(".stop .meta")].every(m => m.getBoundingClientRect().height < 30);`), true, "the links fit on one line");
   });
 
   await step("tapping a description opens that one only", async () => {
@@ -57,12 +58,26 @@ await withApp(async ({run, until, reload}) => {
     assert.equal(await count(".desc.clamp"), await count(".desc"));
   });
 
+  await step("the ⋯ menu opens with Edit and Skip, and closes with Escape or a tap outside", async () => {
+    assert.equal(await count(".menu:not([hidden])"), 0);
+    await click("[data-more]", 0);
+    assert.equal(await count(".menu:not([hidden])"), 1);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".menu:not([hidden]) [role=menuitem]")].map(b => b.textContent);`), ["Edit", "Skip"]);
+    assert.equal(await run(`return document.activeElement.textContent;`), "Edit", "the first item takes the focus");
+    await run(`document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));`);
+    assert.equal(await count(".menu:not([hidden])"), 0);
+    assert.equal(await run(`return document.activeElement.dataset.more !== undefined;`), true, "the focus goes back to ⋯");
+    await click("[data-more]", 0);
+    await run(`document.querySelector("h1").click();`);
+    assert.equal(await count(".menu:not([hidden])"), 0);
+  });
+
   await step("a stop can be skipped and restored", async () => {
     await click("[data-skip]", 2);
     assert.equal(await count(".stop.skipped"), 1);
-    assert.equal(await text(".stop.skipped .skip"), "Restore");
+    assert.equal(await text(".stop.skipped [data-skip]"), "Restore");
     assert.equal(await text(".progress"), "0/6 done · 1 skipped");
-    await click(".stop.skipped .skip");
+    await click(".stop.skipped [data-skip]");
     assert.equal(await count(".stop.skipped"), 0);
     await click("[data-skip]", 2);
   });
@@ -111,8 +126,8 @@ await withApp(async ({run, until, reload}) => {
     await click('[data-lang="it"]');
     assert.equal(await run(`return document.documentElement.lang;`), "it");
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `document.querySelector(".skip")`);
-    assert.equal(await text(".stop:not(.skipped):not(.done) .skip"), "Salta");
+    await until("day 1", `document.querySelector("[data-skip]")`);
+    assert.equal(await text(".stop:not(.skipped):not(.done) [data-skip]"), "Salta");
     await reload();
     assert.equal(await run(`return document.documentElement.lang;`), "it");
     await run(`location.hash = "#trips";`);

@@ -34,6 +34,8 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 - Every change is a version, like a commit in Git. Share the file, and when a friend
   changed it too, the app joins the two.
 - Tick the stops you have done, or skip the ones you leave out. The app remembers both.
+- Each stop at a glance: time, pin number and how you get there on the left, a label
+  like "Booking needed" above the title, Map and Directions always one tap away.
 - A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
   a sketch to scale when you are not. What is behind you is drawn dashed.
 - One tap to open any stop in Google Maps, with directions.
@@ -76,8 +78,9 @@ Trips, remove the app from the Home Screen, add it again and load the files.
 
 ## Change the trip on the way
 
-Tap **+** at the bottom right of a day to add a stop, or **Edit** under a stop to change
-it, move it to another day, or delete it.
+Tap **+** at the bottom right of a day to add a stop. Each stop has a **⋯** button under
+its tick: **Edit** changes it, moves it to another day or deletes it; **Skip** marks a
+stop you leave out.
 
 The quickest way to fill in a stop is to paste what Google Maps gives you. The form
 reads it on the phone:

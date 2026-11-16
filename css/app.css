@@ -84,7 +84,7 @@ h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
 ol.stops{list-style:none;margin:0;padding:0}
 .stop{display:grid;grid-template-columns:4.3rem 1fr auto;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
 .stop:last-child{border-bottom:1px solid var(--line)}
-.time{font:500 .82rem/1.5 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);padding-top:1px;overflow-wrap:anywhere}
+.time{font:500 .82rem/1.5 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);padding-top:1px;overflow-wrap:anywhere;display:grid;justify-items:start;align-content:start;gap:7px;min-width:0}
 .body{min-width:0}
 .body h3{margin:0;font:600 1rem/1.35 var(--f-body)}
 .body p{margin:.2rem 0 0;color:var(--muted);font-size:.9rem}
@@ -105,7 +105,20 @@ ol.stops{list-style:none;margin:0;padding:0}
 .stop.cut .chev,.stop.open .chev{display:block}
 .stop.open .chev{transform:rotate(180deg)}
 .desc.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
-.skip{border:0;background:none;padding:2px 0;font:500 .8rem var(--f-body);color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+/* a label above the title: "Booking needed", "Optional" */
+.eyebrow{display:block;font:600 .66rem/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--warn);margin-bottom:4px}
+.stop.done .eyebrow,.stop.skipped .eyebrow{opacity:.5}
+
+/* right column: the tick, and the ⋯ menu below it */
+.side{display:grid;justify-items:center;align-content:start;gap:8px;position:relative}
+.more{width:30px;height:30px;border-radius:50%;border:0;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
+.more svg{width:16px;height:16px}
+.more:hover,.more[aria-expanded="true"]{background:var(--line);color:var(--ink)}
+.menu{position:absolute;top:72px;right:0;z-index:6;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.28);display:grid;min-width:160px;padding:4px}
+.menu.up{top:auto;bottom:72px}
+.menu[hidden]{display:none}
+.menu button{border:0;background:none;color:var(--ink);font:500 .92rem var(--f-body);text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer;min-height:44px}
+.menu button:hover,.menu button:focus-visible{background:var(--bg)}
 .tag.off{background:var(--line);color:var(--muted)}
 .stop.skipped .body h3,.stop.skipped .time,.stop.skipped .desc{opacity:.5}
 .stop.skipped .body h3{text-decoration:line-through;text-decoration-thickness:1px}
@@ -114,7 +127,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .iconbtn svg{width:18px;height:18px}
 .iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 /* how a stop is travelled: metro, train, plane, boat */
-.tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink));margin-top:-1px}
+.tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink))}
 .tvchip svg{display:block}
 .tap .h,.body > .h{display:flex;align-items:flex-start;gap:8px}
 .h h3{flex:1 1 auto;min-width:0}
@@ -130,7 +143,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .tvpin.gone{border-style:dashed;opacity:.7;box-shadow:none}
 .alt{font-size:.88rem;color:var(--muted);margin:0}
 .alt b{color:var(--ink);font-weight:600}
-.nb{display:inline-block;margin-top:5px;font:600 .68rem var(--f-mono);border:1.5px solid var(--c,var(--line));border-radius:999px;padding:0 6px;color:var(--ink)}
+.nb{display:inline-block;font:600 .68rem var(--f-mono);border:1.5px solid var(--c,var(--line));border-radius:999px;padding:0 6px;color:var(--ink)}
 
 /* sections and cards */
 .sec{display:grid;gap:10px}
