@@ -56,12 +56,14 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/geocode.js` | Finds the coordinates of an address: Google, then OpenStreetMap. |
 | `js/version.js` | Version ids, like Git's, and how two versions relate. No DOM. |
 | `js/merge.js` | Three-way merge of two versions of a trip. No DOM. |
-| `js/trips.js` | What happens on an edit or a file received: versions, merges, saved marks. No DOM. |
+| `js/diff.js` | What changed between two versions, stop by stop: the only comparison, used by the history and by the choice when a file is loaded. No DOM. |
+| `js/history.js` | The History sheet: the versions in words, and a way back to any of them. |
+| `js/trips.js` | What happens on an edit or a file received: `inspect` says how a file relates to the trip on the phone, `apply` carries out the traveller's choice. Versions, merges, restores, saved marks. No DOM. |
 | `js/objects.js` | Keeps versions the way Git does: snapshots made of shared pieces, each stored once under its SHA-256. No DOM. |
 | `js/store.js` | Storage on the device: IndexedDB, or the same calls in memory when the browser refuses storage. The tests use the memory one. |
 | `js/i18n.js` | Interface texts. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
-| `js/icons.js` | Icons for metro, train, plane, boat. No DOM. |
+| `js/icons.js` | Icons for metro, bus, train, plane, boat. No DOM. |
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `icons/` | `icon.svg` and `icon-maskable.svg` are the sources; the PNGs are made from them with `rsvg-convert` (192, 512, the maskable 512, and 180 for the iPhone, on a square without rounded corners). |
 | `sw.js` | Service worker: keeps the app available offline. |
@@ -117,6 +119,19 @@ finds either.
 
 **No new network requests** at startup, and no third-party scripts, fonts or trackers.
 Libraries are vendored under `vendor/` with their licence, and only when really needed.
+
+**The Content-Security-Policy is part of the app.** It is the `<meta>` at the top of
+`index.html`, and it says where the page may load code, images and fonts from and
+where it may send requests. Keep it tight:
+
+- no inline scripts and no `on…=` attributes in HTML: listeners are added from the
+  modules. Never add `'unsafe-inline'` to `script-src`;
+- a feature that needs a new host (a tile server, an API) adds that host, to the one
+  directive that needs it, in the same change, with a line in the comment above the
+  meta saying why;
+- `npm run e2e` fails if the browser blocks anything while it drives the app, so a
+  missing host shows up there. The Google map with a real key cannot run in the e2e:
+  check it by hand on a copy with a key.
 
 ## Testing a change on a phone
 

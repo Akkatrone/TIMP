@@ -63,8 +63,10 @@ async function connect(wsUrl){
   await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = () => reject(new Error("cannot reach Chrome")); });
   let next = 0;
   const waiting = new Map();
+  const events = [];   // what the page reports on its own, such as blocked loads
   ws.onmessage = event => {
     const msg = JSON.parse(event.data);
+    if(msg.method === "Log.entryAdded") events.push(msg.params.entry);
     const w = waiting.get(msg.id);
     if(!w) return;
     waiting.delete(msg.id);
@@ -77,7 +79,7 @@ async function connect(wsUrl){
   });
   const {targetId} = await send("Target.createTarget", {url: "about:blank"});
   const {sessionId} = await send("Target.attachToTarget", {targetId, flatten: true});
-  return {page: (method, params) => send(method, params, sessionId), close: () => ws.close()};
+  return {page: (method, params) => send(method, params, sessionId), close: () => ws.close(), events};
 }
 
 /**
@@ -88,6 +90,7 @@ async function connect(wsUrl){
  *   theme("light"|"dark") switches the colour scheme
  *   reload()              reloads the page and waits for the app
  *   capture()             returns a PNG of the screen as a Buffer
+ *   blocked()             what the Content-Security-Policy blocked so far
  */
 export async function withApp(work){
   const server = await serve();
@@ -95,7 +98,8 @@ export async function withApp(work){
   const profile = await mkdtemp(join(tmpdir(), "timp-browser-"));
   const {chrome, wsUrl} = await launch(profile);
   try{
-    const {page, close} = await connect(wsUrl);
+    const {page, close, events} = await connect(wsUrl);
+    const blocked = () => events.filter(e => /Content Security Policy/i.test(e.text || "")).map(e => e.text);
     const run = async code => {
       const r = await page("Runtime.evaluate", {expression: `(async () => { ${code} })()`, awaitPromise: true, returnByValue: true});
       if(r.exceptionDetails) throw new Error("in the page: " + (r.exceptionDetails.exception?.description || r.exceptionDetails.text));
@@ -119,10 +123,11 @@ export async function withApp(work){
     await page("Emulation.setLocaleOverride", {locale: "en-US"});
     await theme("light");
     await page("Page.enable");
+    await page("Log.enable");
     await page("Page.navigate", {url: base});
     await until("the welcome screen", `document.querySelector('[data-act="demo"]')`);
 
-    await work({run, until, theme, reload, capture, base});
+    await work({run, until, theme, reload, capture, base, blocked});
     close();
   }finally{
     chrome.kill();

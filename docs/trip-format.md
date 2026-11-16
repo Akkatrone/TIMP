@@ -118,7 +118,7 @@ A list. Each entry is one date. Day 1 is the first entry.
 | `query` | no | What to search in Google Maps for the "Map" and "Directions" links. Use the name people would type, with the city. Without it, the coordinates are used. |
 | `tag` | no | A short label: `"Booking needed"`, `"Optional"`. |
 | `link` | no | A Google Maps link to the exact place, `https://` only. When present, "Map" opens it instead of a search. The app keeps the link pasted when a stop is added. |
-| `travel` | no | How you reach this stop: `"metro"`, `"train"`, `"plane"` or `"boat"`. Shown as an icon next to the title and on the map leg that arrives here. Leave it out when you walk, or for any other way (bus, taxi, cable car). See [How the map is built](#how-the-map-is-built). |
+| `travel` | no | How you reach this stop: `"metro"`, `"bus"`, `"train"`, `"plane"` or `"boat"`. Shown as an icon in the stop's left column and on the map leg that arrives here. Leave it out when you walk, or for any other way (taxi, cable car). See [How the map is built](#how-the-map-is-built). |
 | `id` | recommended | Lowercase letters, digits, dashes; unique within the list. The app uses it to remember that the stop was ticked or skipped. Without it, the position in the list is used, so reordering stops in an updated file would move the ticks. |
 
 ### Plans

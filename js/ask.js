@@ -5,8 +5,10 @@
 //   const answer = await ask({title, text, actions: [{id: "no", label: "Cancel"},
 //                                                     {id: "yes", label: "Delete", kind: "danger"}]});
 //
-// Resolves with the id of the button, or null when the dialog is closed another way
-// (Escape, a tap outside). The first button takes the focus: put the safe one first.
+// `text` is a sentence, or a list of sentences and of {title, items} groups shown as
+// short lists. Resolves with the id of the button, or null when the dialog is closed
+// another way (Escape, a tap outside). The first button takes the focus: put the safe
+// one first.
 
 import { esc } from "./util.js";
 
@@ -15,7 +17,9 @@ export function ask({title, text = "", actions}){
     const d = document.createElement("dialog");
     d.className = "ask";
     d.setAttribute("aria-labelledby", "ask-title");
-    d.innerHTML = `<h2 id="ask-title">${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ""}` +
+    const body = [].concat(text).filter(Boolean).map(x => typeof x === "string" ? `<p>${esc(x)}</p>`
+      : `<section><h3>${esc(x.title)}</h3><ul>${x.items.map(i => `<li>${esc(i)}</li>`).join("")}</ul></section>`).join("");
+    d.innerHTML = `<h2 id="ask-title">${esc(title)}</h2>${body}` +
       `<div class="ask-actions">${actions.map(a => `<button type="button" class="btn ${esc(a.kind || "")}" data-answer="${esc(a.id)}">${esc(a.label)}</button>`).join("")}</div>`;
     document.body.appendChild(d);
     const done = answer => { if(d.open) d.close(); d.remove(); resolve(answer); };

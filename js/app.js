@@ -11,7 +11,9 @@ import { REPO_URL } from "./config.js";
 import { openStopEditor } from "./editor.js";
 import { ask } from "./ask.js";
 import { addStop, updateStop, removeStop } from "./edit.js";
-import { prepare, saveEdit, receive, moveMarks, fileName, fileText } from "./trips.js";
+import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText } from "./trips.js";
+import { diffTrips, counts } from "./diff.js";
+import { describe, openHistory } from "./history.js";
 import { shortId } from "./version.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -189,13 +191,21 @@ async function importText(text, name){
       rec = {id: incoming.id, trip: incoming, importedAt: Date.now(), fileName: name || "", exported: incoming.version.id};
       message = t("imported", {t: incoming.title});
     }else{
-      const got = await receive(versions, local.trip, incoming);
-      const v = shortId(got.trip.version.id);
-      rec = {...local, trip: got.trip, importedAt: Date.now(), fileName: name || local.fileName};
-      if(got.kind === "same") message = t("recvSame", {v});
-      else if(got.kind === "older") message = t("recvOlder", {v});
-      else if(got.kind === "newer"){ rec.exported = got.trip.version.id; message = t("recvNewer", {t: got.trip.title, v}); }
-      else { message = t("recvMerged", {a: got.report.added, c: got.report.changed, r: got.report.removed, v}); offer = true; }
+      const x = await inspect(versions, local.trip, incoming);
+      const choice = x.kind === "diverged" ? await chooseMerge(x) : x.kind === "newer" ? "take" : "keep";
+      if(choice === null) return;   // the traveller cancelled: nothing changes
+      const trip = await apply(versions, x, choice);
+      const v = shortId(trip.version.id);
+      rec = {...local, trip, importedAt: Date.now(), fileName: name || local.fileName};
+      if(x.kind === "same") message = t("recvSame", {v});
+      else if(x.kind === "newer"){ rec.exported = trip.version.id; message = t("recvNewer", {t: trip.title, v}); }
+      else if(x.kind === "older"){
+        // Nothing changes, unless the traveller wants this older file back.
+        toast(t("recvOlder", {v}), {label: t("backToFile"), run: () => backToFile(x)});
+        return;
+      }
+      else if(choice === "theirs"){ message = t("recvTheirs", {v}); offer = true; }
+      else { const c = counts(diffTrips(local.trip, trip)); message = t("recvMerged", {a: c.added, c: c.changed, r: c.removed, v}); offer = true; }
     }
     await keepRecord(rec);
     store.askPersistence();
@@ -207,6 +217,42 @@ async function importText(text, name){
     S.importError = {title: t("importFailed"), items: [String(e && e.message || e)]};
     render();
   }
+}
+
+// Both the file and this phone changed: show what, and ask what to do.
+async function chooseMerge(x){
+  const answer = await ask({
+    title: t("divTitle"),
+    text: [
+      {title: t("divInFile"), items: describe(x.theirs, 4)},
+      {title: t("divOnPhone"), items: describe(x.mine, 4)},
+      x.base ? "" : t("divNoBase")
+    ],
+    actions: [{id: "cancel", label: t("cancel")}, {id: "theirs", label: t("useFile")}, {id: "merge", label: t("mergeBoth"), kind: "primary"}]
+  });
+  return answer === "theirs" || answer === "merge" ? answer : null;
+}
+
+// An older file loaded on purpose: its content comes back as a new version.
+async function backToFile(x){
+  const trip = await apply(versions, x, "back");
+  const rec = {...S.records.find(r => r.id === trip.id), trip};
+  await keepRecord(rec);
+  render();
+  offerSave(rec, t("recvBack", {v: shortId(trip.version.id)}));
+}
+
+// The history of the open trip, with a way back to any version this phone has.
+function showHistory(id){
+  const rec = S.records.find(r => r.id === id);
+  if(!rec) return;
+  openHistory({trip: rec.trip, versions, onRestore: async vid => {
+    const {trip} = await restore(versions, rec.trip, vid);
+    const next = {...rec, trip};
+    await keepRecord(next);
+    render();
+    offerSave(next, t("restored", {v: shortId(trip.version.id)}));
+  }}).catch(err => toast(String(err.message || err)));
 }
 
 /* ---------- editing stops ---------- */
@@ -402,7 +448,7 @@ function renderTrips(){
       <div class="s">${esc(t("daysCount", {n: r.trip.days.length}))} · ${esc(t("loadedOn", {d: when}))}</div>
       <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
+      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button><button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
     </div>`;
   }).join("");
   const key = googleKey();
@@ -792,6 +838,7 @@ $app.addEventListener("click", e => {
   else if(a === "demo") loadDemo();
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
+  else if(a === "history") showHistory(act.dataset.id);
   else if(a === "open"){
     const rec = S.records.find(r => r.id === act.dataset.id);
     if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); window.scrollTo(0, 0); });

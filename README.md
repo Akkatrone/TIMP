@@ -29,7 +29,7 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 
 - Day-by-day programme: times, descriptions, reminders, alternative plans for a day.
 - Short descriptions: two lines each, tap one to read it all, or open them all at once.
-- Metro, train, plane and boat at a glance: an icon next to the stop and on the map.
+- Metro, bus, train, plane and boat at a glance: an icon by each stop and on the map.
 - Add and change stops on the phone: paste what Google Maps shares, or an address.
 - Every change is a version, like a commit in Git. Share the file, and when a friend
   changed it too, the app joins the two.
@@ -114,11 +114,21 @@ has been saved.
 When someone loads a file of a trip they already have (same trip `id`):
 
 - **a newer version** made from theirs replaces it;
-- **an older one** changes nothing;
-- **a version that changed separately** is joined with theirs: stops added on either
-  side are kept, a stop changed on one side takes that change, a stop removed on one
-  side and untouched on the other goes. When both changed the same detail, the same
-  side wins on every phone, so two friends who swap files end on the same version.
+- **an older one** changes nothing, unless they tap **Use this one**: the old content
+  then comes back as a new version, and nothing is lost;
+- **a version that changed separately** shows what is new in the file and what is new
+  on the phone, and asks:
+  - **Join both** merges the two: stops added on either side are kept, a stop changed on one
+    side takes that change, a stop removed on one side and untouched on the other goes.
+    When both changed the same detail, the same side wins on every phone, so two
+    friends who swap files end on the same version;
+  - **Use only the file** keeps the file as it is, as a new version that still remembers the
+    phone's changes;
+  - **Cancel** loads nothing.
+
+**History** (on the Trips page) lists the versions on the phone with what each one
+added, removed or changed, and can bring any of them back. Going back makes a new
+version with the old content, the way `git revert` does, so it can itself be undone.
 
 Ticked and skipped stops are never part of the file: they stay on each phone.
 
@@ -228,6 +238,10 @@ real routes and transport times, tap "Directions" on a stop.
   address are sent to Google (with a key) or to OpenStreetMap. Nothing else of the trip
   is sent.
 - A saved trip file goes only where you send it.
+- A Content-Security-Policy in `index.html` lets the page load code only from the app
+  itself and from Google's map servers, and send requests only to the map and address
+  services above. Text in a trip file is always escaped; the policy is a second lock in
+  case that ever fails.
 
 ## Host your own copy
 

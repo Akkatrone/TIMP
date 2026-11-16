@@ -89,18 +89,13 @@ For each stop:
   ("Colosseum Rome"). It drives the "Map" and "Directions" links.
 - `mapLabel`: when the title is an action and not a place ("Check-out" → the hotel name).
 - `link`: a Google Maps link to the exact place, when the traveller gave you one.
-- `travel`: how the travellers reach this stop, when it is by metro, train, plane or
-  boat. It is what they see at a glance, in the list and on the map, so set it every
-  time the description says so ("JR to Yotsuya", "the ferry crosses in ten minutes").
-  Leave it out for walking and for anything else (bus, taxi, cable car): only these
-  four have an icon. For a journey that is a stop of its own without a place ("Train
-  to Kyoto", "Flight to Rome"), set it on that stop and give it no coordinates.
-
-## 4. Coordinates
-
-A stop with `lat` and `lng` gets a pin on the map. A wrong pin is worse than no pin:
-it sends people to the wrong place with full confidence.
-
+- `travel`: how the travellers reach this stop, when it is by metro, bus, train, plane
+  or boat. It is what they see at a glance, in the list and on the map, so set it every
+  time the description says so ("JR to Yotsuya", "bus 7 from the station", "the ferry
+  crosses in ten minutes"). Leave it out for walking and for anything else (taxi, cable
+  car): only these five have an icon. For a journey that is a stop of its own without a
+  place ("Train to Kyoto", "Flight to Rome"), set it on that stop and give it no
+  coordinates.
 - Look coordinates up on a map or on the web whenever you can. Use four decimal places.
 - From memory, give coordinates only for places you are sure about: major landmarks,
   main stations. For a small restaurant or a hotel you cannot verify, leave `lat` and

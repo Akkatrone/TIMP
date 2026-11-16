@@ -269,9 +269,24 @@ body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 .ask{border:0;padding:20px;background:var(--surface);color:var(--ink);border-radius:16px;width:min(420px,calc(100vw - 32px));box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .ask::backdrop{background:rgba(10,12,14,.5)}
 .ask h2{font:700 1.15rem/1.25 var(--f-display);margin:0 0 8px}
-.ask p{margin:0 0 18px;color:var(--muted);font-size:.93rem}
+.ask p{margin:0 0 14px;color:var(--muted);font-size:.93rem}
+.ask section{margin:0 0 14px}
+.ask h3{font:500 .7rem var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.ask ul{margin:0;padding:0;list-style:none;display:grid;gap:2px;font-size:.92rem;overflow-wrap:anywhere}
+.ask{max-height:min(86vh,100%);overflow:auto}
 .ask-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.ask-actions .btn{flex:1 1 auto}
 .ask .btn.danger{background:var(--err);border-color:var(--err);color:var(--surface)}
+
+/* the history of a trip (js/history.js) */
+.versions{list-style:none;margin:0;padding:0;display:grid}
+.versions > li{display:grid;grid-template-columns:5.6rem 1fr auto;gap:10px;align-items:start;padding:12px 0;border-top:1px solid var(--line)}
+.versions > li.current .what{color:var(--ink)}
+.versions > li.away,.versions > li.foot{display:block;color:var(--muted);font-size:.86rem}
+.vid{display:grid;gap:2px;font-size:.78rem;color:var(--muted)}
+.vid code{font:600 .86rem var(--f-mono);color:var(--ink)}
+.what{list-style:none;margin:0;padding:0;font-size:.88rem;color:var(--muted);display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
+.tripcard .actions{flex-wrap:wrap}
 
 /* versions on the Trips page */
 .tripcard .ver code{font:500 .82rem var(--f-mono);color:var(--ink)}

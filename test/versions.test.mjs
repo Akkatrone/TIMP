@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ensureVersion, commit, commitMerge, relation, commonBase, versionId, canonical, shortId } from "../js/version.js";
 import { mergeTrips } from "../js/merge.js";
+import { diffTrips, counts } from "../js/diff.js";
+const merge = (base, ours, theirs) => { const trip = mergeTrips(base, ours, theirs); return {trip, report: counts(diffTrips(ours, trip))}; };
 import { ensureIds, addStop, updateStop, removeStop, insertIndex, clockMinutes, newId } from "../js/edit.js";
 import { validateTrip } from "../js/trip.js";
 
@@ -69,7 +71,7 @@ async function fork(){
 
 test("a merge keeps what both sides added and what only one side changed", async () => {
   const {root, a, b} = await fork();
-  const {trip, report} = mergeTrips(root, a, b);
+  const {trip, report} = merge(root, a, b);
   assert.ok(ids(trip, DAY1).includes("gelato"));
   assert.ok(ids(trip, DAY2).includes("lunch-by-the-river"));
   assert.equal(stopsOf(trip, DAY1).find(s => s.id === "se").text, "Changed on the other phone.");
@@ -79,8 +81,8 @@ test("a merge keeps what both sides added and what only one side changed", async
 
 test("a merge gives the same trip and the same version on both phones", async () => {
   const {root, a, b} = await fork();
-  const ab = await commitMerge(mergeTrips(root, a, b).trip, a, b);
-  const ba = await commitMerge(mergeTrips(root, b, a).trip, b, a);
+  const ab = await commitMerge(merge(root, a, b).trip, a, b);
+  const ba = await commitMerge(merge(root, b, a).trip, b, a);
   assert.equal(canonical(ab), canonical(ba).replace(ba.version.date, ab.version.date));
   assert.equal(ab.version.id, ba.version.id);
   assert.equal(relation(ab, a), "older");
@@ -91,14 +93,14 @@ test("a stop removed on one side goes, unless the other side changed it", async 
   const root = await ensureVersion(demo());
   const a = await commit(removeStop(root, {date: DAY1, id: "castelo"}), root);
   const b = await commit(addStop(root, {date: DAY2}, {time: "08:00", title: "Early coffee"}).trip, root);
-  let merged = mergeTrips(root, a, b);
+  let merged = merge(root, a, b);
   assert.ok(!ids(merged.trip, DAY1).includes("castelo"));
   assert.equal(merged.report.removed, 0, "already gone on this phone");
-  assert.equal(mergeTrips(root, b, a).report.removed, 1, "seen from the phone that still had it");
+  assert.equal(merge(root, b, a).report.removed, 1, "seen from the phone that still had it");
 
   const castelo = stopsOf(root, DAY1).find(s => s.id === "castelo");
   const c = await commit(updateStop(root, {date: DAY1, id: "castelo"}, {...castelo, time: "13:00"}).trip, root);
-  merged = mergeTrips(root, a, c);
+  merged = merge(root, a, c);
   assert.ok(ids(merged.trip, DAY1).includes("castelo"), "changed on one side wins over removed");
 });
 
@@ -108,13 +110,13 @@ test("both sides changed the same field: the same side wins on both phones", asy
   const a = await commit(updateStop(root, {date: DAY1, id: "se"}, {...se, time: "11:05"}).trip, root);
   const b = await commit(updateStop(root, {date: DAY1, id: "se"}, {...se, time: "11:10"}).trip, root);
   const winner = a.version.id > b.version.id ? "11:05" : "11:10";
-  assert.equal(stopsOf(mergeTrips(root, a, b).trip, DAY1).find(s => s.id === "se").time, winner);
-  assert.equal(stopsOf(mergeTrips(root, b, a).trip, DAY1).find(s => s.id === "se").time, winner);
+  assert.equal(stopsOf(merge(root, a, b).trip, DAY1).find(s => s.id === "se").time, winner);
+  assert.equal(stopsOf(merge(root, b, a).trip, DAY1).find(s => s.id === "se").time, winner);
 });
 
 test("without a base nothing is removed, and a stop added at the same place by both is kept once", async () => {
   const {a, b} = await fork();
-  const {trip} = mergeTrips(null, a, b);
+  const {trip} = merge(null, a, b);
   for(const id of ids(a, DAY1)) assert.ok(ids(trip, DAY1).includes(id), id);
   assert.ok(ids(trip, DAY2).includes("lunch-by-the-river"));
   assert.equal(new Set(ids(trip, DAY1)).size, ids(trip, DAY1).length);
@@ -125,7 +127,7 @@ test("a stop moved to another day on one side moves", async () => {
   const lunch = stopsOf(root, DAY1).find(s => s.id === "lunch");
   const a = await commit(updateStop(root, {date: DAY1, id: "lunch"}, lunch, {date: DAY2}).trip, root);
   const b = await commit(addStop(root, {date: DAY2}, {time: "17:00", title: "Shopping"}).trip, root);
-  const {trip} = mergeTrips(root, a, b);
+  const {trip} = merge(root, a, b);
   assert.ok(!ids(trip, DAY1).includes("lunch"));
   assert.ok(ids(trip, DAY2).includes("lunch"));
 });
@@ -135,7 +137,7 @@ test("places, stays and plans merge entry by entry", async () => {
   const a0 = JSON.parse(JSON.stringify(root)); a0.places.porto = {name: "Porto", color: "#3f63b5"};
   const b0 = JSON.parse(JSON.stringify(root)); b0.stays.casa.note = "New note"; b0.days[2].plans[1].name = "Cascais and the coast";
   const a = await commit(a0, root), b = await commit(b0, root);
-  const {trip} = mergeTrips(root, a, b);
+  const {trip} = merge(root, a, b);
   assert.equal(trip.places.porto.name, "Porto");
   assert.equal(trip.stays.casa.note, "New note");
   assert.equal(trip.days[2].plans[1].name, "Cascais and the coast");
@@ -190,7 +192,13 @@ test("stops without an id get one, and the old keys are reported so ticks can fo
 
 /* ---------- receiving files and editing, as the app does ---------- */
 
-import { prepare, saveEdit, receive, moveMarks, fileName } from "../js/trips.js";
+import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName } from "../js/trips.js";
+// What the app does on "Unisci", "Prendi" and so on: inspect, then apply the usual choice.
+async function receive(versions, local, incoming, choice){
+  const x = await inspect(versions, local, incoming);
+  const trip = await apply(versions, x, choice || {diverged: "merge", newer: "take"}[x.kind]);
+  return {...x, trip, report: counts(diffTrips(local, trip))};
+}
 import { versionStore } from "../js/objects.js";
 import { memoryBackend } from "../js/store.js";
 
@@ -204,7 +212,7 @@ test("two phones edit the same trip; each one receiving the other's file ends on
   const a = (await saveEdit(phoneA, root, addStop(root, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip)).trip;
   const b = (await saveEdit(phoneB, root, addStop(root, {date: DAY2}, {time: "13:00", title: "Lunch"}).trip)).trip;
   const onA = await receive(phoneA, a, b), onB = await receive(phoneB, b, a);
-  assert.equal(onA.kind, "merged");
+  assert.equal(onA.kind, "diverged");
   assert.equal(onA.base, true);
   assert.equal(onA.trip.version.id, onB.trip.version.id);
   assert.deepEqual(onA.report, {added: 1, changed: 0, removed: 0});
@@ -267,4 +275,68 @@ test("marks follow a stop that gets an id or moves", () => {
 test("the file name carries the trip and the short version", async () => {
   const {trip} = await prepare(demo());
   assert.match(fileName(trip), /^demo-lisbon-[0-9a-f]{7}\.json$/);
+});
+
+
+/* ---------- choices: the file only, back to an older file, back to an earlier version ---------- */
+
+test("using only the file drops this phone's changes, and an old copy cannot bring them back", async () => {
+  const store = memoryStore();
+  const {trip: root} = await prepare(demo());
+  const mine = (await saveEdit(store, root, addStop(root, {date: DAY1}, {time: "12:15", title: "Wrong stop"}).trip)).trip;
+  const theirs = await commit(addStop(root, {date: DAY2}, {time: "13:00", title: "Lunch"}).trip, root);
+  const x = await inspect(store, mine, theirs);
+  assert.equal(x.kind, "diverged");
+  assert.deepEqual(x.mine.added.map(a => a.stop.title), ["Wrong stop"]);
+  assert.deepEqual(x.theirs.added.map(a => a.stop.title), ["Lunch"]);
+  const kept = await apply(store, x, "theirs");
+  assert.ok(!ids(kept, DAY1).includes("wrong-stop"));
+  assert.ok(ids(kept, DAY2).includes("lunch"));
+  assert.deepEqual([...kept.version.parents].sort(), [mine.version.id, theirs.version.id].sort());
+  assert.equal((await inspect(store, kept, mine)).kind, "older", "the dropped version is already in the history");
+  assert.equal((await apply(store, await inspect(store, mine, theirs), "cancel")).version.id, mine.version.id, "cancel keeps this phone's version");
+});
+
+test("back to an older file makes a new version with its content, newer for every phone", async () => {
+  const store = memoryStore();
+  const {trip: root} = await prepare(demo());
+  const v2 = (await saveEdit(store, root, addStop(root, {date: DAY1}, {time: "12:15", title: "Wrong stop"}).trip)).trip;
+  const x = await inspect(store, v2, root);
+  assert.equal(x.kind, "older");
+  const back = await apply(store, x, "back");
+  assert.ok(!ids(back, DAY1).includes("wrong-stop"));
+  assert.deepEqual(back.version.parents, [v2.version.id]);
+  assert.equal((await inspect(memoryStore(), v2, back)).kind, "newer", "a phone that has v2 takes it");
+});
+
+test("restoring an earlier version undoes what came after, as a new version", async () => {
+  const store = memoryStore();
+  const {trip: v1} = await prepare(demo());
+  const v2 = (await saveEdit(store, v1, addStop(v1, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip)).trip;
+  const v3 = (await saveEdit(store, v2, removeStop(v2, {date: DAY1, id: "castelo"}))).trip;
+  const {trip: back} = await restore(store, v3, v1.version.id);
+  assert.equal(canonical(diffTrips(v1, back)), canonical(diffTrips(v1, v1)), "same stops as v1");
+  assert.deepEqual(back.version.history.slice(0, 3), [v3.version.id, v2.version.id, v1.version.id]);
+  await assert.rejects(restore(store, v3, "0000000000000000"));
+});
+
+test("the comparison names what changed: added, removed, changed fields, moved", () => {
+  const trip = demo();
+  let next = addStop(trip, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip;
+  next = removeStop(next, {date: DAY1, id: "castelo"});
+  const se = stopsOf(next, DAY1).find(s => s.id === "se");
+  next = updateStop(next, {date: DAY1, id: "se"}, {...se, time: "11:30", lat: 1, lng: 2}).trip;
+  next = updateStop(next, {date: DAY1, id: "lunch"}, stopsOf(next, DAY1).find(s => s.id === "lunch"), {date: DAY2}).trip;
+  const d = diffTrips(trip, next);
+  assert.deepEqual(d.added.map(x => x.stop.id), ["gelato"]);
+  assert.deepEqual(d.removed.map(x => x.stop.id), ["castelo"]);
+  assert.deepEqual(d.changed.map(x => [x.stop.id, x.fields]), [["se", ["time", "place"]]]);
+  assert.deepEqual(d.moved.map(x => [x.stop.id, x.from.date, x.date]), [["lunch", DAY1, DAY2]]);
+  assert.equal(d.other, false);
+  assert.deepEqual(counts(d), {added: 1, changed: 2, removed: 1});
+  const renamed = JSON.parse(JSON.stringify(trip)); renamed.title = "Other";
+  assert.equal(diffTrips(trip, renamed).other, true);
+  const reordered = JSON.parse(JSON.stringify(trip));
+  reordered.days[0].stops[0] = Object.fromEntries(Object.entries(reordered.days[0].stops[0]).reverse());
+  assert.equal(diffTrips(trip, reordered).changed.length, 0, "the order of fields is not a change");
 });

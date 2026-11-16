@@ -4,7 +4,7 @@
 export const FORMAT = "travel-in-my-pocket/1";
 
 // How a stop can be travelled. Keep in step with js/icons.js and docs/trip-format.md.
-export const TRAVEL = ["metro", "train", "plane", "boat"];
+export const TRAVEL = ["metro", "bus", "train", "plane", "boat"];
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const HEX = /^#[0-9a-fA-F]{6}$/;

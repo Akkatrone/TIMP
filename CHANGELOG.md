@@ -4,6 +4,27 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version (`travel-in-my-pocket/1`), which has not changed: files written for
 1.0 load in 2.0, and 1.0 ignores what 2.0 adds.
 
+## 2.3.0
+
+History, choices when files disagree, and a Content-Security-Policy.
+
+- **History**, on the Trips page: the versions on the phone, each with what it added,
+  removed, changed or moved ("+ Museum", "~ Lunch · time"), and **Restore** on any
+  earlier one. Restoring makes a new version with the old content, like `git revert`:
+  nothing is deleted, and the restore can itself be undone from the History.
+- A file that changed separately from the phone no longer merges silently. A dialog
+  shows what is new in the file and what is new on the phone, and offers **Join both**,
+  **Use only the file** (the file's content, as a new version that remembers the phone's
+  changes) or **Cancel**.
+- An older file still changes nothing, but its message has **Use this one**, to go back
+  to it on purpose, as a new version.
+- New way of getting there: **bus**, with its icon by the stop and on the map
+  (`"travel": "bus"`).
+- A Content-Security-Policy limits where the page may load code from and send requests
+  to: the app itself, Google's map servers, OpenStreetMap. It is a second lock behind
+  the escaping of trip text. The browser test now fails if the policy blocks anything.
+- Trip files do not change; the format stays `travel-in-my-pocket/1`.
+
 ## 2.2.0
 
 Versions are kept the way Git keeps them.

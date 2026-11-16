@@ -77,12 +77,14 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/geocode.js` | Address to coordinates: Google, then OpenStreetMap. |
 | `js/version.js` | Version ids like Git's, and how versions relate. No DOM. |
 | `js/merge.js` | Deterministic three-way merge of two versions. No DOM. |
-| `js/trips.js` | Edits and received files: versions, merges, marks. No DOM. |
+| `js/diff.js` | What changed between two versions, stop by stop. The only comparison. No DOM. |
+| `js/history.js` | The History sheet: versions in words, restore any of them. |
+| `js/trips.js` | Edits and received files (`inspect`, then `apply` the choice): versions, merges, restores, marks. No DOM. |
 | `js/objects.js` | Versions stored as shared pieces by SHA-256, like Git. No DOM. |
 | `js/store.js` | IndexedDB storage; the same calls in memory (also used by the tests). |
 | `js/i18n.js` | Interface texts, every language. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
-| `js/icons.js` | Icons for metro, train, plane, boat. No DOM. |
+| `js/icons.js` | Icons for metro, bus, train, plane, boat. No DOM. |
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `sw.js` | Service worker: offline copy of the app. |
 | `tools/`, `test/` | Checks, build, tests. `tools/e2e.mjs` drives a real browser. |
@@ -104,6 +106,10 @@ And these rules:
 
 - **Text from a trip file is untrusted.** It reaches the page only through `esc()` or
   `rich()` from `js/util.js`. Values used in styles or URLs are validated in `js/trip.js`.
+- **The Content-Security-Policy stays tight.** It is the `<meta>` in `index.html`. No
+  inline scripts, no `on…=` attributes, never `'unsafe-inline'` in `script-src`. A new
+  host goes in the one directive that needs it, in the same change, with a reason in
+  the comment above. `npm run e2e` fails if the browser blocks anything.
 - **The trip format is a contract.** Adding an optional field is fine. Renaming,
   removing or changing the meaning of a field is a breaking change and needs a new
   format version. A new field needs: a rule in `js/trip.js`, a test in

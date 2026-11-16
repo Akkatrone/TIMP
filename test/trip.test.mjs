@@ -79,9 +79,10 @@ test("a version written by the app is checked, and a link must be https", () => 
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].link = "http://example.com"; }), "stops[0].link"));
 });
 
-test("travel is one of the four ways the app can draw", () => {
+test("travel is one of the five ways the app can draw", () => {
   assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].travel = "train"; }), []);
-  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "bus"; }), "stops[0].travel"));
+  assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].travel = "bus"; }), []);
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "taxi"; }), "stops[0].travel"));
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].travel = "Train"; }), "stops[0].travel"));
 });
 

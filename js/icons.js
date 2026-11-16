@@ -2,11 +2,13 @@
 // Drawn for this project on a 24×24 grid, stroked with currentColor so they follow
 // the theme. No DOM here: the sketch builds SVG text from them under Node too.
 
-export const TRAVEL = ["metro", "train", "plane", "boat"];
+export const TRAVEL = ["metro", "bus", "train", "plane", "boat"];
 
 const PATHS = {
   // the "M" of metro signs
   metro: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 16.5v-9l4 5 4-5v9"/>',
+  // a bus seen from the side: windows, door, wheels
+  bus: '<rect x="2.5" y="5" width="19" height="12" rx="2.5"/><path d="M2.5 10.5h19M8.5 5v5.5M15 5v12"/><circle cx="7" cy="18.5" r="1.6"/><circle cx="18" cy="18.5" r="1.6"/>',
   // a train seen from the front, on its rails
   train: '<rect x="5.5" y="3" width="13" height="13" rx="3"/><path d="M8 7.5h8"/><circle cx="9" cy="12.5" r=".6"/><circle cx="15" cy="12.5" r=".6"/><path d="M8.5 16 6.5 20.5M15.5 16l2 4.5"/>',
   // a plane seen from above, pointing up

@@ -23,7 +23,7 @@ async function step(name, fn){
   }
 }
 
-await withApp(async ({run, until, reload}) => {
+await withApp(async ({run, until, reload, blocked}) => {
   const count = sel => run(`return document.querySelectorAll(${JSON.stringify(sel)}).length;`);
   const text = sel => run(`const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent : null;`);
   const click = (sel, i = 0) => run(`document.querySelectorAll(${JSON.stringify(sel)})[${i}].click(); await new Promise(r => setTimeout(r, 60));`);
@@ -188,6 +188,9 @@ await withApp(async ({run, until, reload}) => {
   const fill = (sel, value) => run(`const el = document.querySelector(${JSON.stringify(sel)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event("change", {bubbles: true}));`);
   const submit = () => run(`document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
   const stopTitles = () => run(`return [...document.querySelectorAll(".stop h3")].map(h => h.textContent);`);
+  const sendFile = trip => run(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(trip))}], "from-a-friend.json")); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change")); await new Promise(r => setTimeout(r, 600));`);
+  const answer = id => run(`document.querySelector('dialog.ask [data-answer="${id}"]').click(); await new Promise(r => setTimeout(r, 600));`);
+  let otherPhone = null;
   const versionOnPhone = () => run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip.version); }; });`);
 
   await step("the + button adds a stop from a Google Maps link, in time order, as a new version", async () => {
@@ -270,8 +273,13 @@ await withApp(async ({run, until, reload}) => {
     // The other phone: the same example trip, with its own new stop.
     const {trip: root} = await prepare(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8")));
     const other = await commit(addStop(root, {date: "2027-05-15"}, {time: "21:00", title: "Fado evening"}).trip, root);
-    const send = trip => run(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(trip))}], "from-a-friend.json")); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change")); await new Promise(r => setTimeout(r, 600));`);
-    await send(other);
+    await sendFile(other);
+    // Both changed: the app shows what, and asks.
+    await until("the choice", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await run(`return document.querySelector("dialog.ask h2").textContent;`), "The file and this phone changed separately");
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask section")].map(s => [s.querySelector("h3").textContent, [...s.querySelectorAll("li")].map(l => l.textContent)]);`),
+      [["In the file", ["+ Fado evening"]], ["Only on this phone", ["+ Tram 28"]]]);
+    await answer("merge");
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Changes joined: 1 new, 0 changed, 0 removed · version [0-9a-f]{7}/);
     const merged = await versionOnPhone();
     assert.deepEqual([...merged.parents].sort(), [saved.version.id, other.version.id].sort());
@@ -280,8 +288,60 @@ await withApp(async ({run, until, reload}) => {
     await run(`location.hash = "#day-1";`);
     await until("day 1", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Tram 28")`);
     // The same file again: this phone already has everything in it.
-    await send(other);
+    await sendFile(other);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /older than the trip on this phone/);
+    otherPhone = {root, other};
+  });
+
+  await step("a file can replace this phone's changes, and Cancel keeps them", async () => {
+    const {root} = otherPhone;
+    const third = await commit(addStop(root, {date: "2027-05-14"}, {time: "18:00", title: "Sunset on the river"}).trip, root);
+    const before = await versionOnPhone();
+    await sendFile(third);
+    await until("the choice", `document.querySelector("dialog.ask[open]")`);
+    await answer("cancel");
+    assert.equal((await versionOnPhone()).id, before.id, "Cancel changes nothing");
+    await sendFile(third);
+    await until("the choice", `document.querySelector("dialog.ask[open]")`);
+    await answer("theirs");
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Now the trip is the one in the file/);
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Sunset on the river")`);
+    assert.ok(!(await stopTitles()).includes("Tram 28"), "this phone's stop is gone");
+    assert.deepEqual([...(await versionOnPhone()).parents].sort(), [before.id, third.version.id].sort());
+  });
+
+  await step("an older file can be taken back on purpose, as a new version", async () => {
+    await sendFile(otherPhone.root);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /older than the trip on this phone/);
+    const before = await versionOnPhone();
+    await run(`document.querySelector("#toast .act").click(); await new Promise(r => setTimeout(r, 500));`);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Back to the file's version/);
+    const after = await versionOnPhone();
+    assert.deepEqual(after.parents, [before.id]);
+    assert.ok(!(await stopTitles()).includes("Sunset on the river"));
+  });
+
+  await step("the history lists the versions with what changed, and restores one", async () => {
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="history"][data-id="demo-lisbon"]')`);
+    await run(`document.querySelector('[data-act="history"][data-id="demo-lisbon"]').click();`);
+    await until("the versions", `document.querySelector("dialog.history .versions [data-restore]")`);
+    const rows = await run(`return [...document.querySelectorAll("dialog.history .versions > li")].map(li => li.textContent);`);
+    assert.match(rows[0], /now/, "the current version first");
+    assert.ok(rows.some(r => r.includes("− Sunset on the river")), rows.join(" | "));
+    assert.ok(rows.some(r => r.includes("+ Sunset on the river")));
+    assert.ok(rows.some(r => r.includes("Joined with ") && r.includes("which brought:")));
+    assert.ok(rows.some(r => r.includes("First version")));
+    // Back to the version that had "Sunset on the river".
+    const before = await versionOnPhone();
+    await run(`[...document.querySelectorAll("dialog.history .versions > li")].find(li => li.textContent.includes("+ Sunset on the river")).querySelector("[data-restore]").click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    await answer("yes");
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Back to an earlier version · new version [0-9a-f]{7}/);
+    assert.deepEqual((await versionOnPhone()).parents, [before.id], "restoring makes a new version");
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Sunset on the river")`);
   });
 
   await step("a place shared from Google Maps on Android opens the form already filled in", async () => {
@@ -420,6 +480,9 @@ await withApp(async ({run, until, reload}) => {
     assert.equal(counts.versions, 0, "the full copies are gone");
     assert.equal(counts.commits, 2, "both versions are kept, as commits");
     assert.ok(counts.objects > 10, `${counts.objects} pieces`);
+  });
+  await step("the Content-Security-Policy blocked nothing the app needs", async () => {
+    assert.deepEqual(blocked(), []);
   });
 }).then(() => {
   console.log(`e2e: OK (${passed} checks)`);
