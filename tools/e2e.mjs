@@ -208,9 +208,17 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     const lines = `document.querySelectorAll(".live .leaflet-overlay-pane path").length`;
     await until("the lines", `${lines} > 0`);
+    // Hiding them keeps the map as it is: the same map, its zoom and its place.
+    await run(`window.__map = document.querySelector(".live .leaflet-container"); window.__view = document.querySelector(".live .leaflet-map-pane").style.transform;`);
     await click("[data-route]");
     await until("no lines", `${lines} === 0 && document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await run(`return document.querySelector("[data-route]").getAttribute("aria-pressed");`), "false");
+    assert.equal(await run(`return document.querySelector(".live .leaflet-container") === window.__map && document.querySelector(".live .leaflet-map-pane").style.transform === window.__view;`), true, "the map was not drawn again");
+    await click("[data-route]");
+    await until("the lines back", `${lines} > 0`);
+    assert.equal(await run(`return document.querySelector(".live .leaflet-container") === window.__map;`), true);
+    await click("[data-route]");
+    await until("no lines", `${lines} === 0`);
     await click('[data-view="schema"]');
     await until("the sketch", `document.querySelector(".mapsvg")`);
     assert.equal(await count(".mapsvg .route"), 0);
@@ -219,6 +227,28 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector("[data-route]").getAttribute("aria-pressed");`), "false", "kept after a reload");
     await click("[data-route]");
     assert.ok(await count(".mapsvg .route") > 0);
+    await click("[data-map]");
+  });
+
+  await step("holding a stop's number shows it on the map; a tap does nothing", async () => {
+    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200));`);
+    await until("day 1", `document.querySelector('.nb[data-pin="2"]')`);
+    if(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded") === "true";`)) await click("[data-map]");
+    const press = (ms) => run(`const nb = document.querySelector('.nb[data-pin="2"]'); const r = nb.getBoundingClientRect(); const o = {bubbles: true, clientX: r.x + 4, clientY: r.y + 4, pointerType: "touch"};
+      nb.dispatchEvent(new PointerEvent("pointerdown", o)); await new Promise(res => setTimeout(res, ${ms})); nb.dispatchEvent(new PointerEvent("pointerup", o)); await new Promise(res => setTimeout(res, 100));`);
+    await press(100);
+    assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded");`), "false", "a tap leaves the map closed");
+    await press(700);
+    assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded");`), "true", "a hold opens it");
+    await run(`document.querySelector('[data-view="live"]').click();`);
+    await press(700);
+    await until("the card of the third stop", `document.querySelector(".live .leaflet-popup") && document.querySelector(".live .leaflet-popup").textContent.includes("Miradouro de Santa Luzia")`);
+    // The sketch: the badge of that stop pulses.
+    await click('[data-view="schema"]');
+    await until("the sketch", `document.querySelector(".mapsvg")`);
+    await press(700);
+    assert.equal(await run(`return [...document.querySelectorAll(".mapsvg .badge.hit")].map(b => b.dataset.idx).join();`), "2");
+    await click('[data-view="live"]');
     await click("[data-map]");
   });
 
@@ -684,7 +714,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("day 2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Pastéis de Belém"))`);
     const stop = title => `[...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent.includes(${JSON.stringify(title)}))`;
     // Lisbon is in Europe: TheFork, searched by name and city; a museum gets none.
-    assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector('a[aria-label="Reviews on TheFork"]').href;`), "https://www.google.com/search?q=TheFork%20Dinner%20in%20Cacilhas%20Lisboa");
+    assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector('a[aria-label="Reviews on TheFork"]').href;`), "https://www.google.com/search?q=site%3Athefork.com%20Dinner%20in%20Cacilhas%20Lisboa");
     assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector(".notice").textContent;`), "!Better booked");
     assert.equal(await run(`return ${stop("Mosteiro")}.querySelector('a[aria-label^="Reviews"]');`), null);
     // Booking required, closed on Saturdays (this day): two warnings, and the name on the sign.

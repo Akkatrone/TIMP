@@ -41,7 +41,8 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 - A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
   a sketch to scale when you are not. Each pin has the colour of its kind of place,
   lighter in the morning and darker after sunset; what is behind you is drawn dashed,
-  and the lines between the stops can be hidden.
+  and the lines between the stops can be hidden. Hold a stop's number in the list to
+  see it on the map.
 - Sunrise and sunset of each day, worked out on the phone from the date and the place,
   and a moon by the stops after dark.
 - One tap to open any stop in Google Maps, with directions.
@@ -105,8 +106,9 @@ Alternative plans for a day, like one for when it rains, are a job for an AI ass
   move it to another day.
 - A link to the reviews people use there, searched by the local name or the title:
   **Tabelog** in Japan, **Naver** in Korea, **Yelp** in the United States and Canada,
-  **TheFork** in Europe (through a web search). Nothing is fetched: the link opens only
-  when you tap it.
+  **TheFork** in Europe (a web search of its pages: it lists only the restaurants it
+  works with, so the results show at once whether the place is there). Nothing is
+  fetched: the link opens only when you tap it.
 
 The quickest way to fill in a stop is to paste what Google Maps gives you. The form
 reads it on the phone:

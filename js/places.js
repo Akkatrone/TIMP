@@ -48,16 +48,21 @@ export function regionOf(stop, timezone){
 }
 
 const q = s => encodeURIComponent(s);
+// TheFork's site in the app's language; the English one otherwise.
+const THEFORK = {it: "thefork.it"};
 
 /**
  * Where people of that part of the world read about a place to eat, as a link the
  * traveller taps: nothing is fetched by the app. Japan: Tabelog, searched by the
  * local name when there is one. Korea: Naver Map. North America: Yelp. Europe:
- * TheFork, through a web search (its own search pages cannot be linked by a name).
+ * TheFork, through a web search on its site in the app's language (thefork.it lists
+ * restaurants of every country too). Its own search goes by city code, not by name,
+ * and it lists only its partners: a list of results shows at once whether the place
+ * is there, where a jump to the first one could land on another restaurant.
  * Elsewhere none: the Map link already opens Google, with its reviews.
  * @returns {{site: string, url: string} | null}
  */
-export function reviewSite(stop, {city, timezone} = {}){
+export function reviewSite(stop, {city, timezone, lang} = {}){
   if(!stop || stop.type !== "food") return null;
   const name = stop.local || stop.title;
   switch(regionOf(stop, timezone)){
@@ -67,7 +72,7 @@ export function reviewSite(stop, {city, timezone} = {}){
       const where = stop.address || city || "";
       return {site: "Yelp", url: "https://www.yelp.com/search?find_desc=" + q(stop.title) + (where ? "&find_loc=" + q(where) : "")};
     }
-    case "eu": return {site: "TheFork", url: "https://www.google.com/search?q=" + q(["TheFork", stop.title, city].filter(Boolean).join(" "))};
+    case "eu": return {site: "TheFork", url: "https://www.google.com/search?q=" + q([`site:${THEFORK[lang] || "thefork.com"}`, stop.title, city].filter(Boolean).join(" "))};
     default: return null;
   }
 }

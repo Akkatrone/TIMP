@@ -1,13 +1,34 @@
 # TIMP (Travel in my pocket): how to write a trip file
 
-> For AI assistants asked to make a trip for TIMP. TIMP is a web app (https://frafal.github.io/TIMP/) that
-> shows a day-by-day travel guide on a phone, offline. A trip is ONE JSON file that
+> For AI assistants asked to make or change a trip for TIMP, a web app (https://frafal.github.io/TIMP/)
+> that shows a day-by-day travel guide on a phone, offline. A trip is ONE JSON file that
 > says what the trip is: days, stops, where to sleep, what to remember. Never how it
 > looks: the app picks colours, draws maps and chooses icons. The app refuses the whole
 > file if one rule is broken, so follow the format below exactly and invent no fields.
 > This page is complete: the format, the guide and a full example are all here. Do not
 > look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
+
+**Version 3.6.0.** TIMP is under active development and this page changes with it.
+Remember this version. Before you change a trip later in the conversation, or when a
+message from the app names a newer TIMP version, open this page again: if its version
+is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
+the message the app copies (Trips → Have an AI assistant change this trip): it always
+carries the current format.
+
+## What's new
+
+Only what a trip file, or a list of changes, can say differently. Files written for an
+older version still load.
+
+- **3.5**: three optional stop fields: `local` (the name as on the sign), `booking`
+  (`required`, `advised`, `booked`) and `closed` (days of the week and dates).
+- **3.4**: changes can add, rename and remove a day's plans: `addPlan`, `setPlan`,
+  `removePlan`.
+- **3.1**: a list of changes instead of the whole file again:
+  `travel-in-my-pocket/changes`.
+- **3.0**: format `travel-in-my-pocket/2`: the file says only what the trip is, and
+  `type` gives each stop its kind of place.
 
 ## The format, in short
 
@@ -91,10 +112,10 @@ On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square
 
 ## How the traveller loads it
 
-They copy your answer and, in the app, tap Trips → Paste a trip (or save it as a .json
-file and load it). If the app refuses it, it lists each problem with its position, like
+They copy your answer and tap Paste in the app (or save it as a .json file and load
+it). If the app refuses it, it lists each problem with its position, like
 `days[0].stops[2].title: is required`, and a button copies that list to send back to
-you. Fix every problem and hand over the whole file again.
+you. Fix every problem and send your answer again.
 
 ---
 
@@ -114,11 +135,8 @@ One JSON file in the format `travel-in-my-pocket/2`. It says what the trip is: d
 stops, stays, things to remember. Never how it looks: the app picks colours, draws the
 maps and chooses the icons from the content.
 
-A trip file contains hotels and dates. Treat it as private:
-
-- Inside a copy of this repository, save it in `private/<trip-name>.json`. Git ignores
-  that folder. Never save a real trip anywhere else in the repository and never commit one.
-- Anywhere else, give the file to the traveller and nobody else. Do not publish it.
+A trip file contains hotels and dates. Treat it as private: give it to the traveller and
+nobody else, and never publish it.
 
 ## 1. Collect the trip
 
@@ -224,23 +242,6 @@ only a phone number can be tapped to call. The stays are listed there by the app
 
 ## 6. Check the file
 
-**With Node and a copy of the repository:**
-
-```bash
-node tools/validate-trip.mjs --map private/<trip-name>.json
-```
-
-Fix every error. Then read the `--map` lines, one per day:
-
-```
-day 3 2027-05-16: Lisbon: 2 pins, 0.9 km across | Sintra: 4 pins, 1.3 km across
-```
-
-- Each `|` separates a map: stops more than 12 km apart are drawn on separate maps. A
-  walking day in one city should be one map, a few km across.
-- An unexpected extra map, or a walking day that is 40 km across, means a position is
-  wrong. Find it and fix it.
-
 **Without Node:** load the file in the app (or paste it: Trips → Paste a trip). It
 runs the same checks and lists every problem with its position in the file, for
 example `days[2].stops[0].lat: must be a number between -90 and 90`. Fix them and load
@@ -300,7 +301,7 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 - Links to review or booking pages you did not get from the traveller.
 - Comments or trailing commas in the JSON.
 - HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.
-- Saving the real trip in a folder Git tracks.
+
 
 ---
 
@@ -313,15 +314,6 @@ The file says **what the trip is**: days, stops, where you sleep, what to rememb
 says nothing about how the app looks: colours, map zones, labels and icons are worked
 out by the app from the content. How to write a *good* trip is in
 the guide (earlier in this page).
-
-- Working example: the complete example (at the end of this page)
-- Check a file: `node tools/validate-trip.mjs --map my-trip.json`
-- The same rules as a JSON Schema, for tools and AI assistants that can follow one:
-  `trip.schema.json`, published next to the app (for example
-  https://frafal.github.io/TIMP/trip.schema.json).
-
-The checker, the schema and the app are all made from one table in
-`js/trip.js` (`FIELDS`): what passes the checker loads in the app.
 
 ## Smallest valid file
 
@@ -379,7 +371,7 @@ an `address` and its position (`lat`, `lng`):
 | `info` | no | Sections of the Info page. |
 | `googleMapsKey` | no | A Google Maps key for everyone who loads the trip. See Google Maps key. |
 | `id` | written by the app | Identifies the trip on the phone. Without it the app makes one from the title and the first date, so a corrected file for the same trip updates it. Keep it when you change a file the app saved. |
-| `version` | written by the app | See Versions. Keep it as it is. |
+| `version` | written by the app | Keep it exactly as it is. |
 
 ## A day
 
@@ -443,59 +435,6 @@ only a phone number becomes a link to call it.
 Texts are plain text. The only formatting is `**bold**`, in a stop's `text`, in
 `notes`, in a stay's `note` and in info items. HTML is shown as written, never run.
 
-## How the app draws the map
-
-The file gives positions; the app does the rest.
-
-- **Online**: an interactive map with a pin per stop (its number, and the icon of its
-  `type`), a straight line from stop to stop, and a card for each pin.
-- **Offline**: a sketch to scale, with the same numbers.
-- Stops more than 12 km apart are drawn on separate maps (a day in Rome, then Naples).
-- Stops less than 30 m apart share a pin, named after the first one.
-- Skipped stops keep their pin, greyed; the line goes past them.
-- Each pin has the colour of its `type`, the lines that of the day's `city`. Their
-  shade follows the part of the day: lighter in the morning, darker after sunset.
-- Sunrise and sunset are worked out from the date and the first stop with a position,
-  on the clock of `timezone`. Stops after sunset get a moon in the list. A `time` in
-  words counts too: "Evening", "Dinner", "Sera", "Cena" are after dark.
-
-## Google Maps key
-
-Without a key, the interactive map uses OpenStreetMap. With `googleMapsKey`, it uses
-Google Maps, for everyone who loads the file. Restrict the key to the address of the
-app and to the Maps JavaScript API, set a daily quota, and never put a file with a key
-in a public repository. How to create one is in the
-README. Each phone can also save its own key, or
-turn Google Maps off, on the Trips page.
-
-## Versions
-
-The app writes a `version` into every file it saves:
-
-```json
-"version": {
-  "id": "3f2a9c1e0b7d4a55",
-  "parents": ["a1b2c3d4e5f60718"],
-  "history": ["a1b2c3d4e5f60718", "0f9e8d7c6b5a4938"],
-  "date": "2026-11-16T10:42:00.000Z"
-}
-```
-
-| Field | Meaning |
-|---|---|
-| `id` | 16 hex characters: the start of the SHA-256 of the trip's content (without `version`, keys in a fixed order) and of its parents. The same content from the same parents has the same id on every device. |
-| `parents` | The version this one was made from; two after a merge; none for the first. |
-| `history` | Every earlier version, newest first. It tells a newer file from an older one, or from one that changed separately. |
-| `date` | When the version was made. Not part of the id. |
-
-A file without `version` gets one when it is loaded, computed from its content, so two
-phones loading the same file agree on it. Each phone keeps the content of every version
-it has seen, the way Git does, as pieces shared between versions.
-
-**Changing a file by hand or with an assistant:** leave `id` and `version` as they are.
-The app sees that the content no longer matches the version and makes a new version
-from it, then joins it with what changed on other phones.
-
 ## Changes
 
 To change a trip that already exists, an AI assistant does not need to write the whole
@@ -520,472 +459,76 @@ as one new version (Paste, at the bottom of the app):
 ```
 
 Stops are named by their `id`, plans by theirs (`"plan": "…"` next to `"day"`). In
-`set`, `null` removes a field. A new stop goes in time order. The changes are applied
-in order, all or none. `addPlan` gives a day an alternative plan; on a day that has
-none yet, the stops it has become the first plan, named by `first`, and their ticks
-follow. A day left with one plan by `removePlan` has plain stops again. `setPlan`
-changes only the name: the stops of a plan change one by one. The changes are applied
-in order, all or none: if one is wrong, the app lists which one and why, and changes
-nothing. The result is checked like any trip file. `trip` may be left out: the changes
-then apply to the trip open on the phone. The rules are in
-`js/changes.js`.
+`set`, `null` removes a field. A new stop goes in time order. `addPlan` gives a day an
+alternative plan; on a day that has none yet, the stops it has become the first plan,
+named by `first`, and their ticks follow. A day left with one plan by `removePlan` has
+plain stops again. `setPlan` changes only the name: the stops of a plan change one by
+one. The changes are applied in order, all or none: if one is wrong, the app lists
+which one and why, and changes nothing. The result is checked like any trip file.
+`trip` may be left out: the changes then apply to the trip open on the phone.
 
-## The old format
 
-Files in `travel-in-my-pocket/1` (TIMP 1.0 to 2.4) still load: the app converts them
-once, as a new version made from the old one. Map settings of the old format
-(`places` colours, `glyph`, `mapZones`, `mapImages`, `zoneNames`, `mapSplitKm`,
-`mapLabel`) are dropped; the app works them out now.
-
-## Checks the app makes
-
-The app refuses a file, and lists every problem with its position, when: it is not JSON,
-`format` is wrong, `title`, `days`, a day's `date` or a stop's `title` is missing, a day
-has neither `stops` nor `plans` (or both), dates are not real or not in order,
-coordinates are out of range or not in pairs, a `link` is not `https://`, or an `id` is
-used twice in a list.
-
-Unknown fields, an unknown `type` or `travel`, and days without any position are
-warnings: the file loads, and the command-line checker shows them.
 
 ---
 
 # A complete example
 
 ```json
-{
- "format": "travel-in-my-pocket/2",
- "id": "demo-lisbon",
- "title": "Lisbon in my pocket (example)",
- "lang": "en",
- "timezone": "Europe/Lisbon",
+{"format": "travel-in-my-pocket/2", "title": "Lisbon in my pocket (example)", "lang": "en", "timezone": "Europe/Lisbon",
  "days": [
-  {
-   "date": "2027-05-14",
-   "city": "Lisboa",
-   "title": "Baixa and Alfama on foot",
-   "stay": {
-    "name": "Casa do Exemplo (invented)",
-    "address": "Baixa, Lisboa",
-    "note": "This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."
-   },
-   "notes": [
-    "This is an invented trip, here to show what the app does. Times and descriptions are examples: check everything before a real visit.",
-    "If it rains: swap this day with the next one. **Belém** has more places indoors."
-   ],
-   "stops": [
-    {
-     "id": "comercio",
-     "time": "10:00",
-     "title": "Praça do Comércio",
-     "type": "sight",
-     "text": "Start at the big square on the river, then walk under the arch into Rua Augusta.",
-     "address": "Praça do Comércio Lisboa",
-     "lat": 38.7075,
-     "lng": -9.1364
-    },
-    {
-     "id": "se",
-     "time": "11:00",
-     "title": "Lisbon Cathedral",
-     "type": "sight",
-     "text": "Ten minutes uphill. The tram line passes right in front of the door.",
-     "address": "Sé de Lisboa",
-     "lat": 38.7098,
-     "lng": -9.1326
-    },
-    {
-     "id": "santa-luzia",
-     "time": "11:45",
-     "title": "Miradouro de Santa Luzia",
-     "type": "view",
-     "text": "A terrace over the roofs of Alfama. A good place for a break.",
-     "address": "Miradouro de Santa Luzia",
-     "lat": 38.7117,
-     "lng": -9.1303
-    },
-    {
-     "id": "castelo",
-     "time": "12:30",
-     "title": "Castelo de São Jorge",
-     "type": "sight",
-     "text": "The castle on top of the hill. Tickets are sold at the gate.",
-     "tag": "Ticket needed",
-     "address": "Castelo de São Jorge",
-     "lat": 38.7139,
-     "lng": -9.1335,
-     "link": "https://www.google.com/maps/search/?api=1&query=Castelo+de+S%C3%A3o+Jorge+Lisboa"
-    },
-    {
-     "id": "lunch",
-     "time": "14:00",
-     "title": "Lunch in Alfama",
-     "type": "food",
-     "text": "No coordinates on this stop: it has no pin on the map, and that is fine."
-    },
-    {
-     "id": "sunset",
-     "time": "Evening",
-     "title": "Miradouro da Senhora do Monte",
-     "type": "view",
-     "text": "The highest viewpoint in the centre, best at sunset.",
-     "tag": "Optional",
-     "address": "Miradouro da Senhora do Monte",
-     "lat": 38.7191,
-     "lng": -9.1327
-    }
-   ]
-  },
-  {
-   "date": "2027-05-15",
-   "city": "Lisboa",
-   "title": "Belém and the river",
-   "stay": {
-    "name": "Casa do Exemplo (invented)",
-    "address": "Baixa, Lisboa",
-    "note": "This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."
-   },
-   "stops": [
-    {
-     "id": "jeronimos",
-     "time": "09:30",
-     "title": "Mosteiro dos Jerónimos",
-     "type": "museum",
-     "text": "Go early: the queue grows during the morning.",
-     "tag": "Ticket needed",
-     "address": "Mosteiro dos Jerónimos",
-     "lat": 38.6979,
-     "lng": -9.2068
-    },
-    {
-     "id": "pasteis",
-     "time": "11:00",
-     "title": "Pastéis de Belém",
-     "type": "food",
-     "text": "The custard tarts, still warm. The queue for take-away moves fast.",
-     "address": "Pastéis de Belém",
-     "lat": 38.6975,
-     "lng": -9.2032
-    },
-    {
-     "id": "torre",
-     "time": "12:00",
-     "title": "Torre de Belém",
-     "type": "sight",
-     "text": "A walk along the river to the tower.",
-     "address": "Torre de Belém",
-     "lat": 38.6916,
-     "lng": -9.216
-    },
-    {
-     "id": "maat",
-     "time": "14:30",
-     "title": "MAAT",
-     "type": "museum",
-     "text": "You can walk on the roof of the museum for free.",
-     "address": "MAAT Lisboa",
-     "lat": 38.6959,
-     "lng": -9.1937
-    },
-    {
-     "id": "lx",
-     "time": "16:30",
-     "title": "LX Factory",
-     "type": "shop",
-     "text": "Shops and cafés in an old factory, under the bridge.",
-     "address": "LX Factory Lisboa",
-     "lat": 38.7034,
-     "lng": -9.1789
-    },
-    {
-     "id": "cais-do-sodre",
-     "time": "18:00",
-     "title": "Cais do Sodré",
-     "travel": "train",
-     "text": "Back towards the centre on the Cascais line from Alcântara-Mar, a few minutes.",
-     "address": "Cais do Sodré station",
-     "lat": 38.7056,
-     "lng": -9.1446
-    },
-    {
-     "id": "cacilhas",
-     "time": "18:30",
-     "title": "Dinner in Cacilhas",
-     "type": "food",
-     "travel": "boat",
-     "text": "The ferry crosses the river in about ten minutes. Fish restaurants along the quay, and the city lit up across the water.",
-     "booking": "advised",
-   "address": "Cacilhas ferry terminal",
-     "lat": 38.6873,
-     "lng": -9.1475
-    }
-   ]
-  },
-  {
-   "date": "2027-05-16",
-   "city": "Sintra",
-   "title": "A day out of town",
-   "stay": {
-    "name": "Casa do Exemplo (invented)",
-    "address": "Baixa, Lisboa",
-    "note": "This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."
-   },
-   "notes": [
-    "A day with two alternative plans: pick one with the buttons below. The app remembers the choice."
-   ],
-   "plans": [
-    {
-     "id": "sintra",
-     "name": "Sintra",
-     "stops": [
-      {
-       "id": "train",
-       "time": "08:40",
-       "title": "Train from Rossio",
-       "travel": "train",
-       "text": "About 40 minutes. This stop has no coordinates on purpose."
-      },
-      {
-       "id": "station",
-       "time": "09:30",
-       "title": "Sintra station",
-       "text": "From here a bus climbs to the palaces.",
-       "address": "Sintra train station",
-       "lat": 38.799,
-       "lng": -9.3859
-      },
-      {
-       "id": "pena",
-       "time": "10:15",
-       "title": "Palácio da Pena",
-       "type": "sight",
-       "text": "Bus 434 from the station, fifteen minutes uphill. The coloured palace on top of the hill.",
-       "tag": "Ticket needed",
-       "address": "Palácio da Pena",
-       "lat": 38.7876,
-       "lng": -9.3906,
-       "travel": "bus"
-      },
-      {
-       "id": "regaleira",
-       "time": "13:30",
-       "title": "Quinta da Regaleira",
-       "type": "park",
-       "text": "Gardens, tunnels and the spiral well.",
-       "address": "Quinta da Regaleira",
-       "lat": 38.7963,
-       "lng": -9.396
-      },
-      {
-       "id": "town",
-       "time": "15:30",
-       "title": "Sintra old town",
-       "type": "walk",
-       "text": "A coffee and a pastry before the train back.",
-       "address": "Palácio Nacional de Sintra",
-       "lat": 38.7976,
-       "lng": -9.3907
-      }
-     ]
-    },
-    {
-     "id": "cascais",
-     "name": "Cascais",
-     "stops": [
-      {
-       "id": "coast-train",
-       "time": "09:20",
-       "title": "Train from Cais do Sodré",
-       "travel": "train",
-       "text": "About 40 minutes along the coast. Sit on the left for the sea."
-      },
-      {
-       "id": "station",
-       "time": "10:00",
-       "title": "Cascais station",
-       "text": "From here the beach is a two-minute walk.",
-       "address": "Cascais train station",
-       "lat": 38.7005,
-       "lng": -9.4177
-      },
-      {
-       "id": "beach",
-       "time": "10:30",
-       "title": "Praia da Rainha",
-       "type": "park",
-       "text": "A small beach between the rocks.",
-       "address": "Praia da Rainha Cascais",
-       "lat": 38.6977,
-       "lng": -9.4194
-      },
-      {
-       "id": "boca",
-       "time": "12:00",
-       "title": "Boca do Inferno",
-       "type": "view",
-       "text": "A walk along the cliff to the sea arch.",
-       "address": "Boca do Inferno Cascais",
-       "lat": 38.6913,
-       "lng": -9.4307
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "date": "2027-05-17",
-   "city": "Porto",
-   "title": "Porto in a day",
-   "stay": "On the way home",
-   "notes": [
-    "Leave the luggage at the station lockers in São Bento and travel light.",
-    "The flight home is at 21:30: be at the airport by 19:30."
-   ],
-   "stops": [
-    {
-     "id": "alfa-pendular-to-porto",
-     "time": "07:39",
-     "title": "Alfa Pendular to Porto",
-     "travel": "train",
-     "tag": "Booked",
-     "text": "From Santa Apolónia, about three hours. Seats are assigned: check the coach number."
-    },
-    {
-     "id": "sao-bento-station",
-     "time": "10:45",
-     "title": "São Bento station",
-     "type": "sight",
-     "text": "Look up in the hall: twenty thousand azulejo tiles telling the history of Portugal.",
-     "address": "Estação de São Bento, Porto",
-     "lat": 41.1456,
-     "lng": -8.6105
-    },
-    {
-     "id": "livraria-lello",
-     "time": "11:15",
-     "title": "Livraria Lello",
-     "type": "shop",
-     "tag": "Ticket needed",
-     "text": "The bookshop with the red staircase. The ticket is deducted from a book you buy.",
-     "address": "Livraria Lello, Porto",
-     "lat": 41.1468,
-     "lng": -8.6148
-    },
-    {
-     "id": "a-francesinha",
-     "time": "Lunch",
-     "title": "A francesinha",
-     "type": "food",
-     "text": "The Porto sandwich: bread, meats, melted cheese and a beer sauce. One is enough for two.",
-     "closed": ["sun"],
-   "address": "Rua de Passos Manuel, Porto",
-     "lat": 41.1474,
-     "lng": -8.6067
-    },
-    {
-     "id": "ribeira",
-     "time": "14:30",
-     "title": "Ribeira",
-     "type": "walk",
-     "text": "Down the steep lanes to the river front, among the coloured houses.",
-     "address": "Cais da Ribeira, Porto",
-     "lat": 41.1406,
-     "lng": -8.6131
-    },
-    {
-     "id": "dom-luis-i-bridge",
-     "time": "15:30",
-     "title": "Dom Luís I bridge",
-     "type": "view",
-     "text": "Cross on the upper deck, with the metro, for the view over the river and the port cellars.",
-     "address": "Ponte Luís I, Porto",
-     "lat": 41.1399,
-     "lng": -8.6094
-    },
-    {
-     "id": "back-to-sao-bento-for-the-luggage",
-     "time": "17:00",
-     "title": "Back to São Bento for the luggage",
-     "type": "sight",
-     "travel": "metro",
-     "text": "Metro line D from Jardim do Morro, two stops.",
-     "address": "Estação de São Bento, Porto",
-     "lat": 41.1456,
-     "lng": -8.6105
-    },
-    {
-     "id": "metro-to-the-airport",
-     "time": "18:30",
-     "title": "Metro to the airport",
-     "travel": "metro",
-     "text": "Line E from Trindade, about thirty minutes."
-    },
-    {
-     "id": "flight-home",
-     "time": "21:30",
-     "title": "Flight home",
-     "travel": "plane",
-     "tag": "Booked",
-     "address": "Aeroporto Francisco Sá Carneiro, Porto",
-     "lat": 41.2481,
-     "lng": -8.6814
-    }
-   ]
-  }
+   {"date": "2027-05-14", "city": "Lisboa", "title": "Baixa and Alfama on foot", "stay": {"name":"Casa do Exemplo (invented)","address":"Baixa, Lisboa","note":"This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."}, "notes": ["This is an invented trip, here to show what the app does. Times and descriptions are examples: check everything before a real visit.","If it rains: swap this day with the next one. **Belém** has more places indoors."],
+    "stops": [
+      {"time":"10:00","title":"Praça do Comércio","type":"sight","text":"Start at the big square on the river, then walk under the arch into Rua Augusta.","address":"Praça do Comércio Lisboa","lat":38.7075,"lng":-9.1364},
+      {"time":"11:00","title":"Lisbon Cathedral","type":"sight","text":"Ten minutes uphill. The tram line passes right in front of the door.","address":"Sé de Lisboa","lat":38.7098,"lng":-9.1326},
+      {"time":"11:45","title":"Miradouro de Santa Luzia","type":"view","text":"A terrace over the roofs of Alfama. A good place for a break.","address":"Miradouro de Santa Luzia","lat":38.7117,"lng":-9.1303},
+      {"time":"12:30","title":"Castelo de São Jorge","type":"sight","text":"The castle on top of the hill. Tickets are sold at the gate.","tag":"Ticket needed","address":"Castelo de São Jorge","lat":38.7139,"lng":-9.1335,"link":"https://www.google.com/maps/search/?api=1&query=Castelo+de+S%C3%A3o+Jorge+Lisboa"},
+      {"time":"14:00","title":"Lunch in Alfama","type":"food","text":"No coordinates on this stop: it has no pin on the map, and that is fine."},
+      {"time":"Evening","title":"Miradouro da Senhora do Monte","type":"view","text":"The highest viewpoint in the centre, best at sunset.","tag":"Optional","address":"Miradouro da Senhora do Monte","lat":38.7191,"lng":-9.1327}
+    ]},
+   {"date": "2027-05-15", "city": "Lisboa", "title": "Belém and the river", "stay": {"name":"Casa do Exemplo (invented)","address":"Baixa, Lisboa","note":"This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."},
+    "stops": [
+      {"time":"09:30","title":"Mosteiro dos Jerónimos","type":"museum","text":"Go early: the queue grows during the morning.","tag":"Ticket needed","address":"Mosteiro dos Jerónimos","lat":38.6979,"lng":-9.2068},
+      {"time":"11:00","title":"Pastéis de Belém","type":"food","text":"The custard tarts, still warm. The queue for take-away moves fast.","address":"Pastéis de Belém","lat":38.6975,"lng":-9.2032},
+      {"time":"12:00","title":"Torre de Belém","type":"sight","text":"A walk along the river to the tower.","address":"Torre de Belém","lat":38.6916,"lng":-9.216},
+      {"time":"14:30","title":"MAAT","type":"museum","text":"You can walk on the roof of the museum for free.","address":"MAAT Lisboa","lat":38.6959,"lng":-9.1937},
+      {"time":"16:30","title":"LX Factory","type":"shop","text":"Shops and cafés in an old factory, under the bridge.","address":"LX Factory Lisboa","lat":38.7034,"lng":-9.1789},
+      {"time":"18:00","title":"Cais do Sodré","travel":"train","text":"Back towards the centre on the Cascais line from Alcântara-Mar, a few minutes.","address":"Cais do Sodré station","lat":38.7056,"lng":-9.1446},
+      {"time":"18:30","title":"Dinner in Cacilhas","type":"food","travel":"boat","text":"The ferry crosses the river in about ten minutes. Fish restaurants along the quay, and the city lit up across the water.","booking":"advised","address":"Cacilhas ferry terminal","lat":38.6873,"lng":-9.1475}
+    ]},
+   {"date": "2027-05-16", "city": "Sintra", "title": "A day out of town", "stay": {"name":"Casa do Exemplo (invented)","address":"Baixa, Lisboa","note":"This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."}, "notes": ["A day with two alternative plans: pick one with the buttons below. The app remembers the choice."],
+    "plans": [
+      {"name": "Sintra", "stops": [
+        {"time":"08:40","title":"Train from Rossio","travel":"train","text":"About 40 minutes. This stop has no coordinates on purpose."},
+        {"time":"09:30","title":"Sintra station","text":"From here a bus climbs to the palaces.","address":"Sintra train station","lat":38.799,"lng":-9.3859},
+        {"time":"10:15","title":"Palácio da Pena","type":"sight","text":"Bus 434 from the station, fifteen minutes uphill. The coloured palace on top of the hill.","tag":"Ticket needed","address":"Palácio da Pena","lat":38.7876,"lng":-9.3906,"travel":"bus"},
+        {"time":"13:30","title":"Quinta da Regaleira","type":"park","text":"Gardens, tunnels and the spiral well.","address":"Quinta da Regaleira","lat":38.7963,"lng":-9.396},
+        {"time":"15:30","title":"Sintra old town","type":"walk","text":"A coffee and a pastry before the train back.","address":"Palácio Nacional de Sintra","lat":38.7976,"lng":-9.3907}
+      ]},
+      {"name": "Cascais", "stops": [
+        {"time":"09:20","title":"Train from Cais do Sodré","travel":"train","text":"About 40 minutes along the coast. Sit on the left for the sea."},
+        {"time":"10:00","title":"Cascais station","text":"From here the beach is a two-minute walk.","address":"Cascais train station","lat":38.7005,"lng":-9.4177},
+        {"time":"10:30","title":"Praia da Rainha","type":"park","text":"A small beach between the rocks.","address":"Praia da Rainha Cascais","lat":38.6977,"lng":-9.4194},
+        {"time":"12:00","title":"Boca do Inferno","type":"view","text":"A walk along the cliff to the sea arch.","address":"Boca do Inferno Cascais","lat":38.6913,"lng":-9.4307}
+      ]}
+    ]},
+   {"date": "2027-05-17", "city": "Porto", "title": "Porto in a day", "stay": "On the way home", "notes": ["Leave the luggage at the station lockers in São Bento and travel light.","The flight home is at 21:30: be at the airport by 19:30."],
+    "stops": [
+      {"time":"07:39","title":"Alfa Pendular to Porto","travel":"train","tag":"Booked","text":"From Santa Apolónia, about three hours. Seats are assigned: check the coach number."},
+      {"time":"10:45","title":"São Bento station","type":"sight","text":"Look up in the hall: twenty thousand azulejo tiles telling the history of Portugal.","address":"Estação de São Bento, Porto","lat":41.1456,"lng":-8.6105},
+      {"time":"11:15","title":"Livraria Lello","type":"shop","tag":"Ticket needed","text":"The bookshop with the red staircase. The ticket is deducted from a book you buy.","address":"Livraria Lello, Porto","lat":41.1468,"lng":-8.6148},
+      {"time":"Lunch","title":"A francesinha","type":"food","text":"The Porto sandwich: bread, meats, melted cheese and a beer sauce. One is enough for two.","closed":["sun"],"address":"Rua de Passos Manuel, Porto","lat":41.1474,"lng":-8.6067},
+      {"time":"14:30","title":"Ribeira","type":"walk","text":"Down the steep lanes to the river front, among the coloured houses.","address":"Cais da Ribeira, Porto","lat":41.1406,"lng":-8.6131},
+      {"time":"15:30","title":"Dom Luís I bridge","type":"view","text":"Cross on the upper deck, with the metro, for the view over the river and the port cellars.","address":"Ponte Luís I, Porto","lat":41.1399,"lng":-8.6094},
+      {"time":"17:00","title":"Back to São Bento for the luggage","type":"sight","travel":"metro","text":"Metro line D from Jardim do Morro, two stops.","address":"Estação de São Bento, Porto","lat":41.1456,"lng":-8.6105},
+      {"time":"18:30","title":"Metro to the airport","travel":"metro","text":"Line E from Trindade, about thirty minutes."},
+      {"time":"21:30","title":"Flight home","travel":"plane","tag":"Booked","address":"Aeroporto Francisco Sá Carneiro, Porto","lat":41.2481,"lng":-8.6814}
+    ]}
  ],
  "info": [
-  {
-   "title": "Getting around",
-   "items": [
-    {
-     "label": "Card",
-     "text": "One rechargeable card works on metro, trams, buses and trains."
-    },
-    {
-     "label": "Trams",
-     "text": "The historic trams are crowded: board at the first stop."
-    }
-   ]
-  },
-  {
-   "title": "In case of need",
-   "items": [
-    {
-     "label": "Emergency",
-     "text": "112"
-    },
-    {
-     "label": "Any emergency",
-     "text": "112 works across the EU, from any phone, free of charge."
-    }
-   ]
-  },
-  {
-   "title": "A few words",
-   "items": [
-    {
-     "label": "Obrigado / Obrigada",
-     "text": "Thank you"
-    },
-    {
-     "label": "Bom dia",
-     "text": "Good morning"
-    },
-    {
-     "label": "A conta, por favor",
-     "text": "The bill, please"
-    }
-   ]
-  },
-  {
-   "title": "Notes",
-   "items": [
-    {
-     "label": "Note",
-     "text": "Everything in this example is invented or approximate. Load your own trip file from «Trips»."
-    }
-   ]
-  }
+   {"title":"Getting around","items":[{"label":"Card","text":"One rechargeable card works on metro, trams, buses and trains."},{"label":"Trams","text":"The historic trams are crowded: board at the first stop."}]},
+   {"title":"In case of need","items":[{"label":"Emergency","text":"112"},{"label":"Any emergency","text":"112 works across the EU, from any phone, free of charge."}]},
+   {"title":"A few words","items":[{"label":"Obrigado / Obrigada","text":"Thank you"},{"label":"Bom dia","text":"Good morning"},{"label":"A conta, por favor","text":"The bill, please"}]},
+   {"title":"Notes","items":[{"label":"Note","text":"Everything in this example is invented or approximate. Load your own trip file from «Trips»."}]}
  ]
 }
 ```

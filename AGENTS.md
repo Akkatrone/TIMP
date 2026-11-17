@@ -91,7 +91,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
 | `sw.js` | Service worker: offline copy of the app. |
 | `tools/`, `test/` | Checks, build, tests. `tools/e2e.mjs` drives a real browser. |
-| `tools/lib/llms.mjs` | Builds `llms.txt` (format for chat assistants) from the docs. It is published with the site and kept at the root of the repository: never edit it, run `node tools/check-llms.mjs --fix` after changing `docs/`, `js/trip.js` or the example (`npm run check` fails otherwise). |
+| `tools/lib/llms.mjs` | Builds `llms.txt` (format for chat assistants) from the docs, with the version of `package.json`; text between `<!-- llms.txt: skip -->` and `<!-- llms.txt: end -->` stays out. A change to what a file can say goes in "What changed, version by version" in `docs/trip-format.md`. It is published with the site and kept at the root of the repository: never edit it, run `node tools/check-llms.mjs --fix` after changing `docs/`, `js/trip.js`, the example or the version in `package.json` (`npm run check` fails otherwise). |
 | `worker/` | The optional link resolver (Cloudflare Workers): a Google Maps link in, name, address, position and kind out. Keeps nothing. |
 | `vendor/` | Third-party code, unmodified. Do not edit. |
 

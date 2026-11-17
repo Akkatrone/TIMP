@@ -18,11 +18,13 @@ One JSON file in the format `travel-in-my-pocket/2`. It says what the trip is: d
 stops, stays, things to remember. Never how it looks: the app picks colours, draws the
 maps and chooses the icons from the content.
 
-A trip file contains hotels and dates. Treat it as private:
+A trip file contains hotels and dates. Treat it as private: give it to the traveller and
+nobody else, and never publish it.
+<!-- llms.txt: skip -->
 
-- Inside a copy of this repository, save it in `private/<trip-name>.json`. Git ignores
-  that folder. Never save a real trip anywhere else in the repository and never commit one.
-- Anywhere else, give the file to the traveller and nobody else. Do not publish it.
+Inside a copy of this repository, save it in `private/<trip-name>.json`: Git ignores
+that folder. Never save a real trip anywhere else in the repository and never commit one.
+<!-- llms.txt: end -->
 
 ## 1. Collect the trip
 
@@ -128,6 +130,7 @@ only a phone number can be tapped to call. The stays are listed there by the app
 
 ## 6. Check the file
 
+<!-- llms.txt: skip -->
 **With Node and a copy of the repository:**
 
 ```bash
@@ -145,6 +148,7 @@ day 3 2027-05-16: Lisbon: 2 pins, 0.9 km across | Sintra: 4 pins, 1.3 km across
 - An unexpected extra map, or a walking day that is 40 km across, means a position is
   wrong. Find it and fix it.
 
+<!-- llms.txt: end -->
 **Without Node:** load the file in the app (or paste it: Trips → Paste a trip). It
 runs the same checks and lists every problem with its position in the file, for
 example `days[2].stops[0].lat: must be a number between -90 and 90`. Fix them and load
@@ -204,4 +208,6 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 - Links to review or booking pages you did not get from the traveller.
 - Comments or trailing commas in the JSON.
 - HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.
+<!-- llms.txt: skip -->
 - Saving the real trip in a folder Git tracks.
+<!-- llms.txt: end -->

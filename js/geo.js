@@ -176,7 +176,7 @@ export function zoneSVG(z, label, gone = () => false, route = true, paint = null
   pts.forEach((p, i) => {
     const lab = p.nums.join("·"), bw = Math.max(20, 9 + lab.length * 6.5), g = pinGone(p, gone) ? " gone" : "";
     const fill = paint ? ` style="fill:${paint.pin(p)}"` : "", painted = paint ? " painted" : "";
-    o += `<rect class="badge${painted}${g}"${fill} x="${f1(B[i][0] - bw / 2)}" y="${f1(B[i][1] - 10)}" width="${f1(bw)}" height="20" rx="10"/><text class="bt${painted}${g}" x="${f1(B[i][0])}" y="${f1(B[i][1])}" dy="0.35em">${lab}</text>`;
+    o += `<rect class="badge${painted}${g}"${fill} data-idx="${p.items.map(it => it.idx).join(" ")}" x="${f1(B[i][0] - bw / 2)}" y="${f1(B[i][1] - 10)}" width="${f1(bw)}" height="20" rx="10"/><text class="bt${painted}${g}" x="${f1(B[i][0])}" y="${f1(B[i][1])}" dy="0.35em">${lab}</text>`;
   });
   const nice = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
   let sb = nice[0];

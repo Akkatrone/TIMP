@@ -486,7 +486,11 @@ function aiSection(folded){
 // write changes and an outline of the trip (js/changes.js), so it needs no link; the
 // assistant answers with only the changes, which come back through Paste a trip as one
 // new version. Few tokens either way.
-const aiEditMessage = () => t("aiEditPrompt") + "\n\n" + changesBrief() + "\n\n" + outline(S.rec.trip);
+// The version of the app, for an assistant that read the format guide (llms.txt) earlier
+// in the chat: a newer one tells it to read the guide again. Only on a published copy.
+const appVersion = () => (/^\d+\.\d+\.\d+/.exec(S.version) || [""])[0];
+const versionLine = () => appVersion() ? "\n\n" + t("aiVersion", {v: appVersion(), url: llmsUrl()}) : "";
+const aiEditMessage = () => t("aiEditPrompt") + versionLine() + "\n\n" + changesBrief() + "\n\n" + outline(S.rec.trip);
 
 function aiEditSection(){
   return `<details class="aihow"><summary>${esc(t("aiEditTitle"))}</summary>
@@ -508,7 +512,7 @@ async function copyText(text, done){
 
 // The problems of a refused file, worded for the assistant that wrote it.
 function messageForAi(){
-  return t("aiFixPrompt") + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
+  return t("aiFixPrompt") + versionLine() + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
 }
 
 function copyErrors(){
@@ -756,7 +760,7 @@ function stopsHTML(day, planId, list, parts, paint){
     const q = placeQuery(s);
     // Left column: when, where on the map, how you get there.
     const dark = parts && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
-    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}</div>`;
+    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}</div>`;
     // Middle: a label above the title, the title with its kind, the description that folds, the links.
     // The name as on the sign, under the title, in its own language (for the glyphs).
     const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
@@ -772,7 +776,7 @@ function stopsHTML(day, planId, list, parts, paint){
       closed ? ["warn", closed.date ? t("closedDate") : t("closedWeekday", {d: weekdayName(closed.weekday, getLang())})] : null
     ].filter(Boolean).map(([k, x]) => `<p class="notice ${k}"><span class="ic" aria-hidden="true">!</span><span>${esc(x)}</span></p>`).join("");
     // Map and Directions, and for a place to eat the review site of that part of the world.
-    const review = reviewSite(s, {city: day.city, timezone: trip().timezone});
+    const review = reviewSite(s, {city: day.city, timezone: trip().timezone, lang: getLang()});
     const links = (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
       (q ? `<a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
       (review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)}</a>` : "");
@@ -865,7 +869,8 @@ function renderDay(i){
     const dark = isDark();
     // Skipping a stop changes the route: the map is drawn again.
     const skippedNow = list.map((s, k) => isSkipped(k) ? k : -1).filter(k => k >= 0).join(",");
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, dark, skippedNow, S.ui.route].join("|"), zones: zs, color: cityColor(d.city), dark, gone, paint};
+    // The lines are not in the key: hiding them keeps the map, its zoom and its place.
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, dark, skippedNow].join("|"), zones: zs, color: cityColor(d.city), dark, gone, paint};
   }
   if(d.notes) html += d.notes.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
   if(d.plans){
@@ -892,6 +897,7 @@ function syncLive(wanted){
   slot.appendChild(live.handle.el);
   live.handle.refresh();
   live.handle.setMarks(wanted.gone);
+  live.handle.setRoute(S.ui.route);
 }
 
 // The buttons at the bottom right: Paste on every page of an open trip, + on a day.
@@ -1067,6 +1073,36 @@ $app.addEventListener("click", e => {
     if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); scrollToY(0); });
   }
 });
+
+// Holding a stop's number shows it on the day's map: the map opens if it is closed and
+// the pin comes to the middle, with its card. Only a hold: a tap or a scroll that
+// starts on the number does nothing.
+let hold = null;
+const endHold = () => { if(hold){ clearTimeout(hold.timer); hold = null; } };
+$app.addEventListener("pointerdown", e => {
+  const nb = e.target.closest("[data-pin]");
+  endHold();
+  if(!nb || (e.pointerType === "mouse" && e.button !== 0)) return;
+  hold = {x: e.clientX, y: e.clientY, timer: setTimeout(() => { hold = null; showOnMap(+nb.dataset.pin); }, 450)};
+});
+$app.addEventListener("pointermove", e => { if(hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 10) endHold(); });
+for(const type of ["pointerup", "pointercancel"]) $app.addEventListener(type, endHold);
+// The phone's own menu for a long press (copy, select) would open on top of it.
+$app.addEventListener("contextmenu", e => { if(e.target.closest("[data-pin]")) e.preventDefault(); });
+
+function showOnMap(idx){
+  try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+  if(!S.ui.mapOpen){ S.ui.mapOpen = true; saveUi(); render(); }
+  const box = document.querySelector(".mapbox");
+  if(!box) return;
+  scrollToY(scrollTop() + box.getBoundingClientRect().top - $strip.offsetHeight - 12);
+  if(live && document.getElementById("live-slot")) live.handle.focus(idx);
+  // The sketch: its badge for that stop pulses.
+  else box.querySelectorAll(".badge").forEach(b => {
+    if(!String(b.dataset.idx || "").split(" ").includes(String(idx))) return;
+    b.classList.remove("hit"); void b.getBoundingClientRect(); b.classList.add("hit");
+  });
+}
 
 function toggleStop(id){
   S.openStops.set(id, !isOpen(id));

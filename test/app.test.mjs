@@ -231,6 +231,15 @@ test("llms.txt gives a chat assistant the whole format in one page, with valid e
   // It is one complete page: nothing sends the assistant to look for another file.
   assert.ok(!/trip-format\.md|creating-a-trip\.md|demo-trip\.json|ask for it/.test(text), "no pointer to a file the page already contains");
   assert.match(text, /This page is complete/);
+  // Its version, and what is new first: an assistant that reads it again sees it at once.
+  const version = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
+  assert.ok(text.includes(`**Version ${version}.**`), "the version at the top");
+  assert.ok(text.indexOf("## What's new") < text.indexOf("## The format, in short"), "what is new before the format");
+  assert.equal((text.match(/## What changed, version by version/g) || []).length, 0, "not twice");
+  // Only what a chat assistant needs: nothing about the repository, no ids in the example.
+  assert.ok(!/llms\.txt: skip|validate-trip|js\/trip\.js|js\/changes\.js|## The old format|## Versions/.test(text), "parts for the repository left out");
+  const example = text.slice(text.indexOf("# A complete example"));
+  assert.ok(!/"id"\s*:/.test(example), "the example has no ids: the app writes them");
   assert.ok(text.includes(formatBrief()), "the format in short, the same text the app copies");
   assert.ok(text.includes("trip.schema.json"));
   const blocks = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => m[1]).filter(b => b.trim().startsWith("{") && b.includes('"travel-in-my-pocket/2"'));

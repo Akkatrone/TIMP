@@ -74,7 +74,7 @@ function pinNode(pt, color, paint){
 }
 
 // In the dark theme the tiles are darkened by CSS (.live.dark), see css/app.css.
-async function drawLeaflet(canvas, zones, color, route, paint){
+async function drawLeaflet(canvas, zones, color, paint){
   const L = await loadLeaflet();
   const map = L.map(canvas, {zoomControl: true});
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
@@ -85,12 +85,13 @@ async function drawLeaflet(canvas, zones, color, route, paint){
   const legs = [], pins = [], marks = [];
   // A jump between zones (Hakone → Kyoto) is thinner: it is not a walk.
   const style = (leg, isGone) => ({weight: leg.bridge ? 3 : 4, opacity: isGone || leg.bridge ? 0.55 : 0.75, dashArray: isGone ? "5 10" : null});
-  (route ? routeOf(zones) : []).forEach(leg => {
+  // The route is always drawn; showRoute hides it or shows it again, map untouched.
+  routeOf(zones).forEach(leg => {
     legs.push({...leg, line: L.polyline([leg.from.ll, leg.to.ll], {color: paint ? paint.leg(leg) : color, interactive: false, ...style(leg, false)}).addTo(map)});
     if(leg.travel){
       const el = travelNode(leg, paint ? paint.leg(leg) : color);
-      L.marker(midpoint(leg.from.ll, leg.to.ll), {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), interactive: false, keyboard: false, zIndexOffset: -1000}).addTo(map);
-      marks.push({leg, el});
+      const m = L.marker(midpoint(leg.from.ll, leg.to.ll), {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), interactive: false, keyboard: false, zIndexOffset: -1000}).addTo(map);
+      marks.push({leg, el, m});
     }
   });
   zones.forEach(z => {
@@ -98,7 +99,7 @@ async function drawLeaflet(canvas, zones, color, route, paint){
       const el = pinNode(pt, color, paint);
       const m = L.marker(pt.ll, {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), title: pt.name}).addTo(map);
       m.bindPopup(popupNode(pt), {offset: [0, -10], maxWidth: 250});
-      pins.push({pt, el});
+      pins.push({pt, el, m});
     });
   });
   // Legs and pins of stops that are done or skipped turn dashed.
@@ -113,10 +114,21 @@ async function drawLeaflet(canvas, zones, color, route, paint){
     else map.fitBounds(L.latLngBounds(pts.map(p => p.ll)), {padding: [36, 36], maxZoom: 16});
   };
   fit(null);
-  return {fit, mark, refresh: () => map.invalidateSize(), destroy: () => map.remove()};
+  const showRoute = on => {
+    legs.forEach(l => on ? l.line.addTo(map) : l.line.remove());
+    marks.forEach(k => on ? k.m.addTo(map) : k.m.remove());
+  };
+  // The pin of the stop at `idx` in the day's list, in the middle, with its card.
+  const focus = idx => {
+    const p = pins.find(x => x.pt.items.some(it => it.idx === idx));
+    if(!p) return;
+    map.setView(p.pt.ll, Math.max(map.getZoom(), 16));
+    p.m.openPopup();
+  };
+  return {fit, mark, showRoute, focus, refresh: () => map.invalidateSize(), destroy: () => map.remove()};
 }
 
-async function drawGoogle(canvas, zones, color, key, dark, route, paint){
+async function drawGoogle(canvas, zones, color, key, dark, paint){
   const gm = await loadGoogle(key);
   const {Map, Polyline, InfoWindow, OverlayView} = await gm.importLibrary("maps");
   const {LatLng, LatLngBounds, ColorScheme} = await gm.importLibrary("core");
@@ -153,7 +165,7 @@ async function drawGoogle(canvas, zones, color, key, dark, route, paint){
   // Google has no dashed lines: a dashed leg is an invisible line that repeats a short stroke.
   const solid = leg => ({strokeOpacity: leg.bridge ? 0.55 : 0.75, strokeWeight: leg.bridge ? 3 : 4, icons: []});
   const dashed = leg => ({strokeOpacity: 0, strokeWeight: leg.bridge ? 3 : 4, icons: [{icon: {path: "M 0,-1 0,1", strokeOpacity: 0.55, strokeWeight: leg.bridge ? 3 : 4, scale: 1.5}, offset: "0", repeat: "13px"}]});
-  (route ? routeOf(zones) : []).forEach(leg => {
+  routeOf(zones).forEach(leg => {
     const line = new Polyline({map, path: [leg.from, leg.to].map(p => ({lat: p.ll[0], lng: p.ll[1]})), strokeColor: paint ? paint.leg(leg) : color, clickable: false, ...solid(leg)});
     drawn.push(line);
     legs.push({...leg, line});
@@ -163,7 +175,7 @@ async function drawGoogle(canvas, zones, color, key, dark, route, paint){
       const icon = new Pin(new LatLng(lat, lng), el, "overlayLayer");
       icon.setMap(map);
       drawn.push(icon);
-      marks.push({leg, el});
+      marks.push({leg, el, icon});
     }
   });
   zones.forEach(z => {
@@ -184,7 +196,7 @@ async function drawGoogle(canvas, zones, color, key, dark, route, paint){
       const pin = new Pin(pos, el);
       pin.setMap(map);
       drawn.push(pin);
-      pins.push({pt, el});
+      pins.push({pt, el, pos});
     });
   });
   const fit = zi => {
@@ -201,13 +213,25 @@ async function drawGoogle(canvas, zones, color, key, dark, route, paint){
     marks.forEach(m => m.el.classList.toggle("gone", legGone(m.leg, gone)));
     pins.forEach(p => p.el.classList.toggle("gone", pinGone(p.pt, gone)));
   };
-  return {fit, mark, refresh: () => {}, destroy: () => { info.close(); drawn.forEach(d => d.setMap(null)); }};
+  const showRoute = on => {
+    legs.forEach(l => l.line.setVisible(on));
+    marks.forEach(k => k.icon.setMap(on ? map : null));
+  };
+  const focus = idx => {
+    const p = pins.find(x => x.pt.items.some(it => it.idx === idx));
+    if(!p) return;
+    map.setCenter(p.pos);
+    if(map.getZoom() < 16) map.setZoom(16);
+    p.el.click();
+  };
+  return {fit, mark, showRoute, focus, refresh: () => {}, destroy: () => { info.close(); drawn.forEach(d => d.setMap(null)); }};
 }
 
 /**
  * Creates the map element. Append `el` to the page right away; drawing starts on its own.
  * @param {{zones: object[], color: string, googleKey: string, dark: boolean, route?: boolean, onNotice: (key: string) => void}} o
- *   route: false hides the lines between the stops (and the travel icons on them).
+ *   route: false hides the lines between the stops (and the travel icons on them);
+ *   setRoute changes it later without drawing the map again.
  *   paint: the colours of pins and lines (painter in js/geo.js); without it, `color`.
  */
 export function createLiveMap({zones, color, googleKey, dark, route = true, paint = null, onNotice}){
@@ -215,6 +239,7 @@ export function createLiveMap({zones, color, googleKey, dark, route = true, pain
   el.className = "live" + (dark ? " dark" : "");
   let canvas = null, impl = null, dead = false;
   let gone = () => false;   // which stops are done or skipped; kept so a map that loads late still shows them
+  let routeOn = route, pending = null;   // the same for the lines, and a pin to show once drawn
 
   const message = text => {
     el.innerHTML = `<div class="msg">${esc(text)}</div>`;
@@ -229,13 +254,15 @@ export function createLiveMap({zones, color, googleKey, dark, route = true, pain
     try{
       // The canvas must be on the page (with a size) before a map is drawn into it.
       el.appendChild(fresh);
-      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, route, paint) : await drawLeaflet(fresh, zones, color, route, paint);
+      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, paint) : await drawLeaflet(fresh, zones, color, paint);
       if(dead){ made.destroy(); return; }
       const msg = el.querySelector(".msg");
       if(msg) msg.remove();
       canvas = fresh;
       impl = made;
       impl.mark(gone);
+      impl.showRoute(routeOn);
+      if(pending !== null){ impl.focus(pending); pending = null; }
     }catch(e){
       fresh.remove();
       if(dead) return;
@@ -252,6 +279,9 @@ export function createLiveMap({zones, color, googleKey, dark, route = true, pain
     fit: zi => { if(impl) impl.fit(zi); },
     refresh: () => { if(impl) impl.refresh(); },
     setMarks: fn => { gone = fn; if(impl) impl.mark(gone); },
+    setRoute: on => { if(on !== routeOn){ routeOn = on; if(impl) impl.showRoute(on); } },
+    // Shows the pin of the stop at `idx` in the day's list, now or once the map is drawn.
+    focus: idx => { if(impl) impl.focus(idx); else pending = idx; },
     onGoogleRefused: () => { if(!dead){ onNotice("googleKeyBad"); start(false); } },
     destroy: () => {
       dead = true;

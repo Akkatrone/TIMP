@@ -4,6 +4,29 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.6.0
+
+- **Hold a stop's number to see it on the map.** The map opens if it is closed, and the
+  pin comes to the middle with its card; on the sketch, its badge pulses. Only a hold:
+  a tap or a scroll that starts on the number does nothing.
+- The TheFork link searches only TheFork's pages, on its site in the app's language
+  (thefork.it in Italian, thefork.com otherwise): a list shows at once whether the
+  place is there. TheFork lists only its partners, so a jump to the first result
+  could land on another restaurant.
+- **Lines on and off without drawing the map again.** The lines and the travel icons
+  are always drawn and only hidden: the map keeps its zoom and its place.
+- **llms.txt says its version**, and what changed in the format version by version, at
+  the top. It asks the assistant to remember the version and to read the page again
+  before changing a trip later in the chat. The list comes from a new section of
+  docs/trip-format.md, "What changed, version by version".
+- The messages the app copies for an assistant (change this trip, problems to fix)
+  carry the app's version and the guide's address: in a chat that read an older guide,
+  that is the signal to read it again.
+- llms.txt is shorter: about 535 lines instead of 991. What only matters inside the
+  repository (the checker, the code, versions and maps inside the app, the old format)
+  is left out between `<!-- llms.txt: skip -->` markers in the docs, and the complete
+  example is one stop per line, without the ids the app writes.
+
 ## 3.5.0
 
 - **Places to eat.** Three optional fields for every stop, so files written for 3.4

@@ -193,6 +193,10 @@ ol.stops{list-style:none;margin:0;padding:0}
 .alt{font-size:.88rem;color:var(--muted);margin:0}
 .alt b{color:var(--ink);font-weight:600}
 .nb{display:inline-block;font:600 .68rem var(--f-mono);border:1.5px solid var(--pf,var(--c,var(--line)));border-radius:999px;padding:0 6px;color:var(--ink)}
+/* held, it shows the stop on the map: no text selection or callout on the way */
+.nb[data-pin]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer}
+.mapsvg .badge.hit{animation:pinhit 1.4s ease-out 2}
+@keyframes pinhit{0%{stroke:var(--ink);stroke-width:5}100%{stroke-width:1.5}}
 
 /* sections and cards */
 .sec{display:grid;gap:10px}
@@ -406,4 +410,4 @@ html:has(dialog[open]){overflow:hidden}
 #toast .x:hover{opacity:1}
 
 @media (max-width:380px){ .stop{grid-template-columns:3.6rem 1fr auto;gap:10px} .rows > div{grid-template-columns:1fr} }
-@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} .chev,.fab-paste,.fab-paste span{transition:none} }
+@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} .chev,.fab-paste,.fab-paste span{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }

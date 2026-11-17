@@ -28,8 +28,11 @@ test("a place to eat gets the review site of its part of the world; other stops 
   assert.equal(reviewSite({type: "food", title: "Myeongdong Kyoja", local: "명동교자", lat: 37.5625, lng: 126.9856}).url, "https://map.naver.com/p/search/%EB%AA%85%EB%8F%99%EA%B5%90%EC%9E%90");
   assert.equal(reviewSite({type: "food", title: "Katz's Delicatessen", address: "205 E Houston St, New York", lat: 40.7223, lng: -73.9874}).url,
     "https://www.yelp.com/search?find_desc=Katz's%20Delicatessen&find_loc=205%20E%20Houston%20St%2C%20New%20York");
+  // TheFork: its own pages only, on its site in the app's language.
   assert.deepEqual(reviewSite({type: "food", title: "Roscioli"}, {city: "Rome", timezone: "Europe/Rome"}),
-    {site: "TheFork", url: "https://www.google.com/search?q=TheFork%20Roscioli%20Rome"});
+    {site: "TheFork", url: "https://www.google.com/search?q=site%3Athefork.com%20Roscioli%20Rome"});
+  assert.equal(reviewSite({type: "food", title: "Roscioli"}, {city: "Roma", timezone: "Europe/Rome", lang: "it"}).url,
+    "https://www.google.com/search?q=site%3Athefork.it%20Roscioli%20Roma");
   assert.equal(reviewSite({type: "museum", title: "Louvre", lat: 48.8606, lng: 2.3376}), null);
   assert.equal(reviewSite({type: "food", title: "Bondi", lat: -33.89, lng: 151.27}), null, "elsewhere the Map link is enough");
 });

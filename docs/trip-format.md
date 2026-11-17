@@ -8,6 +8,7 @@ says nothing about how the app looks: colours, map zones, labels and icons are w
 out by the app from the content. How to write a *good* trip is in
 [creating-a-trip.md](creating-a-trip.md).
 
+<!-- llms.txt: skip -->
 - Working example: [`examples/demo-trip.json`](../examples/demo-trip.json)
 - Check a file: `node tools/validate-trip.mjs --map my-trip.json`
 - The same rules as a JSON Schema, for tools and AI assistants that can follow one:
@@ -16,6 +17,7 @@ out by the app from the content. How to write a *good* trip is in
 
 The checker, the schema and the app are all made from one table in
 [`js/trip.js`](../js/trip.js) (`FIELDS`): what passes the checker loads in the app.
+<!-- llms.txt: end -->
 
 ## Smallest valid file
 
@@ -73,7 +75,7 @@ an `address` and its position (`lat`, `lng`):
 | `info` | no | Sections of the Info page. |
 | `googleMapsKey` | no | A Google Maps key for everyone who loads the trip. See [Google Maps key](#google-maps-key). |
 | `id` | written by the app | Identifies the trip on the phone. Without it the app makes one from the title and the first date, so a corrected file for the same trip updates it. Keep it when you change a file the app saved. |
-| `version` | written by the app | See [Versions](#versions). Keep it as it is. |
+| `version` | written by the app | Keep it exactly as it is.<!-- llms.txt: skip --> See [Versions](#versions).<!-- llms.txt: end --> |
 
 ## A day
 
@@ -137,6 +139,7 @@ only a phone number becomes a link to call it.
 Texts are plain text. The only formatting is `**bold**`, in a stop's `text`, in
 `notes`, in a stay's `note` and in info items. HTML is shown as written, never run.
 
+<!-- llms.txt: skip -->
 ## How the app draws the map
 
 The file gives positions; the app does the rest.
@@ -153,6 +156,8 @@ The file gives positions; the app does the rest.
   on the clock of `timezone`. Stops after sunset get a moon in the list. A `time` in
   words counts too: "Evening", "Dinner", "Sera", "Cena" are after dark.
 
+<!-- llms.txt: end -->
+<!-- llms.txt: skip -->
 ## Google Maps key
 
 Without a key, the interactive map uses OpenStreetMap. With `googleMapsKey`, it uses
@@ -162,6 +167,8 @@ in a public repository. How to create one is in the
 [README](../README.md#google-maps-optional). Each phone can also save its own key, or
 turn Google Maps off, on the Trips page.
 
+<!-- llms.txt: end -->
+<!-- llms.txt: skip -->
 ## Versions
 
 The app writes a `version` into every file it saves:
@@ -190,6 +197,7 @@ it has seen, the way Git does, as pieces shared between versions.
 The app sees that the content no longer matches the version and makes a new version
 from it, then joins it with what changed on other phones.
 
+<!-- llms.txt: end -->
 ## Changes
 
 To change a trip that already exists, an AI assistant does not need to write the whole
@@ -214,16 +222,16 @@ as one new version (Paste, at the bottom of the app):
 ```
 
 Stops are named by their `id`, plans by theirs (`"plan": "…"` next to `"day"`). In
-`set`, `null` removes a field. A new stop goes in time order. The changes are applied
-in order, all or none. `addPlan` gives a day an alternative plan; on a day that has
-none yet, the stops it has become the first plan, named by `first`, and their ticks
-follow. A day left with one plan by `removePlan` has plain stops again. `setPlan`
-changes only the name: the stops of a plan change one by one. The changes are applied
-in order, all or none: if one is wrong, the app lists which one and why, and changes
-nothing. The result is checked like any trip file. `trip` may be left out: the changes
-then apply to the trip open on the phone. The rules are in
-[`js/changes.js`](../js/changes.js).
+`set`, `null` removes a field. A new stop goes in time order. `addPlan` gives a day an
+alternative plan; on a day that has none yet, the stops it has become the first plan,
+named by `first`, and their ticks follow. A day left with one plan by `removePlan` has
+plain stops again. `setPlan` changes only the name: the stops of a plan change one by
+one. The changes are applied in order, all or none: if one is wrong, the app lists
+which one and why, and changes nothing. The result is checked like any trip file.
+`trip` may be left out: the changes then apply to the trip open on the phone.
+<!-- llms.txt: skip -->The rules are in [`js/changes.js`](../js/changes.js).<!-- llms.txt: end -->
 
+<!-- llms.txt: skip -->
 ## The old format
 
 Files in `travel-in-my-pocket/1` (TIMP 1.0 to 2.4) still load: the app converts them
@@ -231,6 +239,8 @@ once, as a new version made from the old one. Map settings of the old format
 (`places` colours, `glyph`, `mapZones`, `mapImages`, `zoneNames`, `mapSplitKm`,
 `mapLabel`) are dropped; the app works them out now.
 
+<!-- llms.txt: end -->
+<!-- llms.txt: skip -->
 ## Checks the app makes
 
 The app refuses a file, and lists every problem with its position, when: it is not JSON,
@@ -241,3 +251,18 @@ used twice in a list.
 
 Unknown fields, an unknown `type` or `travel`, and days without any position are
 warnings: the file loads, and the command-line checker shows them.
+<!-- llms.txt: end -->
+
+## What changed, version by version
+
+Only what a trip file, or a list of changes, can say differently. Files written for an
+older version still load.
+
+- **3.5**: three optional stop fields: `local` (the name as on the sign), `booking`
+  (`required`, `advised`, `booked`) and `closed` (days of the week and dates).
+- **3.4**: changes can add, rename and remove a day's plans: `addPlan`, `setPlan`,
+  `removePlan`.
+- **3.1**: a list of changes instead of the whole file again:
+  `travel-in-my-pocket/changes`.
+- **3.0**: format `travel-in-my-pocket/2`: the file says only what the trip is, and
+  `type` gives each stop its kind of place.

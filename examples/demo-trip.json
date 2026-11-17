@@ -160,7 +160,7 @@
      "travel": "boat",
      "text": "The ferry crosses the river in about ten minutes. Fish restaurants along the quay, and the city lit up across the water.",
      "booking": "advised",
-   "address": "Cacilhas ferry terminal",
+     "address": "Cacilhas ferry terminal",
      "lat": 38.6873,
      "lng": -9.1475
     }
@@ -322,8 +322,10 @@
      "title": "A francesinha",
      "type": "food",
      "text": "The Porto sandwich: bread, meats, melted cheese and a beer sauce. One is enough for two.",
-     "closed": ["sun"],
-   "address": "Rua de Passos Manuel, Porto",
+     "closed": [
+      "sun"
+     ],
+     "address": "Rua de Passos Manuel, Porto",
      "lat": 41.1474,
      "lng": -8.6067
     },
