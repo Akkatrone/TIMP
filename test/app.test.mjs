@@ -186,6 +186,16 @@ test("the service worker lists every file of the app", () => {
   assert.deepEqual([...files].sort(), precacheList().sort());
 });
 
+test("the manifest for Samsung Internet is the same, but shares text and links only", () => {
+  const full = JSON.parse(readFileSync(join(ROOT, "manifest.webmanifest"), "utf8"));
+  const basic = JSON.parse(readFileSync(join(ROOT, "manifest-basic.webmanifest"), "utf8"));
+  const {share_target: a, ...restFull} = full, {share_target: b, ...restBasic} = basic;
+  assert.deepEqual(restBasic, restFull);
+  assert.deepEqual([a.method, a.params.files.length > 0], ["POST", true]);
+  assert.deepEqual([b.method, b.params.files], ["GET", undefined]);
+  assert.match(readFileSync(join(ROOT, "js/theme.js"), "utf8"), /SamsungBrowser[\s\S]*manifest-basic\.webmanifest/);
+});
+
 test("the build publishes only the app, stamped with a version", () => {
   const out = mkdtempSync(join(ROOT, ".build-test-"));
   try{

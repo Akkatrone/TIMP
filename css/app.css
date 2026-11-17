@@ -54,7 +54,10 @@ button{font:inherit}
 /* once the page has scrolled, the bar gets an edge and a soft shadow (js: markStrip) */
 .strip.scrolled{border-bottom-color:var(--line);border-bottom-color:color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 6px 18px -10px rgba(0,0,0,.35)}
 .strip .gutter{padding-block:10px}
-#days{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;padding-block:2px}
+/* Some browsers (Samsung Internet) draw a scroll bar under the list of days whatever
+   the styles say: the list gets room below for it, and its box cuts that room off. */
+.strip .gutter{overflow:hidden}
+#days{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;padding:2px 0 26px;margin-bottom:-24px}
 /* the list of days fades out on a side when there is more to scroll that way */
 #days.more-l{-webkit-mask-image:linear-gradient(to right,transparent,#000 28px);mask-image:linear-gradient(to right,transparent,#000 28px)}
 #days.more-r{-webkit-mask-image:linear-gradient(to left,transparent,#000 28px);mask-image:linear-gradient(to left,transparent,#000 28px)}
@@ -301,6 +304,9 @@ ol.stops{list-style:none;margin:0;padding:0}
 .fab{position:fixed;right:calc(max(16px,env(safe-area-inset-right,0px)));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:15;width:48px;height:48px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.28);padding:0}
 .fab svg{width:22px;height:22px}
 .fab:active{transform:scale(.96)}
+/* dark theme: a raised dark button, not a white disc */
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .fab{background:#2b3137;color:var(--ink);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 8px 24px rgba(0,0,0,.6)} }
+:root[data-theme="dark"] .fab{background:#2b3137;color:var(--ink);box-shadow:0 0 0 1px rgba(255,255,255,.08),0 8px 24px rgba(0,0,0,.6)}
 body.has-fab main.gutter{padding-bottom:96px}
 body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 

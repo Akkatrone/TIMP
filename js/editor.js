@@ -112,7 +112,7 @@ export function openStopEditor(o){
       </div>
       <div class="field">
         <label for="stop-time">${esc(t("fTime"))}</label>
-        <input id="stop-time" type="time" value="${clock0 !== null ? hhmm(clock0) : ""}"${clock0 !== null ? "" : " hidden"}>
+        <input id="stop-time" type="time" required value="${clock0 !== null ? hhmm(clock0) : ""}"${clock0 !== null ? "" : " hidden"}>
         <input id="stop-time-words" type="text" autocomplete="off" aria-label="${esc(t("fTime"))}" placeholder="${esc(t("timeWordsPh"))}" value="${clock0 === null ? esc(time0) : ""}"${clock0 === null ? "" : " hidden"}>
         <button type="button" class="linkbtn" data-time-mode>${esc(t(clock0 !== null ? "timeWords" : "timeClock"))}</button>
       </div>

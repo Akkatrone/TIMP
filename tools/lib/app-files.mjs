@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const TOP_FILES = ["index.html", "manifest.webmanifest", "sw.js"];
+const TOP_FILES = ["index.html", "manifest.webmanifest", "manifest-basic.webmanifest", "sw.js"];
 const TOP_DIRS = ["css", "js", "vendor", "icons", "examples"];
 const JUNK = /(^|\/)\.DS_Store$/;
 // Published with the app, but not needed to run it offline.

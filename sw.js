@@ -15,6 +15,7 @@ const FILES = [
   "./",
   "index.html",
   "manifest.webmanifest",
+  "manifest-basic.webmanifest",
   "css/app.css",
   "js/app.js",
   "js/ask.js",

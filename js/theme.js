@@ -10,3 +10,11 @@ try{
 // says. There the page scrolls inside <body> instead, whose bar can be hidden
 // (css/app.css, .own-scroll; js/app.js, scroller).
 if(/Android/i.test(navigator.userAgent)) document.documentElement.classList.add("own-scroll");
+
+// Samsung Internet fails to install the app ("Download failed") with a manifest whose
+// share target takes files. It gets the same manifest, sharing text and links only
+// (manifest-basic.webmanifest; test/app.test.mjs keeps the two alike).
+if(/SamsungBrowser/i.test(navigator.userAgent)){
+  var manifest = document.querySelector('link[rel="manifest"]');
+  if(manifest) manifest.setAttribute("href", "manifest-basic.webmanifest");
+}

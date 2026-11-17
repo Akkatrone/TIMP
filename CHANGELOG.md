@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.2.1
+
+- Samsung Internet can install the app again: it failed ("Download failed") with the
+  manifest whose share target takes files. It now gets the same manifest sharing text
+  and links only (manifest-basic.webmanifest); Chrome keeps file sharing.
+- The list of days shows no scroll bar in Samsung Internet either: the bar is drawn in
+  room below the list that its box cuts off.
+- Dark theme: the + button is a dark raised button instead of a white disc. The page
+  declares it supports light and dark (color-scheme), and the manifest gives the colours
+  of the installed app's bars for a dark phone, for the browsers that read them.
+- The time picker has no Clear button, which pushed Set off narrow screens on Android.
+
 ## 3.2.0
 
 Colours that say what and when, sunrise and sunset, and files shared to the app.

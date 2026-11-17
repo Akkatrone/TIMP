@@ -50,5 +50,11 @@
         }
       ]
     }
+  },
+  "user_preferences": {
+    "color_scheme_dark": {
+      "theme_color": "#101316",
+      "background_color": "#101316"
+    }
   }
 }
