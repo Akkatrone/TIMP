@@ -67,7 +67,8 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 |---|---|
 | `js/app.js` | Screens, navigation, events. The only file that touches the page. |
 | `js/trip.js` | The trip format: `FIELDS` (one table for every field), checks, JSON Schema, conversion from format 1. No DOM. |
-| `js/geo.js` | Map zones and the offline sketch. No DOM. |
+| `js/geo.js` | Map zones, the offline sketch, the colours of pins and lines. No DOM. |
+| `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
 | `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |
 | `js/editor.js` | The add / edit stop form. |

@@ -34,6 +34,7 @@ const FILES = [
   "js/merge.js",
   "js/objects.js",
   "js/store.js",
+  "js/sun.js",
   "js/theme.js",
   "js/trip.js",
   "js/trips.js",
@@ -68,10 +69,28 @@ self.addEventListener("message", event => {
   if(event.data === "skip-waiting") self.skipWaiting();
 });
 
+// Something shared to the app on Android (share_target in manifest.webmanifest): a
+// place from Google Maps, an assistant's answer, a .json file. It is kept for the page
+// to read once (takeShared in js/app.js), and the app opens.
+const SHARED = "timp-share";
+async function receiveShare(req){
+  const form = await req.formData();
+  const field = name => typeof form.get(name) === "string" ? form.get(name) : "";
+  const file = form.get("file");
+  const shared = {title: field("title"), text: field("text"), url: field("url"),
+    file: file && typeof file.text === "function" && file.size < 5e6 ? await file.text() : ""};
+  await (await caches.open(SHARED)).put("shared", new Response(JSON.stringify(shared)));
+  return Response.redirect(new URL("./?shared=1", self.registration.scope).href, 303);
+}
+
 self.addEventListener("fetch", event => {
   const req = event.request;
-  if(req.method !== "GET") return;
   const url = new URL(req.url);
+  if(req.method === "POST" && url.origin === self.location.origin && url.pathname === new URL(self.registration.scope).pathname + "share"){
+    event.respondWith(receiveShare(req));
+    return;
+  }
+  if(req.method !== "GET") return;
   // Map tiles, Google Maps and anything else from other sites go straight to the network.
   if(url.origin !== self.location.origin) return;
   // Pages of the site that are not the app (llms.txt, LICENSE…) are left to the

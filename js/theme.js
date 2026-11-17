@@ -5,3 +5,8 @@ try{
   var theme = localStorage.getItem("timp-theme");
   if(theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
 }catch(e){}
+
+// Android draws the scroll bar of the page itself over the content, whatever the CSS
+// says. There the page scrolls inside <body> instead, whose bar can be hidden
+// (css/app.css, .own-scroll; js/app.js, scroller).
+if(/Android/i.test(navigator.userAgent)) document.documentElement.classList.add("own-scroll");

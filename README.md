@@ -39,8 +39,11 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 - Each stop at a glance: time, pin number and how you get there on the left, a label
   like "Booking needed" above the title, Map and Directions always one tap away.
 - A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
-  a sketch to scale when you are not. What is behind you is drawn dashed, and the lines
-  between the stops can be hidden.
+  a sketch to scale when you are not. Each pin has the colour of its kind of place,
+  lighter in the morning and darker after sunset; what is behind you is drawn dashed,
+  and the lines between the stops can be hidden.
+- Sunrise and sunset of each day, worked out on the phone from the date and the place,
+  and a moon by the stops after dark.
 - One tap to open any stop in Google Maps, with directions.
 - An Info page for hotels, phone numbers, money, useful phrases.
 - Works on iPhone and Android. Installs on the Home Screen, no app store.
@@ -97,10 +100,14 @@ reads it on the phone:
 | A short link (`maps.app.goo.gl/…`), or the Maps app's text with one | name, address, position and kind of place, through the link resolver (below); without it, the link, and the name and address the text gives |
 | Coordinates, `geo:` links, Apple Maps links | the position |
 
-**Android:** once the app is installed, it appears in the Share menu of Google Maps.
-Share a place to it and the form opens already filled in.
+**Android:** once the app is installed, it appears in the Share menu: share a place from
+Google Maps and the form opens already filled in; share an AI assistant's answer, or a
+`.json` file, and the trip or the changes are loaded. (After an update, Android can take
+a day to learn that TIMP accepts files; removing the app and installing it again is
+immediate.)
 **iPhone:** Safari does not let web apps receive shared content, so in Maps tap Share →
-Copy, then in the app tap + and **Paste**.
+Copy, then in the app tap + and **Paste**; for a trip, copy it and use **Paste a trip**,
+or save the `.json` file in Files and use **Load a trip file**.
 
 When a position has to be looked up, the app asks Google (with a key that has the
 Geocoding API enabled, see below) or OpenStreetMap otherwise. It searches around the

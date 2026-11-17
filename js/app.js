@@ -2,7 +2,9 @@ import { validateTrip, upgrade, citiesOf, stayOf, placeQuery, formatBrief, FORMA
 import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
 import { esc, rich, mapsUrl, dirUrl, dateParts, todayIn, jsonIn } from "./util.js";
-import { zonesOf, routeUrl, zoneSVG } from "./geo.js";
+import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
+import { daylight, partsOfDay } from "./sun.js";
+import { clockMinutes } from "./edit.js";
 import { icon } from "./icons.js";
 import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
@@ -43,6 +45,10 @@ const S = {
 const $app = document.getElementById("app");
 const $strip = document.querySelector(".strip");
 const $days = document.getElementById("days");
+// The element the page scrolls in: <body> on Android (js/theme.js), the window elsewhere.
+const scroller = document.documentElement.classList.contains("own-scroll") ? document.body : null;
+const scrollTop = () => scroller ? scroller.scrollTop : window.scrollY;
+const scrollToY = y => { if(scroller) scroller.scrollTop = y; else window.scrollTo(0, y); };
 const $file = document.getElementById("file");
 const $toast = document.getElementById("toast");
 
@@ -173,7 +179,7 @@ const needsSaving = rec => !!rec && rec.exported !== rec.trip.version.id;
 // names, or to the open one, as one new version, like an edit made on this phone.
 async function importChanges(data){
   const rec = data.trip ? S.records.find(r => r.id === data.trip) : S.rec;
-  const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); window.scrollTo(0, 0); };
+  const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); scrollToY(0); };
   if(!rec) return fail([data.trip ? t("changesNoTrip", {id: data.trip}) : t("changesNoOpen")]);
   const res = applyChanges(rec.trip, data);
   if(!res.ok) return fail(res.errors);
@@ -188,12 +194,12 @@ async function importText(text, name){
   catch(e){
     const why = t("notJson") + " " + String(e && e.message || "");
     S.importError = {title: t("importFailed"), items: [why], all: [why]};
-    render(); window.scrollTo(0, 0); return;
+    render(); scrollToY(0); return;
   }
   if(isChanges(data)){ await importChanges(data); return; }
   data = upgrade(data);   // a file in the old format is converted, then checked
   const res = validateTrip(data);
-  if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12), all: res.errors}; render(); window.scrollTo(0, 0); return; }
+  if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12), all: res.errors}; render(); scrollToY(0); return; }
   S.importError = null;
   try{
     const {trip: incoming} = await prepare(data);
@@ -224,7 +230,7 @@ async function importText(text, name){
     store.askPersistence();
     if(location.hash) history.replaceState(null, "", location.pathname + location.search);
     render();
-    window.scrollTo(0, 0);
+    scrollToY(0);
     if(offer) offerSave(rec, message); else toast(message);
   }catch(e){
     S.importError = {title: t("importFailed"), items: [String(e && e.message || e)]};
@@ -413,14 +419,14 @@ function renderStrip(r){
 // The bar of days: an edge once the page has scrolled under it, and a fade on each side
 // of the list of days where there is more to scroll (css/app.css, .strip).
 function markStrip(){
-  $strip.classList.toggle("scrolled", window.scrollY > 4);
+  $strip.classList.toggle("scrolled", scrollTop() > 4);
   const max = $days.scrollWidth - $days.clientWidth;
   $days.classList.toggle("more-l", $days.scrollLeft > 2);
   $days.classList.toggle("more-r", $days.scrollLeft < max - 2);
 }
 let stripFrame = 0;
 const onScroll = () => { if(!stripFrame) stripFrame = requestAnimationFrame(() => { stripFrame = 0; markStrip(); }); };
-window.addEventListener("scroll", onScroll, {passive: true});
+(scroller || window).addEventListener("scroll", onScroll, {passive: true});
 window.addEventListener("resize", onScroll, {passive: true});
 $days.addEventListener("scroll", onScroll, {passive: true});
 
@@ -671,7 +677,7 @@ function effectiveView(){
   return S.ui.mapView === "schema" || !S.online ? "schema" : "live";
 }
 
-function mapPanel(zs, color, view, gone){
+function mapPanel(zs, color, view, gone, paint){
   const zoneLink = z => `<a class="maplink" href="${esc(z.pts.length < 2 ? mapsUrl(z.pts[0].q) : routeUrl(z))}" target="_blank" rel="noopener">${esc(z.pts.length < 2 ? t("mapLink") : t("openInMaps"))}</a>`;
   const zoneTitle = z => zs.length > 1 ? z.pts[0].name : t("stopsOfDay");
   const views = [["live", t("viewLive")], ["schema", t("viewSchema")]];
@@ -695,11 +701,11 @@ function mapPanel(zs, color, view, gone){
       o += `<p class="off move${gone(z.enter.idx) ? " gone" : ""}"><span class="tvchip">${icon(z.enter.travel, 16)}</span><span>${esc(t("travel_" + z.enter.travel))} · ${esc(z.enter.from.name)} → ${esc(zoneTitle(z))}</span></p>`;
     }
     if(z.pts.length < 2){
-      o += `<p class="off"><span class="mb">${z.pts[0].nums.join("·")}</span><span>${esc(z.pts[0].name)} · ${esc(t("offSketch"))}</span>${zoneLink(z)}</p>`;
+      o += `<p class="off"><span class="mb" style="--pf:${paint.pin(z.pts[0])}">${z.pts[0].nums.join("·")}</span><span>${esc(z.pts[0].name)} · ${esc(t("offSketch"))}</span>${zoneLink(z)}</p>`;
       return;
     }
     const head = `<div class="zhead"><span class="zname">${esc(zoneTitle(z))}</span>${zoneLink(z)}</div>`;
-    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone, S.ui.route)}<ol class="mlegend">${z.pts.map(p => `<li><span class="mb">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
+    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone, S.ui.route, paint)}<ol class="mlegend">${z.pts.map(p => `<li><span class="mb" style="--pf:${paint.pin(p)}">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
   });
   return o + `<p class="foot">${esc(t("footSketch") + " " + t("footNumbers"))}</p></section>`;
 }
@@ -714,16 +720,18 @@ function chip(kind, value){
   const known = kind === "travel" ? TRAVEL : TYPES;
   if(!known.includes(value)) return "";
   const name = esc(t(kind + "_" + value));
-  return `<span class="${kind === "travel" ? "tvchip" : "tychip"}" role="img" aria-label="${name}" title="${name}">${icon(value, kind === "travel" ? 16 : 15)}</span>`;
+  const hue = kind === "type" ? ` style="color:${TYPE_COLORS[value]}"` : "";
+  return `<span class="${kind === "travel" ? "tvchip" : "tychip"}"${hue} role="img" aria-label="${name}" title="${name}">${icon(value, kind === "travel" ? 16 : 15)}</span>`;
 }
 
-function stopsHTML(day, planId, list){
+function stopsHTML(day, planId, list, parts, paint){
   return `<ol class="stops" style="--c:${cityVar(day.city)}">` + list.map((s, i) => {
     const id = stopKey(day, planId, s, i);
     const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id], open = isOpen(id);
     const q = placeQuery(s);
     // Left column: when, where on the map, how you get there.
-    const left = `<div class="time"><span>${esc(s.time || "")}</span>${s.lat !== undefined ? `<span class="nb">${i + 1}</span>` : ""}${chip("travel", s.travel)}</div>`;
+    const dark = parts && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
+    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}</div>`;
     // Middle: a label above the title, the title with its kind, the description that folds, the links.
     const titleRow = `<div class="h"><h3>${chip("type", s.type)}${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>`;
     const head = s.text
@@ -769,6 +777,14 @@ function renderDay(i){
   const stay = stayOf(d.stay);
   const zs = zonesOf(list, isSkipped);
   const view = effectiveView();
+  // Sunrise and sunset where the day is (its first stop with a position), and so the
+  // part of the day of each stop: it shades the maps and marks the stops after dark.
+  const here = list.find(s => s.lat !== undefined);
+  const light = here ? daylight(d.date, here.lat, here.lng, tr.timezone) : null;
+  const parts = partsOfDay(list, light, clockMinutes);
+  const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  // The colours of this day's pins, lines and numbers (js/geo.js).
+  const paint = painter(cityColor(d.city), parts);
   const dp = dateParts(d.date, lang), ti = todayIndex();
   // The sign at the top: the city, and where the day starts when that is another one.
   const city = d.city || "";
@@ -785,7 +801,7 @@ function renderDay(i){
   <section class="sign" style="--c:${color}" aria-label="${esc(t("day"))} ${i + 1}">
     <div class="sign-top">
       <div>${sign}</div>
-      <div class="dayno"><div class="g">${esc(t("day"))} ${i + 1}${i === ti ? " · " + esc(t("today")) : ""}</div><div class="d">${esc(dp.long)}</div></div>
+      <div class="dayno"><div class="g">${esc(t("day"))} ${i + 1}${i === ti ? " · " + esc(t("today")) : ""}</div><div class="d">${esc(dp.long)}</div>${light ? `<div class="sun" role="img" aria-label="${esc(t("sunTimes", {r: hhmm(light.sunrise), s: hhmm(light.sunset)}))}">${icon("sun", 13)}<span>${hhmm(light.sunrise)}–${hhmm(light.sunset)}</span></div>` : ""}</div>
     </div>
     <div class="band"></div>
     <div class="neighbors">
@@ -804,18 +820,18 @@ function renderDay(i){
 
   let wanted = null;
   if(S.ui.mapOpen && zs.length){
-    html += mapPanel(zs, color, view, gone);
+    html += mapPanel(zs, color, view, gone, paint);
     const dark = isDark();
     // Skipping a stop changes the route: the map is drawn again.
     const skippedNow = list.map((s, k) => isSkipped(k) ? k : -1).filter(k => k >= 0).join(",");
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark, skippedNow, S.ui.route].join("|"), zones: zs, color: cityColor(d.city), dark, gone};
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, dark, skippedNow, S.ui.route].join("|"), zones: zs, color: cityColor(d.city), dark, gone, paint};
   }
   if(d.notes) html += d.notes.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
   if(d.plans){
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
   }
-  html += stopsHTML(d, pid, list);
+  html += stopsHTML(d, pid, list, light ? parts : null, paint);
   html += `<p class="foot dayfoot">${esc(t("footDay"))}</p>`;
   return {html, wanted};
 }
@@ -830,7 +846,7 @@ function syncLive(wanted){
   if(applyMapSettings()) return;
   if(!live || live.key !== wanted.key){
     if(live) live.handle.destroy();
-    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), dark: wanted.dark, route: S.ui.route, onNotice: k => toast(t(k))})};
+    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), dark: wanted.dark, route: S.ui.route, paint: wanted.paint, onNotice: k => toast(t(k))})};
   }
   slot.appendChild(live.handle.el);
   live.handle.refresh();
@@ -856,7 +872,7 @@ function render(){
   // by its height: a browser that lays the page out in that moment pulls the scroll up
   // (a tap on ⋯ or Edit under an open map jumped by the map's height). The page keeps
   // its height until the map is back.
-  const y = window.scrollY;
+  const y = scrollTop();
   $app.style.minHeight = $app.offsetHeight + "px";
   if(live) live.handle.el.remove(); // keep the map alive while the page is rebuilt
   let wanted = null;
@@ -867,7 +883,7 @@ function render(){
   syncLive(wanted);
   markCut();
   $app.style.minHeight = "";
-  if(window.scrollY !== y) window.scrollTo(0, y);
+  if(scrollTop() !== y) scrollToY(y);
 }
 
 /* ---------- events ---------- */
@@ -998,7 +1014,7 @@ $app.addEventListener("click", e => {
   else if(a === "history") showHistory(act.dataset.id);
   else if(a === "open"){
     const rec = S.records.find(r => r.id === act.dataset.id);
-    if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); window.scrollTo(0, 0); });
+    if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); scrollToY(0); });
   }
 });
 
@@ -1069,7 +1085,7 @@ $file.addEventListener("change", async () => {
   }
 });
 
-window.addEventListener("hashchange", () => { S.importError = null; S.menuFor = null; render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { S.importError = null; S.menuFor = null; render(); scrollToY(0); });
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
 // The path is the one at the time of the tap: the page may have been redrawn since.
 document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().includes($app)) closeMenu(); });
@@ -1114,14 +1130,26 @@ async function readVersion(){
   }catch(e){}
 }
 
-// Android: what is shared to the app arrives as ?title=…&text=…&url=… (see share_target
-// in manifest.webmanifest). An AI assistant's answer with a trip or a list of changes
-// is loaded as if pasted; a place shared from Google Maps opens the stop form, filled in.
-function takeSharedPlace(){
+// Android: what is shared to the app (share_target in manifest.webmanifest) is kept by
+// the service worker and the app opens with ?shared=1; older installs still send it as
+// ?title=…&text=…&url=…. An AI assistant's answer or a .json file with a trip or a list
+// of changes is loaded as if pasted; a place shared from Google Maps opens the stop
+// form, filled in.
+async function takeSharedPlace(){
   const q = new URLSearchParams(location.search);
-  const parts = ["title", "text", "url"].map(k => q.get(k)).filter(Boolean);
-  if(!parts.length) return;
+  let parts = ["title", "text", "url"].map(k => q.get(k)).filter(Boolean);
+  if(q.get("shared") === "1"){
+    try{
+      const box = await caches.open("timp-share");
+      const res = await box.match("shared");
+      await box.delete("shared");
+      const got = res ? await res.json() : {};
+      parts = [got.title, got.text, got.url, got.file].filter(x => typeof x === "string" && x.trim());
+    }catch(e){ parts = []; }
+  }
+  if(!parts.length && q.get("shared") !== "1") return;
   history.replaceState(null, "", location.pathname + location.hash);
+  if(!parts.length) return;
   const json = jsonIn(parts.join("\n"));
   if(/"format"\s*:\s*"travel-in-my-pocket\//.test(json)){ importText(json, "shared.json"); return; }
   if(!trip()){ toast(t("shareNeedsTrip")); return; }

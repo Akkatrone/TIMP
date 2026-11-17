@@ -192,6 +192,15 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     await until("the pins", `document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await count(".live .pin.typed svg"), 5);
+    // Filled with the colour of their kind, shaded by the part of the day.
+    assert.equal(await count(".live .pin.painted"), 5);
+    const fills = await run(`return [...document.querySelectorAll(".live .pin")].map(p => p.style.getPropertyValue("--pf"));`);
+    assert.ok(fills.every(f => /^#[0-9a-f]{6}$/.test(f)), fills.join(" "));
+    assert.notEqual(fills[0], fills[2], "a sight and a view have different colours");
+    // Sunrise and sunset worked out for Lisbon, and the stop after dark marked.
+    assert.match(await text(".dayno .sun"), /^\d\d:\d\d–2\d:\d\d$/);
+    assert.match(await run(`return document.querySelector(".dayno .sun").getAttribute("aria-label");`), /^Sunrise \d\d:\d\d · sunset 2\d:\d\d$/);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nightmark")).map(li => li.querySelector("h3").textContent);`), ["Miradouro da Senhora do Monte"]);
     await click("[data-map]");
   });
 
@@ -593,6 +602,16 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.href = location.pathname + "?text=" + encodeURIComponent("Done! " + ${JSON.stringify(JSON.stringify(shared))}) + "#day-1";`);
     await until("the stop removed", `document.querySelectorAll(".stop").length > 0 && ![...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Ginjinha bar"))`);
     assert.equal(await run(`return location.search;`), "");
+  });
+
+  await step("a .json file shared on Android is loaded, through the service worker", async () => {
+    await run(`await navigator.serviceWorker.ready;`);
+    if(!await run(`return !!navigator.serviceWorker.controller;`)){ await reload(); await until("the service worker", `!!navigator.serviceWorker.controller`); }
+    const shared = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "se", set: {tag: "Shared as a file"}}}]};
+    await run(`const fd = new FormData(); fd.append("title", "changes.json"); fd.append("file", new File([${JSON.stringify(JSON.stringify(shared))}], "changes.json", {type: "application/json"})); const res = await fetch("share", {method: "POST", body: fd}); window.__shareStatus = res.status; location.href = location.pathname + "?shared=1#day-1";`);
+    await until("the change applied", `[...document.querySelectorAll(".eyebrow")].some(e => e.textContent === "Shared as a file")`);
+    assert.equal(await run(`return location.search;`), "", "nothing left in the address");
+    assert.equal(await run(`return (await caches.open("timp-share").then(c => c.match("shared"))) === undefined;`), true, "read once, then gone");
   });
 
   await step("deleting a trip asks first; Escape or Cancel keep it", async () => {

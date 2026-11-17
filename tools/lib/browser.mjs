@@ -91,6 +91,7 @@ async function connect(wsUrl){
  *   reload()              reloads the page and waits for the app
  *   capture()             returns a PNG of the screen as a Buffer
  *   blocked()             what the Content-Security-Policy blocked so far
+ *   page(method, params)  any DevTools Protocol command, for what the helpers do not cover
  */
 export async function withApp(work){
   const server = await serve();
@@ -127,7 +128,7 @@ export async function withApp(work){
     await page("Page.navigate", {url: base});
     await until("the welcome screen", `document.querySelector('[data-act="demo"]')`);
 
-    await work({run, until, theme, reload, capture, base, blocked});
+    await work({run, until, theme, reload, capture, base, blocked, page});
     close();
   }finally{
     chrome.kill();

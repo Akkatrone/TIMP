@@ -411,6 +411,11 @@ The file gives positions; the app does the rest.
 - Stops more than 12 km apart are drawn on separate maps (a day in Rome, then Naples).
 - Stops less than 30 m apart share a pin, named after the first one.
 - Skipped stops keep their pin, greyed; the line goes past them.
+- Each pin has the colour of its `type`, the lines that of the day's `city`. Their
+  shade follows the part of the day: lighter in the morning, darker after sunset.
+- Sunrise and sunset are worked out from the date and the first stop with a position,
+  on the clock of `timezone`. Stops after sunset get a moon in the list. A `time` in
+  words counts too: "Evening", "Dinner", "Sera", "Cena" are after dark.
 
 ## Google Maps key
 

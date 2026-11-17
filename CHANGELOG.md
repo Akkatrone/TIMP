@@ -4,6 +4,26 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.2.0
+
+Colours that say what and when, sunrise and sunset, and files shared to the app.
+
+- **Colours on the maps.** Each pin is filled with the colour of its kind of place
+  (gold for sights, violet for museums, red for food, green for parks, blue for views,
+  pink for shops, brown for walks, indigo for hotels); the lines take the city's. The
+  shade follows the part of the day: lighter in the morning, full in the afternoon,
+  darker after sunset. The numbers in the list and in the sketch's legend, and the icon
+  by each title, use the same colours.
+- **Sunrise and sunset**, worked out on the phone from the date and the first stop with
+  a position (js/sun.js: no network, nothing in the file). The day shows them under its
+  date, and the stops after dark have a moon by their time.
+- **Android: share a .json file to TIMP.** The app now accepts files in the Share menu,
+  such as a trip or a list of changes from Claude or another assistant, besides text
+  and links. Android may take a day to notice; reinstalling the app is immediate.
+  iPhone does not let web apps receive shares: copy and paste, or Files and Load.
+- **No scroll bar on Android.** The page scrolls inside the app instead of the window,
+  whose bar Android draws whatever the styles say.
+
 ## 3.1.1
 
 - No scroll bars at all: 3.1.0 hid them only on devices that call themselves touch

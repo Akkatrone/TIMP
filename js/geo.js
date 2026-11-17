@@ -8,6 +8,32 @@ import { TRAVEL, TYPES, placeQuery } from "./trip.js";
 // Stops further apart than this are drawn on separate maps (a city, then the next one).
 const SPLIT_KM = 12;
 
+// Colours on the maps. The kind of place gives a pin its hue, the city of the day gives
+// the lines theirs; the part of the day gives the shade: lighter in the morning, full in
+// the afternoon, darker after sunset (js/sun.js). Stops of no kind take the city's hue.
+export const TYPE_COLORS = {sight: "#c98a00", museum: "#7a55c7", food: "#d24f2b", park: "#3a8a3a",
+  view: "#178aae", shop: "#c23f7e", walk: "#8a6a3a", hotel: "#4a5fb0"};
+
+export function shade(hex, part){
+  if(!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+  const k = part === "morning" ? 0.3 : part === "night" ? -0.45 : 0;
+  return "#" + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
+    .map(v => Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k)).toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * The colours of a day's maps. `color` is the city's (#rrggbb), `parts[i]` the part of
+ * the day of the i-th stop ("morning", "afternoon", "night").
+ */
+export function painter(color, parts){
+  const stop = (type, idx) => shade(TYPE_COLORS[type] || color, parts[idx]);
+  return {
+    stop,                                         // a stop of the list: its kind, its index
+    pin: pt => stop(pt.type, pt.items[0].idx),    // a pin: its first stop
+    leg: leg => shade(color, parts[leg.idx])      // a line: the stop it arrives at
+  };
+}
+
 function kmXY(ll, lat0){ return [ll[1] * 111.32 * Math.cos(lat0 * Math.PI / 180), -ll[0] * 110.57]; }
 export function distKm(a, b){
   const l = (a[0] + b[0]) / 2, p = kmXY(a, l), q = kmXY(b, l);
@@ -106,8 +132,9 @@ export const legGone = (leg, gone) => gone(leg.idx);
 
 // The offline map: an SVG sketch to scale, with numbered badges pushed apart so they never overlap.
 // `gone(idx)` says whether the stop at that position in the list is done or skipped;
-// `route` false leaves out the lines between the stops and the travel icons on them.
-export function zoneSVG(z, label, gone = () => false, route = true){
+// `route` false leaves out the lines between the stops and the travel icons on them;
+// `paint` (painter) colours pins and lines, otherwise they take the day's colour.
+export function zoneSVG(z, label, gone = () => false, route = true, paint = null){
   const pts = z.pts, lat0 = pts.reduce((a, p) => a + p.ll[0], 0) / pts.length;
   const xy = pts.map(p => kmXY(p.ll, lat0));
   const xs = xy.map(p => p[0]), ys = xy.map(p => p[1]);
@@ -134,13 +161,13 @@ export function zoneSVG(z, label, gone = () => false, route = true){
   const legs = route ? legsOf(z) : [];
   legs.forEach(leg => {
     const a = P[pts.indexOf(leg.from)], b = P[pts.indexOf(leg.to)];
-    o += `<path class="route${legGone(leg, gone) ? " gone" : ""}" d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}"/>`;
+    o += `<path class="route${legGone(leg, gone) ? " gone" : ""}"${paint ? ` style="stroke:${paint.leg(leg)}"` : ""} d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}"/>`;
   });
   // How a leg is travelled: an icon in the middle of it, under the numbered badges.
   legs.filter(leg => leg.travel).forEach(leg => {
     const a = P[pts.indexOf(leg.from)], b = P[pts.indexOf(leg.to)];
     const [x, y] = midpoint(a, b), g = legGone(leg, gone) ? " gone" : "";
-    o += `<g class="tv${g}"><circle class="tvbg" cx="${f1(x)}" cy="${f1(y)}" r="9"/>${glyph(leg.travel, x, y, 12)}</g>`;
+    o += `<g class="tv${g}"${paint ? ` style="color:${paint.leg(leg)}"` : ""}><circle class="tvbg"${paint ? ` style="stroke:${paint.leg(leg)}"` : ""} cx="${f1(x)}" cy="${f1(y)}" r="9"/>${glyph(leg.travel, x, y, 12)}</g>`;
   });
   pts.forEach((p, i) => {
     const c = P[i];
@@ -148,7 +175,8 @@ export function zoneSVG(z, label, gone = () => false, route = true){
   });
   pts.forEach((p, i) => {
     const lab = p.nums.join("·"), bw = Math.max(20, 9 + lab.length * 6.5), g = pinGone(p, gone) ? " gone" : "";
-    o += `<rect class="badge${g}" x="${f1(B[i][0] - bw / 2)}" y="${f1(B[i][1] - 10)}" width="${f1(bw)}" height="20" rx="10"/><text class="bt${g}" x="${f1(B[i][0])}" y="${f1(B[i][1])}" dy="0.35em">${lab}</text>`;
+    const fill = paint ? ` style="fill:${paint.pin(p)}"` : "", painted = paint ? " painted" : "";
+    o += `<rect class="badge${painted}${g}"${fill} x="${f1(B[i][0] - bw / 2)}" y="${f1(B[i][1] - 10)}" width="${f1(bw)}" height="20" rx="10"/><text class="bt${painted}${g}" x="${f1(B[i][0])}" y="${f1(B[i][1])}" dy="0.35em">${lab}</text>`;
   });
   const nice = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
   let sb = nice[0];

@@ -4,6 +4,7 @@
   --err:#a3261c; --err-bg:#fbe9e7;
   /* The colours of the cities of a trip, in the order they appear (js/app.js, cityVar):
      medium tones, readable on white. The dark theme has lighter ones. */
+  --lift:none;   /* the colours of kinds of places, lifted on a dark page */
   --p0:#b8451b; --p1:#2f6fb0; --p2:#4f8a2a; --p3:#8a4fb0; --p4:#b0306a; --p5:#0f7f7c; --p6:#a06c12; --p7:#5a6a7a;
   /* System fonts only: nothing to download, identical online and offline. */
   --f-display:"Hiragino Sans","Noto Sans CJK JP","Noto Sans JP",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -18,6 +19,7 @@
     --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
     --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
     --err:#f39b92; --err-bg:#33201e;
+    --lift:brightness(1.45) saturate(.9);
     --p0:#ef8a5f; --p1:#7fb3ec; --p2:#93c96b; --p3:#c49be8; --p4:#ee88b4; --p5:#5fd0cb; --p6:#e3b45e; --p7:#a9b6c3;
     color-scheme:dark;
   }
@@ -26,6 +28,7 @@
     --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
     --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
     --err:#f39b92; --err-bg:#33201e;
+    --lift:brightness(1.45) saturate(.9);
     --p0:#ef8a5f; --p1:#7fb3ec; --p2:#93c96b; --p3:#c49be8; --p4:#ee88b4; --p5:#5fd0cb; --p6:#e3b45e; --p7:#a9b6c3;
     color-scheme:dark;
 }
@@ -61,6 +64,10 @@ button{font:inherit}
    the keyboard all the same, and an always visible bar was only in the way. */
 html,*{scrollbar-width:none}
 ::-webkit-scrollbar{display:none;width:0;height:0}
+/* Android: the page scrolls inside <body> (js/theme.js), so no bar of the page shows. */
+html.own-scroll{height:100%;overflow:hidden}
+html.own-scroll body{height:100%;overflow-x:hidden;overflow-y:auto;scroll-padding-top:env(safe-area-inset-top,0px)}
+html.own-scroll:has(dialog[open]) body{overflow:hidden}
 .dchip{flex:0 0 auto;min-width:46px;padding:5px 8px 9px;border:1px solid var(--line);border-color:color-mix(in srgb,var(--line) 80%,transparent);background:var(--surface);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:12px;text-align:center;text-decoration:none;color:var(--ink);display:grid;gap:0;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:background-color .15s,border-color .15s,transform .1s;-webkit-tap-highlight-color:transparent}
 .dchip:active{transform:scale(.96)}
 .dchip::after{content:"";position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:var(--c,var(--muted))}
@@ -153,6 +160,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 /* the kind of place, before the stop's title */
 .tychip{display:inline-block;vertical-align:-2px;margin-right:6px;color:var(--c,var(--ink))}
 .tychip svg{display:block}
+.tychip,.nb,.mb{filter:var(--lift)}
 .stop.done .tychip,.stop.skipped .tychip{opacity:.5}
 .tap .h,.body > .h{display:flex;align-items:flex-start;gap:8px}
 .h h3{flex:1 1 auto;min-width:0}
@@ -168,7 +176,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .tvpin.gone{border-style:dashed;opacity:.7;box-shadow:none}
 .alt{font-size:.88rem;color:var(--muted);margin:0}
 .alt b{color:var(--ink);font-weight:600}
-.nb{display:inline-block;font:600 .68rem var(--f-mono);border:1.5px solid var(--c,var(--line));border-radius:999px;padding:0 6px;color:var(--ink)}
+.nb{display:inline-block;font:600 .68rem var(--f-mono);border:1.5px solid var(--pf,var(--c,var(--line)));border-radius:999px;padding:0 6px;color:var(--ink)}
 
 /* sections and cards */
 .sec{display:grid;gap:10px}
@@ -207,7 +215,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .mapsvg .sbt{font:500 10px var(--f-mono);fill:var(--muted)}
 .mlegend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px 12px;font-size:.84rem}
 .mlegend li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline;min-width:0}
-.mb{display:inline-block;font:600 .7rem var(--f-mono);border:1.5px solid var(--c);border-radius:999px;padding:1px 6px;min-width:22px;text-align:center;color:var(--ink)}
+.mb{display:inline-block;font:600 .7rem var(--f-mono);border:1.5px solid var(--pf,var(--c));border-radius:999px;padding:1px 6px;min-width:22px;text-align:center;color:var(--ink)}
 .mlegend a{color:var(--ink);text-decoration:none;min-width:0;overflow-wrap:anywhere}
 .off{font-size:.84rem;color:var(--muted);margin:0;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 
@@ -232,6 +240,19 @@ ol.stops{list-style:none;margin:0;padding:0}
 .pin.gone{border-style:dashed;color:#5b636b;background:rgba(255,255,255,.9);box-shadow:none}
 /* a pin with the icon of its kind of place (js/livemap.js, pinNode) */
 .pin.typed{display:inline-flex;align-items:center;gap:3px;padding:4px 7px 4px 5px}
+/* pins filled with the colour of their kind and part of the day (js/geo.js, painter) */
+.pin.painted{background:var(--pf);color:#fff;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4)}
+.pin.painted.typed svg,.pin.painted.gone.typed svg{color:#fff}
+.pin.painted.gone{opacity:.55;border-style:dashed;color:#fff;background:var(--pf)}
+.mapsvg .badge.painted{stroke:#fff;stroke-width:1.5}
+.mapsvg .bt.painted{fill:#fff}
+.mapsvg .badge.painted.gone{opacity:.55}
+.mapsvg .bt.painted.gone{fill:#fff;opacity:.8}
+/* the moon by the time of a stop after sunset, and the sun's times on the day */
+.nightmark{display:inline-block;vertical-align:-1px;margin-left:4px;color:var(--muted)}
+.nightmark svg{display:block}
+.dayno .sun{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font:500 .72rem var(--f-mono);color:var(--muted);margin-top:5px;letter-spacing:.02em}
+.dayno .sun svg{display:block}
 .pin.typed svg{color:var(--pc,#15181b);flex:0 0 auto}
 .pin.gone.typed svg{color:#5b636b}
 .pinwrap{background:none;border:0}

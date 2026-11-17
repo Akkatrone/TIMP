@@ -60,11 +60,13 @@ function routeOf(zones){
   return [...legs, ...bridges];
 }
 
-// A numbered pin, with the icon of its kind of place when it has one.
-function pinNode(pt, color){
+// A numbered pin, with the icon of its kind of place when it has one, filled with the
+// colour `paint` gives it (js/geo.js, painter).
+function pinNode(pt, color, paint){
   const el = document.createElement("span");
-  el.className = "pin" + (pt.type ? " typed" : "");
+  el.className = "pin" + (pt.type ? " typed" : "") + (paint ? " painted" : "");
   el.style.setProperty("--pc", color);
+  if(paint) el.style.setProperty("--pf", paint.pin(pt));
   el.innerHTML = icon(pt.type, 13) + `<span>${esc(pt.nums.join("·"))}</span>`;
   el.setAttribute("role", "button");
   el.setAttribute("aria-label", pt.name);
@@ -72,7 +74,7 @@ function pinNode(pt, color){
 }
 
 // In the dark theme the tiles are darkened by CSS (.live.dark), see css/app.css.
-async function drawLeaflet(canvas, zones, color, route){
+async function drawLeaflet(canvas, zones, color, route, paint){
   const L = await loadLeaflet();
   const map = L.map(canvas, {zoomControl: true});
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
@@ -84,16 +86,16 @@ async function drawLeaflet(canvas, zones, color, route){
   // A jump between zones (Hakone → Kyoto) is thinner: it is not a walk.
   const style = (leg, isGone) => ({weight: leg.bridge ? 3 : 4, opacity: isGone || leg.bridge ? 0.55 : 0.75, dashArray: isGone ? "5 10" : null});
   (route ? routeOf(zones) : []).forEach(leg => {
-    legs.push({...leg, line: L.polyline([leg.from.ll, leg.to.ll], {color, interactive: false, ...style(leg, false)}).addTo(map)});
+    legs.push({...leg, line: L.polyline([leg.from.ll, leg.to.ll], {color: paint ? paint.leg(leg) : color, interactive: false, ...style(leg, false)}).addTo(map)});
     if(leg.travel){
-      const el = travelNode(leg, color);
+      const el = travelNode(leg, paint ? paint.leg(leg) : color);
       L.marker(midpoint(leg.from.ll, leg.to.ll), {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), interactive: false, keyboard: false, zIndexOffset: -1000}).addTo(map);
       marks.push({leg, el});
     }
   });
   zones.forEach(z => {
     z.pts.forEach(pt => {
-      const el = pinNode(pt, color);
+      const el = pinNode(pt, color, paint);
       const m = L.marker(pt.ll, {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), title: pt.name}).addTo(map);
       m.bindPopup(popupNode(pt), {offset: [0, -10], maxWidth: 250});
       pins.push({pt, el});
@@ -114,7 +116,7 @@ async function drawLeaflet(canvas, zones, color, route){
   return {fit, mark, refresh: () => map.invalidateSize(), destroy: () => map.remove()};
 }
 
-async function drawGoogle(canvas, zones, color, key, dark, route){
+async function drawGoogle(canvas, zones, color, key, dark, route, paint){
   const gm = await loadGoogle(key);
   const {Map, Polyline, InfoWindow, OverlayView} = await gm.importLibrary("maps");
   const {LatLng, LatLngBounds, ColorScheme} = await gm.importLibrary("core");
@@ -152,11 +154,11 @@ async function drawGoogle(canvas, zones, color, key, dark, route){
   const solid = leg => ({strokeOpacity: leg.bridge ? 0.55 : 0.75, strokeWeight: leg.bridge ? 3 : 4, icons: []});
   const dashed = leg => ({strokeOpacity: 0, strokeWeight: leg.bridge ? 3 : 4, icons: [{icon: {path: "M 0,-1 0,1", strokeOpacity: 0.55, strokeWeight: leg.bridge ? 3 : 4, scale: 1.5}, offset: "0", repeat: "13px"}]});
   (route ? routeOf(zones) : []).forEach(leg => {
-    const line = new Polyline({map, path: [leg.from, leg.to].map(p => ({lat: p.ll[0], lng: p.ll[1]})), strokeColor: color, clickable: false, ...solid(leg)});
+    const line = new Polyline({map, path: [leg.from, leg.to].map(p => ({lat: p.ll[0], lng: p.ll[1]})), strokeColor: paint ? paint.leg(leg) : color, clickable: false, ...solid(leg)});
     drawn.push(line);
     legs.push({...leg, line});
     if(leg.travel){
-      const el = travelNode(leg, color);
+      const el = travelNode(leg, paint ? paint.leg(leg) : color);
       const [lat, lng] = midpoint(leg.from.ll, leg.to.ll);
       const icon = new Pin(new LatLng(lat, lng), el, "overlayLayer");
       icon.setMap(map);
@@ -167,7 +169,7 @@ async function drawGoogle(canvas, zones, color, key, dark, route){
   zones.forEach(z => {
     z.pts.forEach(pt => {
       const pos = new LatLng(pt.ll[0], pt.ll[1]);
-      const el = pinNode(pt, color);
+      const el = pinNode(pt, color, paint);
       el.addEventListener("click", e => {
         e.stopPropagation();
         const head = document.createElement("b");
@@ -206,8 +208,9 @@ async function drawGoogle(canvas, zones, color, key, dark, route){
  * Creates the map element. Append `el` to the page right away; drawing starts on its own.
  * @param {{zones: object[], color: string, googleKey: string, dark: boolean, route?: boolean, onNotice: (key: string) => void}} o
  *   route: false hides the lines between the stops (and the travel icons on them).
+ *   paint: the colours of pins and lines (painter in js/geo.js); without it, `color`.
  */
-export function createLiveMap({zones, color, googleKey, dark, route = true, onNotice}){
+export function createLiveMap({zones, color, googleKey, dark, route = true, paint = null, onNotice}){
   const el = document.createElement("div");
   el.className = "live" + (dark ? " dark" : "");
   let canvas = null, impl = null, dead = false;
@@ -226,7 +229,7 @@ export function createLiveMap({zones, color, googleKey, dark, route = true, onNo
     try{
       // The canvas must be on the page (with a size) before a map is drawn into it.
       el.appendChild(fresh);
-      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, route) : await drawLeaflet(fresh, zones, color, route);
+      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, route, paint) : await drawLeaflet(fresh, zones, color, route, paint);
       if(dead){ made.destroy(); return; }
       const msg = el.querySelector(".msg");
       if(msg) msg.remove();

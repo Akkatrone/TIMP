@@ -49,7 +49,8 @@ taps, add a check to `tools/e2e.mjs`.
 | `index.html`, `css/app.css` | The page and its styles. |
 | `js/app.js` | Screens, navigation, events. The only file that touches the page. |
 | `js/trip.js` | The trip file format: `FIELDS`, one table for every field, from which come the checks and the JSON Schema; the conversion of format 1; what the app works out (trip id, cities). No DOM. |
-| `js/geo.js` | Groups stops into map zones, draws the offline sketch. No DOM. |
+| `js/geo.js` | Groups stops into map zones, draws the offline sketch, and gives pins and lines their colours (kind of place, part of the day). No DOM. |
+| `js/sun.js` | Sunrise and sunset from the date and the place (the sunrise equation), and the part of the day of each stop. Nothing about it goes in the trip file. No DOM. |
 | `js/livemap.js` | The interactive map: Google Maps or Leaflet + OpenStreetMap. |
 | `js/google.js` | Loads Google's script once per page, shared by the map and the address search. |
 | `js/editor.js` | The form to add or change a stop. |
