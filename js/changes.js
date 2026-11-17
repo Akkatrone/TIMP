@@ -11,17 +11,23 @@
 //     {"remove": {"day": "2027-04-10", "stop": "<stop id>"}},
 //     {"setDay": {"day": "2027-04-10", "set": {"title": "…", "city": "…", "stay": …, "notes": […]}}},
 //     {"addDay": {…a day…}},
-//     {"removeDay": {"day": "2027-04-12"}}
+//     {"removeDay": {"day": "2027-04-12"}},
+//     {"addPlan": {"day": "2027-04-11", "plan": {"name": "If it rains", "stops": […]}, "first": "Sunny"}},
+//     {"setPlan": {"day": "2027-04-11", "plan": "<plan id>", "set": {"name": "…"}}},
+//     {"removePlan": {"day": "2027-04-11", "plan": "<plan id>"}}
 //   ]}
 //
-// In "set", null removes a field. A stop goes in time order. Everything is checked
-// against FIELDS once applied, like any trip file.
+// In "set", null removes a field. A stop goes in time order. A day without plans that
+// gets one has two: its stops become the first, named by "first"; a day left with one
+// plan goes back to plain stops. Everything is checked against FIELDS once applied,
+// like any trip file.
 
 import { FIELDS, FORMAT, validateTrip } from "./trip.js";
-import { addStop, updateStop, removeStop, ensureIds } from "./edit.js";
+import { addStop, updateStop, removeStop, ensureIds, addPlan, renamePlan, removePlan } from "./edit.js";
 
 export const CHANGES = "travel-in-my-pocket/changes";
 
+const KINDS = "add, update, remove, setDay, addDay, removeDay, addPlan, setPlan or removePlan";
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const clone = v => JSON.parse(JSON.stringify(v));
 
@@ -66,6 +72,9 @@ export function changesBrief(){
     `  {"setDay": {"day": "YYYY-MM-DD", "set": {…}}}             a day's city, title, stay or notes`,
     `  {"addDay": {…a whole day, as in a trip file…}}`,
     `  {"removeDay": {"day": "YYYY-MM-DD"}}`,
+    `  {"addPlan": {"day": "YYYY-MM-DD", "plan": {"name": "…", "stops": [{…}, …]}, "first": "…"}}  an alternative plan for the day (a rainy day, a lazy morning); the traveller picks one. On a day without plans, "first" names the plan made of the stops it has now`,
+    `  {"setPlan": {"day": "YYYY-MM-DD", "plan": "<plan id>", "set": {"name": "…"}}}  renames a plan`,
+    `  {"removePlan": {"day": "YYYY-MM-DD", "plan": "<plan id>"}}  with one plan left, the day has plain stops again`,
     "",
     `On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them.`
   ].join("\n");
@@ -103,7 +112,7 @@ export function applyChanges(trip, data){
   data.changes.forEach((c, i) => {
     const path = `changes[${i}]`;
     try{
-      if(!isObj(c) || Object.keys(c).length !== 1) throw new Error("must be one of add, update, remove, setDay, addDay, removeDay");
+      if(!isObj(c) || Object.keys(c).length !== 1) throw new Error(`must be one of ${KINDS}`);
       const [kind, x] = Object.entries(c)[0];
       if(!isObj(x)) throw new Error(`"${kind}" must be an object`);
       if(kind === "add"){
@@ -144,8 +153,24 @@ export function applyChanges(trip, data){
         if(!d) throw new Error(`there is no day ${x.day}`);
         out.days.splice(out.days.indexOf(d), 1);
         counts.removed++;
+      }else if(kind === "addPlan"){
+        if(!isObj(x.plan)) throw new Error(`"plan" must be an object with name and stops`);
+        const res = addPlan(out, x.day, x.plan, x.first);
+        out = res.trip;
+        moves.push(...res.marks);
+        counts.added++;
+      }else if(kind === "setPlan"){
+        const other = Object.keys(x.set || {}).filter(k => k !== "name");
+        if(!isObj(x.set) || other.length) throw new Error(`"set" can change only the name of a plan: change its stops one by one`);
+        out = renamePlan(out, x.day, x.plan, x.set.name);
+        counts.changed++;
+      }else if(kind === "removePlan"){
+        const res = removePlan(out, x.day, x.plan);
+        out = res.trip;
+        moves.push(...res.marks);
+        counts.removed++;
       }else{
-        throw new Error(`"${kind}" is not a change: use add, update, remove, setDay, addDay or removeDay`);
+        throw new Error(`"${kind}" is not a change: use ${KINDS}`);
       }
     }catch(e){
       errors.push(`${path}: ${e.message}`);

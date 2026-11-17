@@ -187,7 +187,7 @@ from it, then joins it with what changed on other phones.
 To change a trip that already exists, an AI assistant does not need to write the whole
 file again. The app gives it an outline of the trip (Trips → Have an AI assistant change
 this trip), and the assistant answers with a short list of changes, which the app applies
-as one new version (Trips → Paste a trip):
+as one new version (Paste, at the bottom of the app):
 
 ```json
 {"format": "travel-in-my-pocket/changes", "trip": "rome-in-three-days-2027-04-10", "changes": [
@@ -197,12 +197,20 @@ as one new version (Trips → Paste a trip):
   {"remove": {"day": "2027-04-11", "stop": "trevi"}},
   {"setDay": {"day": "2027-04-11", "set": {"title": "Churches and squares"}}},
   {"addDay": {"date": "2027-04-12", "city": "Rome", "stops": [{"title": "Last coffee"}]}},
-  {"removeDay": {"day": "2027-04-13"}}
+  {"removeDay": {"day": "2027-04-13"}},
+  {"addPlan": {"day": "2027-04-11", "first": "Sunny", "plan": {"name": "If it rains", "stops": [
+    {"time": "10:00", "title": "Vatican Museums", "type": "museum"}]}}},
+  {"setPlan": {"day": "2027-04-11", "plan": "sunny", "set": {"name": "Squares"}}},
+  {"removePlan": {"day": "2027-04-12", "plan": "lazy-morning"}}
 ]}
 ```
 
 Stops are named by their `id`, plans by theirs (`"plan": "…"` next to `"day"`). In
 `set`, `null` removes a field. A new stop goes in time order. The changes are applied
+in order, all or none. `addPlan` gives a day an alternative plan; on a day that has
+none yet, the stops it has become the first plan, named by `first`, and their ticks
+follow. A day left with one plan by `removePlan` has plain stops again. `setPlan`
+changes only the name: the stops of a plan change one by one. The changes are applied
 in order, all or none: if one is wrong, the app lists which one and why, and changes
 nothing. The result is checked like any trip file. `trip` may be left out: the changes
 then apply to the trip open on the phone. The rules are in

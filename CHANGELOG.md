@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.4.0
+
+- **Days in the app.** Each day has its own ⋯, next to Map of the day. **Edit day**
+  changes its city, title, where you sleep and its notes, or deletes the day (asked
+  first; History brings it back). **Add a day** opens the stop form on a new day after
+  the last: a day cannot be empty, so it is made with its first stop. The stop form
+  also offers that new day at the end of its list of days.
+- **Plans from an AI assistant.** The changes format has `addPlan`, `setPlan` and
+  `removePlan`: "add a plan B for day 3 if it rains" gives the day a second plan to
+  choose. On a day without plans, the stops it has become the first plan, named by
+  `first`, with their ticks; a day left with one plan has plain stops again.
+- Plans stay out of the app's forms on purpose: an alternative itinerary is written
+  when the trip is planned, and an assistant writes it better than a phone keyboard.
+
 ## 3.3.1
 
 - Paste shows its word only at the top or at the end of a page; anywhere in between it

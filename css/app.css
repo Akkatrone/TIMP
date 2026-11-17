@@ -157,6 +157,12 @@ ol.stops{list-style:none;margin:0;padding:0}
 .iconbtn{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
 .iconbtn svg{width:18px;height:18px}
 .iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+/* the day's ⋯ menu, at the end of the row of tools */
+.daymore{position:relative;margin-left:auto}
+.tools .iconbtn + .daymore,.daymore .iconbtn{margin-left:0}
+.daymore .iconbtn[aria-expanded="true"]{background:var(--line)}
+.daymore .menu{top:44px;right:0;min-width:190px}
+.daymore .menu.up{top:auto;bottom:44px}
 /* how a stop is travelled: metro, train, plane, boat */
 .tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:var(--bg);background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink))}
 .tvchip svg{display:block}

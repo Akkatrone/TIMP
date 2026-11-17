@@ -5,7 +5,7 @@ import { ensureVersion, commit, commitMerge, relation, commonBase, versionId, ca
 import { mergeTrips } from "../js/merge.js";
 import { diffTrips, counts } from "../js/diff.js";
 const merge = (base, ours, theirs) => { const trip = mergeTrips(base, ours, theirs); return {trip, report: counts(diffTrips(ours, trip))}; };
-import { ensureIds, addStop, updateStop, removeStop, insertIndex, clockMinutes, newId } from "../js/edit.js";
+import { ensureIds, addStop, updateStop, removeStop, insertIndex, clockMinutes, newId, dayAfter, addDay, updateDay, removeDay } from "../js/edit.js";
 import { validateTrip } from "../js/trip.js";
 
 const demo = () => JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
@@ -180,6 +180,36 @@ test("an edit keeps the id and the field order; a new time or day moves the stop
   const moved = updateStop(trip, {date: DAY1, id: "se"}, se, {date: DAY2});
   assert.deepEqual(moved.ref, {date: DAY2, plan: null, id: "se"});
   assert.ok(ids(moved.trip, DAY2).includes("se"));
+});
+
+test("a day is added after the last, its own fields changed, and removed; days merge by date", async () => {
+  assert.equal(dayAfter("2027-05-17"), "2027-05-18");
+  assert.equal(dayAfter("2028-02-28"), "2028-02-29");
+  assert.equal(dayAfter("2027-12-31"), "2028-01-01");
+  const base = await ensureVersion(ensureIds(demo()).trip);
+  // The way the app adds one: a new day after the last, made with its first stop.
+  const added = addStop(addDay(base, {date: "2027-05-18", city: "Porto", stops: []}), {date: "2027-05-18"}, {time: "10:00", title: "Last coffee"}).trip;
+  assert.deepEqual(added.days.map(d => d.date).slice(-2), ["2027-05-17", "2027-05-18"]);
+  assert.deepEqual(validateTrip(added).errors, []);
+  assert.throws(() => addDay(base, {date: DAY1, stops: [{title: "x"}]}), /already a day/);
+  // City, title, stay and notes; empty removes; stops stay, field order kept.
+  const changed = updateDay(base, DAY2, {title: "Belém slowly", notes: [], stay: "Night train"});
+  const d2 = changed.days.find(d => d.date === DAY2);
+  assert.equal(d2.title, "Belém slowly");
+  assert.equal(d2.notes, undefined);
+  assert.equal(d2.stay, "Night train");
+  assert.deepEqual(Object.keys(d2).slice(-1), ["stops"]);
+  assert.deepEqual(ids(changed, DAY2), ids(base, DAY2));
+  assert.throws(() => updateDay(base, DAY2, {stops: []}), /cannot change stops/);
+  assert.equal(removeDay(base, DAY1).days.length, base.days.length - 1);
+  assert.throws(() => removeDay({...base, days: [base.days[0]]}, DAY1), /at least one day/);
+  // One phone adds the day, the other changes a stop: the merge has both, on both phones.
+  const ours = await commit(added, base);
+  const theirs = await commit(updateStop(base, {date: DAY1, plan: null, id: "se"}, {...stopsOf(base, DAY1)[1], time: "11:30"}).trip, base);
+  const a = await commitMerge(mergeTrips(base, ours, theirs), ours, theirs), b = await commitMerge(mergeTrips(base, theirs, ours), theirs, ours);
+  assert.equal(a.version.id, b.version.id);
+  assert.equal(a.days.at(-1).date, "2027-05-18");
+  assert.equal(stopsOf(a, DAY1).find(s => s.id === "se").time, "11:30");
 });
 
 test("stops without an id get one, and the old keys are reported so ticks can follow", () => {

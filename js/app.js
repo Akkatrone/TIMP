@@ -10,9 +10,9 @@ import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
 import { versionStore } from "./objects.js";
 import { REPO_URL } from "./config.js";
-import { openStopEditor } from "./editor.js";
+import { openStopEditor, openDayEditor } from "./editor.js";
 import { ask } from "./ask.js";
-import { addStop, updateStop, removeStop } from "./edit.js";
+import { addStop, updateStop, removeStop, addDay, updateDay, removeDay } from "./edit.js";
 import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText } from "./trips.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
@@ -303,13 +303,28 @@ function editorBase(){
   return {trip: trip(), timezone: trip().timezone, googleKey: googleKey(), dark: isDark()};
 }
 
-// A new stop: on the day on screen, or today when the trip is under way.
-function newStop(prefill){
+// The trip with the day a stop goes to, when the form chose a new one after the last.
+const withDay = (tr, newDay) => newDay ? addDay(tr, {...newDay, stops: []}) : tr;
+const goToDay = date => { const k = trip().days.findIndex(d => d.date === date); if(route().name !== "day" || route().i !== k) location.hash = "#day-" + (k + 1); };
+
+// A new stop: on the day on screen, or today when the trip is under way; with
+// newDay, on a new day after the last.
+function newStop(prefill, newDay = false){
   const here = currentPlace(), ti = todayIndex();
   const dayIndex = route().name === "day" ? here.dayIndex : (ti >= 0 ? ti : 0);
-  openStopEditor({...editorBase(), dayIndex, planId: here.planId, prefill,
-    onSave: ({stop, date, plan}) => applyEdit(tr => addStop(tr, {date, plan}, stop), "stopAdded")
-      .then(() => { const k = trip().days.findIndex(d => d.date === date); if(route().name !== "day" || route().i !== k) location.hash = "#day-" + (k + 1); })
+  openStopEditor({...editorBase(), dayIndex, planId: here.planId, prefill, newDay,
+    onSave: ({stop, date, plan, newDay}) => applyEdit(tr => addStop(withDay(tr, newDay), {date, plan}, stop), newDay ? "dayAdded" : "stopAdded", newDay ? {n: trip().days.length + 1} : {})
+      .then(() => goToDay(date))
+      .catch(err => toast(String(err.message || err)))});
+}
+
+// The day on screen: its city, title, night and notes, or deleted with its stops.
+function editDay(){
+  const i = currentPlace().dayIndex, d = trip().days[i];
+  openDayEditor({day: d, number: i + 1, canDelete: trip().days.length > 1,
+    onSave: set => applyEdit(tr => ({trip: updateDay(tr, d.date, set)}), "daySaved").catch(err => toast(String(err.message || err))),
+    onDelete: () => applyEdit(tr => ({trip: removeDay(tr, d.date)}), "dayDeleted")
+      .then(() => { location.hash = "#day-" + Math.max(1, Math.min(i + 1, trip().days.length)); })
       .catch(err => toast(String(err.message || err)))});
 }
 
@@ -321,8 +336,8 @@ function editStop(stopId){
   if(!stop) return;
   const ref = {date: d.date, plan: here.planId, id: stop.id};
   openStopEditor({...editorBase(), dayIndex: here.dayIndex, planId: here.planId, stop,
-    onSave: ({stop: next, date, plan}) => applyEdit(tr => {
-      const out = updateStop(tr, ref, next, {date, plan});
+    onSave: ({stop: next, date, plan, newDay}) => applyEdit(tr => {
+      const out = updateStop(withDay(tr, newDay), ref, next, {date, plan});
       return {trip: out.trip, marks: [{date: ref.date, plan: ref.plan, from: ref.id, to: out.ref.id, toDate: date, toPlan: plan}]};
     }, "stopSaved").catch(err => toast(String(err.message || err))),
     onDelete: () => applyEdit(tr => ({trip: removeStop(tr, ref)}), "stopDeleted").catch(err => toast(String(err.message || err)))});
@@ -821,10 +836,13 @@ function renderDay(i){
   <div class="headrow">
     ${d.title ? `<h1>${esc(d.title)}</h1>` : ""}
     <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}</span></div>
-    ${zs.length || anyText ? `<div class="tools">` +
+    <div class="tools">${
       (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
       (anyText ? `<button type="button" class="iconbtn" data-expand aria-pressed="${S.ui.expandAll}" aria-label="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}" title="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}">${S.ui.expandAll ? FOLD : UNFOLD}</button>` : "") +
-      `</div>` : ""}
+      // The day's own ⋯ menu: change the day, or add one after the last.
+      `<span class="daymore"><button type="button" class="iconbtn" data-more="day" aria-haspopup="menu" aria-expanded="${S.menuFor === "day"}" aria-label="${esc(t("dayActions"))}" title="${esc(t("dayActions"))}">${DOTS}</button>` +
+      `<div class="menu" role="menu"${S.menuFor === "day" ? "" : " hidden"}><button type="button" role="menuitem" data-day-edit>${esc(t("editDay"))}</button><button type="button" role="menuitem" data-day-add>${esc(t("addDay"))}</button></div></span>`
+    }</div>
   </div>`;
 
   let wanted = null;
@@ -943,6 +961,8 @@ $app.addEventListener("click", e => {
   }
   const edit = e.target.closest("[data-edit]");
   if(edit){ S.menuFor = null; render(); editStop(edit.dataset.edit); return; }
+  if(e.target.closest("[data-day-edit]")){ S.menuFor = null; render(); editDay(); return; }
+  if(e.target.closest("[data-day-add]")){ S.menuFor = null; render(); newStop(undefined, true); return; }
   const tap = e.target.closest("[data-open]");
   if(tap){ toggleStop(tap.dataset.open); return; }
   if(e.target.closest("[data-expand]")){

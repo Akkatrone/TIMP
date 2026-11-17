@@ -1,4 +1,4 @@
-// Changes to the stops of a trip: add, update, move, remove.
+// Changes to the stops, days and plans of a trip: add, update, move, remove.
 // Every function returns a new trip and leaves the one it was given untouched.
 // No DOM here.
 
@@ -115,6 +115,110 @@ export function removeStop(trip, ref){
   return out;
 }
 
+/* ---------- days ---------- */
+
+// The date after "YYYY-MM-DD".
+export function dayAfter(date){
+  const d = new Date(date + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+const byDate = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+const dayAt = (trip, date) => {
+  const d = trip.days.find(x => x.date === date);
+  if(!d) throw new Error(`there is no day ${date}`);
+  return d;
+};
+
+// Adds a day, with its stops or plans, in date order. Days are known by their date:
+// there cannot be two on the same one.
+export function addDay(trip, day){
+  const out = clone(trip);
+  if(out.days.some(d => d.date === day.date)) throw new Error(`there is already a day ${day.date}`);
+  out.days.push(clone(day));
+  out.days.sort(byDate);
+  return out;
+}
+
+// Changes a day's own fields (city, title, stay, notes). An empty value removes the
+// field; the date, the stops and the plans are not changed here.
+export function updateDay(trip, date, set){
+  const out = clone(trip);
+  const i = out.days.indexOf(dayAt(out, date));
+  const old = out.days[i], next = {...old};
+  for(const [k, v] of Object.entries(set)){
+    if(k === "date" || k === "stops" || k === "plans") throw new Error(`cannot change ${k}: change the stops one by one`);
+    if(v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) delete next[k]; else next[k] = v;
+  }
+  // The day's fields in their usual order, stops or plans last.
+  const keys = [...new Set([...Object.keys(old).filter(k => k !== "stops" && k !== "plans"), ...DAY_ORDER])].filter(k => k in next);
+  out.days[i] = Object.fromEntries(keys.map(k => [k, next[k]]));
+  return out;
+}
+
+// Removes a day and its stops. A trip keeps at least one day.
+export function removeDay(trip, date){
+  const out = clone(trip);
+  const d = dayAt(out, date);
+  if(out.days.length === 1) throw new Error("a trip needs at least one day");
+  out.days.splice(out.days.indexOf(d), 1);
+  return out;
+}
+
+/* ---------- plans ---------- */
+
+// Adds an alternative plan ({name, stops}, an id if it has a free one) to a day. A day
+// without plans gets two: the stops it has become the first, named `first`, and their
+// ticks follow (marks). Returns {trip, id, marks}.
+export function addPlan(trip, date, plan, first){
+  const out = clone(trip);
+  const d = dayAt(out, date);
+  if(!plan || typeof plan.name !== "string" || !plan.name.trim()) throw new Error("the plan needs a name");
+  if(!Array.isArray(plan.stops) || !plan.stops.length) throw new Error("the plan needs its stops");
+  const marks = [];
+  if(!d.plans){
+    if(typeof first !== "string" || !first.trim()) throw new Error(`"first" must name the plan made of the stops ${date} has now`);
+    const id0 = newId(first, new Set());
+    d.plans = [{id: id0, name: first.trim(), stops: d.stops}];
+    for(const s of d.stops) if(s.id) marks.push({date, plan: null, from: s.id, to: s.id, toDate: date, toPlan: id0});
+    delete d.stops;
+  }
+  const taken = new Set(d.plans.map(p => p.id));
+  const id = typeof plan.id === "string" && plan.id && !taken.has(plan.id) ? plan.id : newId(plan.name, taken);
+  d.plans.push({id, name: plan.name.trim(), stops: clone(plan.stops)});
+  return {trip: out, id, marks};
+}
+
+// Renames a plan.
+export function renamePlan(trip, date, id, name){
+  const out = clone(trip);
+  const d = dayAt(out, date);
+  const p = d.plans && d.plans.find(x => x.id === id);
+  if(!p) throw new Error(`${date} has no plan "${id}"`);
+  if(typeof name !== "string" || !name.trim()) throw new Error("the plan needs a name");
+  p.name = name.trim();
+  return out;
+}
+
+// Removes a plan. With one plan left, the day goes back to plain stops: that plan's,
+// with their ticks (marks). Returns {trip, marks}.
+export function removePlan(trip, date, id){
+  const out = clone(trip);
+  const d = dayAt(out, date);
+  const i = d.plans ? d.plans.findIndex(x => x.id === id) : -1;
+  if(i < 0) throw new Error(`${date} has no plan "${id}"`);
+  d.plans.splice(i, 1);
+  const marks = [];
+  if(d.plans.length === 1){
+    const last = d.plans[0];
+    for(const s of last.stops) marks.push({date, plan: last.id, from: s.id, to: s.id, toDate: date, toPlan: null});
+    d.stops = last.stops;
+    delete d.plans;
+  }
+  return {trip: out, marks};
+}
+
 // Empty fields are left out of the file.
 function clean(stop){
   return Object.fromEntries(Object.entries(stop).filter(([, v]) => v !== undefined && v !== null && v !== ""));
@@ -122,6 +226,7 @@ function clean(stop){
 
 // Keeps the field order the stop had, so a small edit is a small change in the file.
 const ORDER = ["id", ...Object.keys(FIELDS.stop)];
+const DAY_ORDER = Object.keys(FIELDS.day);
 function orderLike(old, next){
   const keys = [...new Set([...Object.keys(old), ...ORDER, ...Object.keys(next)])].filter(k => k in next);
   return Object.fromEntries(keys.map(k => [k, next[k]]));

@@ -10,7 +10,7 @@ import { geocode, areaAround, resolveLink } from "./geocode.js";
 import { loadLeaflet } from "./livemap.js";
 import { icon } from "./icons.js";
 import { TRAVEL, TYPES } from "./trip.js";
-import { clockMinutes } from "./edit.js";
+import { clockMinutes, dayAfter } from "./edit.js";
 import { ask } from "./ask.js";
 
 let dialog = null;
@@ -43,10 +43,12 @@ const looksLikeAddress = s => /,|\d/.test(String(s || ""));
  * Opens the form.
  * @param {object} o
  *   trip, dayIndex, planId     where the stop is, or goes by default
+ *   newDay                      true: it goes by default on a new day after the last
  *   stop                        the stop to change (absent: a new stop)
  *   prefill                     text to read as if pasted (a shared place)
  *   timezone, googleKey, dark
- *   onSave({stop, date, plan})  the stop as filled in, and where it goes
+ *   onSave({stop, date, plan, newDay})  the stop as filled in, and where it goes;
+ *                               newDay ({date, city}) when that day is still to be made
  *   onDelete()                  remove the stop being changed
  */
 export function openStopEditor(o){
@@ -75,10 +77,16 @@ export function openStopEditor(o){
   const minutes = [...new Set([...Array(12).keys()].map(i => i * 5).concat(m0))].sort((a, b) => a - b);
   const opts = (list, cur) => list.map(n => `<option value="${two(n)}"${n === cur ? " selected" : ""}>${two(n)}</option>`).join("");
 
-  const days = o.trip.days;
+  // The days of the trip, and one more after the last: a stop put there makes it (a
+  // day cannot be empty). It is in the same city as the last day, until changed.
+  const last = o.trip.days[o.trip.days.length - 1];
+  const days = [...o.trip.days, {date: dayAfter(last.date), city: last.city, stops: [], isNew: true}];
+  const dayIndex = o.newDay ? days.length - 1 : o.dayIndex;
   const dayOptions = days.map((d, i) => {
-    const p = dateParts(d.date, lang);
-    return `<option value="${i}"${i === o.dayIndex ? " selected" : ""}>${esc(t("day"))} ${i + 1} · ${esc(p.dow)} ${esc(p.long.split(" ").slice(1).join(" "))} ${d.title || d.city ? " · " + esc(d.title || d.city) : ""}</option>`;
+    const p = dateParts(d.date, lang), when = `${p.dow} ${p.long.split(" ").slice(1).join(" ")}`;
+    const label = d.isNew ? t("newDayOption", {d: when})
+      : `${t("day")} ${i + 1} · ${when}${d.title || d.city ? " · " + (d.title || d.city) : ""}`;
+    return `<option value="${i}"${i === dayIndex ? " selected" : ""}>${esc(label)}</option>`;
   }).join("");
 
   // A row of buttons to pick one value of TYPES or TRAVEL, or none.
@@ -373,7 +381,8 @@ export function openStopEditor(o){
     delete stop.id;
     if(st.lat === undefined){ delete stop.lat; delete stop.lng; }
     dlg.close();
-    o.onSave({stop, date: day.date, plan: day.plans ? $("#stop-plan").value : null});
+    const newDay = day.isNew ? (day.city ? {date: day.date, city: day.city} : {date: day.date}) : null;
+    o.onSave({stop, date: day.date, plan: day.plans ? $("#stop-plan").value : null, newDay});
   });
 
   fillPlans();
@@ -381,4 +390,89 @@ export function openStopEditor(o){
   dlg.showModal();
   if(o.prefill){ $("#stop-src").value = o.prefill; readSource(o.prefill); }
   else if(!editing) $("#stop-src").focus();
+}
+
+/**
+ * The form to change a day: its city, title, where the night is spent, notes. The
+ * date and the stops stay: stops are changed one by one, with their own form.
+ * @param {object} o
+ *   day                  the day as it is
+ *   number               its number in the trip, for the title
+ *   canDelete            false for the only day of a trip
+ *   onSave(set)          the fields as filled in; an empty one is removed
+ *   onDelete()           remove the day and its stops
+ */
+export function openDayEditor(o){
+  const dlg = ensureDialog();
+  const d = o.day, lang = getLang();
+  const $ = sel => dlg.querySelector(sel);
+  const stay = typeof d.stay === "string" ? {name: d.stay} : (d.stay || {});
+  const p = dateParts(d.date, lang);
+  dlg.innerHTML = `
+  <form method="dialog" class="sheet-form" novalidate>
+    <div class="sheet-head">
+      <h2 id="sheet-title">${esc(t("editDayTitle", {n: o.number}))}</h2>
+      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
+    </div>
+    <p class="foot">${esc(p.long)}</p>
+    <div class="field">
+      <label for="day-city">${esc(t("fCity"))}</label>
+      <input id="day-city" type="text" autocomplete="off" value="${esc(d.city || "")}">
+    </div>
+    <div class="field">
+      <label for="day-title">${esc(t("fDayTitle"))}</label>
+      <input id="day-title" type="text" autocomplete="off" value="${esc(d.title || "")}">
+    </div>
+    <div class="field">
+      <label for="day-stay">${esc(t("fStay"))}</label>
+      <input id="day-stay" type="text" autocomplete="off" placeholder="${esc(t("fStayPh"))}" value="${esc(stay.name || "")}">
+    </div>
+    <div class="field">
+      <label for="day-stay-address">${esc(t("fStayAddress"))}</label>
+      <input id="day-stay-address" type="text" autocomplete="off" value="${esc(stay.address || "")}">
+    </div>
+    <div class="field">
+      <label for="day-notes">${esc(t("fNotes"))}</label>
+      <textarea id="day-notes" rows="3">${esc((d.notes || []).join("\n"))}</textarea>
+      <p class="foot">${esc(t("fNotesHelp"))}</p>
+    </div>
+    <div class="sheet-actions">
+      ${o.canDelete ? `<button type="button" class="btn small danger" data-delete>${esc(t("deleteDay"))}</button>` : ""}
+      <span class="grow"></span>
+      <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
+      <button type="submit" class="btn primary">${esc(t("save"))}</button>
+    </div>
+  </form>`;
+
+  dlg.onclick = async e => {
+    if(e.target === dlg) return;
+    if(e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-delete]")){
+      const answer = await ask({title: t("deleteDayTitle"), text: t("deleteDayText", {n: o.number, d: p.long}),
+        actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("deleteDay"), kind: "danger"}]});
+      if(answer !== "yes") return;
+      dlg.close();
+      o.onDelete();
+    }
+  };
+  $("form").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("#day-stay").value.trim(), address = $("#day-stay-address").value.trim();
+    // Where the night is spent: a place (with its address, or as it was) or plain text
+    // ("Night train"), as the file had it. No name, no stay.
+    let nextStay;
+    if(name){
+      if(address || typeof d.stay === "object") nextStay = Object.fromEntries(Object.entries({...stay, name, address: address || undefined}).filter(([, v]) => v !== undefined));
+      else nextStay = name;
+    }
+    const same = JSON.stringify(nextStay) === JSON.stringify(d.stay);
+    dlg.close();
+    o.onSave({
+      city: $("#day-city").value.trim(),
+      title: $("#day-title").value.trim(),
+      ...(same ? {} : {stay: nextStay}),
+      notes: $("#day-notes").value.split("\n").map(s => s.trim()).filter(Boolean)
+    });
+  });
+  dlg.showModal();
 }

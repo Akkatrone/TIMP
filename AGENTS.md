@@ -71,9 +71,9 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
 | `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |
-| `js/editor.js` | The add / edit stop form. |
+| `js/editor.js` | The add / edit stop form, and the day form. |
 | `js/ask.js` | Question dialog for confirmations and choices; never use `confirm()`. |
-| `js/edit.js` | Stop changes, in time order. No DOM. |
+| `js/edit.js` | Changes to stops (in time order), days and plans. No DOM. |
 | `js/changes.js` | Changes written by an AI assistant: the trip's outline, the changes format, applying it. No DOM. |
 | `js/gmaps.js` | Reads Google Maps links and shared text. No DOM. |
 | `js/geocode.js` | Address to coordinates: Google, then OpenStreetMap. |

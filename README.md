@@ -89,6 +89,12 @@ its tick: **Edit** changes it, moves it to another day or deletes it; **Skip** m
 stop you leave out. On the map a skipped stop keeps its pin, greyed, and the route goes
 from the stop before it straight to the one after.
 
+The day has its own **⋯**, next to Map of the day: **Edit day** changes its city, title,
+where you sleep and its notes, or deletes it; **Add a day** opens the stop form on a new
+day after the last (staying one more day: the day is made with its first stop).
+Alternative plans for a day, like one for when it rains, are a job for an AI assistant
+(below): "add a plan for day 3 if it rains" is all it takes.
+
 The quickest way to fill in a stop is to paste what Google Maps gives you. The form
 reads it on the phone:
 
@@ -223,7 +229,9 @@ For bigger ones, at the bottom of **Trips** open **Have an AI assistant change t
 trip**: one button copies a message with an outline of the trip, you write what to
 change, and the assistant answers with the changes only, a few lines instead of the
 whole file. Copy them and tap **Paste** (on Android, share the answer to TIMP):
-the app applies them as a new version, and Undo is one tap in History. A coding agent
+the app applies them as a new version, and Undo is one tap in History. The assistant
+can also add, rename or remove a day's alternative plans: ask for a plan B for a rainy
+day, and the day gets two buttons to choose from. A coding agent
 can also work on the latest file the app saved (Trips → Save the file).
 
 ### By hand

@@ -67,14 +67,14 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("the ⋯ menu opens with Edit and Skip, and closes with Escape or a tap outside", async () => {
     assert.equal(await count(".menu:not([hidden])"), 0);
-    await click("[data-more]", 0);
+    await click(".stop [data-more]", 0);
     assert.equal(await count(".menu:not([hidden])"), 1);
     assert.deepEqual(await run(`return [...document.querySelectorAll(".menu:not([hidden]) [role=menuitem]")].map(b => b.textContent);`), ["Edit", "Skip"]);
     assert.equal(await run(`return document.activeElement.textContent;`), "Edit", "the first item takes the focus");
     await run(`document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));`);
     assert.equal(await count(".menu:not([hidden])"), 0);
     assert.equal(await run(`return document.activeElement.dataset.more !== undefined;`), true, "the focus goes back to ⋯");
-    await click("[data-more]", 0);
+    await click(".stop [data-more]", 0);
     await run(`document.querySelector("h1").click();`);
     assert.equal(await count(".menu:not([hidden])"), 0);
   });
@@ -643,6 +643,40 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-title")`);
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+  });
+
+  await step("the day's ⋯ menu changes the day, adds one after the last with its first stop, and deletes it", async () => {
+    await run(`location.hash = "#day-2";`);
+    await until("day 2", `document.querySelector('[data-more="day"]')`);
+    // Edit day: a new title and a note, the stops untouched.
+    await run(`document.querySelector('[data-more="day"]').click();`);
+    await until("the menu", `!document.querySelector('[data-more="day"] + .menu').hidden`);
+    await run(`document.querySelector("[data-day-edit]").click();`);
+    await until("the day form", `document.querySelector("dialog.sheet[open] #day-title")`);
+    assert.equal(await run(`return document.getElementById("day-city").value;`), "Lisboa");
+    await run(`document.getElementById("day-title").value = "Belém slowly"; document.getElementById("day-notes").value = "Pastéis before ten\\n\\nTram 15 from Praça da Figueira"; document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+    assert.equal(await text(".headrow h1"), "Belém slowly");
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".remind div")].map(d => d.textContent);`), ["Pastéis before ten", "Tram 15 from Praça da Figueira"]);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Day saved · version [0-9a-f]{7}/);
+    // Add a day: the stop form, on a new day after the last.
+    await run(`document.querySelector('[data-more="day"]').click(); document.querySelector("[data-day-add]").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-day")`);
+    assert.match(await run(`const s = document.getElementById("stop-day"); return s.options[s.selectedIndex].textContent;`), /^New day · Tue May 18/);
+    await fill("#stop-src", PLACE);
+    await submit();
+    await until("day 5", `location.hash === "#day-5"`);
+    assert.deepEqual(await stopTitles(), ["Pastelaria Exemplo"]);
+    assert.equal(await count(".dchip:not(.info)"), 5);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Day 5 added · version/);
+    // Delete it: asked first, then gone with its stop.
+    await run(`document.querySelector('[data-more="day"]').click(); document.querySelector("[data-day-edit]").click();`);
+    await until("the day form", `document.querySelector("dialog.sheet[open] [data-delete]")`);
+    await run(`document.querySelector("[data-delete]").click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.match(await run(`return document.querySelector("dialog.ask p").textContent;`), /Day 5, .* goes from the trip with all its stops/);
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click(); await new Promise(r => setTimeout(r, 500));`);
+    assert.equal(await count(".dchip:not(.info)"), 4);
+    assert.equal(await run(`return location.hash;`), "#day-4");
   });
 
   await step("a .json file shared on Android is loaded, through the service worker", async () => {

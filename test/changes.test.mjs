@@ -50,6 +50,53 @@ test("days can be changed, added and removed; plans are named by id", () => {
   assert.equal(res.trip.days[3].stops[0].id, "last-coffee", "new stops get their ids");
 });
 
+test("a rainy-day plan: a day without plans gets two, the stops it had become the first, ticks follow", () => {
+  const res = applyChanges(demo(), changes([
+    {addPlan: {day: D1, first: "Sunny", plan: {name: "If it rains", stops: [
+      {time: "10:00", title: "Tile Museum", type: "museum"},
+      {time: "13:00", title: "Lunch in Alfama", type: "food"}
+    ]}}},
+    {add: {day: D1, plan: "if-it-rains", stop: {time: "15:00", title: "Coffee at the castle", type: "food"}}}
+  ]));
+  assert.equal(res.ok, true, String(res.errors));
+  const d = res.trip.days[0];
+  assert.equal(d.stops, undefined);
+  assert.deepEqual(d.plans.map(p => [p.id, p.name]), [["sunny", "Sunny"], ["if-it-rains", "If it rains"]]);
+  assert.deepEqual(ids(res.trip, D1, "sunny"), ["comercio", "se", "santa-luzia", "castelo", "lunch", "sunset"]);
+  assert.deepEqual(ids(res.trip, D1, "if-it-rains"), ["tile-museum", "lunch-in-alfama", "coffee-at-the-castle"]);
+  assert.deepEqual(res.moves[0], {date: D1, plan: null, from: "comercio", to: "comercio", toDate: D1, toPlan: "sunny"});
+  assert.equal(res.moves.length, 6);
+  assert.deepEqual(res.counts, {added: 2, changed: 0, removed: 0});
+  assert.deepEqual(validateTrip(res.trip).errors, []);
+});
+
+test("plans can be added to a day that has them, renamed and removed; one left is plain stops again", () => {
+  const res = applyChanges(demo(), changes([
+    {addPlan: {day: D3, plan: {name: "Lazy morning", stops: [{time: "11:00", title: "Breakfast"}]}}},
+    {setPlan: {day: D3, plan: "cascais", set: {name: "Coast"}}},
+    {removePlan: {day: D3, plan: "sintra"}}
+  ]));
+  assert.equal(res.ok, true, String(res.errors));
+  assert.deepEqual(res.trip.days[2].plans.map(p => [p.id, p.name]), [["cascais", "Coast"], ["lazy-morning", "Lazy morning"]]);
+  const back = applyChanges(res.trip, changes([{removePlan: {day: D3, plan: "lazy-morning"}}]));
+  assert.equal(back.ok, true, String(back.errors));
+  assert.equal(back.trip.days[2].plans, undefined);
+  assert.deepEqual(ids(back.trip, D3), ["coast-train", "station", "beach", "boca"]);
+  assert.deepEqual(back.moves[0], {date: D3, plan: "cascais", from: "coast-train", to: "coast-train", toDate: D3, toPlan: null});
+  // Wrong ones: no name for the stops already there, a plan without stops, more than a name.
+  const bad = applyChanges(demo(), changes([
+    {addPlan: {day: D1, plan: {name: "Rain", stops: [{title: "Museum"}]}}},
+    {addPlan: {day: D3, plan: {name: "Empty", stops: []}}},
+    {setPlan: {day: D3, plan: "sintra", set: {stops: []}}},
+    {removePlan: {day: D1, plan: "x"}}
+  ]));
+  assert.equal(bad.ok, false);
+  assert.match(bad.errors[0], /"first" must name/);
+  assert.match(bad.errors[1], /needs its stops/);
+  assert.match(bad.errors[2], /only the name/);
+  assert.match(bad.errors[3], /has no plan "x"/);
+});
+
 test("a wrong change says which one and why, and nothing is applied", () => {
   const trip = demo();
   const res = applyChanges(trip, changes([
@@ -79,6 +126,6 @@ test("changes are checked like a trip file once applied, and must be for the ope
 
 test("the brief for assistants names every kind of change", () => {
   const brief = changesBrief();
-  for(const k of ["add", "update", "remove", "setDay", "addDay", "removeDay"]) assert.match(brief, new RegExp(`"${k}"`));
+  for(const k of ["add", "update", "remove", "setDay", "addDay", "removeDay", "addPlan", "setPlan", "removePlan"]) assert.match(brief, new RegExp(`"${k}"`));
   assert.ok(brief.length < 2500, String(brief.length));
 });
