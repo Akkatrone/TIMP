@@ -72,7 +72,7 @@ function pinNode(pt, color){
 }
 
 // In the dark theme the tiles are darkened by CSS (.live.dark), see css/app.css.
-async function drawLeaflet(canvas, zones, color){
+async function drawLeaflet(canvas, zones, color, route){
   const L = await loadLeaflet();
   const map = L.map(canvas, {zoomControl: true});
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
@@ -83,7 +83,7 @@ async function drawLeaflet(canvas, zones, color){
   const legs = [], pins = [], marks = [];
   // A jump between zones (Hakone → Kyoto) is thinner: it is not a walk.
   const style = (leg, isGone) => ({weight: leg.bridge ? 3 : 4, opacity: isGone || leg.bridge ? 0.55 : 0.75, dashArray: isGone ? "5 10" : null});
-  routeOf(zones).forEach(leg => {
+  (route ? routeOf(zones) : []).forEach(leg => {
     legs.push({...leg, line: L.polyline([leg.from.ll, leg.to.ll], {color, interactive: false, ...style(leg, false)}).addTo(map)});
     if(leg.travel){
       const el = travelNode(leg, color);
@@ -114,7 +114,7 @@ async function drawLeaflet(canvas, zones, color){
   return {fit, mark, refresh: () => map.invalidateSize(), destroy: () => map.remove()};
 }
 
-async function drawGoogle(canvas, zones, color, key, dark){
+async function drawGoogle(canvas, zones, color, key, dark, route){
   const gm = await loadGoogle(key);
   const {Map, Polyline, InfoWindow, OverlayView} = await gm.importLibrary("maps");
   const {LatLng, LatLngBounds, ColorScheme} = await gm.importLibrary("core");
@@ -151,7 +151,7 @@ async function drawGoogle(canvas, zones, color, key, dark){
   // Google has no dashed lines: a dashed leg is an invisible line that repeats a short stroke.
   const solid = leg => ({strokeOpacity: leg.bridge ? 0.55 : 0.75, strokeWeight: leg.bridge ? 3 : 4, icons: []});
   const dashed = leg => ({strokeOpacity: 0, strokeWeight: leg.bridge ? 3 : 4, icons: [{icon: {path: "M 0,-1 0,1", strokeOpacity: 0.55, strokeWeight: leg.bridge ? 3 : 4, scale: 1.5}, offset: "0", repeat: "13px"}]});
-  routeOf(zones).forEach(leg => {
+  (route ? routeOf(zones) : []).forEach(leg => {
     const line = new Polyline({map, path: [leg.from, leg.to].map(p => ({lat: p.ll[0], lng: p.ll[1]})), strokeColor: color, clickable: false, ...solid(leg)});
     drawn.push(line);
     legs.push({...leg, line});
@@ -204,9 +204,10 @@ async function drawGoogle(canvas, zones, color, key, dark){
 
 /**
  * Creates the map element. Append `el` to the page right away; drawing starts on its own.
- * @param {{zones: object[], color: string, googleKey: string, dark: boolean, onNotice: (key: string) => void}} o
+ * @param {{zones: object[], color: string, googleKey: string, dark: boolean, route?: boolean, onNotice: (key: string) => void}} o
+ *   route: false hides the lines between the stops (and the travel icons on them).
  */
-export function createLiveMap({zones, color, googleKey, dark, onNotice}){
+export function createLiveMap({zones, color, googleKey, dark, route = true, onNotice}){
   const el = document.createElement("div");
   el.className = "live" + (dark ? " dark" : "");
   let canvas = null, impl = null, dead = false;
@@ -225,7 +226,7 @@ export function createLiveMap({zones, color, googleKey, dark, onNotice}){
     try{
       // The canvas must be on the page (with a size) before a map is drawn into it.
       el.appendChild(fresh);
-      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark) : await drawLeaflet(fresh, zones, color);
+      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, route) : await drawLeaflet(fresh, zones, color, route);
       if(dead){ made.destroy(); return; }
       const msg = el.querySelector(".msg");
       if(msg) msg.remove();

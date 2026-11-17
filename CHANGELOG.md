@@ -4,6 +4,22 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.1.1
+
+- No scroll bars at all: 3.1.0 hid them only on devices that call themselves touch
+  only, and some phones do not.
+- The bar of days is frosted glass: the page shows blurred under it while scrolling,
+  and an edge appears once it has scrolled. The list of days fades out on the side
+  where there are more days to scroll to. Day buttons are a little more polished.
+- Older Safari (iOS 15.4 to 16.1): solid colours where color-mix() is missing, and the
+  link resolver works without AbortSignal.timeout.
+- **Lines**, next to Map and Sketch: hides the lines between the stops (and the travel
+  icons on them), on both maps. The choice is kept.
+- The example trip shows what the app does now: a fourth day in Porto, reached by train,
+  with every kind of place, the metro and the flight home, a night that is not a place
+  to sleep, two stops sharing a pin, a map of its own for the airport; the bus up to
+  Pena; a Google Maps link on a stop; the emergency number to call with a tap.
+
 ## 3.1.0
 
 Changing a trip with an AI assistant costs a few lines, not the whole file again.

@@ -39,7 +39,8 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 - Each stop at a glance: time, pin number and how you get there on the left, a label
   like "Booking needed" above the title, Map and Directions always one tap away.
 - A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
-  a sketch to scale when you are not. What is behind you is drawn dashed.
+  a sketch to scale when you are not. What is behind you is drawn dashed, and the lines
+  between the stops can be hidden.
 - One tap to open any stop in Google Maps, with directions.
 - An Info page for hotels, phone numbers, money, useful phrases.
 - Works on iPhone and Android. Installs on the Home Screen, no app store.

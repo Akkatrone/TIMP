@@ -33,6 +33,12 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--f-body);-webkit-text-size-adjust:100%}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+/* Frosted glass, for the bars that stay on top while the page scrolls under them.
+   Without backdrop-filter, or without color-mix (Safari before 16.2), they keep a solid
+   background. Safari needs the -webkit- prefix before 18. */
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  body::before,.strip{background:color-mix(in srgb,var(--bg) 70%,transparent);-webkit-backdrop-filter:saturate(170%) blur(16px);backdrop-filter:saturate(170%) blur(16px)}
+}
 img{max-width:100%}
 [hidden]{display:none!important}
 a{color:var(--link)}
@@ -41,22 +47,26 @@ button{font:inherit}
 .gutter{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* day strip */
-.strip{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.strip{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid transparent;transition:border-color .2s,box-shadow .2s}
+/* once the page has scrolled, the bar gets an edge and a soft shadow (js: markStrip) */
+.strip.scrolled{border-bottom-color:var(--line);border-bottom-color:color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 6px 18px -10px rgba(0,0,0,.35)}
 .strip .gutter{padding-block:10px}
-#days{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
+#days{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;padding-block:2px}
+/* the list of days fades out on a side when there is more to scroll that way */
+#days.more-l{-webkit-mask-image:linear-gradient(to right,transparent,#000 28px);mask-image:linear-gradient(to right,transparent,#000 28px)}
+#days.more-r{-webkit-mask-image:linear-gradient(to left,transparent,#000 28px);mask-image:linear-gradient(to left,transparent,#000 28px)}
+#days.more-l.more-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 28px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to right,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
 #days::-webkit-scrollbar{display:none}
-/* On phones and tablets no scroll bar is drawn: a finger scrolls without it, and an
-   always visible bar (inside the forms, beside the page) was a distraction. A mouse
-   keeps its bars. */
-@media (hover:none) and (pointer:coarse){
-  *{scrollbar-width:none}
-  ::-webkit-scrollbar{display:none}
-}
-.dchip{flex:0 0 auto;min-width:46px;padding:5px 8px 9px;border:1px solid var(--line);background:var(--surface);border-radius:10px;text-align:center;text-decoration:none;color:var(--ink);display:grid;gap:0;position:relative}
+/* No scroll bars anywhere (page, forms, fields): pages scroll with a finger, a wheel or
+   the keyboard all the same, and an always visible bar was only in the way. */
+html,*{scrollbar-width:none}
+::-webkit-scrollbar{display:none;width:0;height:0}
+.dchip{flex:0 0 auto;min-width:46px;padding:5px 8px 9px;border:1px solid var(--line);border-color:color-mix(in srgb,var(--line) 80%,transparent);background:var(--surface);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:12px;text-align:center;text-decoration:none;color:var(--ink);display:grid;gap:0;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:background-color .15s,border-color .15s,transform .1s;-webkit-tap-highlight-color:transparent}
+.dchip:active{transform:scale(.96)}
 .dchip::after{content:"";position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:var(--c,var(--muted))}
 .dchip .n{font:700 1.05rem/1.1 var(--f-display);font-variant-numeric:tabular-nums}
 .dchip .w{font:500 .66rem/1.2 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.dchip[aria-current="page"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.dchip[aria-current="page"]{background:var(--ink);border-color:var(--ink);color:var(--bg);box-shadow:0 4px 12px -4px rgba(0,0,0,.4)}
 .dchip[aria-current="page"] .w{color:var(--bg);opacity:.75}
 .dchip.today .n::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:3px;vertical-align:super}
 .dchip.info{align-content:center;font:600 .8rem var(--f-body);padding-inline:12px}
@@ -138,7 +148,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .iconbtn svg{width:18px;height:18px}
 .iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 /* how a stop is travelled: metro, train, plane, boat */
-.tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink))}
+.tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:var(--bg);background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink))}
 .tvchip svg{display:block}
 /* the kind of place, before the stop's title */
 .tychip{display:inline-block;vertical-align:-2px;margin-right:6px;color:var(--c,var(--ink))}
@@ -205,6 +215,10 @@ ol.stops{list-style:none;margin:0;padding:0}
 .livewrap{display:grid;gap:8px;min-width:0}
 .zchips{display:flex;flex-wrap:wrap;gap:6px}
 .zchip{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:600 .76rem var(--f-body);padding:5px 12px;border-radius:999px;cursor:pointer;min-height:32px}
+/* the map's view picker and the switch for the lines between the stops */
+.maptools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
+.chipbtn{font:600 .84rem var(--f-body);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;min-height:36px}
+.chipbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .live{height:min(62vh,380px);border-radius:10px;overflow:hidden;background:var(--bg);position:relative;isolation:isolate}
 .live .canvas{position:absolute;inset:0}
 .live .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:var(--muted);font-size:.88rem}

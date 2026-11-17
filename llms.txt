@@ -558,7 +558,8 @@ warnings: the file loads, and the command-line checker shows them.
      "tag": "Ticket needed",
      "address": "Castelo de São Jorge",
      "lat": 38.7139,
-     "lng": -9.1335
+     "lng": -9.1335,
+     "link": "https://www.google.com/maps/search/?api=1&query=Castelo+de+S%C3%A3o+Jorge+Lisboa"
     },
     {
      "id": "lunch",
@@ -702,11 +703,12 @@ warnings: the file loads, and the command-line checker shows them.
        "time": "10:15",
        "title": "Palácio da Pena",
        "type": "sight",
-       "text": "The coloured palace on top of the hill.",
+       "text": "Bus 434 from the station, fifteen minutes uphill. The coloured palace on top of the hill.",
        "tag": "Ticket needed",
        "address": "Palácio da Pena",
        "lat": 38.7876,
-       "lng": -9.3906
+       "lng": -9.3906,
+       "travel": "bus"
       },
       {
        "id": "regaleira",
@@ -773,6 +775,105 @@ warnings: the file loads, and the command-line checker shows them.
      ]
     }
    ]
+  },
+  {
+   "date": "2027-05-17",
+   "city": "Porto",
+   "title": "Porto in a day",
+   "stay": "On the way home",
+   "notes": [
+    "Leave the luggage at the station lockers in São Bento and travel light.",
+    "The flight home is at 21:30: be at the airport by 19:30."
+   ],
+   "stops": [
+    {
+     "id": "alfa-pendular-to-porto",
+     "time": "07:39",
+     "title": "Alfa Pendular to Porto",
+     "travel": "train",
+     "tag": "Booked",
+     "text": "From Santa Apolónia, about three hours. Seats are assigned: check the coach number."
+    },
+    {
+     "id": "sao-bento-station",
+     "time": "10:45",
+     "title": "São Bento station",
+     "type": "sight",
+     "text": "Look up in the hall: twenty thousand azulejo tiles telling the history of Portugal.",
+     "address": "Estação de São Bento, Porto",
+     "lat": 41.1456,
+     "lng": -8.6105
+    },
+    {
+     "id": "livraria-lello",
+     "time": "11:15",
+     "title": "Livraria Lello",
+     "type": "shop",
+     "tag": "Ticket needed",
+     "text": "The bookshop with the red staircase. The ticket is deducted from a book you buy.",
+     "address": "Livraria Lello, Porto",
+     "lat": 41.1468,
+     "lng": -8.6148
+    },
+    {
+     "id": "a-francesinha",
+     "time": "Lunch",
+     "title": "A francesinha",
+     "type": "food",
+     "text": "The Porto sandwich: bread, meats, melted cheese and a beer sauce. One is enough for two.",
+     "address": "Rua de Passos Manuel, Porto",
+     "lat": 41.1474,
+     "lng": -8.6067
+    },
+    {
+     "id": "ribeira",
+     "time": "14:30",
+     "title": "Ribeira",
+     "type": "walk",
+     "text": "Down the steep lanes to the river front, among the coloured houses.",
+     "address": "Cais da Ribeira, Porto",
+     "lat": 41.1406,
+     "lng": -8.6131
+    },
+    {
+     "id": "dom-luis-i-bridge",
+     "time": "15:30",
+     "title": "Dom Luís I bridge",
+     "type": "view",
+     "text": "Cross on the upper deck, with the metro, for the view over the river and the port cellars.",
+     "address": "Ponte Luís I, Porto",
+     "lat": 41.1399,
+     "lng": -8.6094
+    },
+    {
+     "id": "back-to-sao-bento-for-the-luggage",
+     "time": "17:00",
+     "title": "Back to São Bento for the luggage",
+     "type": "sight",
+     "travel": "metro",
+     "text": "Metro line D from Jardim do Morro, two stops.",
+     "address": "Estação de São Bento, Porto",
+     "lat": 41.1456,
+     "lng": -8.6105
+    },
+    {
+     "id": "metro-to-the-airport",
+     "time": "18:30",
+     "title": "Metro to the airport",
+     "travel": "metro",
+     "text": "Line E from Trindade, about thirty minutes."
+    },
+    {
+     "id": "flight-home",
+     "time": "21:30",
+     "title": "Flight home",
+     "travel": "plane",
+     "tag": "Booked",
+     "address": "Aeroporto Francisco Sá Carneiro, Porto",
+     "lat": 41.2481,
+     "lng": -8.6814
+    }
+   ]
   }
  ],
  "info": [
@@ -794,7 +895,11 @@ warnings: the file loads, and the command-line checker shows them.
    "items": [
     {
      "label": "Emergency",
-     "text": "112 · any emergency, across the EU"
+     "text": "112"
+    },
+    {
+     "label": "Any emergency",
+     "text": "112 works across the EU, from any phone, free of charge."
     }
    ]
   },

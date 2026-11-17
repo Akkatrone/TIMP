@@ -105,8 +105,9 @@ export const pinGone = (pt, gone) => pt.items.every(it => gone(it.idx));
 export const legGone = (leg, gone) => gone(leg.idx);
 
 // The offline map: an SVG sketch to scale, with numbered badges pushed apart so they never overlap.
-// `gone(idx)` says whether the stop at that position in the list is done or skipped.
-export function zoneSVG(z, label, gone = () => false){
+// `gone(idx)` says whether the stop at that position in the list is done or skipped;
+// `route` false leaves out the lines between the stops and the travel icons on them.
+export function zoneSVG(z, label, gone = () => false, route = true){
   const pts = z.pts, lat0 = pts.reduce((a, p) => a + p.ll[0], 0) / pts.length;
   const xy = pts.map(p => kmXY(p.ll, lat0));
   const xs = xy.map(p => p[0]), ys = xy.map(p => p[1]);
@@ -130,7 +131,7 @@ export function zoneSVG(z, label, gone = () => false){
     B.forEach(b => { b[0] = Math.min(W - 16, Math.max(16, b[0])); b[1] = Math.min(H - 13, Math.max(13, b[1])); });
   }
   let o = `<svg class="mapsvg" viewBox="0 0 ${W} ${H + FOOT}" role="img" aria-label="${esc(label)}">`;
-  const legs = legsOf(z);
+  const legs = route ? legsOf(z) : [];
   legs.forEach(leg => {
     const a = P[pts.indexOf(leg.from)], b = P[pts.indexOf(leg.to)];
     o += `<path class="route${legGone(leg, gone) ? " gone" : ""}" d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}"/>`;

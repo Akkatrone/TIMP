@@ -34,6 +34,13 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.documentElement.lang;`), "en");
   });
 
+  await step("the bar of days gets an edge once the page scrolls under it", async () => {
+    assert.equal(await run(`return document.querySelector(".strip").classList.contains("scrolled");`), false);
+    await run(`window.scrollTo(0, 300); await new Promise(r => setTimeout(r, 200));`);
+    assert.equal(await run(`return document.querySelector(".strip").classList.contains("scrolled");`), true);
+    await run(`window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 200));`);
+  });
+
   await step("descriptions are folded, links stay visible", async () => {
     assert.equal(await count(".desc.clamp"), await count(".desc"));
     assert.ok(await count(".stop.cut") > 0, "at least one description is cut short at phone width");
@@ -185,6 +192,24 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     await until("the pins", `document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await count(".live .pin.typed svg"), 5);
+    await click("[data-map]");
+  });
+
+  await step("the lines between the stops can be hidden on both maps, and the choice is kept", async () => {
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    const lines = `document.querySelectorAll(".live .leaflet-overlay-pane path").length`;
+    await until("the lines", `${lines} > 0`);
+    await click("[data-route]");
+    await until("no lines", `${lines} === 0 && document.querySelectorAll(".live .pin").length === 5`);
+    assert.equal(await run(`return document.querySelector("[data-route]").getAttribute("aria-pressed");`), "false");
+    await click('[data-view="schema"]');
+    await until("the sketch", `document.querySelector(".mapsvg")`);
+    assert.equal(await count(".mapsvg .route"), 0);
+    await reload();
+    await until("day 1", `document.querySelector("[data-route]")`);
+    assert.equal(await run(`return document.querySelector("[data-route]").getAttribute("aria-pressed");`), "false", "kept after a reload");
+    await click("[data-route]");
+    assert.ok(await count(".mapsvg .route") > 0);
     await click("[data-map]");
   });
 

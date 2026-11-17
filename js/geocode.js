@@ -103,6 +103,14 @@ export async function geocode(address, {googleKey = "", lang = "en", near = null
   return null;
 }
 
+// A signal that aborts after `ms`. AbortSignal.timeout is missing before Safari 16.
+function timeout(ms){
+  if(AbortSignal.timeout) return AbortSignal.timeout(ms);
+  const c = new AbortController();
+  setTimeout(() => c.abort(), ms);
+  return c.signal;
+}
+
 /**
  * A Google Maps short link, read by the link resolver (worker/, when this copy of the
  * app has one): {title, address, lat, lng, type}, each only when known. Null without a
@@ -112,7 +120,7 @@ export async function geocode(address, {googleKey = "", lang = "en", near = null
 export async function resolveLink(link){
   if(!RESOLVER_URL || (typeof navigator !== "undefined" && navigator.onLine === false)) return null;
   try{
-    const res = await fetch(RESOLVER_URL + "?url=" + encodeURIComponent(link), {signal: AbortSignal.timeout(8000), credentials: "omit"});
+    const res = await fetch(RESOLVER_URL + "?url=" + encodeURIComponent(link), {signal: timeout(8000), credentials: "omit"});
     if(!res.ok) return null;
     const r = await res.json();
     const text = v => typeof v === "string" && v.trim() ? v.trim().slice(0, 300) : undefined;

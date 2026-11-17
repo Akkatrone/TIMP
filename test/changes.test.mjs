@@ -11,7 +11,7 @@ const ids = (t, date, plan) => { const d = t.days.find(x => x.date === date); re
 
 test("the outline is a few lines per day with every stop's id, far shorter than the file", () => {
   const trip = demo(), text = outline(trip);
-  assert.match(text, /^Trip "Lisbon in my pocket \(example\)", id demo-lisbon, 3 days\./);
+  assert.match(text, /^Trip "Lisbon in my pocket \(example\)", id demo-lisbon, 4 days\./);
   assert.match(text, /\[se\] 11:00 Lisbon Cathedral \(sight\)/);
   assert.match(text, /plan \[cascais\]/);
   assert.match(text, /\[train\] 08:40 Train from Rossio \(by train, no position\)/);
@@ -40,14 +40,14 @@ test("days can be changed, added and removed; plans are named by id", () => {
   const res = applyChanges(demo(), changes([
     {setDay: {day: D2, set: {title: "Belém slowly", notes: null}}},
     {add: {day: D3, plan: "cascais", stop: {time: "18:00", title: "Sunset at the bay", type: "view"}}},
-    {addDay: {date: "2027-05-17", city: "Lisboa", stops: [{time: "10:00", title: "Last coffee"}]}},
+    {addDay: {date: "2027-05-18", city: "Lisboa", stops: [{time: "10:00", title: "Last coffee"}]}},
     {removeDay: {day: D1}}
   ]));
   assert.equal(res.ok, true, String(res.errors));
   assert.equal(res.trip.days[0].title, "Belém slowly");
   assert.ok(ids(res.trip, D3, "cascais").includes("sunset-at-the-bay"));
-  assert.deepEqual(res.trip.days.map(d => d.date), [D2, D3, "2027-05-17"]);
-  assert.equal(res.trip.days[2].stops[0].id, "last-coffee", "new stops get their ids");
+  assert.deepEqual(res.trip.days.map(d => d.date), [D2, D3, "2027-05-17", "2027-05-18"]);
+  assert.equal(res.trip.days[3].stops[0].id, "last-coffee", "new stops get their ids");
 });
 
 test("a wrong change says which one and why, and nothing is applied", () => {

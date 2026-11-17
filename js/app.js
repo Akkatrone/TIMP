@@ -28,7 +28,7 @@ const S = {
   records: [],            // [{id, trip, importedAt, fileName}]
   rec: null,              // the open one
   state: {done: {}, skipped: {}, plans: {}},
-  ui: {mapOpen: false, mapView: "live", expandAll: false},
+  ui: {mapOpen: false, mapView: "live", expandAll: false, route: true},
   langPref: "auto",       // "auto" follows the trip, or a language chosen on this device
   theme: document.documentElement.dataset.theme || "auto",   // set early by js/theme.js
   openStops: new Map(),   // descriptions opened or closed one by one, until the page is closed
@@ -407,7 +407,22 @@ function renderStrip(r){
     `<a class="dchip info" href="#trips"${r.name === "trips" ? ' aria-current="page"' : ""}>${esc(t("trips"))}</a>`;
   const active = $days.querySelector('[aria-current="page"]');
   if(active) $days.scrollLeft = active.offsetLeft - ($days.clientWidth - active.offsetWidth) / 2;
+  markStrip();
 }
+
+// The bar of days: an edge once the page has scrolled under it, and a fade on each side
+// of the list of days where there is more to scroll (css/app.css, .strip).
+function markStrip(){
+  $strip.classList.toggle("scrolled", window.scrollY > 4);
+  const max = $days.scrollWidth - $days.clientWidth;
+  $days.classList.toggle("more-l", $days.scrollLeft > 2);
+  $days.classList.toggle("more-r", $days.scrollLeft < max - 2);
+}
+let stripFrame = 0;
+const onScroll = () => { if(!stripFrame) stripFrame = requestAnimationFrame(() => { stripFrame = 0; markStrip(); }); };
+window.addEventListener("scroll", onScroll, {passive: true});
+window.addEventListener("resize", onScroll, {passive: true});
+$days.addEventListener("scroll", onScroll, {passive: true});
 
 function errorBox(){
   const e = S.importError;
@@ -662,7 +677,8 @@ function mapPanel(zs, color, view, gone){
   const views = [["live", t("viewLive")], ["schema", t("viewSchema")]];
 
   let o = `<section class="mapbox" style="--c:${color}" aria-label="${esc(t("dayMap"))}">`;
-  o += `<div class="seg" role="group" aria-label="${esc(t("mapType"))}">${views.map(([id, name]) => `<button type="button" data-view="${id}" aria-pressed="${id === view}">${esc(name)}</button>`).join("")}</div>`;
+  o += `<div class="maptools"><div class="seg" role="group" aria-label="${esc(t("mapType"))}">${views.map(([id, name]) => `<button type="button" data-view="${id}" aria-pressed="${id === view}">${esc(name)}</button>`).join("")}</div>` +
+    `<button type="button" class="chipbtn" data-route aria-pressed="${S.ui.route}">${esc(t("routeLines"))}</button></div>`;
   if(!S.online && S.ui.mapView === "live") o += `<p class="off">${esc(t("offlineMap"))}</p>`;
 
   if(view === "live"){
@@ -683,7 +699,7 @@ function mapPanel(zs, color, view, gone){
       return;
     }
     const head = `<div class="zhead"><span class="zname">${esc(zoneTitle(z))}</span>${zoneLink(z)}</div>`;
-    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone)}<ol class="mlegend">${z.pts.map(p => `<li><span class="mb">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
+    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone, S.ui.route)}<ol class="mlegend">${z.pts.map(p => `<li><span class="mb">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
   });
   return o + `<p class="foot">${esc(t("footSketch") + " " + t("footNumbers"))}</p></section>`;
 }
@@ -792,7 +808,7 @@ function renderDay(i){
     const dark = isDark();
     // Skipping a stop changes the route: the map is drawn again.
     const skippedNow = list.map((s, k) => isSkipped(k) ? k : -1).filter(k => k >= 0).join(",");
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark, skippedNow].join("|"), zones: zs, color: cityColor(d.city), dark, gone};
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.importedAt, i, pid || "", googleKey(), lang, dark, skippedNow, S.ui.route].join("|"), zones: zs, color: cityColor(d.city), dark, gone};
   }
   if(d.notes) html += d.notes.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
   if(d.plans){
@@ -814,7 +830,7 @@ function syncLive(wanted){
   if(applyMapSettings()) return;
   if(!live || live.key !== wanted.key){
     if(live) live.handle.destroy();
-    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), dark: wanted.dark, onNotice: k => toast(t(k))})};
+    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), dark: wanted.dark, route: S.ui.route, onNotice: k => toast(t(k))})};
   }
   slot.appendChild(live.handle.el);
   live.handle.refresh();
@@ -937,6 +953,14 @@ $app.addEventListener("click", e => {
     saveUi();
     render();
     refocus("[data-map]");
+    return;
+  }
+  // The lines between the stops on both maps: shown or hidden, remembered.
+  if(e.target.closest("[data-route]")){
+    S.ui.route = !S.ui.route;
+    saveUi();
+    render();
+    refocus("[data-route]");
     return;
   }
   const view = e.target.closest("[data-view]");
@@ -1130,7 +1154,7 @@ async function start(){
     await store.putTrip(rec);
     await versions.put(ready);
   }
-  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll};
+  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll, route: ui.route !== false};
   if(typeof key === "string") S.deviceKey = key;
   syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);
