@@ -23,6 +23,7 @@ const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const FOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l3.5-3.5M4.5 13.5L8 10l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PLUS = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+const CLIP = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5.5" y="4.5" width="13" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M9 4.5h6v2.5H9z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12h6M9 15.5h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const DOTS = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="12.5" cy="8" r="1.5" fill="currentColor"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -424,8 +425,18 @@ function markStrip(){
   $days.classList.toggle("more-l", $days.scrollLeft > 2);
   $days.classList.toggle("more-r", $days.scrollLeft < max - 2);
 }
+// Paste at the bottom: while the page scrolls down it shrinks to its icon, so it
+// covers less of the stops; scrolling up, or at the top or the end, it has its word.
+let lastY = 0;
+function markFabs(){
+  const y = scrollTop(), el = scroller || document.documentElement;
+  const atEnd = y + el.clientHeight >= el.scrollHeight - 24;
+  if(y < 40 || atEnd || y < lastY - 6) $fabs.classList.remove("compact");
+  else if(y > lastY + 6) $fabs.classList.add("compact");
+  if(Math.abs(y - lastY) > 6) lastY = y;
+}
 let stripFrame = 0;
-const onScroll = () => { if(!stripFrame) stripFrame = requestAnimationFrame(() => { stripFrame = 0; markStrip(); }); };
+const onScroll = () => { if(!stripFrame) stripFrame = requestAnimationFrame(() => { stripFrame = 0; markStrip(); markFabs(); }); };
 (scroller || window).addEventListener("scroll", onScroll, {passive: true});
 window.addEventListener("resize", onScroll, {passive: true});
 $days.addEventListener("scroll", onScroll, {passive: true});
@@ -492,8 +503,10 @@ function copyErrors(){
 }
 
 // A trip pasted as text, as a chat assistant gives it: no file to save on the phone.
+// `any`: opened by the Paste button when the phone would not hand over what was
+// copied, so it takes a place too (takeText decides).
 let pasteDialog = null;
-function pasteTrip(){
+function pasteTrip(any = false){
   if(!pasteDialog){
     pasteDialog = document.createElement("dialog");
     pasteDialog.className = "sheet";
@@ -503,8 +516,8 @@ function pasteTrip(){
   }
   const d = pasteDialog;
   d.innerHTML = `<form class="sheet-form" novalidate>
-    <div class="sheet-head"><h2 id="paste-title">${esc(t("pasteTrip"))}</h2><button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button></div>
-    <p class="foot">${esc(t("pasteHelp"))}</p>
+    <div class="sheet-head"><h2 id="paste-title">${esc(t(any ? "paste" : "pasteTrip"))}</h2><button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button></div>
+    <p class="foot">${esc(t(any ? "pasteAnyHelp" : "pasteHelp"))}</p>
     <textarea id="paste-text" rows="8" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder='{"format": "travel-in-my-pocket/1", …}'></textarea>
     <p class="errbox" data-error role="alert" hidden></p>
     <div class="sheet-actions">
@@ -524,15 +537,14 @@ function pasteTrip(){
   };
   d.querySelector("form").onsubmit = async e => {
     e.preventDefault();
-    const text = jsonIn(area.value);
-    if(!text){
+    if(!area.value.trim()){
       const box = d.querySelector("[data-error]");
       box.textContent = t("pasteEmpty");
       box.hidden = false;
       return;
     }
     d.close();
-    try{ await importText(text, "pasted.json"); }
+    try{ if(any) await takeText(area.value, "pasted.json"); else await importText(jsonIn(area.value), "pasted.json"); }
     catch(err){ S.importError = {title: t("importFailed"), items: [String(err && err.message || err)]}; render(); }
   };
   d.showModal();
@@ -853,21 +865,27 @@ function syncLive(wanted){
   live.handle.setMarks(wanted.gone);
 }
 
-const $fab = document.createElement("button");
-$fab.type = "button";
-$fab.className = "fab";
-$fab.hidden = true;
-$fab.innerHTML = PLUS;
-document.body.appendChild($fab);
+// The buttons at the bottom right: Paste on every page of an open trip, + on a day.
+const $fabs = document.createElement("div");
+$fabs.className = "fabs";
+$fabs.hidden = true;
+$fabs.innerHTML = `<button type="button" class="fab-paste">${CLIP}<span></span></button><button type="button" class="fab">${PLUS}</button>`;
+document.body.appendChild($fabs);
+const $fab = $fabs.querySelector(".fab"), $fabPaste = $fabs.querySelector(".fab-paste");
 $fab.addEventListener("click", () => newStop());
+$fabPaste.addEventListener("click", () => pasteAnything());
 
 function render(){
   const r = route();
   renderStrip(r);
+  $fabs.hidden = r.name === "welcome";
   $fab.hidden = r.name !== "day";
   $fab.setAttribute("aria-label", t("addStop"));
   $fab.title = t("addStop");
-  document.body.classList.toggle("has-fab", r.name === "day");
+  $fabPaste.querySelector("span").textContent = t("paste");
+  $fabPaste.title = t("pasteAnyHelp");
+  $fabPaste.setAttribute("aria-label", t("paste"));
+  document.body.classList.toggle("has-fab", !$fabs.hidden);
   // While the page is rebuilt the interactive map is out of it, and the page is shorter
   // by its height: a browser that lays the page out in that moment pulls the scroll up
   // (a tap on ⋯ or Edit under an open map jumped by the map's height). The page keeps
@@ -1150,12 +1168,29 @@ async function takeSharedPlace(){
   if(!parts.length && q.get("shared") !== "1") return;
   history.replaceState(null, "", location.pathname + location.hash);
   if(!parts.length) return;
-  const json = jsonIn(parts.join("\n"));
-  if(/"format"\s*:\s*"travel-in-my-pocket\//.test(json)){ importText(json, "shared.json"); return; }
+  takeText(parts.join("\n"), "shared.json");
+}
+
+// What was shared or pasted, wherever it came from: JSON (a trip, or an assistant's
+// changes, even with text around it) is loaded; anything else is a place, and opens
+// the stop form filled in. The share menu on Android and the Paste button everywhere
+// end here, so they behave the same.
+async function takeText(text, name){
+  const json = jsonIn(text);
+  if(json.startsWith("{")){ await importText(json, name); return; }
   if(!trip()){ toast(t("shareNeedsTrip")); return; }
   // The Maps app often repeats the link inside the text: keep each piece once.
-  const text = [...new Set(parts.join("\n").split("\n").map(s => s.trim()).filter(Boolean))].join("\n");
-  newStop(text);
+  newStop([...new Set(String(text).split("\n").map(s => s.trim()).filter(Boolean))].join("\n"));
+}
+
+// The Paste button: what was copied, in one tap (iPhone shows its own Paste bubble
+// first). If the phone will not hand it over, or nothing was copied, a field to paste
+// it by hand.
+async function pasteAnything(){
+  let text = "";
+  try{ text = await navigator.clipboard.readText(); }catch(e){}
+  if(text && text.trim()) await takeText(text, "pasted.json");
+  else pasteTrip(true);
 }
 
 /* ---------- start ---------- */

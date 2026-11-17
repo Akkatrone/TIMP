@@ -54,7 +54,7 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 
 1. Open <https://frafal.github.io/TIMP/>.
 2. Install it on the Home Screen:
-   - **iPhone**: open the page in Safari, tap Share, then "Add to Home Screen".
+   - **iPhone**: open the page in Safari (or Chrome), tap Share, then "Add to Home Screen".
    - **Android**: open the browser menu, tap "Install app" or "Add to Home screen".
 3. Open it from the new icon and tap **Load a trip file**. Pick the `.json` file you
    received (from Files, Drive, a chat).
@@ -105,9 +105,11 @@ Google Maps and the form opens already filled in; share an AI assistant's answer
 `.json` file, and the trip or the changes are loaded. (After an update, Android can take
 a day to learn that TIMP accepts files; removing the app and installing it again is
 immediate.)
-**iPhone:** Safari does not let web apps receive shared content, so in Maps tap Share →
-Copy, then in the app tap + and **Paste**; for a trip, copy it and use **Paste a trip**,
-or save the `.json` file in Files and use **Load a trip file**.
+**iPhone:** iOS does not let web apps receive shared content, whatever the browser they
+were installed from. Copy instead, then tap **Paste** at the bottom of the app: it reads
+what you copied and does the same as the Share menu on Android. In Maps, Share → Copy;
+from an AI assistant, copy the answer. A `.json` file: save it in Files and use **Load a
+trip file**. (iPhone shows its own small Paste bubble first: tap it.)
 
 When a position has to be looked up, the app asks Google (with a key that has the
 Geocoding API enabled, see below) or OpenStreetMap otherwise. It searches around the
@@ -220,7 +222,7 @@ place is the one mistake no automatic check can catch.
 For bigger ones, at the bottom of **Trips** open **Have an AI assistant change this
 trip**: one button copies a message with an outline of the trip, you write what to
 change, and the assistant answers with the changes only, a few lines instead of the
-whole file. Paste them with **Paste a trip** (on Android, share the answer to TIMP):
+whole file. Copy them and tap **Paste** (on Android, share the answer to TIMP):
 the app applies them as a new version, and Undo is one tap in History. A coding agent
 can also work on the latest file the app saved (Trips → Save the file).
 

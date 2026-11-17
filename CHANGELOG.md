@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.3.0
+
+- **Paste**, at the bottom of every page of a trip, next to +: it reads what you copied
+  and does what the Share menu does on Android. A place from Google Maps opens the stop
+  form filled in; an AI assistant's answer, a trip or its changes, is loaded. On an
+  iPhone, where web apps cannot appear in the Share menu, this is the way in: Copy, then
+  Paste. If the phone does not hand over what was copied, a field to paste it opens.
+  While the page scrolls down it shrinks to its icon; scrolling up, its word is back.
+- The time of a stop is chosen from two lists, hour and minutes, instead of the phone's
+  clock: Chrome on Android put that clock's Set button off narrow screens.
+- The + button is the accent colour in both themes: the dark one was hard to see.
+
 ## 3.2.1
 
 - Samsung Internet can install the app again: it failed ("Download failed") with the

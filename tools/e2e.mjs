@@ -265,7 +265,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     await fill("#stop-src", PLACE);
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
     assert.match(await run(`return document.querySelector("[data-pos]").textContent;`), /38\.71012, -9\.13751/);
-    await fill("#stop-time", "12:15");
+    // The time from two lists, hour and minutes (no clock of the phone's own).
+    assert.equal(await run(`return document.querySelector('input[type="time"]');`), null);
+    await fill("#stop-hh", "12");
+    await fill("#stop-mm", "15");
     await run(`document.querySelector('[data-travel="metro"]').click();`);
     await submit();
     assert.deepEqual((await stopTitles()).slice(2, 5), ["Miradouro de Santa Luzia", "Pastelaria Exemplo", "Castelo de São Jorge"]);
@@ -602,6 +605,42 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.href = location.pathname + "?text=" + encodeURIComponent("Done! " + ${JSON.stringify(JSON.stringify(shared))}) + "#day-1";`);
     await until("the stop removed", `document.querySelectorAll(".stop").length > 0 && ![...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Ginjinha bar"))`);
     assert.equal(await run(`return location.search;`), "");
+  });
+
+  await step("Paste at the bottom takes what was copied: a place opens the form, changes are applied", async () => {
+    const clip = value => run(`navigator.clipboard.readText = async () => { if(${JSON.stringify(value)} === null) throw new Error("denied"); return ${JSON.stringify(value)}; };`);
+    await run(`location.hash = "#trips";`);
+    await until("the Paste button", `document.querySelector(".fab-paste") && !document.querySelector(".fabs").hidden`);
+    assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "no + outside a day");
+    // Scrolling down it keeps only its icon; back at the top, its word again.
+    const scrollBy = y => run(`const el = document.documentElement.classList.contains("own-scroll") ? document.body : document.scrollingElement; el.scrollTop = ${y}; await new Promise(r => setTimeout(r, 120));`);
+    await scrollBy(0); await scrollBy(300);
+    assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), true, "compact while scrolling down");
+    assert.equal(await run(`return document.querySelector(".fab-paste").getAttribute("aria-label");`), "Paste");
+    await scrollBy(0);
+    assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), false, "its word back at the top");
+    // A place copied from Google Maps: the stop form, filled in.
+    await clip("Pastelaria Exemplo\n" + PLACE);
+    await run(`document.querySelector(".fab-paste").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-title")`);
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    // An assistant's answer with changes: applied as a new version.
+    const before = await versionOnPhone();
+    const changes = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "se", set: {tag: "Pasted"}}}]};
+    await clip("Sure:\n```json\n" + JSON.stringify(changes) + "\n```");
+    await run(`document.querySelector(".fab-paste").click(); await new Promise(r => setTimeout(r, 600));`);
+    assert.deepEqual((await versionOnPhone()).parents, [before.id]);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Changes applied: 0 added, 1 changed/);
+    // The phone refuses the clipboard: a field to paste by hand, which takes a place too.
+    await clip(null);
+    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200)); document.querySelector(".fab-paste").click();`);
+    await until("the paste field", `document.querySelector("dialog.sheet[open] #paste-text")`);
+    assert.equal(await text("#paste-title"), "Paste");
+    await run(`document.querySelector("#paste-text").value = ${JSON.stringify(PLACE)}; document.querySelector("#paste-text").closest("form").requestSubmit();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-title")`);
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
   });
 
   await step("a .json file shared on Android is loaded, through the service worker", async () => {

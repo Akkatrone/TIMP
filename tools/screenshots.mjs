@@ -52,7 +52,7 @@ await withApp(async ({run, until, theme, capture}) => {
   await until("day 1", `document.querySelectorAll(".stop").length === 6`);
   await run(`document.querySelector(".fab").click();`);
   await until("the form", `document.querySelector("dialog.sheet[open]")`);
-  await run(`const el = document.getElementById("stop-src"); el.value = ${JSON.stringify(PLACE)}; el.dispatchEvent(new Event("change")); document.getElementById("stop-time").value = "12:15"; document.querySelector('[data-travel="metro"]').click(); document.getElementById("stop-text").value = "Custard tarts at the counter, three minutes from the square.";`);
+  await run(`const el = document.getElementById("stop-src"); el.value = ${JSON.stringify(PLACE)}; el.dispatchEvent(new Event("change")); document.getElementById("stop-hh").value = "12"; document.getElementById("stop-mm").value = "15"; document.querySelector('[data-travel="metro"]').click(); document.getElementById("stop-text").value = "Custard tarts at the counter, three minutes from the square.";`);
   await shoot("new-stop.png");
   await run(`document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
 
