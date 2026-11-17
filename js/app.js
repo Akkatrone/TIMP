@@ -425,15 +425,12 @@ function markStrip(){
   $days.classList.toggle("more-l", $days.scrollLeft > 2);
   $days.classList.toggle("more-r", $days.scrollLeft < max - 2);
 }
-// Paste at the bottom: while the page scrolls down it shrinks to its icon, so it
-// covers less of the stops; scrolling up, or at the top or the end, it has its word.
-let lastY = 0;
+// Paste at the bottom: with its word only at the top or at the end of the page; in
+// between only its icon, so it covers less of the stops.
 function markFabs(){
   const y = scrollTop(), el = scroller || document.documentElement;
   const atEnd = y + el.clientHeight >= el.scrollHeight - 24;
-  if(y < 40 || atEnd || y < lastY - 6) $fabs.classList.remove("compact");
-  else if(y > lastY + 6) $fabs.classList.add("compact");
-  if(Math.abs(y - lastY) > 6) lastY = y;
+  $fabs.classList.toggle("compact", y >= 40 && !atEnd);
 }
 let stripFrame = 0;
 const onScroll = () => { if(!stripFrame) stripFrame = requestAnimationFrame(() => { stripFrame = 0; markStrip(); markFabs(); }); };
@@ -902,6 +899,7 @@ function render(){
   markCut();
   $app.style.minHeight = "";
   if(scrollTop() !== y) scrollToY(y);
+  markFabs();
 }
 
 /* ---------- events ---------- */

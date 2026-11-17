@@ -4,6 +4,11 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.3.1
+
+- Paste shows its word only at the top or at the end of a page; anywhere in between it
+  is only its icon, scrolling up as well.
+
 ## 3.3.0
 
 - **Paste**, at the bottom of every page of a trip, next to +: it reads what you copied

@@ -612,11 +612,13 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#trips";`);
     await until("the Paste button", `document.querySelector(".fab-paste") && !document.querySelector(".fabs").hidden`);
     assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "no + outside a day");
-    // Scrolling down it keeps only its icon; back at the top, its word again.
+    // In the middle of the page only its icon, scrolling up too; its word at the top.
     const scrollBy = y => run(`const el = document.documentElement.classList.contains("own-scroll") ? document.body : document.scrollingElement; el.scrollTop = ${y}; await new Promise(r => setTimeout(r, 120));`);
     await scrollBy(0); await scrollBy(300);
     assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), true, "compact while scrolling down");
     assert.equal(await run(`return document.querySelector(".fab-paste").getAttribute("aria-label");`), "Paste");
+    await scrollBy(200);
+    assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), true, "still compact scrolling up");
     await scrollBy(0);
     assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), false, "its word back at the top");
     // A place copied from Google Maps: the stop form, filled in.
