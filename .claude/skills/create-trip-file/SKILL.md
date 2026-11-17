@@ -26,8 +26,8 @@ Then:
   node tools/validate-trip.mjs --map private/<trip-id>.json
   ```
 
-- Tell the user what you could not verify (coordinates, prices, opening hours) and
-  how to load the file on a phone.
+- Tell the user what you could not verify (coordinates, prices, opening hours,
+  closing days, booking rules) and how to load the file on a phone.
 
 The rules for working in this repository are in `AGENTS.md`.
 

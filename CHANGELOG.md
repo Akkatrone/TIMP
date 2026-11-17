@@ -4,6 +4,25 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.5.0
+
+- **Places to eat.** Three optional fields for every stop, so files written for 3.4
+  still load and older apps ignore them with a warning:
+  - `local`: the name as on the sign ("一蘭 渋谷店"), shown under the title.
+  - `booking`: `required` shows a warning until it is done, `advised` a softer line,
+    `booked` the Booked label. Set it in the stop form (Booking: Done after booking).
+  - `closed`: days of the week and dates. The stop warns when its day is one of them,
+    also after it is moved. Seven day buttons in the form.
+- A review link on food stops, from the stop's position or the trip's time zone:
+  Tabelog in Japan (searched by the local name), Naver Map in Korea, Yelp in North
+  America, TheFork in Europe (through a web search: its own search pages cannot be
+  linked by a name). New js/places.js, no DOM. Nothing is fetched by the app.
+- The guide for assistants (docs/creating-a-trip.md, llms.txt) has a section on places
+  to eat: local names, booking, closing days, how the place works, a fallback nearby,
+  and no invented links to review sites. The outline for changes shows booking and
+  closing days.
+- The example trip: a dinner that is better booked, a lunch closed on Sundays.
+
 ## 3.4.0
 
 - **Days in the app.** Each day has its own ⋯, next to Map of the day. **Edit day**

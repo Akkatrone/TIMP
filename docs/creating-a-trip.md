@@ -61,6 +61,8 @@ One entry per date, from the arrival day to the departure day, in date order.
 - `time`: a clock time when it matters ("09:30"), a word when it does not ("Evening",
   "Dinner"). Leave it out when there is no time at all.
 - `title`: the name of the place as written on maps and signs.
+- `local`: the same name in the local script, as on the sign ("一蘭 渋谷店", "명동교자"),
+  wherever the country does not write in the Latin alphabet. Leave it out otherwise.
 - `type`: what kind of place it is. One of `sight` (monuments, churches, squares),
   `museum`, `food` (restaurants, cafés, markets to eat at), `park` (parks, gardens,
   beaches), `view` (viewpoints), `shop`, `walk` (a stroll through a quarter), `hotel`.
@@ -73,7 +75,13 @@ One entry per date, from the arrival day to the departure day, in date order.
   the previous stop (line, direction, minutes), price and opening hours, what to look
   at, one tip. The app shows the first two lines until the traveller taps, so put what
   matters most first. Write in the travellers' language and tone.
-- `tag`: "Booking needed", "Ticket needed", "Optional", in the trip's language.
+- `tag`: what to know at a glance, in the trip's language: "Ticket needed",
+  "Booked 19:30 · 2 people", "Cash only", "Optional".
+- `booking`: `required` when there is no way in without booking, `advised` when going
+  without is a gamble, `booked` only when the traveller says it is done. Never write
+  `booked` on your own. Museums and shows can need it too.
+- `closed`: the regular closing days ("mon") and closures on the dates of the trip
+  ("2027-05-03"), when you know them. The app warns if the stop falls on one.
 - `address`: where it is, as someone would type it into Google Maps: a street address,
   or the name and the town ("Pantheon, Rome"). It drives the Map and Directions links.
 - `lat`, `lng`: the position, four decimal places. Look it up on a map or on the web
@@ -84,6 +92,25 @@ One entry per date, from the arrival day to the departure day, in date order.
 - No position for stops that are not a place: a train ride, "free afternoon".
 
 Tell the traveller which positions were not verified.
+
+### Places to eat
+
+Meals are what travellers remember, and what goes wrong most easily: a closed door, a
+two-hour queue, a counter that only takes bookings. For every place to eat:
+
+- `type`: `food`, and `local` wherever the sign is not in the Latin alphabet. In Japan
+  many places have a sign only in Japanese; the app also searches the reviews by it.
+- `booking` and `closed` as above. Many restaurants in Japan close one fixed day a
+  week, and some on irregular days: then write "check the closing days" in `text`.
+- `text`: what to order, how it works (queue, ticket machine at the door, counter
+  seats, cash only), the price per person, then one tip.
+- No links to review sites (Tabelog, Yelp, TheFork, Tripadvisor): their addresses carry
+  numbers you cannot know. The app links each place to the reviews used in that
+  country by itself.
+- For a meal that matters (a famous place, a long queue), add a fallback nearby: a
+  second food stop with the tag "Alternative".
+
+Tell the traveller which closing days and booking rules were not verified.
 
 ## 4. Facts that go out of date
 
@@ -174,6 +201,7 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 - A day with both `stops` and `plans`, or with neither.
 - Colours, icons or map settings: the file has none.
 - Long paragraphs in `text`. The traveller reads this standing up.
+- Links to review or booking pages you did not get from the traveller.
 - Comments or trailing commas in the JSON.
 - HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.
 - Saving the real trip in a folder Git tracks.

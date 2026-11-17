@@ -88,6 +88,20 @@ test("a kind of place or a way of travelling the app does not know is a warning,
   assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].type = ""; }), "stops[0].type"));
 });
 
+test("a stop can say its local name, whether it needs booking and when it is closed", () => {
+  const ok = errorsAfter(t => Object.assign(t.days[0].stops[0], {local: "コロッセオ", booking: "required", closed: ["mon", "2027-04-25"]}));
+  assert.deepEqual(ok, []);
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].closed = ["monday"]; }), "closed[0]: must be \"mon\" to \"sun\""));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].closed = ["2027-02-30"]; }), "closed[0]"));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].closed = []; }), "closed: must not be empty"));
+  // A booking value from a newer app is a warning: the file still loads.
+  const trip = minimal(); trip.days[0].stops[0].booking = "waitlist";
+  const res = validateTrip(trip);
+  assert.equal(res.ok, true);
+  assert.match(res.warnings.join(), /booking: should be one of "required", "advised", "booked"/);
+  assert.match(tripSchema().$defs.stop.properties.closed.items.pattern, /sun\|mon/);
+});
+
 test("every kind of place and way of travelling has its icon", () => {
   for(const v of [...TYPES, ...TRAVEL]) assert.ok(hasIcon(v), v);
 });

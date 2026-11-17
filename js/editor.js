@@ -4,7 +4,7 @@
 // the + button, the Edit link, and a place shared from Google Maps.
 
 import { t, getLang } from "./i18n.js";
-import { esc, dateParts } from "./util.js";
+import { esc, dateParts, weekdayName } from "./util.js";
 import { parseMapsInput, queryOf } from "./gmaps.js";
 import { geocode, areaAround, resolveLink } from "./geocode.js";
 import { loadLeaflet } from "./livemap.js";
@@ -36,6 +36,9 @@ function timeNow(timezone){
   }
 }
 
+// The days of the week on the buttons for closing days, Monday first.
+const WEEK = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
 // An address worth searching: it has a comma or a number, not just a name.
 const looksLikeAddress = s => /,|\d/.test(String(s || ""));
 
@@ -63,9 +66,11 @@ export function openStopEditor(o){
     address: (o.stop && o.stop.address) || "",
     travel: (o.stop && o.stop.travel) || "",
     type: (o.stop && o.stop.type) || "",
+    booking: (o.stop && o.stop.booking) || "",
     searching: false
   };
   const s0 = o.stop || {};
+  const closed0 = Array.isArray(s0.closed) ? s0.closed : [];
   // The time: hour and minutes from two lists, or words ("Evening") for a time that is
   // not a clock time. A stop that has words keeps them. Not <input type="time">: Chrome
   // on Android opens its own clock, whose Set button falls off narrow screens.
@@ -118,6 +123,11 @@ export function openStopEditor(o){
       <input id="stop-title" type="text" required value="${esc(s0.title || "")}">
     </div>
 
+    <div class="field">
+      <label for="stop-local">${esc(t("fLocal"))}</label>
+      <input id="stop-local" type="text" autocomplete="off" placeholder="${esc(t("fLocalPh"))}" value="${esc(s0.local || "")}">
+    </div>
+
     <div class="field two">
       <div class="field">
         <label for="stop-day">${esc(t("fDay"))}</label>
@@ -137,6 +147,14 @@ export function openStopEditor(o){
 
     ${choice("type", TYPES, t("fType"))}
     ${choice("travel", TRAVEL, t("fTravel"))}
+    ${choice("booking", ["advised", "required", "booked"], t("fBooking"))}
+
+    <div class="field">
+      <span class="label" id="closed-label">${esc(t("fClosed"))}</span>
+      <div class="seg wrap week" role="group" aria-labelledby="closed-label">
+        ${WEEK.map(d => `<button type="button" data-closed="${d}" aria-pressed="${closed0.includes(d)}">${esc(weekdayName(d, lang, "short"))}</button>`).join("")}
+      </div>
+    </div>
 
     <div class="field">
       <label for="stop-text">${esc(t("fText"))}</label>
@@ -316,7 +334,9 @@ export function openStopEditor(o){
       (toWords ? words : $("#stop-hh")).focus();
       return;
     }
-    for(const kind of ["type", "travel"]){
+    const day = e.target.closest("[data-closed]");
+    if(day){ day.setAttribute("aria-pressed", String(day.getAttribute("aria-pressed") !== "true")); return; }
+    for(const kind of ["type", "travel", "booking"]){
       const b = e.target.closest(`[data-${kind}]`);
       if(b){ setChoice(kind, b.dataset[kind]); return; }
     }
@@ -374,11 +394,16 @@ export function openStopEditor(o){
       type: st.type || undefined,
       travel: st.travel || undefined,
       text: $("#stop-text").value.trim() || undefined,
+      local: $("#stop-local").value.trim() || undefined,
+      booking: st.booking || undefined,
+      // Days of the week from the buttons; dates the file had stay as they are.
+      closed: [...[...dlg.querySelectorAll('[data-closed][aria-pressed="true"]')].map(b => b.dataset.closed), ...closed0.filter(d => !WEEK.includes(d))],
       address,
       lat: st.lat, lng: st.lng,
       link: st.link
     };
     delete stop.id;
+    if(!stop.closed.length) delete stop.closed;
     if(st.lat === undefined){ delete stop.lat; delete stop.lng; }
     dlg.close();
     const newDay = day.isNew ? (day.city ? {date: day.date, city: day.city} : {date: day.date}) : null;

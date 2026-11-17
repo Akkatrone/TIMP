@@ -95,6 +95,19 @@ day after the last (staying one more day: the day is made with its first stop).
 Alternative plans for a day, like one for when it rains, are a job for an AI assistant
 (below): "add a plan for day 3 if it rains" is all it takes.
 
+**Places to eat** get more help, because a meal is the easiest thing to lose:
+
+- The name as on the sign, under the title ("一蘭 渋谷店"): to find the door, and to show
+  it to the staff or a taxi driver.
+- **Booking**: a stop that needs one shows a warning until you mark it done in the form
+  (Booking: Done); then it shows Booked.
+- **Closing days**: a stop on a day its place is closed shows a warning, also after you
+  move it to another day.
+- A link to the reviews people use there, searched by the local name or the title:
+  **Tabelog** in Japan, **Naver** in Korea, **Yelp** in the United States and Canada,
+  **TheFork** in Europe (through a web search). Nothing is fetched: the link opens only
+  when you tap it.
+
 The quickest way to fill in a stop is to paste what Google Maps gives you. The form
 reads it on the phone:
 

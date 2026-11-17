@@ -42,8 +42,8 @@ Someone wants their itinerary turned into a file for the app. No code changes.
    node tools/validate-trip.mjs --map private/<trip-id>.json
    ```
 
-5. Tell the person what you could not verify (coordinates, prices, opening hours) and
-   how to load the file on a phone.
+5. Tell the person what you could not verify (coordinates, prices, opening hours,
+   closing days, booking rules) and how to load the file on a phone.
 
 ## Request B: change the app
 
@@ -69,6 +69,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/trip.js` | The trip format: `FIELDS` (one table for every field), checks, JSON Schema, conversion from format 1. No DOM. |
 | `js/geo.js` | Map zones, the offline sketch, the colours of pins and lines. No DOM. |
 | `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
+| `js/places.js` | What the app works out about a place: its part of the world, its review site (Tabelog, Naver, Yelp, TheFork), closing days, the language of its local name. No DOM. |
 | `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |
 | `js/editor.js` | The add / edit stop form, and the day form. |

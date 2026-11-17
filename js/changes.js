@@ -41,7 +41,7 @@ export const isChanges = data => isObj(data) && data.format === CHANGES;
  */
 export function outline(trip){
   const stop = s => {
-    const extra = [s.type, s.travel && "by " + s.travel, s.lat === undefined && "no position"].filter(Boolean);
+    const extra = [s.type, s.travel && "by " + s.travel, s.booking && "booking " + s.booking, s.closed && "closed " + s.closed.join(" "), s.lat === undefined && "no position"].filter(Boolean);
     return `[${s.id}] ${s.time ? s.time + " " : ""}${s.title}${extra.length ? " (" + extra.join(", ") + ")" : ""}`;
   };
   const stay = d => !d.stay ? "" : ` · night: ${typeof d.stay === "string" ? d.stay : d.stay.name}`;

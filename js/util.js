@@ -28,6 +28,14 @@ export function dateParts(iso, lang){
   };
 }
 
+// The name of a day of the week ("mon") in a language: "Monday", "lunedì"; "short"
+// gives "Mon", "lun".
+export function weekdayName(code, lang, width = "long"){
+  const i = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(code);
+  if(i < 0) return String(code);
+  return new Intl.DateTimeFormat(lang, {weekday: width, timeZone: "UTC"}).format(new Date(Date.UTC(2024, 0, 7 + i, 12))).replace(".", "");
+}
+
 export function todayIn(timezone){
   try{
     return new Intl.DateTimeFormat("en-CA", {timeZone: timezone || undefined, year: "numeric", month: "2-digit", day: "2-digit"}).format(new Date());

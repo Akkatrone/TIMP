@@ -34,6 +34,7 @@ const FILES = [
   "js/livemap.js",
   "js/merge.js",
   "js/objects.js",
+  "js/places.js",
   "js/store.js",
   "js/sun.js",
   "js/theme.js",

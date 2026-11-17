@@ -17,6 +17,10 @@ export const FORMAT_1 = "travel-in-my-pocket/1";
 // stop, so new kinds can be added without breaking files or older apps.
 export const TRAVEL = ["metro", "bus", "train", "plane", "boat"];
 export const TYPES = ["sight", "museum", "food", "park", "view", "shop", "walk", "hotel"];
+// Whether a stop needs booking, and whether it is done. Unknown values: a warning.
+export const BOOKING = ["required", "advised", "booked"];
+// The days a place is closed: days of the week, as in `closed`.
+export const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const HASH = /^[0-9a-f]{16}$/;
@@ -32,6 +36,11 @@ function realDate(s){
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
+// A closing day: a day of the week, or a date.
+function closedDay(s){
+  return WEEKDAYS.includes(s) || realDate(s);
+}
+
 function realTimezone(s){
   try{ new Intl.DateTimeFormat("en", {timeZone: s}); return true; }catch(e){ return false; }
 }
@@ -40,7 +49,8 @@ function realTimezone(s){
  * Every field of the format. A field is
  *   {type, req, doc, ...}
  * type: "text" | "number" | "list" | "fixed" | "any" | "<name of another entry>"
- *   list: `of` is the type of the items, `min` the fewest items.
+ *   list: `of` is the type of the items, `min` the fewest items; `item`, a text field
+ *     every item must match (its `pattern`, `test` and `hint`).
  *   text: `pattern` + `hint`, or `test` + `hint`, or `values` (one of them).
  *   number: `min`, `max`.
  * soft: a value outside `values` is a warning, not an error.
@@ -76,11 +86,14 @@ export const FIELDS = {
   },
   stop: {
     title: {type: "text", req: true, doc: "The name of the place or of the activity."},
+    local: {type: "text", doc: "The name in the local language and script, as on the sign (\"一蘭 渋谷店\"): to recognise the place, show it to staff, and search it."},
     time: {type: "text", doc: "When: \"09:30\", or words like \"Evening\"."},
     type: {type: "text", values: TYPES, soft: true, doc: "What kind of place it is; it gives the stop its icon and pin."},
     travel: {type: "text", values: TRAVEL, soft: true, doc: "How you get there from the stop before."},
     text: {type: "text", doc: "What to know: what to see, what to order, tickets. **bold** is allowed."},
-    tag: {type: "text", doc: "A short label shown on the stop, like \"Booked\" or \"Optional\"."},
+    tag: {type: "text", doc: "A short label shown on the stop, like \"Booked 19:30\" or \"Optional\"."},
+    booking: {type: "text", values: BOOKING, soft: true, doc: "\"required\": no entry without booking (the app warns until it is done); \"advised\": better booked; \"booked\": done."},
+    closed: {type: "list", of: "text", min: 1, item: {type: "text", pattern: /^(sun|mon|tue|wed|thu|fri|sat|\d{4}-\d{2}-\d{2})$/, test: closedDay, hint: "\"mon\" to \"sun\", or a date as \"YYYY-MM-DD\""}, doc: "When the place is closed: days of the week (\"mon\"…\"sun\") and dates. The app warns when the stop falls on one."},
     address: {type: "text", doc: "Where it is, as you would search it in Google Maps: a street address, or name and town."},
     lat: {type: "number", min: -90, max: 90, doc: "Latitude, with `lng`. Gives the stop its pin on the map."},
     lng: {type: "number", min: -180, max: 180, doc: "Longitude, with `lat`."},
@@ -132,7 +145,7 @@ export function validateTrip(trip){
       case "list":
         if(!Array.isArray(v)){ err(path, "must be a list"); return; }
         if(f.min && v.length < f.min) err(path, f.min === 1 ? "must not be empty" : `needs at least ${f.min} entries`);
-        v.forEach((x, i) => value(x, {type: f.of}, `${path}[${i}]`));
+        v.forEach((x, i) => value(x, f.item || {type: f.of}, `${path}[${i}]`));
         return;
       case "stay":
         if(typeof v === "string") value(v, {type: "text"}, path); else object(v, "stay", path);
@@ -206,7 +219,7 @@ export function tripSchema(){
       case "any": return doc;
       case "number": return {...doc, type: "number", minimum: f.min, maximum: f.max};
       case "text": return {...doc, type: "string", minLength: 1, ...(f.values && !f.soft ? {enum: f.values} : {}), ...(f.values && f.soft ? {examples: f.values} : {}), ...(f.pattern ? {pattern: f.pattern.source} : {})};
-      case "list": return {...doc, type: "array", ...(f.min ? {minItems: f.min} : {}), items: f.of === "text" ? {type: "string", minLength: 1} : {$ref: `#/$defs/${f.of}`}};
+      case "list": return {...doc, type: "array", ...(f.min ? {minItems: f.min} : {}), items: f.of === "text" ? {type: "string", minLength: 1, ...(f.item && f.item.pattern ? {pattern: f.item.pattern.source} : {})} : {$ref: `#/$defs/${f.of}`}};
       case "stay": return {...doc, anyOf: [{type: "string", minLength: 1}, {$ref: "#/$defs/stay"}]};
       default: return {...doc, $ref: `#/$defs/${f.type}`};
     }
@@ -248,7 +261,7 @@ export function formatBrief(){
   const kind = (k, name) => {
     const f = FIELDS[k][name];
     if(f.type === "fixed") return `  ${name} (required): ${JSON.stringify(f.value)}`;
-    const what = f.type === "list" ? `list of ${f.of}` : f.type === "stay" ? "text or stay"
+    const what = f.type === "list" ? `list of ${f.item ? f.item.hint : f.of}` : f.type === "stay" ? "text or stay"
       : f.type === "number" ? `number from ${f.min} to ${f.max}` : f.values ? f.values.join("|") : f.hint || f.type;
     return `  ${name}${f.req ? " (required)" : ""}: ${what}. ${f.doc}`;
   };

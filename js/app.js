@@ -1,9 +1,10 @@
 import { validateTrip, upgrade, citiesOf, stayOf, placeQuery, formatBrief, FORMAT, TRAVEL, TYPES } from "./trip.js";
 import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
-import { esc, rich, mapsUrl, dirUrl, dateParts, todayIn, jsonIn } from "./util.js";
+import { esc, rich, mapsUrl, dirUrl, dateParts, todayIn, jsonIn, weekdayName } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
 import { daylight, partsOfDay } from "./sun.js";
+import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
 import { clockMinutes } from "./edit.js";
 import { icon } from "./icons.js";
 import { createLiveMap } from "./livemap.js";
@@ -757,13 +758,26 @@ function stopsHTML(day, planId, list, parts, paint){
     const dark = parts && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
     const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}</div>`;
     // Middle: a label above the title, the title with its kind, the description that folds, the links.
-    const titleRow = `<div class="h"><h3>${chip("type", s.type)}${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>`;
+    // The name as on the sign, under the title, in its own language (for the glyphs).
+    const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
+    const titleRow = `<div class="h"><h3>${chip("type", s.type)}${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>` +
+      (s.local ? `<p class="local"${lang ? ` lang="${lang}"` : ""}>${esc(s.local)}</p>` : "");
     const head = s.text
       ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}">${titleRow}<p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p></div>`
       : titleRow;
+    // What could leave the traveller at a closed door, while the stop is still ahead.
+    const closed = closedOn(s, day.date);
+    const notices = isDone || isSkipped ? "" : [
+      s.booking === "required" ? ["warn", t("bookingRequired")] : s.booking === "advised" ? ["soft", t("bookingAdvised")] : null,
+      closed ? ["warn", closed.date ? t("closedDate") : t("closedWeekday", {d: weekdayName(closed.weekday, getLang())})] : null
+    ].filter(Boolean).map(([k, x]) => `<p class="notice ${k}"><span class="ic" aria-hidden="true">!</span><span>${esc(x)}</span></p>`).join("");
+    // Map and Directions, and for a place to eat the review site of that part of the world.
+    const review = reviewSite(s, {city: day.city, timezone: trip().timezone});
     const links = (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
-      (q ? `<a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "");
-    const meta = isSkipped || links ? `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${links}</div>` : "";
+      (q ? `<a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
+      (review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)}</a>` : "");
+    const booked = s.booking === "booked" ? `<span class="tag ok">${esc(t("booked"))}</span>` : "";
+    const meta = isSkipped || links || booked ? `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}</div>` : "";
     const eyebrow = s.tag ? `<span class="eyebrow">${esc(s.tag)}</span>` : "";
     // Right: the tick, and the ⋯ menu with the actions used less often.
     const menuOpen = S.menuFor === id;
@@ -772,7 +786,7 @@ function stopsHTML(day, planId, list, parts, paint){
     const side = `<div class="side"><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button>` +
       (items ? `<button class="more" type="button" data-more="${esc(id)}" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="${esc(t("moreActions"))}: ${esc(s.title)}">${DOTS}</button>` +
         `<div class="menu" role="menu"${menuOpen ? "" : " hidden"}>${items}</div>` : "") + `</div>`;
-    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}">${left}<div class="body">${eyebrow}${head}${meta}</div>${side}</li>`;
+    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}">${left}<div class="body">${eyebrow}${head}${notices}${meta}</div>${side}</li>`;
   }).join("") + `</ol>`;
 }
 

@@ -92,11 +92,14 @@ an `address` and its position (`lat`, `lng`):
 | Field | Required | Meaning |
 |---|---|---|
 | `title` | yes | The name of the place or of the activity. |
+| `local` | no | The name in the local language and script, as on the sign: `"一蘭 渋谷店"`. Shown under the title, to recognise the place, show it to staff or a taxi driver, and search it: the review link uses it. |
 | `time` | no | `"09:30"`, or words like `"Evening"`. Clock times keep new stops in order. |
 | `type` | no | What kind of place it is: `sight`, `museum`, `food`, `park`, `view`, `shop`, `walk`, `hotel`. It gives the stop its icon, in the list and on the map pin. |
 | `travel` | no | How you get there from the stop before: `metro`, `bus`, `train`, `plane`, `boat`. Drawn on the leg of the map that arrives at the stop. |
 | `text` | no | What to know: what to see, what to order, tickets. |
-| `tag` | no | A short label above the title, like `"Booked"` or `"Optional"`. |
+| `tag` | no | A short label above the title, like `"Booked 19:30"` or `"Optional"`. |
+| `booking` | no | `"required"`: no entry without booking, and the stop shows a warning until it is done; `"advised"`: better booked; `"booked"`: done, shown as Booked (the time and the people go in `tag`). |
+| `closed` | no | When the place is closed: days of the week (`"mon"` … `"sun"`) and dates (`"2027-05-03"`). The stop shows a warning when its day is one of them, also after it is moved. |
 | `address` | no | Where it is, as you would search it in Google Maps: a street address, or name and town (`"Pantheon, Rome"`). Used by the Map and Directions links. |
 | `lat`, `lng` | no | The position, both or neither. Gives the stop its pin on the map. |
 | `link` | no | A Google Maps link (`https://…`) to the exact place. The Map link opens it. |
@@ -106,8 +109,13 @@ A stop without a position is still shown, without a pin. A journey can be a stop
 own ("Train to Naples", `"travel": "train"`, no position): it marks the leg from the
 pin before it to the pin after it.
 
-A `type` or `travel` the app does not know yet is accepted with a warning and drawn as
-a plain stop: files written for a newer app still load.
+A `type`, `travel` or `booking` the app does not know yet is accepted with a warning and
+drawn as a plain stop: files written for a newer app still load.
+
+A stop of `type` `food` also gets a link to the reviews people read in that part of the
+world, searched by its `local` name or its title: Tabelog in Japan, Naver Map in Korea,
+Yelp in the United States and Canada, TheFork in Europe. The app picks the site from
+the position, or from the trip's `timezone`; nothing about it goes in the file.
 
 ## Info
 

@@ -679,6 +679,35 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return location.hash;`), "#day-4");
   });
 
+  await step("places to eat: review link, local name, booking and closing-day warnings that follow the stop", async () => {
+    await run(`location.hash = "#day-2";`);
+    await until("day 2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Pastéis de Belém"))`);
+    const stop = title => `[...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent.includes(${JSON.stringify(title)}))`;
+    // Lisbon is in Europe: TheFork, searched by name and city; a museum gets none.
+    assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector('a[aria-label="Reviews on TheFork"]').href;`), "https://www.google.com/search?q=TheFork%20Dinner%20in%20Cacilhas%20Lisboa");
+    assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector(".notice").textContent;`), "!Better booked");
+    assert.equal(await run(`return ${stop("Mosteiro")}.querySelector('a[aria-label^="Reviews"]');`), null);
+    // Booking required, closed on Saturdays (this day): two warnings, and the name on the sign.
+    await run(`document.querySelector('[data-edit="pasteis"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-local")`);
+    await run(`document.getElementById("stop-local").value = "Antiga Confeitaria de Belém"; document.querySelector('[data-booking="required"]').click(); document.querySelector('[data-closed="sat"]').click();`);
+    assert.equal(await run(`return document.querySelector('[data-closed="sat"]').getAttribute("aria-pressed");`), "true");
+    await submit();
+    assert.deepEqual(await run(`return [...${stop("Pastéis de Belém")}.querySelectorAll(".notice")].map(n => n.textContent);`), ["!Booking required: not done yet", "!Closed on Saturday"]);
+    assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".local").textContent;`), "Antiga Confeitaria de Belém");
+    // Booked: the warning goes, Booked shows; the closing day stays until the stop moves.
+    await run(`document.querySelector('[data-edit="pasteis"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-local")`);
+    await run(`document.querySelector('[data-booking="booked"]').click(); document.getElementById("stop-day").value = "2"; document.getElementById("stop-day").dispatchEvent(new Event("change"));`);
+    await submit();
+    await run(`location.hash = "#day-3";`);
+    await until("day 3", `${stop("Pastéis de Belém")}`);
+    assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelectorAll(".notice").length;`), 0, "Sunday: open, and booked");
+    assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".tag.ok").textContent;`), "Booked");
+    const saved = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => { const d = g.result.trip.days[2]; r((d.plans ? d.plans[0].stops : d.stops).find(s => s.id === "pasteis")); }; }; });`);
+    assert.deepEqual([saved.local, saved.booking, saved.closed], ["Antiga Confeitaria de Belém", "booked", ["sat"]]);
+  });
+
   await step("a .json file shared on Android is loaded, through the service worker", async () => {
     await run(`await navigator.serviceWorker.ready;`);
     if(!await run(`return !!navigator.serviceWorker.controller;`)){ await reload(); await until("the service worker", `!!navigator.serviceWorker.controller`); }
