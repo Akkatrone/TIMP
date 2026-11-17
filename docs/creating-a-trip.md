@@ -138,6 +138,13 @@ Tell the travellers, briefly:
 
 ## Updating a file later
 
+**An AI assistant in a chat:** the traveller sends an outline of the trip (from Trips →
+Have an AI assistant change this trip). Answer with the changes only, in the format
+`travel-in-my-pocket/changes` described in the format reference: never the whole file
+again.
+
+**With the whole file:**
+
 - Start from the latest file: travellers change trips in the app too, and save them
   from Trips → Save the file. An older copy loses nothing, because the app merges, but
   starting from the latest one avoids surprises.

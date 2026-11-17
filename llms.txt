@@ -60,6 +60,29 @@ Example:
 {"format":"travel-in-my-pocket/2","title":"Rome in three days","lang":"en","days":[{"date":"2027-04-10","city":"Rome","title":"The ancient city","stay":{"name":"Hotel Example","address":"Via Cavour 1, Rome"},"notes":["Colosseum tickets booked for 9:00"],"stops":[{"time":"09:00","title":"Colosseum","type":"sight","text":"Enter from the Via Sacra side.","address":"Piazza del Colosseo, Rome","lat":41.8902,"lng":12.4922},{"time":"13:00","title":"Lunch in Monti","type":"food","travel":"metro"}]}],"info":[{"title":"In case of need","items":[{"label":"Emergency","text":"112"}]}]}
 ```
 
+## Changing a trip that already exists
+
+When the traveller gives you an outline of their trip (lines like
+`[colosseum] 09:00 Colosseum (sight)`), do not write the whole file again: answer
+with the changes only.
+
+```text
+To change an existing trip, answer with ONE JSON object in one code block, format "travel-in-my-pocket/changes", listing only what changes:
+
+{"format": "travel-in-my-pocket/changes", "trip": "<the trip id>", "changes": [ … ]}
+
+Each change is one of:
+  {"add": {"day": "YYYY-MM-DD", "stop": {…}}}             a new stop (fields: title, time, type, travel, text, tag, address, lat, lng, link); it goes in time order
+  {"update": {"day": "YYYY-MM-DD", "stop": "<id>", "set": {…}}}  changed fields of a stop; null removes a field
+  {"update": {"day": …, "stop": "<id>", "to": {"day": "YYYY-MM-DD"}}}  moves the stop to another day (set may go with it)
+  {"remove": {"day": "YYYY-MM-DD", "stop": "<id>"}}
+  {"setDay": {"day": "YYYY-MM-DD", "set": {…}}}             a day's city, title, stay or notes
+  {"addDay": {…a whole day, as in a trip file…}}
+  {"removeDay": {"day": "YYYY-MM-DD"}}
+
+On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them.
+```
+
 ## How the traveller loads it
 
 They copy your answer and, in the app, tap Trips → Paste a trip (or save it as a .json
@@ -204,6 +227,13 @@ Tell the travellers, briefly:
 4. What could not be verified: positions, prices, hours.
 
 ## Updating a file later
+
+**An AI assistant in a chat:** the traveller sends an outline of the trip (from Trips →
+Have an AI assistant change this trip). Answer with the changes only, in the format
+`travel-in-my-pocket/changes` described in the format reference: never the whole file
+again.
+
+**With the whole file:**
 
 - Start from the latest file: travellers change trips in the app too, and save them
   from Trips → Save the file. An older copy loses nothing, because the app merges, but
@@ -418,6 +448,32 @@ it has seen, the way Git does, as pieces shared between versions.
 **Changing a file by hand or with an assistant:** leave `id` and `version` as they are.
 The app sees that the content no longer matches the version and makes a new version
 from it, then joins it with what changed on other phones.
+
+## Changes
+
+To change a trip that already exists, an AI assistant does not need to write the whole
+file again. The app gives it an outline of the trip (Trips → Have an AI assistant change
+this trip), and the assistant answers with a short list of changes, which the app applies
+as one new version (Trips → Paste a trip):
+
+```json
+{"format": "travel-in-my-pocket/changes", "trip": "rome-in-three-days-2027-04-10", "changes": [
+  {"add": {"day": "2027-04-10", "stop": {"time": "13:00", "title": "Lunch in Monti", "type": "food"}}},
+  {"update": {"day": "2027-04-10", "stop": "colosseum", "set": {"time": "10:00", "tag": null}}},
+  {"update": {"day": "2027-04-10", "stop": "pantheon", "to": {"day": "2027-04-11"}}},
+  {"remove": {"day": "2027-04-11", "stop": "trevi"}},
+  {"setDay": {"day": "2027-04-11", "set": {"title": "Churches and squares"}}},
+  {"addDay": {"date": "2027-04-12", "city": "Rome", "stops": [{"title": "Last coffee"}]}},
+  {"removeDay": {"day": "2027-04-13"}}
+]}
+```
+
+Stops are named by their `id`, plans by theirs (`"plan": "…"` next to `"day"`). In
+`set`, `null` removes a field. A new stop goes in time order. The changes are applied
+in order, all or none: if one is wrong, the app lists which one and why, and changes
+nothing. The result is checked like any trip file. `trip` may be left out: the changes
+then apply to the trip open on the phone. The rules are in
+`js/changes.js`.
 
 ## The old format
 

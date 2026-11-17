@@ -4,6 +4,23 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.1.0
+
+Changing a trip with an AI assistant costs a few lines, not the whole file again.
+
+- **Changes instead of the whole file.** "Have an AI assistant change this trip" copies
+  a message with how to write changes and an outline of the trip (a few lines per day,
+  every stop with its id). The assistant answers with the changes only, format
+  `travel-in-my-pocket/changes`: add, update, move and remove stops; change, add and
+  remove days. Paste a trip applies them as one new version, all or none, with the
+  reason when one is wrong. llms.txt and the format reference describe it.
+- **Android: share the answer to TIMP.** An assistant's answer with a trip or with
+  changes, shared to the app, is loaded as if pasted: no copy and paste.
+- **A clock for the time** in the stop form: the phone's own time picker. "Write it in
+  words" keeps times like "Evening".
+- No scroll bars on phones and tablets.
+- The note under a day's stops stands apart from them.
+
 ## 3.0.2
 
 - The message to give an AI assistant is short again (three lines). It points to

@@ -210,11 +210,11 @@ place is the one mistake no automatic check can catch.
 
 **Changing a trip you already use:** small changes are quicker in the app (+ and Edit).
 For bigger ones, at the bottom of **Trips** open **Have an AI assistant change this
-trip**: one button copies a message with the trip in it, you write what to change, and
-the answer goes back with **Paste a trip**. The app keeps the trip `id`, the stop ids
-and the `version` block, turns the result into a new version, and joins it with what
-changed on the other phones. A coding agent works the same way from the latest file the
-app saved (Trips → Save the file).
+trip**: one button copies a message with an outline of the trip, you write what to
+change, and the assistant answers with the changes only, a few lines instead of the
+whole file. Paste them with **Paste a trip** (on Android, share the answer to TIMP):
+the app applies them as a new version, and Undo is one tap in History. A coding agent
+can also work on the latest file the app saved (Trips → Save the file).
 
 ### By hand
 

@@ -9,6 +9,7 @@ import { TRAVEL, TYPES, FIELDS, validateTrip, placeQuery, formatBrief } from "..
 import { STRINGS } from "../js/i18n.js";
 import { ROOT, precacheList, readSw } from "../tools/lib/app-files.mjs";
 import { llmsText } from "../tools/lib/llms.mjs";
+import { changesBrief } from "../js/changes.js";
 
 /* ---------- text from trip files is never trusted ---------- */
 
@@ -222,8 +223,9 @@ test("llms.txt gives a chat assistant the whole format in one page, with valid e
   assert.match(text, /This page is complete/);
   assert.ok(text.includes(formatBrief()), "the format in short, the same text the app copies");
   assert.ok(text.includes("trip.schema.json"));
-  const blocks = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => m[1]).filter(b => b.trim().startsWith("{") && b.includes('"format"'));
+  const blocks = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => m[1]).filter(b => b.trim().startsWith("{") && b.includes('"travel-in-my-pocket/2"'));
   assert.ok(blocks.length >= 1, "the complete example");
+  assert.ok(text.includes(changesBrief()), "how to write changes, for a trip that exists");
   for(const b of blocks) assert.deepEqual(validateTrip(JSON.parse(b)).errors, [], b.slice(0, 60));
   // The link resolver is described only on a site that has one.
   assert.ok(!text.includes("link resolver"));

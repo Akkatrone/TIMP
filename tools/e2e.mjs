@@ -276,7 +276,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     await fill("#stop-src", "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
     assert.match(await run(`return document.querySelector("[data-src-note]").textContent;`), /Short Google Maps link/);
     await fill("#stop-title", "Tram 28");
-    await fill("#stop-time", "Evening");
+    // A time in words instead of the clock.
+    await run(`document.querySelector("[data-time-mode]").click();`);
+    assert.equal(await run(`return document.getElementById("stop-time").hidden && !document.getElementById("stop-time-words").hidden;`), true);
+    await fill("#stop-time-words", "Evening");
     await submit();
     assert.equal(await run(`return [...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent === "Tram 28").querySelector(".maplink").href;`), "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
   });
@@ -511,8 +514,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-act='copy-edit']").click(); await new Promise(r => setTimeout(r, 100));`);
     const edit = await run(`return window.__copied;`);
     assert.match(edit, /\[what to change\]/);
-    assert.match(edit, /"format": "travel-in-my-pocket\/2"/);
-    assert.match(edit, /Keep the trip id, every stop id and the version block/);
+    assert.match(edit, /travel-in-my-pocket\/changes/, "how to write changes");
+    assert.match(edit, /\nTrip ".*", id [a-z0-9-]+, \d+ days?\./, "the outline of the open trip");
+    assert.ok(!edit.includes('"text":'), "not the whole file");
     // What Gemini wrote: "name" instead of "title", no format, no places.
     const wrong = {id: "rome-gemini", title: "Rome", days: [{date: "2027-05-01", place: "rome", title: "Day 1", stops: [{time: "09:00", name: "Colosseum"}]}]};
     await run(`document.querySelector('[data-act="paste"]').click();`);
@@ -536,6 +540,34 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await count("#app .errbox"), 0, "the problems are gone");
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector('[data-act="remove"]')`);
+  });
+
+  await step("changes from an assistant apply as one new version; a wrong one says why and changes nothing", async () => {
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="paste"]')`);
+    // The example trip, opened.
+    await run(`const b = [...document.querySelectorAll('[data-act="open"]')].find(b => b.closest(".tripcard").innerText.includes("Lisbon")); if(b) b.click(); await new Promise(r => setTimeout(r, 400));`);
+    const before = await versionOnPhone();
+    const paste = body => run(`location.hash = "#trips"; await new Promise(r => setTimeout(r, 200)); document.querySelector('[data-act="paste"]').click(); await new Promise(r => setTimeout(r, 200)); document.querySelector("#paste-text").value = ${JSON.stringify(body)}; document.querySelector("#paste-text").closest("form").requestSubmit(); await new Promise(r => setTimeout(r, 600));`);
+    const wrong = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "nowhere", set: {time: "10:00"}}}]};
+    await paste("Here you go:\n```json\n" + JSON.stringify(wrong) + "\n```");
+    assert.match(await text("#app .errbox li"), /changes\[0\]: there is no stop "nowhere" on 2027-05-14/);
+    assert.equal((await versionOnPhone()).id, before.id, "nothing changed");
+    const right = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [
+      {add: {day: "2027-05-14", stop: {time: "16:00", title: "Ginjinha bar", type: "food", lat: 38.7139, lng: -9.1375}}},
+      {update: {day: "2027-05-14", stop: "se", set: {tag: "Free entry"}}}
+    ]};
+    await paste(JSON.stringify(right));
+    const after = await versionOnPhone();
+    assert.deepEqual(after.parents, [before.id], "one new version");
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /Changes applied: 1 added, 1 changed, 0 removed/);
+    await run(`location.hash = "#day-1";`);
+    await until("the new stop", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Ginjinha bar"))`);
+    // Android: the assistant's answer shared to the app is loaded the same way.
+    const shared = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{remove: {day: "2027-05-14", stop: "ginjinha-bar"}}]};
+    await run(`location.href = location.pathname + "?text=" + encodeURIComponent("Done! " + ${JSON.stringify(JSON.stringify(shared))}) + "#day-1";`);
+    await until("the stop removed", `document.querySelectorAll(".stop").length > 0 && ![...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Ginjinha bar"))`);
+    assert.equal(await run(`return location.search;`), "");
   });
 
   await step("deleting a trip asks first; Escape or Cancel keep it", async () => {

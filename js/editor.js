@@ -10,6 +10,7 @@ import { geocode, areaAround, resolveLink } from "./geocode.js";
 import { loadLeaflet } from "./livemap.js";
 import { icon } from "./icons.js";
 import { TRAVEL, TYPES } from "./trip.js";
+import { clockMinutes } from "./edit.js";
 import { ask } from "./ask.js";
 
 let dialog = null;
@@ -63,6 +64,11 @@ export function openStopEditor(o){
     searching: false
   };
   const s0 = o.stop || {};
+  // The time: the phone's own clock picker, or words ("Evening") for a time that is not
+  // a clock time. A stop that has words keeps them.
+  const time0 = s0.time || timeNow(o.timezone);
+  const clock0 = clockMinutes(time0);
+  const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
 
   const days = o.trip.days;
   const dayOptions = days.map((d, i) => {
@@ -106,7 +112,9 @@ export function openStopEditor(o){
       </div>
       <div class="field">
         <label for="stop-time">${esc(t("fTime"))}</label>
-        <input id="stop-time" type="text" inputmode="text" autocomplete="off" value="${esc(s0.time || timeNow(o.timezone))}">
+        <input id="stop-time" type="time" value="${clock0 !== null ? hhmm(clock0) : ""}"${clock0 !== null ? "" : " hidden"}>
+        <input id="stop-time-words" type="text" autocomplete="off" aria-label="${esc(t("fTime"))}" placeholder="${esc(t("timeWordsPh"))}" value="${clock0 === null ? esc(time0) : ""}"${clock0 === null ? "" : " hidden"}>
+        <button type="button" class="linkbtn" data-time-mode>${esc(t(clock0 !== null ? "timeWords" : "timeClock"))}</button>
       </div>
     </div>
     <div class="field" data-plan-field hidden>
@@ -287,6 +295,14 @@ export function openStopEditor(o){
   dlg.onclick = async e => {
     if(e.target === dlg) return;
     if(e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-time-mode]")){
+      const clock = $("#stop-time"), words = $("#stop-time-words");
+      const toWords = !clock.hidden;
+      clock.hidden = toWords; words.hidden = !toWords;
+      e.target.closest("[data-time-mode]").textContent = t(toWords ? "timeClock" : "timeWords");
+      (toWords ? words : clock).focus();
+      return;
+    }
     for(const kind of ["type", "travel"]){
       const b = e.target.closest(`[data-${kind}]`);
       if(b){ setChoice(kind, b.dataset[kind]); return; }
@@ -340,7 +356,7 @@ export function openStopEditor(o){
     const address = st.address || (day.city ? `${title}, ${day.city}` : undefined);
     const stop = {
       ...s0,
-      time: $("#stop-time").value.trim() || timeNow(o.timezone),
+      time: ($("#stop-time").hidden ? $("#stop-time-words") : $("#stop-time")).value.trim() || timeNow(o.timezone),
       title,
       type: st.type || undefined,
       travel: st.travel || undefined,

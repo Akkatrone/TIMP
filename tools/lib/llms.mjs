@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./app-files.mjs";
 import { formatBrief } from "../../js/trip.js";
+import { changesBrief } from "../../js/changes.js";
 
 const read = (root, f) => readFileSync(join(root, f), "utf8").trim();
 
@@ -53,6 +54,16 @@ known) and \`link\`. Put them in the stop as they are. It keeps nothing.
 
 \`\`\`text
 ${formatBrief()}
+\`\`\`
+
+## Changing a trip that already exists
+
+When the traveller gives you an outline of their trip (lines like
+\`[colosseum] 09:00 Colosseum (sight)\`), do not write the whole file again: answer
+with the changes only.
+
+\`\`\`text
+${changesBrief()}
 \`\`\`
 
 ## How the traveller loads it

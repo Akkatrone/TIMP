@@ -73,6 +73,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/editor.js` | The add / edit stop form. |
 | `js/ask.js` | Question dialog for confirmations and choices; never use `confirm()`. |
 | `js/edit.js` | Stop changes, in time order. No DOM. |
+| `js/changes.js` | Changes written by an AI assistant: the trip's outline, the changes format, applying it. No DOM. |
 | `js/gmaps.js` | Reads Google Maps links and shared text. No DOM. |
 | `js/geocode.js` | Address to coordinates: Google, then OpenStreetMap. |
 | `js/version.js` | Version ids like Git's, and how versions relate. No DOM. |

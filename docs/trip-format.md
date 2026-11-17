@@ -177,6 +177,32 @@ it has seen, the way Git does, as pieces shared between versions.
 The app sees that the content no longer matches the version and makes a new version
 from it, then joins it with what changed on other phones.
 
+## Changes
+
+To change a trip that already exists, an AI assistant does not need to write the whole
+file again. The app gives it an outline of the trip (Trips → Have an AI assistant change
+this trip), and the assistant answers with a short list of changes, which the app applies
+as one new version (Trips → Paste a trip):
+
+```json
+{"format": "travel-in-my-pocket/changes", "trip": "rome-in-three-days-2027-04-10", "changes": [
+  {"add": {"day": "2027-04-10", "stop": {"time": "13:00", "title": "Lunch in Monti", "type": "food"}}},
+  {"update": {"day": "2027-04-10", "stop": "colosseum", "set": {"time": "10:00", "tag": null}}},
+  {"update": {"day": "2027-04-10", "stop": "pantheon", "to": {"day": "2027-04-11"}}},
+  {"remove": {"day": "2027-04-11", "stop": "trevi"}},
+  {"setDay": {"day": "2027-04-11", "set": {"title": "Churches and squares"}}},
+  {"addDay": {"date": "2027-04-12", "city": "Rome", "stops": [{"title": "Last coffee"}]}},
+  {"removeDay": {"day": "2027-04-13"}}
+]}
+```
+
+Stops are named by their `id`, plans by theirs (`"plan": "…"` next to `"day"`). In
+`set`, `null` removes a field. A new stop goes in time order. The changes are applied
+in order, all or none: if one is wrong, the app lists which one and why, and changes
+nothing. The result is checked like any trip file. `trip` may be left out: the changes
+then apply to the trip open on the phone. The rules are in
+[`js/changes.js`](../js/changes.js).
+
 ## The old format
 
 Files in `travel-in-my-pocket/1` (TIMP 1.0 to 2.4) still load: the app converts them

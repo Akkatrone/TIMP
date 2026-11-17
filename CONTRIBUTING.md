@@ -55,6 +55,7 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/editor.js` | The form to add or change a stop. |
 | `js/ask.js` | A question with buttons in a dialog: confirmations and choices. Use it instead of `confirm()`. |
 | `js/edit.js` | Adds, changes, moves and removes stops, in time order. No DOM. |
+| `js/changes.js` | Changes written by an AI assistant: an outline of the trip to send, the changes format it answers with (`travel-in-my-pocket/changes`), and applying it as one version. No DOM. |
 | `js/gmaps.js` | Reads Google Maps links and shared text: name, address, position. No DOM. |
 | `js/geocode.js` | Finds the coordinates of an address: Google, then OpenStreetMap. |
 | `js/version.js` | Version ids, like Git's, and how two versions relate. No DOM. |

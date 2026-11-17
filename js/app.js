@@ -12,6 +12,7 @@ import { openStopEditor } from "./editor.js";
 import { ask } from "./ask.js";
 import { addStop, updateStop, removeStop } from "./edit.js";
 import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText } from "./trips.js";
+import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId } from "./version.js";
@@ -168,6 +169,19 @@ async function keepRecord(rec){
 
 const needsSaving = rec => !!rec && rec.exported !== rec.trip.version.id;
 
+// A list of changes written by an AI assistant (js/changes.js): applied to the trip it
+// names, or to the open one, as one new version, like an edit made on this phone.
+async function importChanges(data){
+  const rec = data.trip ? S.records.find(r => r.id === data.trip) : S.rec;
+  const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); window.scrollTo(0, 0); };
+  if(!rec) return fail([data.trip ? t("changesNoTrip", {id: data.trip}) : t("changesNoOpen")]);
+  const res = applyChanges(rec.trip, data);
+  if(!res.ok) return fail(res.errors);
+  S.importError = null;
+  if(S.rec !== rec) await openRecord(rec);
+  await applyEdit(() => ({trip: res.trip, marks: res.moves}), "changesApplied", res.counts);
+}
+
 async function importText(text, name){
   let data;
   try{ data = JSON.parse(text); }
@@ -176,6 +190,7 @@ async function importText(text, name){
     S.importError = {title: t("importFailed"), items: [why], all: [why]};
     render(); window.scrollTo(0, 0); return;
   }
+  if(isChanges(data)){ await importChanges(data); return; }
   data = upgrade(data);   // a file in the old format is converted, then checked
   const res = validateTrip(data);
   if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12), all: res.errors}; render(); window.scrollTo(0, 0); return; }
@@ -257,16 +272,16 @@ function showHistory(id){
 
 // Applies an edit to the open trip: a new version, kept on the phone, then offered
 // as a file. `change(trip)` returns {trip, marks?}: marks move ticks with a stop.
-async function applyEdit(change, message){
+async function applyEdit(change, message, extra = {}){
   const cur = S.rec.trip;
   const out = change(cur);
   const {trip: next, changed} = await saveEdit(versions, cur, out.trip);
   if(!changed) return;
-  if(out.marks){ S.state = moveMarks(S.state, out.marks); saveState(); }
+  if(out.marks && out.marks.length){ S.state = moveMarks(S.state, out.marks); saveState(); }
   const rec = {...S.rec, trip: next};
   await keepRecord(rec);
   render();
-  offerSave(rec, t(message, {v: shortId(next.version.id)}));
+  offerSave(rec, t(message, {v: shortId(next.version.id), ...extra}));
 }
 
 function currentPlace(){
@@ -422,15 +437,16 @@ function aiSection(folded){
     : `<section class="sec aihow"><h2>${esc(t("aiTitle"))}</h2>${body}</section>`;
 }
 
-// How to have the open trip changed by an AI assistant: the message carries the trip
-// itself, so nothing has to be saved and attached; the answer comes back through
-// Paste a trip, and the app treats it like any changed file (a new version, merged).
-const aiEditMessage = () => t("aiEditPrompt", {url: llmsUrl()}) + "\n\n" + fileText(S.rec.trip);
+// How to have the open trip changed by an AI assistant: the message carries how to
+// write changes and an outline of the trip (js/changes.js), so it needs no link; the
+// assistant answers with only the changes, which come back through Paste a trip as one
+// new version. Few tokens either way.
+const aiEditMessage = () => t("aiEditPrompt") + "\n\n" + changesBrief() + "\n\n" + outline(S.rec.trip);
 
 function aiEditSection(){
   return `<details class="aihow"><summary>${esc(t("aiEditTitle"))}</summary>
     <ol class="steps"><li>${esc(t("aiEdit1"))}</li><li>${esc(t("aiEdit2"))}</li><li>${esc(t("aiEdit3"))}</li></ol>
-    <pre class="prompt">${esc(t("aiEditPrompt", {url: llmsUrl()}))}\n${esc(t("aiEditMore", {t: S.rec.trip.title}))}</pre>
+    <pre class="prompt">${esc(t("aiEditPrompt"))}\n${esc(t("aiEditMore", {t: S.rec.trip.title}))}</pre>
     <div class="actions"><button type="button" class="btn small" data-act="copy-edit">${esc(t("copyEdit"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
   </details>`;
 }
@@ -784,7 +800,7 @@ function renderDay(i){
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
   }
   html += stopsHTML(d, pid, list);
-  html += `<p class="foot">${esc(t("footDay"))}</p>`;
+  html += `<p class="foot dayfoot">${esc(t("footDay"))}</p>`;
   return {html, wanted};
 }
 
@@ -1074,13 +1090,16 @@ async function readVersion(){
   }catch(e){}
 }
 
-// Android: a place shared from Google Maps opens the app as ?title=…&text=…&url=…
-// (see share_target in manifest.webmanifest). The form opens already filled in.
+// Android: what is shared to the app arrives as ?title=…&text=…&url=… (see share_target
+// in manifest.webmanifest). An AI assistant's answer with a trip or a list of changes
+// is loaded as if pasted; a place shared from Google Maps opens the stop form, filled in.
 function takeSharedPlace(){
   const q = new URLSearchParams(location.search);
   const parts = ["title", "text", "url"].map(k => q.get(k)).filter(Boolean);
   if(!parts.length) return;
   history.replaceState(null, "", location.pathname + location.hash);
+  const json = jsonIn(parts.join("\n"));
+  if(/"format"\s*:\s*"travel-in-my-pocket\//.test(json)){ importText(json, "shared.json"); return; }
   if(!trip()){ toast(t("shareNeedsTrip")); return; }
   // The Maps app often repeats the link inside the text: keep each piece once.
   const text = [...new Set(parts.join("\n").split("\n").map(s => s.trim()).filter(Boolean))].join("\n");
