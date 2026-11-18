@@ -127,10 +127,11 @@ Google Maps and the form opens already filled in; share an AI assistant's answer
 a day to learn that TIMP accepts files; removing the app and installing it again is
 immediate.)
 **iPhone:** iOS does not let web apps receive shared content, whatever the browser they
-were installed from. Copy instead, then tap **Paste** at the bottom of the app: it reads
-what you copied and does the same as the Share menu on Android. In Maps, Share → Copy;
-from an AI assistant, copy the answer. A `.json` file: save it in Files and use **Load a
-trip file**. (iPhone shows its own small Paste bubble first: tap it.)
+were installed from. Copy instead, then tap **Paste** at the bottom of the app and
+**Paste** in the sheet that opens: what you copied appears in the field, and
+**Continue** does the same as the Share menu on Android. In Maps, Share → Copy; from an
+AI assistant, copy the answer. A `.json` file: save it in Files and use **Load a trip
+file**. (iPhone shows its own small Paste bubble first: tap it.)
 
 When a position has to be looked up, the app asks Google (with a key that has the
 Geocoding API enabled, see below) or OpenStreetMap otherwise. It searches around the

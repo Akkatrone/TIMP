@@ -195,6 +195,9 @@ ol.stops{list-style:none;margin:0;padding:0}
 .nb{display:inline-block;font:600 .68rem var(--f-mono);border:1.5px solid var(--pf,var(--c,var(--line)));border-radius:999px;padding:0 6px;color:var(--ink)}
 /* held, it shows the stop on the map: no text selection or callout on the way */
 .nb[data-pin]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer}
+.stop .time{-webkit-user-select:none;user-select:none}
+/* while a number is held, nothing is selected and the phone shows no callout */
+.holding,.holding *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
 .mapsvg .badge.hit{animation:pinhit 1.4s ease-out 2}
 @keyframes pinhit{0%{stroke:var(--ink);stroke-width:5}100%{stroke-width:1.5}}
 
@@ -257,6 +260,9 @@ ol.stops{list-style:none;margin:0;padding:0}
 /* the popup's title, when Google shows it in its own header */
 .pop-h{font:600 14px/1.3 var(--f-body);color:#15181b;padding-top:4px}
 .gm-style .gm-style-iw-d{overflow-x:hidden!important}
+/* The card is always light: in the dark theme the page's color-scheme would draw
+   Google's close button white on white. */
+.gm-style .gm-style-iw-c,.gm-style .gm-style-iw-tc{color-scheme:light}
 .pin.gone{border-style:dashed;color:#5b636b;background:rgba(255,255,255,.9);box-shadow:none}
 /* a pin with the icon of its kind of place (js/livemap.js, pinNode) */
 .pin.typed{display:inline-flex;align-items:center;gap:3px;padding:4px 7px 4px 5px}
@@ -279,7 +285,8 @@ ol.stops{list-style:none;margin:0;padding:0}
 .pop{font:400 13px/1.4 var(--f-body);color:#15181b;display:grid;gap:4px;min-width:150px;max-width:230px}
 .pop b{font-weight:600;font-size:14px}
 .pop .when{color:#5b636b}
-.pop .links{display:flex;gap:12px;margin-top:2px}
+.pop .local{color:#5b636b;font-size:13px}
+.pop .links{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:2px}
 .pop a{color:#1d5ca8;text-decoration:none;font-weight:500}
 
 /* welcome and trips */
@@ -302,7 +309,7 @@ ol.stops{list-style:none;margin:0;padding:0}
 .badge-on{font:600 .68rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ok)}
 .field{display:grid;gap:6px}
 .field label{font-weight:600;font-size:.9rem}
-.field input{font:500 .9rem var(--f-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);width:100%;min-height:44px}
+.field input{font:500 1rem var(--f-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);width:100%;min-height:44px}
 .errbox{background:var(--err-bg);color:var(--err);border-radius:10px;padding:10px 12px;font-size:.88rem;display:grid;gap:6px}
 .errbox ul{margin:0;padding-left:1.1rem;font:500 .8rem/1.5 var(--f-mono);overflow-wrap:anywhere}
 .errbox .aihelp{margin:10px 0 8px;font-size:.88rem;color:var(--ink)}
@@ -342,14 +349,17 @@ body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 .sheet-head h2{font:700 1.2rem/1.2 var(--f-display);margin:0}
 .sheet-head .iconbtn{margin-left:0;font-size:1.4rem;line-height:1}
 .sheet .field{display:grid;gap:6px;min-width:0}
-.sheet .field.two{grid-template-columns:1.4fr 1fr;gap:10px}
+.sheet .field.two{grid-template-columns:1.4fr 1fr;gap:10px;align-items:start}
 .sheet label,.sheet .label{font-weight:600;font-size:.88rem}
-.sheet input,.sheet select,.sheet textarea{font:500 .95rem var(--f-body);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%;min-height:44px;min-width:0}
+/* 16px at least: an iPhone zooms the page into a smaller field and stays zoomed */
+.sheet input,.sheet select,.sheet textarea{font:500 1rem var(--f-body);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%;min-height:44px;min-width:0}
+/* lists drawn the same on every phone: same height as the fields, one arrow */
+.sheet select{-webkit-appearance:none;appearance:none;height:44px;padding-right:30px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%238a9199' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;background-size:14px;text-overflow:ellipsis}
 .sheet textarea{resize:vertical;min-height:72px;line-height:1.45}
 .sheet [data-time-mode]{justify-self:start;font-size:.82rem}
 /* the time: hour and minutes, two lists side by side */
 .sheet .clock{display:flex;align-items:center;gap:4px;min-width:0}
-.sheet .clock select{flex:1 1 0;padding:10px 4px 10px 8px;font:500 .95rem var(--f-mono);font-variant-numeric:tabular-nums}
+.sheet .clock select{flex:1 1 0;padding:10px 22px 10px 10px;background-position:right 5px center;background-size:12px;font:500 1rem var(--f-mono);font-variant-numeric:tabular-nums}
 .sheet .clock > span{font:600 1rem var(--f-mono);color:var(--muted)}
 .sheet #stop-src{resize:none;min-height:44px;line-height:1.4;overflow-y:auto}
 /* the map in the stop form, to put the pin by hand */

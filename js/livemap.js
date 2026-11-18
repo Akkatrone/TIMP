@@ -33,11 +33,15 @@ export function loadLeaflet(){
 whenGoogleRefuses(() => [...active].forEach(m => m.onGoogleRefused()));
 
 // Google shows the title in the popup's own header (`withTitle` false), Leaflet inside it.
+// The app may add to a pin: `local` (the name as on the sign, with its `lang`), `dir`
+// (directions from the stop before) and `review` ({site, url}, for a place to eat).
 function popupNode(pt, withTitle = true){
   const el = document.createElement("div");
   el.className = "pop";
   const rows = pt.items.map(it => `<span class="when">${it.n}${it.time ? " · " + esc(it.time) : ""}${it.title !== pt.name ? " · " + esc(it.title) : ""}</span>`).join("");
-  el.innerHTML = `${withTitle ? `<b>${esc(pt.name)}</b>` : ""}${rows}<span class="links"><a href="${esc(mapsUrl(pt.q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a><a href="${esc(dirUrl(pt.q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a></span>`;
+  const local = pt.local ? `<span class="local"${pt.lang ? ` lang="${esc(pt.lang)}"` : ""}>${esc(pt.local)}</span>` : "";
+  const review = pt.review ? `<a href="${esc(pt.review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: pt.review.site}))}">${esc(pt.review.site)}</a>` : "";
+  el.innerHTML = `${withTitle ? `<b>${esc(pt.name)}</b>` : ""}${local}${rows}<span class="links"><a href="${esc(mapsUrl(pt.q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a><a href="${esc(pt.dir || dirUrl(pt.q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>${review}</span>`;
   return el;
 }
 
@@ -161,6 +165,8 @@ async function drawGoogle(canvas, zones, color, key, dark, paint){
     ...(ColorScheme ? {colorScheme: dark ? ColorScheme.DARK : ColorScheme.LIGHT} : {})
   });
   const info = new InfoWindow({maxWidth: 260});
+  // A tap on the map, outside the card, closes it, as on the OpenStreetMap map.
+  map.addListener("click", () => info.close());
   const drawn = [], legs = [], pins = [], marks = [];
   // Google has no dashed lines: a dashed leg is an invisible line that repeats a short stroke.
   const solid = leg => ({strokeOpacity: leg.bridge ? 0.55 : 0.75, strokeWeight: leg.bridge ? 3 : 4, icons: []});

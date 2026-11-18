@@ -4,6 +4,23 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.6.1
+
+What a first try on real phones showed.
+
+- **Holding a number** no longer leaves words selected: while the finger is down
+  nothing on the page can be selected, and the phone's own menu does not open.
+- **Directions start from the stop before** (not skipped, with a place), in the list
+  and on the map. The first stop of a day starts from where the night before was
+  spent, or else from the last place of the day before. From where you are: Map.
+- **The cards on the map** show the name as on the sign and, for a place to eat, the
+  review link. On Google Maps a tap outside the card closes it, and its close button
+  shows in the dark theme too (the page's dark color-scheme drew it white on white).
+- **Paste** opens its sheet first; Paste in the sheet reads what was copied into the
+  field, where you see it before Continue. The phone asks for permission only then.
+- **iPhone:** the fields of the forms are 16 px, so the page no longer zooms in when
+  you type; lists look the same on every phone, and Day and Time line up.
+
 ## 3.6.0
 
 - **Hold a stop's number to see it on the map.** The map opens if it is closed, and the

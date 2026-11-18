@@ -520,8 +520,8 @@ function copyErrors(){
 }
 
 // A trip pasted as text, as a chat assistant gives it: no file to save on the phone.
-// `any`: opened by the Paste button when the phone would not hand over what was
-// copied, so it takes a place too (takeText decides).
+// `any`: opened by the Paste button at the bottom, so it takes a place too (takeText
+// decides what it is).
 let pasteDialog = null;
 function pasteTrip(any = false){
   if(!pasteDialog){
@@ -535,13 +535,13 @@ function pasteTrip(any = false){
   d.innerHTML = `<form class="sheet-form" novalidate>
     <div class="sheet-head"><h2 id="paste-title">${esc(t(any ? "paste" : "pasteTrip"))}</h2><button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button></div>
     <p class="foot">${esc(t(any ? "pasteAnyHelp" : "pasteHelp"))}</p>
-    <textarea id="paste-text" rows="8" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder='{"format": "travel-in-my-pocket/1", …}'></textarea>
+    <textarea id="paste-text" rows="8" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(any ? t("pasteAnyPh") : '{"format": "travel-in-my-pocket/2", …}')}"></textarea>
     <p class="errbox" data-error role="alert" hidden></p>
     <div class="sheet-actions">
       <button type="button" class="btn small" data-paste>${esc(t("paste"))}</button>
       <span class="grow"></span>
       <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
-      <button type="submit" class="btn primary">${esc(t("pasteLoad"))}</button>
+      <button type="submit" class="btn primary">${esc(t(any ? "pasteGo" : "pasteLoad"))}</button>
     </div>
   </form>`;
   const area = d.querySelector("#paste-text");
@@ -565,7 +565,8 @@ function pasteTrip(any = false){
     catch(err){ S.importError = {title: t("importFailed"), items: [String(err && err.message || err)]}; render(); }
   };
   d.showModal();
-  area.focus();
+  // From the Paste button the next tap is Paste in the sheet: no keyboard over it.
+  if(!any) area.focus();
 }
 
 function installSteps(){
@@ -753,7 +754,29 @@ function chip(kind, value){
   return `<span class="${kind === "travel" ? "tvchip" : "tychip"}"${hue} role="img" aria-label="${name}" title="${name}">${icon(value, kind === "travel" ? 16 : 15)}</span>`;
 }
 
+// Where the traveller comes from to reach the stop at `k` of a day's list: the stop
+// before it that has a place and is not skipped; for the first one, where the night
+// before was spent (the day before's stay, when it is a place), or else the last place
+// of the day before. "" when there is none: directions then start from the phone.
+function comingFrom(dayIndex, list, k, skipped){
+  for(let j = k - 1; j >= 0; j--){ if(skipped(j)) continue; const q = placeQuery(list[j]); if(q) return q; }
+  const prev = trip().days[dayIndex - 1];
+  if(!prev) return "";
+  if(prev.stay && typeof prev.stay === "object") return prev.stay.address || prev.stay.name;
+  const plan = prev.plans ? (prev.plans.find(p => p.id === S.state.plans[prev.date]) || prev.plans[0]) : null;
+  const before = plan ? plan.stops : prev.stops;
+  for(let j = before.length - 1; j >= 0; j--){
+    const key = stopKey(prev, plan ? plan.id : null, before[j], j);
+    if(!S.state.done[key] && S.state.skipped[key]) continue;
+    const q = placeQuery(before[j]);
+    if(q) return q;
+  }
+  return "";
+}
+
 function stopsHTML(day, planId, list, parts, paint){
+  const dayIndex = trip().days.indexOf(day);
+  const skippedAt = j => { const k = stopKey(day, planId, list[j], j); return !S.state.done[k] && !!S.state.skipped[k]; };
   return `<ol class="stops" style="--c:${cityVar(day.city)}">` + list.map((s, i) => {
     const id = stopKey(day, planId, s, i);
     const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id], open = isOpen(id);
@@ -778,7 +801,7 @@ function stopsHTML(day, planId, list, parts, paint){
     // Map and Directions, and for a place to eat the review site of that part of the world.
     const review = reviewSite(s, {city: day.city, timezone: trip().timezone, lang: getLang()});
     const links = (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
-      (q ? `<a class="maplink" href="${esc(dirUrl(q))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
+      (q ? `<a class="maplink" href="${esc(dirUrl(q, comingFrom(dayIndex, list, i, skippedAt)))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
       (review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)}</a>` : "");
     const booked = s.booking === "booked" ? `<span class="tag ok">${esc(t("booked"))}</span>` : "";
     const meta = isSkipped || links || booked ? `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}</div>` : "";
@@ -818,6 +841,14 @@ function renderDay(i){
   const anyText = list.some(s => s.text);
   const stay = stayOf(d.stay);
   const zs = zonesOf(list, isSkipped);
+  // What the cards on the map add to a pin: the name as on the sign, directions from
+  // the stop before, and the review site for a place to eat.
+  for(const z of zs) for(const pt of z.pts){
+    const k = pt.items[0].idx, s = list[k];
+    if(pt.q) pt.dir = dirUrl(pt.q, comingFrom(i, list, k, isSkipped));
+    pt.review = reviewSite(s, {city: d.city, timezone: tr.timezone, lang});
+    if(s.local){ pt.local = s.local; pt.lang = localLang(s.local, regionOf(s, tr.timezone)); }
+  }
   const view = effectiveView();
   // Sunrise and sunset where the day is (its first stop with a position), and so the
   // part of the day of each stop: it shades the maps and marks the stops after dark.
@@ -1076,19 +1107,33 @@ $app.addEventListener("click", e => {
 
 // Holding a stop's number shows it on the day's map: the map opens if it is closed and
 // the pin comes to the middle, with its card. Only a hold: a tap or a scroll that
-// starts on the number does nothing.
+// starts on the number does nothing. While the finger is down nothing on the page can
+// be selected: a long press would otherwise select the words near the number, and
+// leave them selected once the map is open.
 let hold = null;
-const endHold = () => { if(hold){ clearTimeout(hold.timer); hold = null; } };
+const $root = document.documentElement;
+const clearSelection = () => { try{ const sel = getSelection(); if(sel && sel.rangeCount) sel.removeAllRanges(); }catch(e){} };
+function endHold(){
+  if(!hold) return;
+  clearTimeout(hold.timer);
+  const fired = hold.fired;
+  hold = null;
+  // The phone may still select or open its menu as the finger lifts: wait a moment.
+  setTimeout(() => { $root.classList.remove("holding"); if(fired) clearSelection(); }, fired ? 400 : 0);
+}
 $app.addEventListener("pointerdown", e => {
   const nb = e.target.closest("[data-pin]");
   endHold();
   if(!nb || (e.pointerType === "mouse" && e.button !== 0)) return;
-  hold = {x: e.clientX, y: e.clientY, timer: setTimeout(() => { hold = null; showOnMap(+nb.dataset.pin); }, 450)};
+  $root.classList.add("holding");
+  hold = {x: e.clientX, y: e.clientY, fired: false};
+  hold.timer = setTimeout(() => { if(!hold) return; hold.fired = true; clearSelection(); showOnMap(+nb.dataset.pin); }, 450);
 });
-$app.addEventListener("pointermove", e => { if(hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 10) endHold(); });
-for(const type of ["pointerup", "pointercancel"]) $app.addEventListener(type, endHold);
-// The phone's own menu for a long press (copy, select) would open on top of it.
-$app.addEventListener("contextmenu", e => { if(e.target.closest("[data-pin]")) e.preventDefault(); });
+document.addEventListener("pointermove", e => { if(hold && !hold.fired && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 10) endHold(); });
+for(const type of ["pointerup", "pointercancel"]) document.addEventListener(type, endHold);
+// The phone's own menu for a long press (copy, select) would open on top of the map.
+document.addEventListener("contextmenu", e => { if($root.classList.contains("holding")) e.preventDefault(); });
+document.addEventListener("selectionchange", () => { if(hold && hold.fired) clearSelection(); });
 
 function showOnMap(idx){
   try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
@@ -1251,14 +1296,11 @@ async function takeText(text, name){
   newStop([...new Set(String(text).split("\n").map(s => s.trim()).filter(Boolean))].join("\n"));
 }
 
-// The Paste button: what was copied, in one tap (iPhone shows its own Paste bubble
-// first). If the phone will not hand it over, or nothing was copied, a field to paste
-// it by hand.
-async function pasteAnything(){
-  let text = "";
-  try{ text = await navigator.clipboard.readText(); }catch(e){}
-  if(text && text.trim()) await takeText(text, "pasted.json");
-  else pasteTrip(true);
+// The Paste button: the sheet first, then Paste in it reads what was copied into the
+// field, where the traveller sees it before going on. The phone asks for permission
+// (or shows its own Paste bubble) only then, on a tap meant for it.
+function pasteAnything(){
+  pasteTrip(true);
 }
 
 /* ---------- start ---------- */

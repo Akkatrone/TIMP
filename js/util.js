@@ -13,8 +13,11 @@ export function mapsUrl(query){
   return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query);
 }
 
-export function dirUrl(query){
-  return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(query) + "&travelmode=transit";
+// Directions to a place: from `from` when given (the stop before), otherwise from where
+// the phone is.
+export function dirUrl(query, from){
+  return "https://www.google.com/maps/dir/?api=1" + (from ? "&origin=" + encodeURIComponent(from) : "") +
+    "&destination=" + encodeURIComponent(query) + "&travelmode=transit";
 }
 
 export function dateParts(iso, lang){

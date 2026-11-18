@@ -236,6 +236,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     if(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded") === "true";`)) await click("[data-map]");
     const press = (ms) => run(`const nb = document.querySelector('.nb[data-pin="2"]'); const r = nb.getBoundingClientRect(); const o = {bubbles: true, clientX: r.x + 4, clientY: r.y + 4, pointerType: "touch"};
       nb.dispatchEvent(new PointerEvent("pointerdown", o)); await new Promise(res => setTimeout(res, ${ms})); nb.dispatchEvent(new PointerEvent("pointerup", o)); await new Promise(res => setTimeout(res, 100));`);
+    // While the finger is down nothing can be selected; after a tap, all as before.
+    assert.equal(await run(`const nb = document.querySelector('.nb[data-pin="2"]'); const r = nb.getBoundingClientRect(); nb.dispatchEvent(new PointerEvent("pointerdown", {bubbles: true, clientX: r.x + 4, clientY: r.y + 4, pointerType: "touch"}));
+      const on = document.documentElement.classList.contains("holding"); document.dispatchEvent(new PointerEvent("pointerup", {bubbles: true, pointerType: "touch"})); await new Promise(res => setTimeout(res, 50));
+      return on && !document.documentElement.classList.contains("holding");`), true);
     await press(100);
     assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded");`), "false", "a tap leaves the map closed");
     await press(700);
@@ -250,6 +254,16 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return [...document.querySelectorAll(".mapsvg .badge.hit")].map(b => b.dataset.idx).join();`), "2");
     await click('[data-view="live"]');
     await click("[data-map]");
+  });
+
+  await step("Directions start from the stop before; the first of a day from where the night was spent", async () => {
+    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200));`);
+    const dir = (title) => run(`const li = [...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent.includes(${JSON.stringify(title)})); const a = [...li.querySelectorAll(".maplink")].find(a => a.textContent.startsWith("Directions")); return new URL(a.href).searchParams.get("origin");`);
+    assert.equal(await dir("Praça do Comércio"), null, "the first stop of the trip: from where the phone is");
+    assert.equal(await dir("Lisbon Cathedral"), "Praça do Comércio Lisboa");
+    await run(`location.hash = "#day-2"; await new Promise(r => setTimeout(r, 200));`);
+    assert.equal(await dir("Mosteiro dos Jerónimos"), "Baixa, Lisboa", "the hotel of the night before");
+    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200));`);
   });
 
   await step("the dark theme can be chosen, survives a reload, and darkens the map", async () => {
@@ -279,7 +293,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   // Invented place link, in the shape Google Maps gives on a computer: name, address, position.
   const PLACE = "https://www.google.com/maps/place/Pastelaria+Exemplo,+Rua+Augusta+10,+Lisboa/@38.7101,-9.1375,18z/data=!4m6!3m5!1s0x0:0x0!8m2!3d38.71012!4d-9.13751";
   const fill = (sel, value) => run(`const el = document.querySelector(${JSON.stringify(sel)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event("change", {bubbles: true}));`);
-  const submit = () => run(`document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+  const submit = () => run(`document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
   const stopTitles = () => run(`return [...document.querySelectorAll(".stop h3")].map(h => h.textContent);`);
   const sendFile = trip => run(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(trip))}], "from-a-friend.json")); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change")); await new Promise(r => setTimeout(r, 600));`);
   const answer = id => run(`document.querySelector('dialog.ask [data-answer="${id}"]').click(); await new Promise(r => setTimeout(r, 600));`);
@@ -651,24 +665,35 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), true, "still compact scrolling up");
     await scrollBy(0);
     assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), false, "its word back at the top");
-    // A place copied from Google Maps: the stop form, filled in.
-    await clip("Pastelaria Exemplo\n" + PLACE);
+    // Paste opens the sheet first: nothing is read until Paste in it is tapped.
+    await run(`window.__reads = 0; const real = navigator.clipboard.readText; navigator.clipboard.readText = async () => { window.__reads++; return "x"; };`);
     await run(`document.querySelector(".fab-paste").click();`);
+    await until("the paste sheet", `document.querySelector("dialog.sheet[open] #paste-text")`);
+    assert.equal(await run(`return window.__reads;`), 0, "nothing read on opening");
+    assert.equal(await text("#paste-title"), "Paste");
+    assert.equal(await run(`return document.activeElement && document.activeElement.id;`) === "paste-text", false, "no keyboard over the Paste button");
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    const pasteThenGo = value => run(`document.querySelector(".fab-paste").click(); await new Promise(r => setTimeout(r, 100));
+      navigator.clipboard.readText = async () => ${JSON.stringify(value)};
+      document.querySelector("dialog.sheet[open] [data-paste]").click(); await new Promise(r => setTimeout(r, 100));
+      window.__shown = document.getElementById("paste-text").value;
+      document.getElementById("paste-text").closest("form").requestSubmit(); await new Promise(r => setTimeout(r, 600));`);
+    // A place copied from Google Maps: shown in the field, then the stop form, filled in.
+    await pasteThenGo("Pastelaria Exemplo\n" + PLACE);
+    assert.equal(await run(`return window.__shown;`), "Pastelaria Exemplo\n" + PLACE, "what was copied is in the field first");
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-title")`);
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
     // An assistant's answer with changes: applied as a new version.
     const before = await versionOnPhone();
     const changes = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "se", set: {tag: "Pasted"}}}]};
-    await clip("Sure:\n```json\n" + JSON.stringify(changes) + "\n```");
-    await run(`document.querySelector(".fab-paste").click(); await new Promise(r => setTimeout(r, 600));`);
+    await pasteThenGo("Sure:\n```json\n" + JSON.stringify(changes) + "\n```");
     assert.deepEqual((await versionOnPhone()).parents, [before.id]);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Changes applied: 0 added, 1 changed/);
-    // The phone refuses the clipboard: a field to paste by hand, which takes a place too.
+    // The phone refuses the clipboard: the field takes the focus, to paste by hand.
     await clip(null);
-    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200)); document.querySelector(".fab-paste").click();`);
-    await until("the paste field", `document.querySelector("dialog.sheet[open] #paste-text")`);
-    assert.equal(await text("#paste-title"), "Paste");
+    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200)); document.querySelector(".fab-paste").click(); await new Promise(r => setTimeout(r, 100)); document.querySelector("dialog.sheet[open] [data-paste]").click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(await run(`return document.activeElement.id;`), "paste-text");
     await run(`document.querySelector("#paste-text").value = ${JSON.stringify(PLACE)}; document.querySelector("#paste-text").closest("form").requestSubmit();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-title")`);
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
@@ -684,7 +709,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-day-edit]").click();`);
     await until("the day form", `document.querySelector("dialog.sheet[open] #day-title")`);
     assert.equal(await run(`return document.getElementById("day-city").value;`), "Lisboa");
-    await run(`document.getElementById("day-title").value = "Belém slowly"; document.getElementById("day-notes").value = "Pastéis before ten\\n\\nTram 15 from Praça da Figueira"; document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+    await run(`document.getElementById("day-title").value = "Belém slowly"; document.getElementById("day-notes").value = "Pastéis before ten\\n\\nTram 15 from Praça da Figueira"; document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
     assert.equal(await text(".headrow h1"), "Belém slowly");
     assert.deepEqual(await run(`return [...document.querySelectorAll(".remind div")].map(d => d.textContent);`), ["Pastéis before ten", "Tram 15 from Praça da Figueira"]);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Day saved · version [0-9a-f]{7}/);
@@ -725,6 +750,15 @@ await withApp(async ({run, until, reload, blocked}) => {
     await submit();
     assert.deepEqual(await run(`return [...${stop("Pastéis de Belém")}.querySelectorAll(".notice")].map(n => n.textContent);`), ["!Booking required: not done yet", "!Closed on Saturday"]);
     assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".local").textContent;`), "Antiga Confeitaria de Belém");
+    // On the map too: the card of the pin has the name on the sign and the review link.
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    await until("the pins", `document.querySelector('.live .pin[aria-label="Pastéis de Belém"]')`);
+    await run(`document.querySelector('.live .pin[aria-label="Pastéis de Belém"]').click();`);
+    await until("the card", `document.querySelector(".live .leaflet-popup .local")`);
+    assert.equal(await run(`return document.querySelector(".live .leaflet-popup .local").textContent;`), "Antiga Confeitaria de Belém");
+    assert.ok(await run(`return !!document.querySelector('.live .leaflet-popup a[aria-label="Reviews on TheFork"]');`));
+    assert.equal(await run(`return new URL([...document.querySelectorAll(".live .leaflet-popup a")].find(a => a.textContent.startsWith("Directions")).href).searchParams.get("origin");`), "Mosteiro dos Jerónimos");
+    await click("[data-map]");
     // Booked: the warning goes, Booked shows; the closing day stays until the stop moves.
     await run(`document.querySelector('[data-edit="pasteis"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-local")`);
