@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.8.1
+
+Buttons that feel like buttons.
+
+- **No box around a tapped button**: the phone's own tap highlight, a rectangle that
+  ignored the round shape of the buttons, is gone everywhere. A pressed button gives
+  way a little instead; links and rows fade while pressed.
+- **No ring after a tap**: the app puts the focus back on the button it draws again,
+  or on the first button of a dialog, for keyboards and screen readers. After a tap
+  that showed a ring wider than the button, on iPhone above all. Rings now show only
+  after a key.
+- Text on buttons is not selected by a long press, and hover effects stay with the
+  mouse: on a phone they stuck after the tap.
+
 ## 3.8.0
 
 What the trip costs you, and what you keep for yourself.

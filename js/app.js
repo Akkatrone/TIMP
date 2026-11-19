@@ -58,6 +58,14 @@ const $strip = document.querySelector(".strip");
 const $days = document.getElementById("days");
 // The element the page scrolls in: <body> on Android (js/theme.js), the window elsewhere.
 const scroller = document.documentElement.classList.contains("own-scroll") ? document.body : null;
+
+// Focus rings are for the keyboard. After a tap the app often puts the focus back on
+// the button it has just drawn again, or on the first button of a dialog: the browser
+// then shows a ring around a button that was only touched. The page says how the last
+// interaction came, and the CSS shows rings only after a key.
+for(const [type, kind] of [["pointerdown", "pointer"], ["keydown", "key"]]){
+  addEventListener(type, () => { if(document.documentElement.dataset.input !== kind) document.documentElement.dataset.input = kind; }, true);
+}
 const scrollTop = () => scroller ? scroller.scrollTop : window.scrollY;
 const scrollToY = y => { if(scroller) scroller.scrollTop = y; else window.scrollTo(0, y); };
 const $file = document.getElementById("file");

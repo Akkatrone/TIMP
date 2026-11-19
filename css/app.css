@@ -50,6 +50,15 @@ img{max-width:100%}
 a{color:var(--link)}
 button{font:inherit}
 :focus-visible{outline:2px solid var(--link);outline-offset:2px;border-radius:6px}
+/* Taps: no grey box from the browser (it ignores the button's round shape), no ring
+   around what the app focuses again after a tap (js/app.js sets data-input), no text
+   selected on a button. A button pressed gives way a little instead. */
+html{-webkit-tap-highlight-color:transparent}
+:root[data-input="pointer"] :is(button,a,summary,[role="button"],[tabindex]):focus-visible{outline:none}
+button,.btn,.seg,summary,.dchip{-webkit-user-select:none;user-select:none}
+:is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act):active{transform:scale(.96)}
+:is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act){transition:transform .1s,background-color .15s,color .15s}
+:is(.tap,.costbtn,.linkbtn,.maplink,.costs > summary):active{opacity:.6}
 .gutter{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* day strip */
@@ -74,7 +83,7 @@ html,*{scrollbar-width:none}
 html.own-scroll{height:100%;overflow:hidden}
 html.own-scroll body{height:100%;overflow-x:hidden;overflow-y:auto;scroll-padding-top:env(safe-area-inset-top,0px)}
 html.own-scroll:has(dialog[open]) body{overflow:hidden}
-.dchip{flex:0 0 auto;min-width:46px;padding:5px 8px 9px;border:1px solid var(--line);border-color:color-mix(in srgb,var(--line) 80%,transparent);background:var(--surface);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:12px;text-align:center;text-decoration:none;color:var(--ink);display:grid;gap:0;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:background-color .15s,border-color .15s,transform .1s;-webkit-tap-highlight-color:transparent}
+.dchip{flex:0 0 auto;min-width:46px;padding:5px 8px 9px;border:1px solid var(--line);border-color:color-mix(in srgb,var(--line) 80%,transparent);background:var(--surface);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:12px;text-align:center;text-decoration:none;color:var(--ink);display:grid;gap:0;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:background-color .15s,border-color .15s,transform .1s}
 .dchip:active{transform:scale(.96)}
 .dchip::after{content:"";position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:var(--c,var(--muted))}
 .dchip .n{font:700 1.05rem/1.1 var(--f-display);font-variant-numeric:tabular-nums}
@@ -98,7 +107,6 @@ main.gutter{padding-block:16px 56px;display:grid;gap:18px}
 .band{height:7px;background:var(--c)}
 .neighbors{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
 .neighbors a,.neighbors span{padding:9px 14px;font:500 .8rem var(--f-body);color:var(--muted);text-decoration:none;min-width:0}
-.neighbors a:hover{color:var(--ink)}
 .neighbors .next{text-align:right;border-left:1px solid var(--line)}
 .neighbors b{color:var(--ink);font-weight:600}
 h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
@@ -130,7 +138,6 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .meta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:7px}
 .tag{font:600 .7rem var(--f-body);letter-spacing:.02em;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn)}
 .maplink{font:500 .8rem var(--f-body);text-decoration:none}
-.maplink:hover{text-decoration:underline}
 .tick{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;color:transparent;padding:0}
 .tick svg{width:15px;height:15px}
 .stop.done .tick{background:var(--ok);border-color:var(--ok);color:#fff}
@@ -152,12 +159,12 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .side{display:grid;justify-items:center;align-content:start;gap:8px;position:relative}
 .more{width:30px;height:30px;border-radius:50%;border:0;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
 .more svg{width:16px;height:16px}
-.more:hover,.more[aria-expanded="true"]{background:var(--line);color:var(--ink)}
+.more[aria-expanded="true"]{background:var(--line);color:var(--ink)}
 .menu{position:absolute;top:72px;right:0;z-index:6;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.28);display:grid;min-width:160px;padding:4px}
 .menu.up{top:auto;bottom:72px}
 .menu[hidden]{display:none}
 .menu button{border:0;background:none;color:var(--ink);font:500 .92rem var(--f-body);text-align:left;padding:11px 12px;border-radius:8px;cursor:pointer;min-height:44px}
-.menu button:hover,.menu button:focus-visible{background:var(--bg)}
+.menu button:focus-visible{background:var(--bg)}
 .tag.off{background:var(--line);color:var(--muted)}
 .tag.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
 /* the name as on the sign, under the title */
@@ -216,7 +223,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .stop.skipped .time .cost{text-decoration:line-through}
 .stop.has-cost .chev{display:block}
 .costrow{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:grid;gap:4px}
-.costbtn{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;width:100%;border:0;background:none;color:var(--ink);padding:2px 0;text-align:left;font:inherit;cursor:pointer;min-height:32px;-webkit-tap-highlight-color:transparent}
+.costbtn{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;width:100%;border:0;background:none;color:var(--ink);padding:2px 0;text-align:left;font:inherit;cursor:pointer;min-height:32px}
 span.costbtn{cursor:auto}
 .costbtn .l{font:500 .66rem var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .costbtn .y{font:600 .95rem var(--f-mono);font-variant-numeric:tabular-nums}
@@ -357,9 +364,9 @@ span.costbtn{cursor:auto}
 /* bottom right: Paste (what was copied: a place, a trip, changes) and + (a stop on the
    day on screen). + is the one coloured button, in both themes. */
 .fabs{position:fixed;right:calc(max(16px,env(safe-area-inset-right,0px)));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:15;display:flex;align-items:center;gap:10px}
-.fab{width:52px;height:52px;border-radius:50%;border:0;background:var(--accent);color:var(--bg);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px -2px rgba(0,0,0,.35);padding:0;-webkit-tap-highlight-color:transparent}
+.fab{width:52px;height:52px;border-radius:50%;border:0;background:var(--accent);color:var(--bg);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px -2px rgba(0,0,0,.35);padding:0}
 .fab svg{width:24px;height:24px}
-.fab-paste{display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 16px 0 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .88rem var(--f-body);cursor:pointer;box-shadow:0 3px 12px -2px rgba(0,0,0,.22);-webkit-tap-highlight-color:transparent}
+.fab-paste{display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 16px 0 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .88rem var(--f-body);cursor:pointer;box-shadow:0 3px 12px -2px rgba(0,0,0,.22)}
 .fab-paste svg{width:18px;height:18px;flex:none}
 .fab-paste span{max-width:8em;overflow:hidden;white-space:nowrap;transition:max-width .2s,opacity .15s}
 /* while the page scrolls down: only the icon, a circle */
@@ -412,7 +419,7 @@ html:has(dialog[open]){overflow:hidden}
 .sheet-actions .grow{flex:1 1 auto}
 /* what the trip costs: folded at the end of Info */
 .costs{margin-top:8px}
-.costs > summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--card);border-radius:20px;padding:14px 16px;min-height:52px;-webkit-tap-highlight-color:transparent}
+.costs > summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--card);border-radius:20px;padding:14px 16px;min-height:52px}
 .costs > summary::-webkit-details-marker{display:none}
 .costs > summary .h{font:500 .72rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .costs > summary .tot{margin-left:auto;font:700 1.05rem var(--f-mono);font-variant-numeric:tabular-nums}
@@ -525,7 +532,15 @@ button.crow{cursor:pointer}
 #toast:not(:has(button)){padding-right:16px}
 #toast .act{border:0;background:var(--bg);color:var(--ink);font:600 .85rem var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer;flex:0 0 auto;min-height:36px;white-space:nowrap}
 #toast .x{border:0;background:none;color:var(--bg);opacity:.7;font:400 1.3rem/1 var(--f-body);width:32px;height:32px;border-radius:50%;cursor:pointer;flex:0 0 auto;padding:0}
-#toast .x:hover{opacity:1}
+
+/* Hover, only with a mouse: on a phone it would stay on after the tap. */
+@media (hover:hover){
+  .neighbors a:hover{color:var(--ink)}
+  .maplink:hover{text-decoration:underline}
+  .more:hover{background:var(--line);color:var(--ink)}
+  .menu button:hover{background:var(--bg)}
+  #toast .x:hover{opacity:1}
+}
 
 @media (max-width:380px){ .stop{grid-template-columns:3.4rem 1fr auto;gap:10px;padding-left:12px} .rows > div{grid-template-columns:1fr} }
-@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} .costs > summary .chev,.chev,.fab-paste,.fab-paste span{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }
+@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} :is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act){transition:none} .costs > summary .chev,.chev,.fab-paste,.fab-paste span{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }
