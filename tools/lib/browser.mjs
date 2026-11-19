@@ -15,14 +15,28 @@ import { ROOT } from "./app-files.mjs";
 const PHONE = {width: 375, height: 812, deviceScaleFactor: 2, mobile: true};
 const TYPES = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json", ".svg": "image/svg+xml", ".png": "image/png"};
 
-function serve(){
+// share: the address of a sharing service, put in js/config.js and in the page's
+// Content-Security-Policy the way tools/build.mjs does it; "self" for `api`, a fake of
+// the service answering /v1/ on this very server: (method, path, body) → {status, body}.
+function serve({share, api} = {}){
   const server = createServer(async (req, res) => {
+    if(api && req.url.startsWith("/v1/")){
+      let raw = "";
+      for await(const chunk of req) raw += chunk;
+      const out = await api(req.method, new URL(req.url, "http://x").pathname, raw ? JSON.parse(raw) : {}, req.headers);
+      res.writeHead(out.status, {"content-type": "application/json"}).end(JSON.stringify(out.body));
+      return;
+    }
+    share = share === "self" ? "" : share;
+    const address = share || (api ? `http://${req.headers.host}` : "");
     const path = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname)).replace(/^([/\\])+/, "");
     const file = join(ROOT, path === "" || path.endsWith("/") ? path + "index.html" : path);
     // Never serve the folders that hold real trips.
     if(!file.startsWith(ROOT) || /^(private|originale)([/\\]|$)/.test(path)){ res.writeHead(404).end(); return; }
     try{
-      const data = await readFile(file);
+      let data = await readFile(file);
+      if(address && path === "js/config.js") data = Buffer.from(data.toString("utf8").replace('export const SHARE_URL = "";', `export const SHARE_URL = ${JSON.stringify(address)};`));
+      if(share && file.endsWith("index.html")) data = Buffer.from(data.toString("utf8").replace("connect-src 'self'", `connect-src 'self' ${share}`));
       res.writeHead(200, {"content-type": TYPES[extname(file)] || "application/octet-stream"}).end(data);
     }catch(e){
       res.writeHead(404).end();
@@ -64,9 +78,11 @@ async function connect(wsUrl){
   let next = 0;
   const waiting = new Map();
   const events = [];   // what the page reports on its own, such as blocked loads
+  const listeners = new Map();   // DevTools events a test listens to (on)
   ws.onmessage = event => {
     const msg = JSON.parse(event.data);
     if(msg.method === "Log.entryAdded") events.push(msg.params.entry);
+    if(msg.method && listeners.has(msg.method)) listeners.get(msg.method)(msg.params);
     const w = waiting.get(msg.id);
     if(!w) return;
     waiting.delete(msg.id);
@@ -79,7 +95,8 @@ async function connect(wsUrl){
   });
   const {targetId} = await send("Target.createTarget", {url: "about:blank"});
   const {sessionId} = await send("Target.attachToTarget", {targetId, flatten: true});
-  return {page: (method, params) => send(method, params, sessionId), close: () => ws.close(), events};
+  return {page: (method, params) => send(method, params, sessionId), close: () => ws.close(), events,
+    on: (method, fn) => listeners.set(method, fn)};
 }
 
 /**
@@ -92,14 +109,17 @@ async function connect(wsUrl){
  *   capture()             returns a PNG of the screen as a Buffer
  *   blocked()             what the Content-Security-Policy blocked so far
  *   page(method, params)  any DevTools Protocol command, for what the helpers do not cover
+ *   on(event, fn)         listens to a DevTools Protocol event (one listener per event)
+ * Options: {share, api} a sharing service for the app (see serve); {host} the host the
+ *   page is opened on ("localhost" for passkeys: they refuse an IP address).
  */
-export async function withApp(work){
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}/`;
+export async function withApp(work, {share = "", api = null, host = "127.0.0.1"} = {}){
+  const server = await serve({share, api});
+  const base = `http://${host}:${server.address().port}/`;
   const profile = await mkdtemp(join(tmpdir(), "timp-browser-"));
   const {chrome, wsUrl} = await launch(profile);
   try{
-    const {page, close, events} = await connect(wsUrl);
+    const {page, close, events, on} = await connect(wsUrl);
     const blocked = () => events.filter(e => /Content Security Policy/i.test(e.text || "")).map(e => e.text);
     const run = async code => {
       const r = await page("Runtime.evaluate", {expression: `(async () => { ${code} })()`, awaitPromise: true, returnByValue: true});
@@ -128,7 +148,7 @@ export async function withApp(work){
     await page("Page.navigate", {url: base});
     await until("the welcome screen", `document.querySelector('[data-act="demo"]')`);
 
-    await work({run, until, theme, reload, capture, base, blocked, page});
+    await work({run, until, theme, reload, capture, base, blocked, page, on});
     close();
   }finally{
     chrome.kill();

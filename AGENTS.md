@@ -72,6 +72,8 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
 | `js/money.js` | Amounts as people type them, in their currency, and what they make in another at the rate of their own day. No DOM, no network. |
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
+| `js/share.js` | The app's side of the sharing service: the account kept on the phone, passkeys (WebAuthn), calls checked against `js/share-api.js`. Nothing runs without `SHARE_URL` in `js/config.js`. |
+| `js/account.js` | The form to make an account: invitation code, name, passkey. |
 | `js/share-api.js` | The contract with the sharing service (accounts, sync, sharing): every route, what it takes and answers; checks and an OpenAPI page made from it. Inside a version only additions: `contract/v1.lock.json` is the released contract and `node tools/check-contract.mjs` fails on a change that would break it (`--fix` records additions). No DOM. |
 | `js/private.js` | Private expenses: in the file and on the phone, never in a version or a merge; what to do with those a loaded file brings. No DOM. |
 | `js/places.js` | What the app works out about a place: its part of the world, its review site (Tabelog, Naver, Yelp, TheFork), closing days, the language of its local name. No DOM. |
@@ -111,7 +113,10 @@ seems to need it: say so instead.
    and a Google Maps link pasted or shared goes to the link resolver (`worker/`),
    which keeps nothing. And one for costs in another currency: the month whose
    exchange rates are needed goes to Frankfurter, always asking for every currency
-   against the euro (`js/rates.js`), so no amount, place or currency of the trip.
+   against the euro (`js/rates.js`), so no amount, place or currency of the trip. And
+   an account, only on a copy built with a sharing service (`--share`) and only if the
+   traveller makes one: its name and the public half of its passkey go to that
+   service. Trips go there only when sync arrives, and only for those who sign in.
 2. **It works offline.** Everything except the interactive map, after one online visit.
 3. **Anyone can host it.** Static files only; running it needs no build and no
    installed dependency. The link resolver is optional: without it the app loses only

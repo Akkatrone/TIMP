@@ -1049,9 +1049,86 @@ await withApp(async ({run, until, reload, blocked}) => {
   await step("the Content-Security-Policy blocked nothing the app needs", async () => {
     assert.deepEqual(blocked(), []);
   });
-}).then(() => {
+}).then(() => withApp(accountSteps, {api: fakeService(), host: "localhost"})).then(() => {
   console.log(`e2e: OK (${passed} checks)`);
 }).catch(e => {
   console.error("e2e: FAILED");
   process.exit(1);
 });
+
+// The sharing service, faked: what js/share-api.js promises, and checks of what the
+// browser sends. The real one is tested in its own repository.
+function fakeService(){
+  const b64 = s => Buffer.from(s).toString("base64url");
+  const users = new Map(), keys = new Map(), codes = new Set(["TEST-CODE-0000-0001"]), sessions = new Map(), challenges = new Map();
+  let n = 0;
+  const client = cred => JSON.parse(Buffer.from(cred.response.clientDataJSON, "base64url").toString());
+  return async (method, path, body, headers) => {
+    const ok = b => ({status: 200, body: b}), no = (status, error) => ({status, body: {error}});
+    const user = handle => ({id: "u-" + handle, handle, name: "", since: "2026-11-19T00:00:00.000Z"});
+    const session = handle => { const token = "tok-" + ++n; sessions.set(token, handle); return ok({token, user: user(handle)}); };
+    if(method === "POST" && path === "/v1/auth/register/options"){
+      if(!codes.has(body.code)) return no(403, "code: not valid, expired or used");
+      const id = "c" + ++n, challenge = b64("challenge-" + id);
+      challenges.set(id, {challenge, handle: body.handle});
+      return ok({challengeId: id, publicKey: {challenge, rp: {id: "localhost", name: "TIMP"}, user: {id: b64("u-" + body.handle), name: body.handle, displayName: body.handle},
+        pubKeyCredParams: [{type: "public-key", alg: -7}], authenticatorSelection: {residentKey: "required", userVerification: "required"}, attestation: "none"}});
+    }
+    if(method === "POST" && path === "/v1/auth/register"){
+      const c = challenges.get(body.challengeId), cred = body.credential, cd = client(cred);
+      // What the real service needs: the challenge signed for this page, the key apart.
+      if(!c || cd.type !== "webauthn.create" || cd.challenge !== c.challenge || !cd.origin.startsWith("http://localhost:")) return no(400, "passkey: could not be checked");
+      if(!cred.response.publicKey || !cred.response.authenticatorData || cred.response.publicKeyAlgorithm !== -7) return no(400, "passkey: could not be checked");
+      codes.clear();
+      users.set(c.handle, true);
+      keys.set(cred.id, c.handle);
+      return session(c.handle);
+    }
+    if(method === "POST" && path === "/v1/auth/login/options"){
+      const id = "c" + ++n, challenge = b64("challenge-" + id);
+      challenges.set(id, {challenge});
+      return ok({challengeId: id, publicKey: {challenge, rpId: "localhost", userVerification: "required"}});
+    }
+    if(method === "POST" && path === "/v1/auth/login"){
+      const c = challenges.get(body.challengeId), cred = body.credential, cd = client(cred);
+      if(!c || cd.type !== "webauthn.get" || cd.challenge !== c.challenge || !keys.has(cred.id) || !cred.response.signature) return no(401, "sign-in: failed");
+      return session(keys.get(cred.id));
+    }
+    if(method === "POST" && path === "/v1/auth/logout"){
+      sessions.delete(String(headers.authorization || "").replace("Bearer ", ""));
+      return ok({ok: true});
+    }
+    return no(404, "not found");
+  };
+}
+
+async function accountSteps({run, until, reload, page, blocked}){
+  const text = sel => run(`const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent : null;`);
+  await step("an account: made with an invitation code and a passkey, kept on the phone, signed out and in again", async () => {
+    // A passkey as a phone makes it: kept on the device, opened with the fingerprint.
+    await page("WebAuthn.enable", {enableUI: false});
+    await page("WebAuthn.addVirtualAuthenticator", {options: {protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true}});
+    await run(`location.hash = "#trips";`);
+    await until("the account section", `document.querySelector(".acct [data-act='signup']")`);
+    assert.equal(await text(".acct .who b"), "Account");
+    await run(`document.querySelector(".acct [data-act='signup']").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #acct-code")`);
+    // A wrong code: said in the form, nothing made.
+    await run(`document.getElementById("acct-code").value = "WRONG-CODE"; document.getElementById("acct-handle").value = "fra"; document.querySelector("dialog.sheet[open] form").requestSubmit();`);
+    await until("the error", `!document.querySelector("dialog.sheet[open] [data-error]").hidden`);
+    assert.equal(await text("dialog.sheet[open] [data-error]"), "That code does not work: wrong, expired or used.");
+    await run(`document.getElementById("acct-code").value = "TEST-CODE-0000-0001"; document.querySelector("dialog.sheet[open] form").requestSubmit();`);
+    await until("signed in", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`, 15000);
+    assert.equal(await run(`return !!document.querySelector("dialog.sheet[open]");`), false);
+    // Kept on the phone: still signed in after a reload.
+    await reload();
+    await run(`location.hash = "#trips";`);
+    await until("still signed in", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`);
+    // Out, then in again with the same passkey (the phone lists it; one here).
+    await run(`document.querySelector(".acct [data-act='signout']").click();`);
+    await until("signed out", `document.querySelector(".acct [data-act='signin']")`);
+    await run(`document.querySelector(".acct [data-act='signin']").click();`);
+    await until("signed in again", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`, 15000);
+    assert.deepEqual(blocked(), []);
+  });
+}

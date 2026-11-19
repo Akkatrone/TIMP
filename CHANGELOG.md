@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.11.0
+
+An account, if you want one.
+
+- **Account**, at the top of Trips and on the welcome screen, only on a copy of the app
+  that has a sharing service (built with `--share`). Created with an invitation code
+  and a **passkey**: no password, no email; the phone makes a key that never leaves
+  it, opened with your fingerprint, face or PIN. Sign in again on any phone with the
+  same passkey; sign out when you like. Without an account the app is as before.
+- **The sharing service's API is a contract** (`js/share-api.js`): every route, what it
+  takes and answers, checked on both sides; `contract/v1.lock.json` and
+  `tools/check-contract.mjs` keep it from breaking. Next: your trips synced between
+  phones, and shared with people.
+
 ## 3.10.0
 
 Maps you can read, wherever you are.

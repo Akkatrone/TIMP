@@ -342,6 +342,10 @@ real routes and transport times, tap "Directions" on a stop.
   trip is sent.
 - The link resolver keeps nothing: no storage, no logs. Cloudflare, which runs it, sees
   the request like any web service. Its code is [worker/resolve.js](worker/resolve.js).
+- An account is optional, and only on a copy of the app that has a sharing service.
+  Making one sends that service a name and the public half of a passkey (the key
+  itself never leaves the phone): no password, no email. Without an account nothing
+  changes.
 - A saved trip file goes only where you send it. When the trip has private expenses,
   the app asks each time whether they go in the file.
 - A Content-Security-Policy in `index.html` lets the page load code only from the app

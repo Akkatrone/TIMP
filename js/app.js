@@ -22,6 +22,8 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical } from "./version.js";
+import { hasService, session as shareSession, signIn, signOut } from "./share.js";
+import { openSignUp, accountError } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -50,6 +52,7 @@ const S = {
   home: homeOf(navigator.language),   // the traveller's own currency
   rates: {},              // exchange rates of the days the trip needs (js/money.js)
   owner: "",              // this phone's code for its private expenses, made with the first one
+  account: null,          // the sharing service's account on this phone ({id, handle, …}), or null
   openCosts: new Set()    // stops whose cost shows what it makes at home, until the page is closed
 };
 
@@ -741,12 +744,37 @@ function renderWelcome(){
     <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
     <button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>
   </div>
+  ${accountSection()}
   ${aiSection(false)}
   ${installSteps()}
   ${langPicker()}
   ${themePicker()}
   ${REPO_URL ? `<p class="foot"><a href="${esc(REPO_URL)}#create-your-own-trip" target="_blank" rel="noopener">${esc(t("makeYourOwn"))} ↗</a></p>` : ""}
   ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}`;
+}
+
+// The account with the sharing service, at the top of Trips (and on the welcome screen,
+// for a new phone), only when this copy of the app has one (js/config.js). Without an
+// account the app is exactly as before.
+function accountSection(){
+  if(!hasService()) return "";
+  const u = S.account;
+  if(!u) return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">?</span>` +
+    `<span class="who"><b>${esc(t("account"))}</b><small>${esc(t("accountShort"))}</small></span>` +
+    `<span class="acts"><button type="button" class="btn small" data-act="signin">${esc(t("signIn"))}</button><button type="button" class="btn small primary" data-act="signup">${esc(t("signUp"))}</button></span></section>`;
+  return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${esc(u.handle.slice(0, 1).toUpperCase())}</span>` +
+    `<span class="who"><b>@${esc(u.handle)}</b><small>${esc(t("signedIn"))}</small></span>` +
+    `<span class="acts"><button type="button" class="btn small" data-act="signout">${esc(t("signOut"))}</button></span></section>`;
+}
+
+async function accountSignIn(){
+  try{
+    const user = await signIn();
+    if(!user) return;
+    S.account = user;
+    render();
+    toast(t("welcomeBack", {h: user.handle}));
+  }catch(e){ toast(accountError(e)); }
 }
 
 function renderTrips(){
@@ -769,6 +797,7 @@ function renderTrips(){
     : S.deviceKey ? "statusGoogleDevice" : "statusGoogleTrip";
   return `
   <h1>${esc(t("yourTrips"))}</h1>
+  ${accountSection()}
   ${errorBox()}
   <section class="sec">${cards}
     <div class="actions">
@@ -1580,6 +1609,9 @@ $app.addEventListener("click", e => {
   else if(a === "copy-prompt-full") copyText(aiMessageFull(), t("copiedPrompt"));
   else if(a === "copy-edit" && S.rec) copyText(aiEditMessage(), t("copiedEdit"));
   else if(a === "demo") loadDemo();
+  else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); }, onSignIn: accountSignIn});
+  else if(a === "signin") accountSignIn();
+  else if(a === "signout") signOut().then(() => { S.account = null; render(); toast(t("signedOut")); });
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
   else if(a === "history") showHistory(act.dataset.id);
@@ -1817,6 +1849,7 @@ async function start(){
   const [records, activeId, ui, key, lang, useGoogle, home, owner] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle"), store.getKV("home"), store.getKV("owner")]);
   if(typeof home === "string" && /^[A-Z]{3}$/.test(home)) S.home = home;
   if(typeof owner === "string") S.owner = owner;
+  if(hasService()) S.account = ((await shareSession()) || {}).user || null;
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);

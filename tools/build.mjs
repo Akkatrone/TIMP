@@ -4,7 +4,8 @@
 //
 //   node tools/build.mjs                         -> dist/
 //   node tools/build.mjs --out _site --repo https://github.com/you/your-fork \
-//                        --resolver https://timp-resolve.you.workers.dev
+//                        --resolver https://timp-resolve.you.workers.dev \
+//                        --share https://timp-share.you.workers.dev
 //
 // --resolver is the address of the link resolver (worker/README.md): it goes in
 // js/config.js and in the Content-Security-Policy, the one place it may be reached.
@@ -28,6 +29,8 @@ function option(name, fallback){
 const out = resolve(ROOT, option("out", "dist"));
 const repoUrl = option("repo", "");
 const resolverUrl = option("resolver", "").replace(/\/+$/, "");
+// --share: the sharing service (accounts, sync); the account section shows only with it.
+const shareUrl = option("share", "").replace(/\/+$/, "");
 const inside = relative(ROOT, out);
 if(!inside || inside.startsWith("..") || appFiles().some(f => f === inside || f.startsWith(inside + "/"))){
   console.error(`Refusing to build into "${out}": choose an empty folder inside the project, like dist/ or _site/.`);
@@ -35,6 +38,10 @@ if(!inside || inside.startsWith("..") || appFiles().some(f => f === inside || f.
 }
 if(repoUrl && !/^https:\/\/[\w.-]+\/[\w./-]+$/.test(repoUrl)){
   console.error(`--repo must be an https address, got "${repoUrl}"`);
+  process.exit(2);
+}
+if(shareUrl && !/^https:\/\/[\w.-]+(:\d+)?$/.test(shareUrl)){
+  console.error(`--share must be an https origin, got "${shareUrl}"`);
   process.exit(2);
 }
 if(resolverUrl && !/^https:\/\/[\w.-]+(\/[\w./-]*)?$/.test(resolverUrl)){
@@ -53,13 +60,15 @@ function configure(name, value){
   contents.set("js/config.js", Buffer.from(next));
 }
 if(repoUrl) configure("REPO_URL", repoUrl);
-if(resolverUrl){
-  configure("RESOLVER_URL", resolverUrl);
+// A service the page may call: added to connect-src, the one directive that needs it.
+function allowConnect(url){
   const html = contents.get("index.html").toString("utf8");
-  const next = html.replace("connect-src 'self'", `connect-src 'self' ${new URL(resolverUrl).origin}`);
+  const next = html.replace("connect-src 'self'", `connect-src 'self' ${new URL(url).origin}`);
   if(next === html){ console.error("index.html: connect-src not found in the Content-Security-Policy"); process.exit(1); }
   contents.set("index.html", Buffer.from(next));
 }
+if(resolverUrl){ configure("RESOLVER_URL", resolverUrl); allowConnect(resolverUrl); }
+if(shareUrl){ configure("SHARE_URL", shareUrl); allowConnect(shareUrl); }
 
 const hash = createHash("sha256");
 files.filter(f => f !== "sw.js").forEach(f => { hash.update(f); hash.update("\0"); hash.update(contents.get(f)); hash.update("\0"); });

@@ -32,9 +32,10 @@ jobs:
           CHROME: google-chrome
         run: npm run e2e
       - name: Build
-        # RESOLVER_URL: a repository variable (Settings → Secrets and variables → Actions →
-        # Variables) with the address of the link resolver, see worker/README.md. Unset: none.
-        run: node tools/build.mjs --out _site --repo "${{ github.server_url }}/${{ github.repository }}" --resolver "${{ vars.RESOLVER_URL }}"
+        # RESOLVER_URL, SHARE_URL: repository variables (Settings → Secrets and variables →
+        # Actions → Variables): the link resolver (worker/README.md) and the sharing service.
+        # Unset: none, and the app works without them.
+        run: node tools/build.mjs --out _site --repo "${{ github.server_url }}/${{ github.repository }}" --resolver "${{ vars.RESOLVER_URL }}" --share "${{ vars.SHARE_URL }}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

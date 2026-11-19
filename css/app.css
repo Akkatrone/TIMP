@@ -540,6 +540,16 @@ button.crow{cursor:pointer}
 #toast .act{border:0;background:var(--bg);color:var(--ink);font:600 .85rem var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer;flex:0 0 auto;min-height:36px;white-space:nowrap}
 #toast .x{border:0;background:none;color:var(--bg);opacity:.7;font:400 1.3rem/1 var(--f-body);width:32px;height:32px;border-radius:50%;cursor:pointer;flex:0 0 auto;padding:0}
 
+/* The account with the sharing service, at the top of Trips */
+.acct{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:18px;padding:14px 16px;margin:0 0 14px;flex-wrap:wrap}
+.acct .av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--bg);font:700 1rem var(--f-display);flex:none}
+.acct .who{display:grid;gap:2px;flex:1 1 140px;min-width:0}
+.acct .who b{font:600 1rem var(--f-body)}
+.acct .who small{font:500 .74rem var(--f-mono);color:var(--muted)}
+.acct .acts{display:flex;gap:6px;flex-wrap:wrap}
+.sheet .passkey{display:grid;place-items:center;gap:6px;text-align:center;padding:6px 0 2px;color:var(--muted);font:400 .86rem var(--f-body)}
+.sheet .passkey svg{width:44px;height:44px;color:var(--ink)}
+
 /* Hover, only with a mouse: on a phone it would stay on after the tap. */
 @media (hover:hover){
   .neighbors a:hover{color:var(--ink)}
