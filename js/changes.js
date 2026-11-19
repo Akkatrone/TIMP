@@ -4,7 +4,7 @@
 // version (applyChanges). Far fewer tokens both ways, and nothing else of the trip can
 // be lost by accident. No DOM here.
 //
-//   {"format": "travel-in-my-pocket/changes", "trip": "<trip id>", "changes": [
+//   {"format": "travel-in-my-pocket/changes", "trip": "<trip id>", "from": "<version id>", "changes": [
 //     {"add":    {"day": "2027-04-10", "plan": "<plan id, on days with plans>", "stop": {…a stop…}}},
 //     {"update": {"day": "2027-04-10", "stop": "<stop id>", "set": {"time": "10:00", "tag": null},
 //                 "to": {"day": "2027-04-11"}}},
@@ -24,9 +24,12 @@
 //
 // In "set", null removes a field. A stop goes in time order. A day without plans that
 // gets one has two: its stops become the first, named by "first"; a day left with one
-// plan goes back to plain stops. "private": true on an expense change is for the
-// traveller's private expenses (js/private.js): they change on this phone, outside the
-// trip's versions. Everything is checked against FIELDS once applied, like any trip file.
+// plan goes back to plain stops. "from" is the version the outline showed: when the
+// trip has changed since, the app applies the changes to that version and joins the
+// result with what changed after (js/trips.js joinChanges). "private": true on an
+// expense change is for the traveller's private expenses (js/private.js): they change
+// on this phone, outside the trip's versions. Everything is checked against FIELDS once
+// applied, like any trip file.
 
 import { FIELDS, FORMAT, validateTrip } from "./trip.js";
 import { addStop, updateStop, removeStop, ensureIds, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense } from "./edit.js";
@@ -57,7 +60,7 @@ export function outline(trip, priv = null){
   };
   const stay = d => !d.stay ? "" : ` · night: ${typeof d.stay === "string" ? d.stay : d.stay.name}`;
   const n = trip.days.length;
-  const lines = [`Trip "${trip.title}", id ${trip.id}, ${n} day${n === 1 ? "" : "s"}${trip.currency ? `, costs in ${trip.currency}` : ""}.`];
+  const lines = [`Trip "${trip.title}", id ${trip.id}${trip.version ? `, version ${trip.version.id}` : ""}, ${n} day${n === 1 ? "" : "s"}${trip.currency ? `, costs in ${trip.currency}` : ""}.`];
   for(const d of trip.days){
     lines.push("", `${d.date}${d.city ? " · " + d.city : ""}${d.title ? " · " + d.title : ""}${stay(d)}`);
     for(const n of d.notes || []) lines.push(`  note: ${n}`);
@@ -81,7 +84,9 @@ export function changesBrief(){
   return [
     `To change an existing trip, answer with ONE JSON object in one code block, format "${CHANGES}", listing only what changes:`,
     "",
-    `{"format": "${CHANGES}", "trip": "<the trip id>", "changes": [ … ]}`,
+    `{"format": "${CHANGES}", "trip": "<the trip id>", "from": "<the version in the outline>", "changes": [ … ]}`,
+    "",
+    `"from" lets the app apply the changes to the trip as you saw it, and join them with what changed on the phone since.`,
     "",
     "Each change is one of:",
     `  {"add": {"day": "YYYY-MM-DD", "stop": {…}}}             a new stop (fields: ${stopFields}); it goes in time order`,
@@ -115,6 +120,7 @@ export function applyChanges(trip, data, priv = null, owner = ""){
   if(!isChanges(data)) return {ok: false, errors: [`format: must be "${CHANGES}"`]};
   if(data.trip !== undefined && data.trip !== trip.id) return {ok: false, errors: [`trip: these changes are for "${data.trip}", the open trip is "${trip.id}"`]};
   if(!Array.isArray(data.changes) || !data.changes.length) return {ok: false, errors: ["changes: must be a non-empty list"]};
+  if(data.from !== undefined && !/^[0-9a-f]{16}$/.test(data.from)) return {ok: false, errors: ["from: must be the version named in the outline, 16 characters from 0-9 and a-f"]};
 
   let out = clone(trip), mine = priv;
   const moves = [], counts = {added: 0, changed: 0, removed: 0};

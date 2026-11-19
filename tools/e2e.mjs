@@ -605,7 +605,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     const edit = await run(`return window.__copied;`);
     assert.match(edit, /\[what to change\]/);
     assert.match(edit, /travel-in-my-pocket\/changes/, "how to write changes");
-    assert.match(edit, /\nTrip ".*", id [a-z0-9-]+, \d+ days?\./, "the outline of the open trip");
+    assert.match(edit, /\nTrip ".*", id [a-z0-9-]+, version [0-9a-f]{16}, \d+ days?\./, "the outline of the open trip");
     assert.ok(!edit.includes('"text":'), "not the whole file");
     // What Gemini wrote: "name" instead of "title", no format, no places.
     const wrong = {id: "rome-gemini", title: "Rome", days: [{date: "2027-05-01", place: "rome", title: "Day 1", stops: [{time: "09:00", name: "Colosseum"}]}]};
@@ -658,6 +658,43 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.href = location.pathname + "?text=" + encodeURIComponent("Done! " + ${JSON.stringify(JSON.stringify(shared))}) + "#day-1";`);
     await until("the stop removed", `document.querySelectorAll(".stop").length > 0 && ![...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Ginjinha bar"))`);
     assert.equal(await run(`return location.search;`), "");
+  });
+
+  await step("changes for an earlier version are joined with what changed since; a trip with the same id and no shared version is kept apart", async () => {
+    const paste = body => run(`location.hash = "#trips"; await new Promise(r => setTimeout(r, 200)); document.querySelector('[data-act="paste"]').click(); await new Promise(r => setTimeout(r, 200)); document.querySelector("#paste-text").value = ${JSON.stringify(body)}; document.querySelector("#paste-text").closest("form").requestSubmit(); await new Promise(r => setTimeout(r, 600));`);
+    const v1 = await versionOnPhone();
+    // The outline names the version; the trip then changes on the phone.
+    const message = await run(`const {outline} = await import(new URL("js/changes.js", location.href)); const st = await import(new URL("js/store.js", location.href)); return outline((await st.listTrips()).find(r => r.id === "demo-lisbon").trip);`);
+    assert.ok(message.includes(`version ${v1.id}`), "the outline names the version");
+    await paste(JSON.stringify({format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "se", set: {tag: "Changed on the phone"}}}]}));
+    const v2 = await versionOnPhone();
+    // The assistant answers for the version it saw.
+    await paste(JSON.stringify({format: "travel-in-my-pocket/changes", trip: "demo-lisbon", from: v1.id, changes: [{update: {day: "2027-05-14", stop: "castelo", set: {tag: "From the assistant"}}}]}));
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /^Changes applied to version [0-9a-f]{7} and joined with what changed since: 0 added, 1 changed, 0 removed · version [0-9a-f]{7}/);
+    const v3 = await versionOnPhone();
+    assert.deepEqual([...v3.parents].sort().includes(v2.id), true);
+    assert.equal(v3.parents.length, 2, "joined, as two files are");
+    await run(`location.hash = "#day-1";`);
+    await until("both tags", `["Changed on the phone", "From the assistant"].every(t => [...document.querySelectorAll(".eyebrow")].some(e => e.textContent === t))`);
+    // A friend's trip with the same name and first day: same id, no version in common.
+    const friend = JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
+    delete friend.private;
+    friend.days[0].stops[0].title = "Breakfast at a friend's";
+    await sendFile(friend);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await run(`return document.querySelector("dialog.ask h2").textContent;`), "Another trip with the same name?");
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask [data-answer]")].map(b => b.textContent);`), ["Cancel", "Join both", "Keep them apart"]);
+    await answer("separate");
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /loaded as a trip of its own/);
+    assert.equal((await versionOnPhone()).id, v3.id, "this phone's trip is untouched");
+    await run(`location.hash = "#trips";`);
+    await until("both trips", `document.querySelector('[data-act="remove"][data-id="demo-lisbon-2"]')`);
+    await run(`document.querySelector('[data-act="remove"][data-id="demo-lisbon-2"]').click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    await answer("yes");
+    await run(`location.hash = "#trips";`);
+    await until("the example", `document.querySelector('[data-act="open"][data-id="demo-lisbon"]') || document.querySelector('.tripcard.current [data-act="save"][data-id="demo-lisbon"]')`);
+    await run(`const b = document.querySelector('[data-act="open"][data-id="demo-lisbon"]'); if(b) b.click(); await new Promise(r => setTimeout(r, 300));`);
   });
 
   await step("Paste at the bottom takes what was copied: a place opens the form, changes are applied", async () => {

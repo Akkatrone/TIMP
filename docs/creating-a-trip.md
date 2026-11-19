@@ -194,7 +194,7 @@ Tell the travellers, briefly:
 **An AI assistant in a chat:** the traveller sends an outline of the trip (from Trips →
 Have an AI assistant change this trip). Answer with the changes only, in the format
 `travel-in-my-pocket/changes` described in the format reference: never the whole file
-again.
+again. Put the version named at the top of the outline in `from`.
 
 **With the whole file:**
 

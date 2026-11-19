@@ -102,6 +102,13 @@ export function relation(local, incoming){
   return "diverged";
 }
 
+// Two copies that share no version at all: not the same trip changed in two places,
+// but two trips that happen to have the same id (the same name and first day).
+export function unrelated(local, incoming){
+  const theirs = new Set([incoming.version.id, ...incoming.version.history]);
+  return ![local.version.id, ...local.version.history].some(id => theirs.has(id));
+}
+
 // The most recent version both have seen, among those `known` (ids whose content the
 // device still has). Null when there is none: the merge then has no base.
 export function commonBase(local, incoming, known){

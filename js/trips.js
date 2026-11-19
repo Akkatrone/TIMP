@@ -6,7 +6,7 @@
 
 import { validateTrip, upgrade } from "./trip.js";
 import { ensureIds } from "./edit.js";
-import { ensureVersion, childOf, commit, commitMerge, relation, commonBase, isIntact } from "./version.js";
+import { ensureVersion, childOf, commit, commitMerge, relation, commonBase, isIntact, unrelated, canonical, contentOf } from "./version.js";
 import { mergeTrips } from "./merge.js";
 import { diffTrips } from "./diff.js";
 import { withPrivate } from "./private.js";
@@ -60,7 +60,9 @@ export async function restore(versions, current, id){
  *   newer     made from this phone's version: take it as it is
  *   older     this phone already has everything in it
  *   diverged  both changed: `merged` is the two joined; `theirs` and `mine` say what
- *             changed on each side since the version they shared (js/diff.js)
+ *             changed on each side since the version they shared (js/diff.js);
+ *             `unrelated` when they share no version at all: two different trips with
+ *             the same id, most likely (see separate)
  */
 export async function inspect(versions, local, incoming){
   const kind = relation(local, incoming);
@@ -69,7 +71,7 @@ export async function inspect(versions, local, incoming){
   if(kind !== "diverged") return {kind, local, incoming};
   const baseId = commonBase(local, incoming, new Set(await versions.ids(local.id)));
   const base = baseId ? await versions.get(local.id, baseId) : null;
-  return {kind, local, incoming, base: !!base, merged: mergeTrips(base, local, incoming),
+  return {kind, local, incoming, base: !!base, unrelated: unrelated(local, incoming), merged: mergeTrips(base, local, incoming),
     theirs: diffTrips(base || local, incoming), mine: diffTrips(base || incoming, local)};
 }
 
@@ -88,6 +90,31 @@ export async function apply(versions, x, choice){
   if(choice === "take" && x.kind === "newer") return x.incoming;
   if(choice === "back" && x.kind === "older") return (await saveEdit(versions, x.local, x.incoming)).trip;
   return x.local;
+}
+
+/**
+ * A file that shares no version with the trip of the same id, kept as a trip of its
+ * own: under the first of "<id>-2", "<id>-3"… not in `taken`, as a version made from
+ * the file's.
+ */
+export async function separate(versions, incoming, taken){
+  const base = String(incoming.id).slice(0, 60);
+  let n = 2, id;
+  do id = `${base}-${n++}`; while(taken.has(id));
+  return keep(versions, await childOf({...incoming, id}, incoming.version));
+}
+
+/**
+ * Changes an assistant wrote for an earlier version of the trip, the one its outline
+ * showed: `changed` is that version as the changes left it. It becomes a version made
+ * from that one, joined with what changed on the phone since, as two files are.
+ * @returns the trip to keep (this phone's, when the changes changed nothing)
+ */
+export async function joinChanges(versions, current, from, changed){
+  if(canonical(contentOf(changed)) === canonical(contentOf(from))) return current;
+  const branch = await childOf(changed, from.version);
+  const x = await inspect(versions, current, branch);
+  return apply(versions, x, x.kind === "diverged" ? "merge" : x.kind === "newer" ? "take" : "keep");
 }
 
 /**

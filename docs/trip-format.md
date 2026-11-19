@@ -266,6 +266,11 @@ it has seen, the way Git does, as pieces shared between versions.
 The app sees that the content no longer matches the version and makes a new version
 from it, then joins it with what changed on other phones.
 
+**Two trips with the same id:** a trip's id comes from its title and first day, so a
+friend's trip can have the same one. A file that shares no version at all with the
+trip on the phone is most likely another trip: the app asks, and can keep it apart
+under a new id (`…-2`), or join the two if it is the same trip written again.
+
 <!-- llms.txt: end -->
 ## Changes
 
@@ -275,7 +280,7 @@ this trip), and the assistant answers with a short list of changes, which the ap
 as one new version (Paste, at the bottom of the app):
 
 ```json
-{"format": "travel-in-my-pocket/changes", "trip": "rome-in-three-days-2027-04-10", "changes": [
+{"format": "travel-in-my-pocket/changes", "trip": "rome-in-three-days-2027-04-10", "from": "3f2a9c1e0b7d4a55", "changes": [
   {"add": {"day": "2027-04-10", "stop": {"time": "13:00", "title": "Lunch in Monti", "type": "food"}}},
   {"update": {"day": "2027-04-10", "stop": "colosseum", "set": {"time": "10:00", "tag": null}}},
   {"update": {"day": "2027-04-10", "stop": "pantheon", "to": {"day": "2027-04-11"}}},
@@ -307,6 +312,10 @@ one. `setTrip` changes the trip's `title`, `lang`, `timezone`, `info` or `curren
 the phone, outside the trip's versions. The changes are applied in order, all or none: if one is wrong, the app lists
 which one and why, and changes nothing. The result is checked like any trip file.
 `trip` may be left out: the changes then apply to the trip open on the phone.
+`from` is the version named at the top of the outline. When the trip has changed on the
+phone since the outline was copied, the app applies the changes to that version and
+joins the result with what changed after, as it does with two files; without `from`,
+or with a version the phone does not have, they apply to the trip as it is.
 <!-- llms.txt: skip -->The rules are in [`js/changes.js`](../js/changes.js).<!-- llms.txt: end -->
 
 <!-- llms.txt: skip -->
@@ -336,6 +345,7 @@ warnings: the file loads, and the command-line checker shows them.
 Only what a trip file, or a list of changes, can say differently. Files written for an
 older version still load.
 
+- **3.9**: changes say the version they were written for: `from`, from the outline.
 - **3.8**: a `cost` is what the traveller pays, their share of what is split; in 3.7
   it was the total for everyone. Private expenses: `private`, with its `expenses` (a
   private one can name the `stop` where it was paid) and `owner`, outside versions and

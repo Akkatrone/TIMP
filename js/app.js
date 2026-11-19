@@ -16,7 +16,7 @@ import { ask } from "./ask.js";
 import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense } from "./edit.js";
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
 import { keptRates, fetchMonth } from "./rates.js";
-import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText } from "./trips.js";
+import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText, separate, joinChanges } from "./trips.js";
 import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop } from "./private.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
@@ -209,12 +209,26 @@ async function importChanges(data){
   const rec = data.trip ? S.records.find(r => r.id === data.trip) : S.rec;
   const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); scrollToY(0); };
   if(!rec) return fail([data.trip ? t("changesNoTrip", {id: data.trip}) : t("changesNoOpen")]);
-  const res = applyChanges(rec.trip, data, rec.priv || null, S.owner);
-  if(!res.ok) return fail(res.errors);
+  // Written for the version the outline showed: when the trip changed since, applied
+  // to that version and joined with what came after. A version this phone does not
+  // have: tried on the trip as it is.
+  const behind = !!data.from && data.from !== rec.trip.version.id;
+  const from = behind ? await versions.get(rec.id, data.from) : null;
+  const res = applyChanges(from || rec.trip, data, rec.priv || null, S.owner);
+  if(!res.ok) return fail(behind && !from ? [t("changesOtherVersion", {v: shortId(data.from)}), ...res.errors] : res.errors);
   if(res.priv && !res.priv.owner) res.priv.owner = ownerNow();
   S.importError = null;
   if(S.rec !== rec) await openRecord(rec);
-  await applyEdit(() => ({trip: res.trip, marks: res.moves, priv: res.priv}), "changesApplied", res.counts);
+  if(!from) return applyEdit(() => ({trip: res.trip, marks: res.moves, priv: res.priv}), "changesApplied", res.counts);
+  const trip = await joinChanges(versions, rec.trip, from, res.trip);
+  const priv = res.priv && res.priv.expenses.length ? res.priv : null;
+  const privChanged = canonical(priv) !== canonical(rec.priv || null);
+  if(trip === rec.trip && !privChanged) return;
+  if(res.moves.length){ S.state = moveMarks(S.state, res.moves); saveState(); }
+  const next = {...S.rec, trip, priv, ...(privChanged ? {privUnsaved: true} : {})};
+  await keepRecord(next);
+  render();
+  offerSave(next, trip === rec.trip ? t("privSaved") : t("changesJoined", {...res.counts, f: shortId(data.from), v: shortId(trip.version.id)}));
 }
 
 // demo: the example's private expenses are taken without asking.
@@ -236,37 +250,48 @@ async function importText(text, name, {demo = false} = {}){
     const {trip: shared, priv: theirs} = splitPrivate(data);
     const {trip: incoming} = await prepare(shared);
     const local = S.records.find(r => r.id === incoming.id);
-    const pv = demo && theirs ? {action: "mine"} : privateOnLoad(local ? local.priv || null : null, theirs, S.owner);
+    let pv = demo && theirs ? {action: "mine"} : privateOnLoad(local ? local.priv || null : null, theirs, S.owner);
     const check = pv.action === "ask" ? {label: t("privCheck", {n: theirs.expenses.length}), checked: pv.yes} : null;
-    let rec, message, offer = false, kind = "new";
+    // asked: the merge question had the box for the private expenses.
+    let rec, message, offer = false, asked = false, mine = local ? local.priv || null : null;
     if(!local){
       await versions.put(incoming);
       rec = {id: incoming.id, trip: incoming, importedAt: Date.now(), fileName: name || "", exported: incoming.version.id};
       message = t("imported", {t: incoming.title});
     }else{
       const x = await inspect(versions, local.trip, incoming);
-      kind = x.kind;
-      const choice = x.kind === "diverged" ? await chooseMerge(x, check) : x.kind === "newer" ? "take" : "keep";
+      asked = x.kind === "diverged" && !x.unrelated;
+      const choice = x.kind !== "diverged" ? (x.kind === "newer" ? "take" : "keep")
+        : x.unrelated ? await chooseUnrelated(x) : await chooseMerge(x, check);
       if(choice === null) return;   // the traveller cancelled: nothing changes
-      const trip = await apply(versions, x, choice);
-      const v = shortId(trip.version.id);
-      rec = {...local, trip, importedAt: Date.now(), fileName: name || local.fileName};
-      if(x.kind === "same") message = t("recvSame", {v});
-      else if(x.kind === "newer"){ rec.exported = trip.version.id; message = t("recvNewer", {t: trip.title, v}); }
-      else if(x.kind === "older"){
-        // Nothing changes, unless the traveller wants this older file back; its private
-        // expenses are older too.
-        toast(t("recvOlder", {v}), {label: t("backToFile"), run: () => backToFile(x)});
-        return;
+      if(choice === "separate"){
+        // Another trip with the same id: a trip of its own, with its own private expenses.
+        const trip = await separate(versions, incoming, new Set(S.records.map(r => r.id)));
+        rec = {id: trip.id, trip, importedAt: Date.now(), fileName: name || "", exported: incoming.version.id};
+        message = t("recvSeparate", {t: trip.title});
+        mine = null;
+        if(pv.action !== "none") pv = privateOnLoad(null, theirs, S.owner);
+      }else{
+        const trip = await apply(versions, x, choice);
+        const v = shortId(trip.version.id);
+        rec = {...local, trip, importedAt: Date.now(), fileName: name || local.fileName};
+        if(x.kind === "same") message = t("recvSame", {v});
+        else if(x.kind === "newer"){ rec.exported = trip.version.id; message = t("recvNewer", {t: trip.title, v}); }
+        else if(x.kind === "older"){
+          // Nothing changes, unless the traveller wants this older file back; its private
+          // expenses are older too.
+          toast(t("recvOlder", {v}), {label: t("backToFile"), run: () => backToFile(x)});
+          return;
+        }
+        else if(choice === "theirs"){ message = t("recvTheirs", {v}); offer = true; }
+        else { const c = counts(diffTrips(local.trip, trip)); message = t("recvMerged", {a: c.added, c: c.changed, r: c.removed, v}); offer = true; }
       }
-      else if(choice === "theirs"){ message = t("recvTheirs", {v}); offer = true; }
-      else { const c = counts(diffTrips(local.trip, trip)); message = t("recvMerged", {a: c.added, c: c.changed, r: c.removed, v}); offer = true; }
     }
     // The file's private expenses: taken when they are this phone's, or when the
     // traveller says so (in the merge question, or in one of their own).
-    const take = pv.action === "mine" || (pv.action === "ask" && (kind === "diverged" ? check.checked : await askPrivate(theirs, pv.yes)));
+    const take = pv.action === "mine" || (pv.action === "ask" && (asked ? check.checked : await askPrivate(theirs, pv.yes)));
     if(take){
-      rec.priv = joinPrivate(local ? local.priv || null : null, theirs, ownerNow(theirs.owner));
+      rec.priv = joinPrivate(mine, theirs, ownerNow(theirs.owner));
       message += " " + t("privLoaded", {n: theirs.expenses.length});
     }else if(pv.action === "other") message += " " + t("privOther");
     await keepRecord(rec);
@@ -295,6 +320,15 @@ async function chooseMerge(x, check){
     actions: [{id: "cancel", label: t("cancel")}, {id: "theirs", label: t("useFile")}, {id: "merge", label: t("mergeBoth"), kind: "primary"}]
   });
   return answer === "theirs" || answer === "merge" ? answer : null;
+}
+
+// The file and the trip on this phone have the same id but no version in common: most
+// likely two trips with the same name and first day (a friend's), or the same trip
+// written again from scratch, which is joined as before.
+async function chooseUnrelated(x){
+  const answer = await ask({title: t("unrelTitle"), text: t("unrelText", {t: x.incoming.title}),
+    actions: [{id: "cancel", label: t("cancel")}, {id: "merge", label: t("mergeBoth")}, {id: "separate", label: t("keepApart"), kind: "primary"}]});
+  return answer === "merge" || answer === "separate" ? answer : null;
 }
 
 // A file with private expenses that may not be this traveller's: add them or not.

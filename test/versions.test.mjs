@@ -393,3 +393,52 @@ test("the comparison names what changed: added, removed, changed fields, moved",
   reordered.days[0].stops[0] = Object.fromEntries(Object.entries(reordered.days[0].stops[0]).reverse());
   assert.equal(diffTrips(trip, reordered).changed.length, 0, "the order of fields is not a change");
 });
+
+import { separate, joinChanges } from "../js/trips.js";
+import { unrelated } from "../js/version.js";
+import { applyChanges, outline, CHANGES } from "../js/changes.js";
+
+test("a file with the same id but no version in common is another trip, kept apart under a new id", async () => {
+  const store = memoryStore();
+  const {trip: mine} = await prepare(demo());
+  // Someone else's trip with the same name and first day: the same id, its own history.
+  const other = demo(); other.days[0].stops[0].title = "Breakfast somewhere else";
+  const {trip: theirs} = await prepare(other);
+  assert.equal(theirs.id, mine.id);
+  const x = await inspect(store, mine, theirs);
+  assert.deepEqual([x.kind, x.unrelated], ["diverged", true]);
+  // The same trip changed on another phone shares its history: related.
+  const edited = await commit(addStop(mine, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip, mine);
+  const changedHere = await commit(addStop(mine, {date: DAY2}, {time: "13:00", title: "Lunch"}).trip, mine);
+  assert.equal(unrelated(edited, changedHere), false);
+  assert.equal((await inspect(store, edited, changedHere)).unrelated, false);
+  // Kept apart: the first free "<id>-n", a version made from the file's.
+  const kept = await separate(store, theirs, new Set([mine.id, mine.id + "-2"]));
+  assert.equal(kept.id, mine.id + "-3");
+  assert.deepEqual(kept.version.parents, [theirs.version.id]);
+  assert.equal(kept.days[0].stops[0].title, "Breakfast somewhere else");
+});
+
+test("changes written for an earlier version are applied there, and joined with what changed since", async () => {
+  const store = memoryStore();
+  const {trip: v1} = await prepare(demo());
+  // The outline names the version; the phone changes the trip meanwhile.
+  assert.match(outline(v1), new RegExp(`^Trip "[^"]+", id demo-lisbon, version ${v1.version.id}, 4 days`));
+  const v2 = (await saveEdit(store, v1, addStop(v1, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip)).trip;
+  const data = {format: CHANGES, trip: "demo-lisbon", from: v1.version.id, changes: [
+    {update: {day: DAY1, stop: "castelo", set: {tag: "Tickets online"}}},
+    {add: {day: DAY2, stop: {time: "21:00", title: "Fado evening"}}}
+  ]};
+  const res = applyChanges(v1, data);
+  assert.equal(res.ok, true, JSON.stringify(res.errors));
+  const joined = await joinChanges(store, v2, v1, res.trip);
+  assert.ok(ids(joined, DAY1).includes("gelato"), "what the phone added stays");
+  assert.ok(ids(joined, DAY2).includes("fado-evening"), "what the assistant added comes");
+  assert.equal(stopsOf(joined, DAY1).find(s => s.id === "castelo").tag, "Tickets online");
+  assert.equal(joined.version.parents.length, 2, "a merge, in the history");
+  assert.ok(joined.version.history.includes(v2.version.id));
+  // Changes that change nothing: the phone's trip as it is.
+  assert.equal(await joinChanges(store, v2, v1, v1), v2);
+  // "from" must look like a version
+  assert.match(applyChanges(v1, {...data, from: "abc"}).errors[0], /^from: must be the version named in the outline/);
+});

@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.9.0
+
+Ready for trips that are not only yours.
+
+- **Two trips with the same name and first day** have the same id. A file that shares
+  no version with the trip on the phone (a friend's trip, say) was offered for a
+  merge; now the app asks, and can keep it as a trip of its own, under a new id. It
+  can still join them, for the same trip written again from scratch.
+- **Changes say which version they were written for.** The outline for an assistant
+  names the trip's version, and the changes carry it back in `from`. If the trip has
+  changed on the phone in the meantime, the changes are applied to the version the
+  assistant saw and joined with what came after, as two files are, instead of
+  landing on a trip the assistant never read.
+
 ## 3.8.1
 
 Buttons that feel like buttons.
