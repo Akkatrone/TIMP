@@ -5,7 +5,7 @@ import { ensureVersion, commit, commitMerge, relation, commonBase, versionId, ca
 import { mergeTrips } from "../js/merge.js";
 import { diffTrips, counts } from "../js/diff.js";
 const merge = (base, ours, theirs) => { const trip = mergeTrips(base, ours, theirs); return {trip, report: counts(diffTrips(ours, trip))}; };
-import { ensureIds, addStop, updateStop, removeStop, insertIndex, clockMinutes, newId, dayAfter, addDay, updateDay, removeDay } from "../js/edit.js";
+import { ensureIds, addStop, updateStop, removeStop, insertIndex, clockMinutes, newId, dayAfter, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense } from "../js/edit.js";
 import { validateTrip } from "../js/trip.js";
 
 const demo = () => JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
@@ -210,6 +210,29 @@ test("a day is added after the last, its own fields changed, and removed; days m
   assert.equal(a.version.id, b.version.id);
   assert.equal(a.days.at(-1).date, "2027-05-18");
   assert.equal(stopsOf(a, DAY1).find(s => s.id === "se").time, "11:30");
+});
+
+test("expenses get ids, stay in date order, and merge by id on both phones alike", async () => {
+  const base = await ensureVersion(ensureIds(demo()).trip);
+  assert.ok(base.expenses.every(x => x.id), "ids for expenses written without them");
+  const {trip: added, id} = addExpense(base, {title: "Travel insurance", date: "2026-09-20", cost: 35, currency: undefined});
+  assert.deepEqual(added.expenses.map(x => x.id)[0], id, "in date order");
+  assert.deepEqual(Object.keys(added.expenses[0]), ["id", "title", "cost", "date"]);
+  const changed = updateExpense(added, id, {title: "Travel insurance", date: "2027-03-20", cost: 30});
+  assert.deepEqual(changed.expenses.map(x => x.title), ["Flights to Lisbon and back (invented)", "Casa do Exemplo, 3 nights (invented)", "Travel insurance"]);
+  assert.equal(changed.expenses[2].id, id);
+  assert.equal(removeExpense(removeExpense(base, base.expenses[0].id), base.expenses[1].id).expenses, undefined, "no empty list");
+  assert.throws(() => updateExpense(base, "nope", {title: "x", cost: 1}), /no expense/);
+  // One phone adds an expense, the other changes the cost of another: both, on both phones.
+  const ours = await commit(added, base);
+  const theirs = await commit(updateExpense(base, base.expenses[0].id, {...base.expenses[0], cost: 250}), base);
+  const a = await commitMerge(mergeTrips(base, ours, theirs), ours, theirs), b = await commitMerge(mergeTrips(base, theirs, ours), theirs, ours);
+  assert.equal(a.version.id, b.version.id);
+  assert.deepEqual(a.expenses.map(x => x.cost).sort((x, y) => x - y), [35, 250, 390]);
+  assert.deepEqual(validateTrip(a).errors, []);
+  // the comparison sees a stop's cost as a change of its cost
+  const priced = updateStop(base, {date: DAY1, plan: null, id: "se"}, {...stopsOf(base, DAY1)[1], cost: 12}).trip;
+  assert.deepEqual(diffTrips(base, priced).changed[0].fields, ["cost"]);
 });
 
 test("stops without an id get one, and the old keys are reported so ticks can follow", () => {

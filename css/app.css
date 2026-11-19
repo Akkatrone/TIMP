@@ -1,5 +1,6 @@
 :root{
-  --bg:#f2f3f1; --surface:#ffffff; --ink:#15181b; --muted:#5b636b; --line:#dcdfdb;
+  --bg:#eceeeb; --surface:#ffffff; --ink:#15181b; --muted:#5b636b; --line:#dcdfdb;
+  --card:#ffffff; --card-off:#f5f6f4;   /* a stop, and a stop done or skipped */
   --link:#1d5ca8; --warn:#9a4a08; --warn-bg:#fbefe1; --ok:#2c7a4c; --accent:#d65f22;
   --err:#a3261c; --err-bg:#fbe9e7;
   /* The colours of the cities of a trip, in the order they appear (js/app.js, cityVar):
@@ -16,7 +17,8 @@
    Keep the two blocks identical. */
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
+    --bg:#0d1012; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
+    --card:#1c2126; --card-off:#14181b;
     --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
     --err:#f39b92; --err-bg:#33201e;
     --lift:brightness(1.45) saturate(.9);
@@ -25,7 +27,8 @@
   }
 }
 :root[data-theme="dark"]{
-    --bg:#101316; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
+    --bg:#0d1012; --surface:#191d21; --ink:#edefec; --muted:#9aa2aa; --line:#2b3137;
+    --card:#1c2126; --card-off:#14181b;
     --link:#7fb0ee; --warn:#f0a65c; --warn-bg:#2d2116; --ok:#5cbf88; --accent:#f2905a;
     --err:#f39b92; --err-bg:#33201e;
     --lift:brightness(1.45) saturate(.9);
@@ -112,9 +115,14 @@ h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 
 /* stops */
-ol.stops{list-style:none;margin:0;padding:0}
-.stop{display:grid;grid-template-columns:4.3rem 1fr auto;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
-.stop:last-child{border-bottom:1px solid var(--line)}
+/* Each stop is a card on the page, as the lists of Android (Gmail, Settings): cards a
+   little apart, rounded more at the two ends of the list. Done and skipped ones sink
+   halfway into the page. */
+ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.stop{display:grid;grid-template-columns:4.3rem 1fr auto;gap:12px;padding:14px 10px 14px 14px;background:var(--card);border-radius:6px}
+.stop:first-child{border-top-left-radius:20px;border-top-right-radius:20px}
+.stop:last-child{border-bottom-left-radius:20px;border-bottom-right-radius:20px}
+.stop.done,.stop.skipped{background:var(--card-off)}
 .time{font:500 .82rem/1.5 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);padding-top:1px;overflow-wrap:anywhere;display:grid;justify-items:start;align-content:start;gap:7px;min-width:0}
 .body{min-width:0}
 .body h3{margin:0;font:600 1rem/1.35 var(--f-body)}
@@ -200,6 +208,24 @@ ol.stops{list-style:none;margin:0;padding:0}
 .holding,.holding *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
 .mapsvg .badge.hit{animation:pinhit 1.4s ease-out 2}
 @keyframes pinhit{0%{stroke:var(--ink);stroke-width:5}100%{stroke-width:1.5}}
+
+/* what a stop costs: small in the margin; opened, the last line of the card, and with
+   one more tap what it makes in the traveller's currency */
+.time .cost{font:500 .68rem/1.2 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);letter-spacing:-.01em;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.stop.done .time .cost,.stop.skipped .time .cost{opacity:.6}
+.stop.skipped .time .cost{text-decoration:line-through}
+.stop.has-cost .chev{display:block}
+.costrow{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:grid;gap:4px}
+.costbtn{display:flex;align-items:baseline;gap:10px;width:100%;border:0;background:none;color:var(--ink);padding:2px 0;text-align:left;font:inherit;cursor:pointer;min-height:32px;-webkit-tap-highlight-color:transparent}
+span.costbtn{cursor:auto}
+.costbtn .l{font:500 .66rem var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.costbtn .y{font:600 .95rem var(--f-mono);font-variant-numeric:tabular-nums}
+.costbtn .to{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font:600 .8rem var(--f-mono);color:var(--link)}
+.costbtn .to .chev{display:block;margin:0;transform:rotate(-90deg)}
+.costbtn[aria-expanded="true"] .to .chev{transform:none}
+.costrow .rate{margin:0;display:grid;gap:2px;font-size:.8rem;line-height:1.4;color:var(--muted)}
+.costrow .rate b{font:600 .95rem var(--f-mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.daycost b{color:var(--ink);font-weight:600}
 
 /* sections and cards */
 .sec{display:grid;gap:10px}
@@ -380,6 +406,75 @@ html:has(dialog[open]){overflow:hidden}
 .pos.muted{font-family:var(--f-body);color:var(--muted)}
 .sheet-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .sheet-actions .grow{flex:1 1 auto}
+/* what the trip costs: folded at the end of Info */
+.costs{margin-top:8px}
+.costs > summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--card);border-radius:20px;padding:14px 16px;min-height:52px;-webkit-tap-highlight-color:transparent}
+.costs > summary::-webkit-details-marker{display:none}
+.costs > summary .h{font:500 .72rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.costs > summary .tot{margin-left:auto;font:700 1.05rem var(--f-mono);font-variant-numeric:tabular-nums}
+.costs > summary .chev{display:block;margin:0;transition:transform .15s}
+.costs > summary .tot + .chev{margin-left:0}
+.costs > summary .h + .chev{margin-left:auto}
+.costs[open] > summary{border-bottom-left-radius:6px;border-bottom-right-radius:6px}
+.costs[open] > summary .chev{transform:rotate(180deg)}
+.costsbody{display:grid;gap:10px;padding-top:12px}
+.costtools{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+.costtools .seg button{padding:5px 12px;min-height:32px;font-size:.78rem}
+.costsbody > .btn{justify-self:start}
+.costsbody .warnline{color:var(--warn)}
+.chero{background:var(--card);border-radius:20px;padding:16px;display:grid;gap:9px}
+.chero .lab{font:500 .7rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.chero .big{font:700 2.2rem/1 var(--f-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.chero .sub{font-size:.84rem;color:var(--muted)}
+.chero .split{display:flex;height:10px;gap:2px}
+.chero .split i{display:block;border-radius:999px;min-width:0}
+.chero .split .done{background:var(--ok)}
+.chero .split .todo{background:repeating-linear-gradient(-45deg,var(--line) 0 4px,transparent 4px 7px);box-shadow:inset 0 0 0 1px var(--line)}
+.chero .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font:500 .78rem var(--f-mono);color:var(--muted)}
+.chero .legend b{color:var(--ink)}
+.chero .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--ok)}
+.chero .legend i.todo{background:none;border:1.5px solid var(--muted)}
+.costsbody .ch{font:500 .7rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 0 0}
+.clist{display:grid;gap:3px}
+.crow{background:var(--card);border-radius:6px;padding:11px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;color:var(--ink);text-decoration:none;border:0;font:inherit;text-align:left;width:100%;min-height:52px}
+button.crow{cursor:pointer}
+.clist .crow:first-child{border-top-left-radius:18px;border-top-right-radius:18px}
+.clist .crow:last-child{border-bottom-left-radius:18px;border-bottom-right-radius:18px}
+.crow .n{font:600 .8rem var(--f-mono);width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,var(--card));color:var(--c)}
+.crow .n.ic{filter:var(--lift)}
+.crow .n svg{display:block}
+.crow .w{min-width:0;display:grid;gap:5px}
+.crow .w b{font-weight:600;font-size:.92rem;overflow-wrap:anywhere}
+.crow .w b small,.crow .w > small{font:500 .74rem var(--f-mono);color:var(--muted);margin-left:6px}
+.crow .w > small{margin-left:0}
+.crow .bar{height:5px;border-radius:999px;background:var(--bg);overflow:hidden}
+.crow .bar i{display:block;height:100%;border-radius:999px;background:var(--c)}
+.crow .a{text-align:right;font:600 .9rem var(--f-mono);font-variant-numeric:tabular-nums;display:grid;white-space:nowrap}
+.crow .a small{font:500 .72rem var(--f-mono);color:var(--muted)}
+/* the receipt: a strip of paper, torn at the bottom */
+.receipt{background:var(--card);font:500 .8rem/1.55 var(--f-mono);font-variant-numeric:tabular-nums;padding:18px 16px 26px;border-radius:14px 14px 0 0;min-width:0;
+  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%}
+.receipt .hd{text-align:center;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-size:.72rem;margin-bottom:10px;display:grid}
+.receipt .hd b{color:var(--ink);font-size:.95rem;letter-spacing:.04em;overflow-wrap:anywhere}
+.receipt .dy{margin:12px 0 2px;padding-top:10px;border-top:1px dashed var(--line);text-transform:uppercase;letter-spacing:.08em;font-size:.7rem;color:var(--muted)}
+.receipt .dy b{color:var(--c,var(--ink))}
+.receipt .ln{display:flex;align-items:baseline;gap:6px;min-width:0}
+.receipt .ln > span:last-child{flex:none}
+.receipt .ln .t{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.receipt .ln .f{flex:1 1 auto;border-bottom:1.5px dotted var(--line);transform:translateY(-4px);min-width:10px}
+.receipt .ln.sub{color:var(--muted);font-size:.74rem}
+.receipt .ln.sub .f{border:0}
+.receipt .tot{margin-top:14px;padding-top:10px;border-top:3px double var(--ink);display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-weight:700;font-size:1.1rem;text-transform:uppercase}
+/* the cost in a form: the amount, the currency, what it makes at home */
+.money .amount{position:relative}
+.money .amount .sym{position:absolute;left:12px;top:50%;transform:translateY(-50%);font:600 1rem var(--f-mono);color:var(--muted);pointer-events:none}
+.sheet .money .amount input{padding-left:34px;font:600 1rem var(--f-mono);font-variant-numeric:tabular-nums}
+.money-hint{font-family:var(--f-mono)}
+.money-hint:empty{display:none}
+.money-hint.bad{color:var(--err)}
+/* a list to pick from, outside the forms (the traveller's currency) */
+.sec .field select{-webkit-appearance:none;appearance:none;font:500 1rem var(--f-body);padding:10px 30px 10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%238a9199' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center/14px;color:var(--ink);width:100%;max-width:420px;min-height:44px}
+
 @media (max-width:380px){ .sheet .field.two{grid-template-columns:1fr} }
 
 /* a question with buttons (js/ask.js) */
@@ -419,5 +514,5 @@ html:has(dialog[open]){overflow:hidden}
 #toast .x{border:0;background:none;color:var(--bg);opacity:.7;font:400 1.3rem/1 var(--f-body);width:32px;height:32px;border-radius:50%;cursor:pointer;flex:0 0 auto;padding:0}
 #toast .x:hover{opacity:1}
 
-@media (max-width:380px){ .stop{grid-template-columns:3.6rem 1fr auto;gap:10px} .rows > div{grid-template-columns:1fr} }
-@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} .chev,.fab-paste,.fab-paste span{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }
+@media (max-width:380px){ .stop{grid-template-columns:3.4rem 1fr auto;gap:10px;padding-left:12px} .rows > div{grid-template-columns:1fr} }
+@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} .costs > summary .chev,.chev,.fab-paste,.fab-paste span{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }

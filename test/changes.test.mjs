@@ -11,10 +11,12 @@ const ids = (t, date, plan) => { const d = t.days.find(x => x.date === date); re
 
 test("the outline is a few lines per day with every stop's id, far shorter than the file", () => {
   const trip = demo(), text = outline(trip);
-  assert.match(text, /^Trip "Lisbon in my pocket \(example\)", id demo-lisbon, 4 days\./);
-  assert.match(text, /\[se\] 11:00 Lisbon Cathedral \(sight\)/);
+  assert.match(text, /^Trip "Lisbon in my pocket \(example\)", id demo-lisbon, 4 days, costs in EUR\./);
+  assert.match(text, /\[se\] 11:00 Lisbon Cathedral \(sight, cost 10\)/);
+  assert.match(text, /\[comercio\] 10:00 Praça do Comércio \(sight\)/);
   assert.match(text, /plan \[cascais\]/);
-  assert.match(text, /\[train\] 08:40 Train from Rossio \(by train, no position\)/);
+  assert.match(text, /\[train\] 08:40 Train from Rossio \(by train, cost 9\.2, no position\)/);
+  assert.match(text, /Expenses outside the stops:\n  \[[a-z0-9-]+\] 2026-10-05 Flights to Lisbon and back \(invented\): 280/);
   assert.ok(text.length * 3 < JSON.stringify(trip).length, `${text.length} vs ${JSON.stringify(trip).length}`);
 });
 
@@ -128,4 +130,31 @@ test("the brief for assistants names every kind of change", () => {
   const brief = changesBrief();
   for(const k of ["add", "update", "remove", "setDay", "addDay", "removeDay", "addPlan", "setPlan", "removePlan"]) assert.match(brief, new RegExp(`"${k}"`));
   assert.ok(brief.length < 2500, String(brief.length));
+});
+
+test("changes can set what things cost: a stop's cost, the trip's currency, expenses", () => {
+  const trip = demo();
+  const first = applyChanges(trip, changes([{update: {day: D1, stop: "comercio", set: {cost: 0}}}])).trip;
+  const exp = first.expenses[0].id;
+  const r = applyChanges(first, changes([
+    {update: {day: D1, stop: "se", set: {cost: 12, currency: "USD"}}},
+    {setTrip: {set: {currency: "GBP"}}},
+    {addExpense: {expense: {title: "Travel insurance", date: "2026-09-20", cost: 35, currency: "EUR"}}},
+    {setExpense: {expense: exp, set: {cost: 260}}},
+    {removeExpense: {expense: first.expenses[1].id}}
+  ]));
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.trip.currency, "GBP");
+  const se = r.trip.days[0].stops.find(s => s.id === "se");
+  assert.deepEqual([se.cost, se.currency], [12, "USD"]);
+  assert.equal(r.trip.days[0].stops.find(s => s.id === "comercio").cost, 0);
+  // in date order, each with an id
+  assert.deepEqual(r.trip.expenses.map(x => [x.title, x.cost]), [["Travel insurance", 35], ["Flights to Lisbon and back (invented)", 260]]);
+  assert.ok(r.trip.expenses.every(x => /^[a-z0-9-]+$/.test(x.id)));
+  assert.deepEqual(r.counts, {added: 1, changed: 3, removed: 1});
+  // only what setTrip may change; expenses named by id; a cost is a number
+  assert.match(applyChanges(trip, changes([{setTrip: {set: {days: []}}}])).errors[0], /can change only title, lang, timezone, info, currency/);
+  assert.match(applyChanges(trip, changes([{setExpense: {expense: "nope", set: {cost: 1}}}])).errors[0], /no expense "nope"/);
+  assert.match(applyChanges(trip, changes([{update: {day: D1, stop: "se", set: {cost: "12 €"}}}])).errors[0], /cost: must be a number/);
+  assert.match(changesBrief(), /addExpense/);
 });

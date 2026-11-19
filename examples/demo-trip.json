@@ -4,6 +4,7 @@
  "title": "Lisbon in my pocket (example)",
  "lang": "en",
  "timezone": "Europe/Lisbon",
+ "currency": "EUR",
  "days": [
   {
    "date": "2027-05-14",
@@ -35,6 +36,7 @@
      "title": "Lisbon Cathedral",
      "type": "sight",
      "text": "Ten minutes uphill. The tram line passes right in front of the door.",
+     "cost": 10,
      "address": "Sé de Lisboa",
      "lat": 38.7098,
      "lng": -9.1326
@@ -56,6 +58,7 @@
      "type": "sight",
      "text": "The castle on top of the hill. Tickets are sold at the gate.",
      "tag": "Ticket needed",
+     "cost": 30,
      "address": "Castelo de São Jorge",
      "lat": 38.7139,
      "lng": -9.1335,
@@ -66,7 +69,8 @@
      "time": "14:00",
      "title": "Lunch in Alfama",
      "type": "food",
-     "text": "No coordinates on this stop: it has no pin on the map, and that is fine."
+     "text": "No coordinates on this stop: it has no pin on the map, and that is fine.",
+     "cost": 38
     },
     {
      "id": "sunset",
@@ -98,6 +102,7 @@
      "type": "museum",
      "text": "Go early: the queue grows during the morning.",
      "tag": "Ticket needed",
+     "cost": 36,
      "address": "Mosteiro dos Jerónimos",
      "lat": 38.6979,
      "lng": -9.2068
@@ -108,6 +113,7 @@
      "title": "Pastéis de Belém",
      "type": "food",
      "text": "The custard tarts, still warm. The queue for take-away moves fast.",
+     "cost": 6.4,
      "address": "Pastéis de Belém",
      "lat": 38.6975,
      "lng": -9.2032
@@ -128,6 +134,7 @@
      "title": "MAAT",
      "type": "museum",
      "text": "You can walk on the roof of the museum for free.",
+     "cost": 22,
      "address": "MAAT Lisboa",
      "lat": 38.6959,
      "lng": -9.1937
@@ -160,6 +167,7 @@
      "travel": "boat",
      "text": "The ferry crosses the river in about ten minutes. Fish restaurants along the quay, and the city lit up across the water.",
      "booking": "advised",
+     "cost": 54,
      "address": "Cacilhas ferry terminal",
      "lat": 38.6873,
      "lng": -9.1475
@@ -188,7 +196,8 @@
        "time": "08:40",
        "title": "Train from Rossio",
        "travel": "train",
-       "text": "About 40 minutes. This stop has no coordinates on purpose."
+       "text": "About 40 minutes. This stop has no coordinates on purpose.",
+       "cost": 9.2
       },
       {
        "id": "station",
@@ -206,6 +215,7 @@
        "type": "sight",
        "text": "Bus 434 from the station, fifteen minutes uphill. The coloured palace on top of the hill.",
        "tag": "Ticket needed",
+       "cost": 40,
        "address": "Palácio da Pena",
        "lat": 38.7876,
        "lng": -9.3906,
@@ -217,6 +227,7 @@
        "title": "Quinta da Regaleira",
        "type": "park",
        "text": "Gardens, tunnels and the spiral well.",
+       "cost": 30,
        "address": "Quinta da Regaleira",
        "lat": 38.7963,
        "lng": -9.396
@@ -242,7 +253,8 @@
        "time": "09:20",
        "title": "Train from Cais do Sodré",
        "travel": "train",
-       "text": "About 40 minutes along the coast. Sit on the left for the sea."
+       "text": "About 40 minutes along the coast. Sit on the left for the sea.",
+       "cost": 9.2
       },
       {
        "id": "station",
@@ -293,6 +305,7 @@
      "title": "Alfa Pendular to Porto",
      "travel": "train",
      "tag": "Booked",
+     "cost": 62,
      "text": "From Santa Apolónia, about three hours. Seats are assigned: check the coach number."
     },
     {
@@ -311,6 +324,7 @@
      "title": "Livraria Lello",
      "type": "shop",
      "tag": "Ticket needed",
+     "cost": 20,
      "text": "The bookshop with the red staircase. The ticket is deducted from a book you buy.",
      "address": "Livraria Lello, Porto",
      "lat": 41.1468,
@@ -322,6 +336,7 @@
      "title": "A francesinha",
      "type": "food",
      "text": "The Porto sandwich: bread, meats, melted cheese and a beer sauce. One is enough for two.",
+     "cost": 32,
      "closed": [
       "sun"
      ],
@@ -365,7 +380,8 @@
      "time": "18:30",
      "title": "Metro to the airport",
      "travel": "metro",
-     "text": "Line E from Trindade, about thirty minutes."
+     "text": "Line E from Trindade, about thirty minutes.",
+     "cost": 5.2
     },
     {
      "id": "flight-home",
@@ -378,6 +394,18 @@
      "lng": -8.6814
     }
    ]
+  }
+ ],
+ "expenses": [
+  {
+   "title": "Flights to Lisbon and back (invented)",
+   "date": "2026-10-05",
+   "cost": 280
+  },
+  {
+   "title": "Casa do Exemplo, 3 nights (invented)",
+   "date": "2026-11-02",
+   "cost": 390
   }
  ],
  "info": [

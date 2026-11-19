@@ -26,6 +26,8 @@ async function step(name, fn){
 await withApp(async ({run, until, reload, blocked}) => {
   const count = sel => run(`return document.querySelectorAll(${JSON.stringify(sel)}).length;`);
   const text = sel => run(`const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent : null;`);
+  // What is done and skipped, without the day's cost after it.
+  const progress = () => run(`const p = document.querySelector(".progress").cloneNode(true); const c = p.querySelector(".daycost"); if(c) c.remove(); return p.textContent.replace(/ · $/, "");`);
   const click = (sel, i = 0) => run(`document.querySelectorAll(${JSON.stringify(sel)})[${i}].click(); await new Promise(r => setTimeout(r, 60));`);
 
   await step("the example trip opens on its first day", async () => {
@@ -83,7 +85,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await click("[data-skip]", 2);
     assert.equal(await count(".stop.skipped"), 1);
     assert.equal(await text(".stop.skipped [data-skip]"), "Restore");
-    assert.equal(await text(".progress"), "0/6 done · 1 skipped");
+    assert.equal(await progress(), "0/6 done · 1 skipped");
     await click(".stop.skipped [data-skip]");
     assert.equal(await count(".stop.skipped"), 0);
     await click("[data-skip]", 2);
@@ -91,11 +93,11 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("done and skipped are separate, and done wins", async () => {
     await click("[data-tick]", 0);
-    assert.equal(await text(".progress"), "1/6 done · 1 skipped");
+    assert.equal(await progress(), "1/6 done · 1 skipped");
     assert.equal(await run(`return !!document.querySelector(".stop.done [data-skip]");`), false);
     await click(".stop.skipped [data-tick]");
     assert.equal(await count(".stop.skipped"), 0);
-    assert.equal(await text(".progress"), "2/6 done");
+    assert.equal(await progress(), "2/6 done");
     await click(".stop:nth-child(2) [data-skip]"); // now: stops 1 and 3 done, stop 2 skipped
   });
 
@@ -144,7 +146,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   await step("what was ticked and skipped survives a reload", async () => {
     await reload();
     await until("the stops", `document.querySelectorAll(".stop").length === 6`);
-    assert.equal(await text(".progress"), "3/6 done · 1 skipped");
+    assert.equal(await progress(), "3/6 done · 1 skipped");
   });
 
   await step("the interface language can be chosen on the device", async () => {
@@ -770,6 +772,83 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".tag.ok").textContent;`), "Booked");
     const saved = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => { const d = g.result.trip.days[2]; r((d.plans ? d.plans[0].stops : d.stops).find(s => s.id === "pasteis")); }; }; });`);
     assert.deepEqual([saved.local, saved.booking, saved.closed], ["Antiga Confeitaria de Belém", "booked", ["sat"]]);
+  });
+
+  await step("costs: small by the stop, in full when it is opened, at home with one more tap; the trip's at the end of Info", async () => {
+    // Rates kept on the phone for the last days (1 € = 1.25 $), so nothing depends on the network.
+    await run(`const store = await import(new URL("js/store.js", location.href));
+      const today = new Date().toISOString().slice(0, 10), days = {};
+      for(const k of [0, 1, 2, 3]) days[new Date(Date.now() - k * 864e5).toISOString().slice(0, 10)] = {USD: 1.25, JPY: 160};
+      for(const m of new Set(Object.keys(days).map(d => d.slice(0, 7)))) await store.setKV("rates:" + m, {fetched: today, days});`);
+    await reload();
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector('[data-edit="castelo"]')`);
+    const stop = id => `document.querySelector('[data-edit="${id}"]').closest(".stop")`;
+    // In the margin, in the currency it is paid in; the day's total, and what it makes at home
+    // (en-US: dollars), as an estimate: the trip is still to come.
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".time .cost").textContent;`), "€30");
+    // Lisbon Cathedral (€10) was skipped above: left out of the day.
+    assert.equal(await run(`return document.querySelector(".daycost").textContent;`), "€68 · ≈ $85");
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".costrow");`), null, "closed: no cost line");
+    // Opened: the cost line; one more tap: dollars, the rate and that it can change.
+    await run(`${stop("castelo")}.querySelector("[data-open]").click();`);
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".costrow .y").textContent;`), "€30");
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".costrow .rate");`), null);
+    await run(`${stop("castelo")}.querySelector("[data-cost-rate]").click();`);
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".costrow .rate b").textContent;`), "≈ $37.50");
+    assert.match(await run(`return ${stop("castelo")}.querySelector(".costrow .rate span").textContent;`), /^Today's rate, .+: 1 \$ = 0\.8 €\. It may change by then\.$/);
+    // A stop without a description opens too, for its cost.
+    await run(`${stop("se")}.querySelector("[data-open]").click();`);
+    assert.equal(await run(`return ${stop("se")}.querySelector(".costrow .y").textContent;`), "€10");
+    // The form: the amount as people type it, the trip's currency or the traveller's own.
+    await run(`document.querySelector('[data-edit="castelo"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-cost-amount")`);
+    assert.equal(await run(`return document.getElementById("stop-cost-amount").value;`), "30");
+    assert.deepEqual(await run(`return [...document.querySelectorAll('[data-money] [data-cur]')].map(b => b.textContent + ":" + b.getAttribute("aria-checked"));`), ["€ EUR:true", "$ USD:false", "Other…:false"]);
+    await run(`const a = document.getElementById("stop-cost-amount"); a.value = "1.234,5"; a.dispatchEvent(new Event("input"));`);
+    assert.match(await run(`return document.querySelector("[data-money-hint]").textContent;`), /^≈ \$1,543\.13 · rate of .+, may change$/);
+    await run(`const a = document.getElementById("stop-cost-amount"); a.value = "twelve"; a.dispatchEvent(new Event("input"));`);
+    await run(`document.querySelector("dialog.sheet[open] form").requestSubmit();`);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-error]").textContent;`), "Write only the amount, like 16000 or 4.50.");
+    await run(`const a = document.getElementById("stop-cost-amount"); a.value = "40"; document.querySelector('[data-cur="USD"]').click();`);
+    await submit();
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".time .cost").textContent;`), "$40");
+    const saved = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip); }; });`);
+    const castelo = saved.days[0].stops.find(s => s.id === "castelo"), se = saved.days[0].stops.find(s => s.id === "se");
+    assert.deepEqual([castelo.cost, castelo.currency, se.cost, se.currency], [40, "USD", 10, undefined], "a cost in the trip's currency has no currency of its own");
+    // Info: what the trip costs, folded at the end; open, a summary or a receipt, in a currency to pick.
+    await run(`location.hash = "#info";`);
+    await until("info", `document.querySelector("[data-costs]")`);
+    assert.equal(await run(`const all = [...document.querySelectorAll("#app > section, #app > details")]; return all[all.length - 1].matches("[data-costs]") && !document.querySelector("[data-costs]").open;`), true);
+    await run(`document.querySelector("[data-costs] summary").click();`);
+    await until("the summary", `document.querySelector(".chero")`);
+    await run(`document.querySelector('[data-cost-cur="EUR"]').click();`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll('[data-expense]')].map(b => b.querySelector(".a").textContent);`), ["€280", "€390"]);
+    assert.ok(await run(`return document.querySelectorAll(".clist a.crow").length;`) >= 4, "a row for each day with costs");
+    await run(`document.querySelector('[data-cost-view="receipt"]').click();`);
+    assert.match(await run(`return document.querySelector(".receipt .tot").textContent;`), /^Total≈ €\d/);
+    // An expense outside the stops: added, then deleted after the question.
+    await run(`document.querySelector("[data-expense-add]").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #exp-title")`);
+    await run(`document.getElementById("exp-title").value = "Travel insurance"; const a = document.getElementById("exp-cost-amount"); a.value = "40";`);
+    await submit();
+    await run(`document.querySelector('[data-cost-view="sum"]').click();`);
+    const added = await run(`return [...document.querySelectorAll('[data-expense]')].find(b => b.textContent.includes("Travel insurance")).dataset.expense;`);
+    await run(`document.querySelector('[data-expense="${added}"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] [data-delete]")`);
+    await run(`document.querySelector("dialog.sheet[open] [data-delete]").click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    await answer("yes");
+    assert.equal(await run(`return document.querySelector('[data-expense="${added}"]');`), null);
+    // The traveller's currency, on Trips: euro, and euro costs have nothing to convert.
+    await run(`location.hash = "#trips";`);
+    await until("trips", `document.querySelector("#home-cur")`);
+    await run(`const s = document.querySelector("#home-cur"); s.value = "EUR"; s.dispatchEvent(new Event("change", {bubbles: true}));`);
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector('[data-edit="se"]')`);
+    assert.equal(await run(`return ${stop("se")}.querySelector("[data-cost-rate]");`), null);
+    assert.equal(await run(`return !!${stop("castelo")}.querySelector("[data-cost-rate]");`), true, "dollars still convert");
+    await run(`const st = await import(new URL("js/store.js", location.href)); await st.delKV("home");`);
   });
 
   await step("a .json file shared on Android is loaded, through the service worker", async () => {

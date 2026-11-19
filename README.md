@@ -21,10 +21,11 @@ the app can be public and open source while your hotels and dates stay private.
 <p align="center">
   <img src="docs/screenshots/new-stop.png" width="24%" alt="The form to add a stop, filled in from a Google Maps link: name, day, time, how you get there, position">
   <img src="docs/screenshots/trips-dark.png" width="24%" alt="The Trips page in the dark theme: the trip's version and a reminder to save the changed trip as a file">
+  <img src="docs/screenshots/costs.png" width="24%" alt="What the trip costs, at the end of the Info page: the total in dollars, done and still to do, day by day">
 </p>
 
 <p align="center"><sub>The example trip: programme of the day, interactive map, offline sketch, alternative plans in the dark theme;
-a stop added from a Google Maps link, and the trip's version on the Trips page.<br>
+a stop added from a Google Maps link, the trip's version on the Trips page, and what the trip costs.<br>
 Retake them with <code>npm run screenshots</code>.</sub></p>
 
 - Day-by-day programme: times, descriptions, reminders, alternative plans for a day.
@@ -47,6 +48,9 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
   and a moon by the stops after dark.
 - One tap to open any stop in Google Maps, with directions.
 - An Info page for hotels, phone numbers, money, useful phrases.
+- What the trip costs: each stop's cost, small by its time; flights and hotels paid
+  before leaving; and at the end of Info the total in your currency, day by day and
+  by kind of place, or as a receipt. Each cost is converted at the rate of its own day.
 - Works on iPhone and Android. Installs on the Home Screen, no app store.
 - Interface in English and Italian: it follows the trip file, or the language you choose.
 - Light and dark theme: it follows the phone, or the one you choose. Maps follow it too.
@@ -323,14 +327,18 @@ real routes and transport times, tap "Directions" on a stop.
 - "Map" and "Directions" links open Google Maps.
 - When you add or change a stop and its position has to be looked up, its name and
   address are sent to Google (with a key) or to OpenStreetMap. A Google Maps short link
-  you paste or share is sent to the link resolver, if the app has one. Nothing else of
-  the trip is sent.
+  you paste or share is sent to the link resolver, if the app has one. When a cost in
+  another currency has to be converted, the app asks
+  [Frankfurter](https://frankfurter.dev/) for the exchange rates of that month: every
+  currency against the euro, so the request carries only the month, never an amount, a
+  place or the trip's currency. Each month is kept on the phone. Nothing else of the
+  trip is sent.
 - The link resolver keeps nothing: no storage, no logs. Cloudflare, which runs it, sees
   the request like any web service. Its code is [worker/resolve.js](worker/resolve.js).
 - A saved trip file goes only where you send it.
 - A Content-Security-Policy in `index.html` lets the page load code only from the app
-  itself and from Google's map servers, and send requests only to the map and address
-  services above. Text in a trip file is always escaped; the policy is a second lock in
+  itself and from Google's map servers, and send requests only to the map, address and
+  exchange-rate services above. Text in a trip file is always escaped; the policy is a second lock in
   case that ever fails.
 
 ## Host your own copy

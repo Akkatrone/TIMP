@@ -6,8 +6,8 @@
 <title>TIMP</title>
 <meta name="description" content="A pocket travel guide that works offline. The app is public, your trip stays on your phone.">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f2f3f1" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#101316" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eceeeb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1012" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -17,8 +17,9 @@
      inside a page or a trip file can run (no 'unsafe-inline' for scripts): even text that
      slipped past the escaping could not execute. Google's hosts and 'unsafe-eval' are
      those of Google's guide for the Maps JavaScript API; OpenStreetMap serves the map
-     tiles and the address search. See CONTRIBUTING.md before adding a host. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com https://*.ggpht.com; connect-src 'self' data: blob: https://nominatim.openstreetmap.org https://*.googleapis.com https://*.gstatic.com https://*.google.com; font-src 'self' https://fonts.gstatic.com; frame-src https://*.google.com; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+     tiles and the address search; Frankfurter the exchange rates of a month, for what
+     the trip costs (js/rates.js). See CONTRIBUTING.md before adding a host. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com https://*.ggpht.com; connect-src 'self' data: blob: https://nominatim.openstreetmap.org https://api.frankfurter.dev https://*.googleapis.com https://*.gstatic.com https://*.google.com; font-src 'self' https://fonts.gstatic.com; frame-src https://*.google.com; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">

@@ -102,6 +102,27 @@ test("a stop can say its local name, whether it needs booking and when it is clo
   assert.match(tripSchema().$defs.stop.properties.closed.items.pattern, /sun\|mon/);
 });
 
+test("a stop can say what it costs; the trip its currency and the expenses outside the stops", () => {
+  const ok = errorsAfter(t => {
+    Object.assign(t.days[0].stops[0], {cost: 2400});
+    t.currency = "JPY";
+    t.expenses = [{title: "Flights", cost: 1280, currency: "EUR", date: "2027-02-01"}, {title: "Rail pass", cost: 50000}];
+  });
+  assert.deepEqual(ok, []);
+  assert.deepEqual(errorsAfter(t => { t.days[0].stops[0].cost = 0; }), [], "free");
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].cost = "2400"; }), "cost: must be a number"));
+  assert.ok(hasError(errorsAfter(t => { t.days[0].stops[0].cost = -5; }), "cost: must be a number"));
+  assert.ok(hasError(errorsAfter(t => { t.currency = "yen"; }), "currency: must be a currency code"));
+  assert.ok(hasError(errorsAfter(t => { t.expenses = [{title: "Flights"}]; }), "expenses[0].cost: is required"));
+  assert.ok(hasError(errorsAfter(t => { t.expenses = [{title: "Flights", cost: 10, date: "2027-02-30"}]; }), "expenses[0].date"));
+  assert.ok(hasError(errorsAfter(t => { t.expenses = []; }), "expenses: must not be empty"));
+  assert.ok(hasError(errorsAfter(t => { t.expenses = [{id: "a", title: "A", cost: 1}, {id: "a", title: "B", cost: 2}]; }), "expenses[1].id"));
+  // a currency without a cost says nothing: a warning
+  const trip = minimal(); trip.days[0].stops[0].currency = "EUR";
+  assert.match(validateTrip(trip).warnings.join(), /"currency" without "cost"/);
+  assert.equal(tripSchema().$defs.expense.properties.currency.pattern, "^[A-Z]{3}$");
+});
+
 test("every kind of place and way of travelling has its icon", () => {
   for(const v of [...TYPES, ...TRAVEL]) assert.ok(hasIcon(v), v);
 });

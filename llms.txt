@@ -9,7 +9,7 @@
 > look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
-**Version 3.6.1.** TIMP is under active development and this page changes with it.
+**Version 3.7.0.** TIMP is under active development and this page changes with it.
 Remember this version. Before you change a trip later in the conversation, or when a
 message from the app names a newer TIMP version, open this page again: if its version
 is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
@@ -21,6 +21,9 @@ carries the current format.
 Only what a trip file, or a list of changes, can say differently. Files written for an
 older version still load.
 
+- **3.7**: what things cost: `cost` and `currency` on a stop; `currency` and
+  `expenses` on the trip. Changes can set them: `setTrip`, `addExpense`, `setExpense`,
+  `removeExpense`.
 - **3.5**: three optional stop fields: `local` (the name as on the sign), `booking`
   (`required`, `advised`, `booked`) and `closed` (days of the week and dates).
 - **3.4**: changes can add, rename and remove a day's plans: `addPlan`, `setPlan`,
@@ -41,10 +44,12 @@ trip:
   days (required): list of day. One entry per date, in date order.
   lang: en|it. Language of the app while this trip is open. Without it, the phone's.
   timezone: an IANA time zone such as "Europe/Rome". Time zone of the destination: decides which day is today.
-  info: list of section. Sections of the Info page: useful numbers, words, how to get around.
+  info: list of section. Sections of the Info page: numbers, words, transport.
+  currency: a currency code like "JPY". The currency of every cost without its own.
+  expenses: list of expense. Money spent outside the stops: flights, hotels, passes.
 day:
   date (required): a real date as "YYYY-MM-DD". The date.
-  city: text. Where the day is spent: a city or an area. Days in the same city share a colour.
+  city: text. Where the day is spent: a city or an area.
   title: text. What the day is about, in a few words.
   stay: text or stay. Where the night is spent: a name, or an object with name, address and note.
   notes: list of text. Things to remember that day, shown at the top.
@@ -55,18 +60,25 @@ plan:
   stops (required): list of stop. The stops of this plan, in order.
 stop:
   title (required): text. The name of the place or of the activity.
-  local: text. The name in the local language and script, as on the sign ("一蘭 渋谷店"): to recognise the place, show it to staff, and search it.
+  local: text. The name in the local script, as on the sign ("一蘭 渋谷店"): to show staff, and to search it.
   time: text. When: "09:30", or words like "Evening".
   type: sight|museum|food|park|view|shop|walk|hotel. What kind of place it is; it gives the stop its icon and pin.
   travel: metro|bus|train|plane|boat. How you get there from the stop before.
   text: text. What to know: what to see, what to order, tickets. **bold** is allowed.
   tag: text. A short label shown on the stop, like "Booked 19:30" or "Optional".
-  booking: required|advised|booked. "required": no entry without booking (the app warns until it is done); "advised": better booked; "booked": done.
-  closed: list of "mon" to "sun", or a date as "YYYY-MM-DD". When the place is closed: days of the week ("mon"…"sun") and dates. The app warns when the stop falls on one.
-  address: text. Where it is, as you would search it in Google Maps: a street address, or name and town.
-  lat: number from -90 to 90. Latitude, with `lng`. Gives the stop its pin on the map.
+  booking: required|advised|booked. "required": no entry without it (the app warns); "advised": better booked; "booked": done.
+  cost: number, 0 or more. What it costs in all, for everyone: tickets, meal, ride. 0: free.
+  currency: a currency code like "JPY". The currency of `cost`, if not the trip's.
+  closed: list of "mon" to "sun", or a date as "YYYY-MM-DD". Days of the week and dates the place is closed: the app warns on them.
+  address: text. As you would search it in Google Maps: a street address, or name and town.
+  lat: number from -90 to 90. Latitude, with `lng`: the pin on the map.
   lng: number from -180 to 180. Longitude, with `lat`.
   link: an https:// address. A Google Maps link to the exact place.
+expense:
+  title (required): text. What it was: "Flights", "Hotel, 3 nights".
+  cost (required): number, 0 or more. How much, in all.
+  currency: a currency code like "JPY". The currency of `cost`, if not the trip's.
+  date: a real date as "YYYY-MM-DD". When it was paid: the day of its rate. Without it, the trip's first day.
 stay:
   name (required): text. The name of the hotel or flat.
   address: text. Its address.
@@ -78,7 +90,7 @@ item:
   label (required): text. What the line is about.
   text (required): text. The line itself. Phone numbers become a link to call.
 
-Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings or hotels. Give lat/lng only for places you are sure about; otherwise an address.
+Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. Give lat/lng only for places you are sure about; otherwise an address.
 
 Example:
 {"format":"travel-in-my-pocket/2","title":"Rome in three days","lang":"en","days":[{"date":"2027-04-10","city":"Rome","title":"The ancient city","stay":{"name":"Hotel Example","address":"Via Cavour 1, Rome"},"notes":["Colosseum tickets booked for 9:00"],"stops":[{"time":"09:00","title":"Colosseum","type":"sight","text":"Enter from the Via Sacra side.","address":"Piazza del Colosseo, Rome","lat":41.8902,"lng":12.4922},{"time":"13:00","title":"Lunch in Monti","type":"food","travel":"metro"}]}],"info":[{"title":"In case of need","items":[{"label":"Emergency","text":"112"}]}]}
@@ -96,7 +108,7 @@ To change an existing trip, answer with ONE JSON object in one code block, forma
 {"format": "travel-in-my-pocket/changes", "trip": "<the trip id>", "changes": [ … ]}
 
 Each change is one of:
-  {"add": {"day": "YYYY-MM-DD", "stop": {…}}}             a new stop (fields: title, local, time, type, travel, text, tag, booking, closed, address, lat, lng, link); it goes in time order
+  {"add": {"day": "YYYY-MM-DD", "stop": {…}}}             a new stop (fields: title, local, time, type, travel, text, tag, booking, cost, currency, closed, address, lat, lng, link); it goes in time order
   {"update": {"day": "YYYY-MM-DD", "stop": "<id>", "set": {…}}}  changed fields of a stop; null removes a field
   {"update": {"day": …, "stop": "<id>", "to": {"day": "YYYY-MM-DD"}}}  moves the stop to another day (set may go with it)
   {"remove": {"day": "YYYY-MM-DD", "stop": "<id>"}}
@@ -106,8 +118,11 @@ Each change is one of:
   {"addPlan": {"day": "YYYY-MM-DD", "plan": {"name": "…", "stops": [{…}, …]}, "first": "…"}}  an alternative plan for the day (a rainy day, a lazy morning); the traveller picks one. On a day without plans, "first" names the plan made of the stops it has now
   {"setPlan": {"day": "YYYY-MM-DD", "plan": "<plan id>", "set": {"name": "…"}}}  renames a plan
   {"removePlan": {"day": "YYYY-MM-DD", "plan": "<plan id>"}}  with one plan left, the day has plain stops again
+  {"setTrip": {"set": {…}}}  the trip's title, lang, timezone, info, currency
+  {"addExpense": {"expense": {"title": "…", "cost": 0, "currency": "EUR", "date": "YYYY-MM-DD"}}}  money spent outside the stops (flights, hotels)
+  {"setExpense": {"expense": "<id>", "set": {…}}}  /  {"removeExpense": {"expense": "<id>"}}
 
-On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them.
+On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them. A cost is for everyone, in all, in the trip's currency unless the stop says another; write only prices you know.
 ```
 
 ## How the traveller loads it
@@ -226,6 +241,21 @@ two-hour queue, a counter that only takes bookings. For every place to eat:
 
 Tell the traveller which closing days and booking rules were not verified.
 
+### Costs
+
+The app adds up what the trip costs, at the exchange rate of each day. Give it what you
+know, and nothing you do not:
+
+- `currency` on the trip: the money of the destination (`"JPY"` in Japan).
+- `cost` on a stop, as a number: what it costs **in all, for everyone travelling**
+  (two museum tickets at ¥1,200 are `2400`). Only prices you know: tickets, trains,
+  a booked menu. A free sight is `0`; a price you are not sure of stays out, or goes in
+  `text` as something to check.
+- `currency` on a stop only when it is paid in another money (a ticket bought from home).
+- `expenses` for what is paid outside the stops, often before leaving: flights,
+  hotels, rail passes, insurance, each with `title`, `cost` and the `date` it was paid.
+  Only the ones the traveller told you about.
+
 ## 4. Facts that go out of date
 
 Prices, opening hours, closing days, timetables and seasonal closures change.
@@ -299,6 +329,7 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 - Colours, icons or map settings: the file has none.
 - Long paragraphs in `text`. The traveller reads this standing up.
 - Links to review or booking pages you did not get from the traveller.
+- Prices you guessed, or a price per person in `cost` (it is for everyone, in all).
 - Comments or trailing commas in the JSON.
 - HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.
 
@@ -369,6 +400,8 @@ an `address` and its position (`lat`, `lng`):
 | `lang` | no | Language of the app while this trip is open: `"en"` or `"it"`. Without it, the phone's. |
 | `timezone` | no | IANA time zone of the destination, like `"Europe/Rome"`: decides which day is "today". Without it, the phone's. |
 | `info` | no | Sections of the Info page. |
+| `currency` | no | The currency money is spent in, as its code: `"JPY"`, `"EUR"`. Every `cost` without its own `currency` is in it. See Costs. |
+| `expenses` | no | Money spent outside the stops: flights, hotels, passes. See Costs. |
 | `googleMapsKey` | no | A Google Maps key for everyone who loads the trip. See Google Maps key. |
 | `id` | written by the app | Identifies the trip on the phone. Without it the app makes one from the title and the first date, so a corrected file for the same trip updates it. Keep it when you change a file the app saved. |
 | `version` | written by the app | Keep it exactly as it is. |
@@ -397,6 +430,8 @@ an `address` and its position (`lat`, `lng`):
 | `text` | no | What to know: what to see, what to order, tickets. |
 | `tag` | no | A short label above the title, like `"Booked 19:30"` or `"Optional"`. |
 | `booking` | no | `"required"`: no entry without booking, and the stop shows a warning until it is done; `"advised"`: better booked; `"booked"`: done, shown as Booked (the time and the people go in `tag`). |
+| `cost` | no | What the stop costs, in all, for everyone on the trip: the tickets, the meal, the ride. A number, `0` for free. See Costs. |
+| `currency` | no | The currency of `cost`, when it is not the trip's `currency`: `"EUR"` for a ticket bought from home. |
 | `closed` | no | When the place is closed: days of the week (`"mon"` … `"sun"`) and dates (`"2027-05-03"`). The stop shows a warning when its day is one of them, also after it is moved. |
 | `address` | no | Where it is, as you would search it in Google Maps: a street address, or name and town (`"Pantheon, Rome"`). Used by the Map and Directions links. |
 | `lat`, `lng` | no | The position, both or neither. Gives the stop its pin on the map. |
@@ -414,6 +449,39 @@ A stop of `type` `food` also gets a link to the reviews people read in that part
 world, searched by its `local` name or its title: Tabelog in Japan, Naver Map in Korea,
 Yelp in the United States and Canada, TheFork in Europe. The app picks the site from
 the position, or from the trip's `timezone`; nothing about it goes in the file.
+
+## Costs
+
+A trip can say what it costs. Each stop has its `cost`; the money spent outside the
+stops, often before leaving, goes in `expenses`:
+
+```json
+"currency": "JPY",
+"expenses": [
+  {"title": "Flights Rome – Tokyo", "date": "2027-02-01", "cost": 1280, "currency": "EUR"},
+  {"title": "Ryokan in Kyoto, 3 nights", "date": "2027-03-10", "cost": 96000}
+]
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `title` | yes | What it was. |
+| `cost` | yes | How much, in all, for everyone. |
+| `currency` | no | Its currency, when it is not the trip's. |
+| `date` | no | When it was paid, `"YYYY-MM-DD"`. Without it, the first day of the trip. |
+| `id` | written by the app | Lets edits and merges follow the expense. |
+
+Amounts are written in the currency they are paid in. The app converts each one into
+the traveller's own currency at the rate of its day: a stop on the date of its day, an
+expense on the date it was paid. Days still to come use today's rate, as an estimate
+that changes until then. The traveller's currency is a setting of the phone, not of
+the file: two people on the same trip can each see their own. Write only prices you
+know (tickets, trains, a booked dinner), never a guess; the traveller corrects them
+with what was really spent.
+
+On the stop it shows small, under its time; an opened stop shows it in full, and a tap
+on it shows what it makes at home. The end of the Info page sums it all up: day by day,
+by kind of place, and the expenses, or as a receipt.
 
 ## Info
 
@@ -454,7 +522,12 @@ as one new version (Paste, at the bottom of the app):
   {"addPlan": {"day": "2027-04-11", "first": "Sunny", "plan": {"name": "If it rains", "stops": [
     {"time": "10:00", "title": "Vatican Museums", "type": "museum"}]}}},
   {"setPlan": {"day": "2027-04-11", "plan": "sunny", "set": {"name": "Squares"}}},
-  {"removePlan": {"day": "2027-04-12", "plan": "lazy-morning"}}
+  {"removePlan": {"day": "2027-04-12", "plan": "lazy-morning"}},
+  {"update": {"day": "2027-04-10", "stop": "colosseum", "set": {"cost": 36}}},
+  {"setTrip": {"set": {"currency": "EUR"}}},
+  {"addExpense": {"expense": {"title": "Train Rome – Naples", "date": "2027-03-01", "cost": 58}}},
+  {"setExpense": {"expense": "train-rome-naples", "set": {"cost": 49}}},
+  {"removeExpense": {"expense": "hotel-deposit"}}
 ]}
 ```
 
@@ -463,7 +536,8 @@ Stops are named by their `id`, plans by theirs (`"plan": "…"` next to `"day"`)
 alternative plan; on a day that has none yet, the stops it has become the first plan,
 named by `first`, and their ticks follow. A day left with one plan by `removePlan` has
 plain stops again. `setPlan` changes only the name: the stops of a plan change one by
-one. The changes are applied in order, all or none: if one is wrong, the app lists
+one. `setTrip` changes the trip's `title`, `lang`, `timezone`, `info` or `currency`;
+`addExpense`, `setExpense` and `removeExpense` its `expenses`, named by their `id`. The changes are applied in order, all or none: if one is wrong, the app lists
 which one and why, and changes nothing. The result is checked like any trip file.
 `trip` may be left out: the changes then apply to the trip open on the phone.
 
@@ -474,38 +548,38 @@ which one and why, and changes nothing. The result is checked like any trip file
 # A complete example
 
 ```json
-{"format": "travel-in-my-pocket/2", "title": "Lisbon in my pocket (example)", "lang": "en", "timezone": "Europe/Lisbon",
+{"format": "travel-in-my-pocket/2", "title": "Lisbon in my pocket (example)", "lang": "en", "timezone": "Europe/Lisbon", "currency": "EUR", "expenses": [{"title":"Flights to Lisbon and back (invented)","date":"2026-10-05","cost":280},{"title":"Casa do Exemplo, 3 nights (invented)","date":"2026-11-02","cost":390}],
  "days": [
    {"date": "2027-05-14", "city": "Lisboa", "title": "Baixa and Alfama on foot", "stay": {"name":"Casa do Exemplo (invented)","address":"Baixa, Lisboa","note":"This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."}, "notes": ["This is an invented trip, here to show what the app does. Times and descriptions are examples: check everything before a real visit.","If it rains: swap this day with the next one. **Belém** has more places indoors."],
     "stops": [
       {"time":"10:00","title":"Praça do Comércio","type":"sight","text":"Start at the big square on the river, then walk under the arch into Rua Augusta.","address":"Praça do Comércio Lisboa","lat":38.7075,"lng":-9.1364},
-      {"time":"11:00","title":"Lisbon Cathedral","type":"sight","text":"Ten minutes uphill. The tram line passes right in front of the door.","address":"Sé de Lisboa","lat":38.7098,"lng":-9.1326},
+      {"time":"11:00","title":"Lisbon Cathedral","type":"sight","text":"Ten minutes uphill. The tram line passes right in front of the door.","cost":10,"address":"Sé de Lisboa","lat":38.7098,"lng":-9.1326},
       {"time":"11:45","title":"Miradouro de Santa Luzia","type":"view","text":"A terrace over the roofs of Alfama. A good place for a break.","address":"Miradouro de Santa Luzia","lat":38.7117,"lng":-9.1303},
-      {"time":"12:30","title":"Castelo de São Jorge","type":"sight","text":"The castle on top of the hill. Tickets are sold at the gate.","tag":"Ticket needed","address":"Castelo de São Jorge","lat":38.7139,"lng":-9.1335,"link":"https://www.google.com/maps/search/?api=1&query=Castelo+de+S%C3%A3o+Jorge+Lisboa"},
-      {"time":"14:00","title":"Lunch in Alfama","type":"food","text":"No coordinates on this stop: it has no pin on the map, and that is fine."},
+      {"time":"12:30","title":"Castelo de São Jorge","type":"sight","text":"The castle on top of the hill. Tickets are sold at the gate.","tag":"Ticket needed","cost":30,"address":"Castelo de São Jorge","lat":38.7139,"lng":-9.1335,"link":"https://www.google.com/maps/search/?api=1&query=Castelo+de+S%C3%A3o+Jorge+Lisboa"},
+      {"time":"14:00","title":"Lunch in Alfama","type":"food","text":"No coordinates on this stop: it has no pin on the map, and that is fine.","cost":38},
       {"time":"Evening","title":"Miradouro da Senhora do Monte","type":"view","text":"The highest viewpoint in the centre, best at sunset.","tag":"Optional","address":"Miradouro da Senhora do Monte","lat":38.7191,"lng":-9.1327}
     ]},
    {"date": "2027-05-15", "city": "Lisboa", "title": "Belém and the river", "stay": {"name":"Casa do Exemplo (invented)","address":"Baixa, Lisboa","note":"This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."},
     "stops": [
-      {"time":"09:30","title":"Mosteiro dos Jerónimos","type":"museum","text":"Go early: the queue grows during the morning.","tag":"Ticket needed","address":"Mosteiro dos Jerónimos","lat":38.6979,"lng":-9.2068},
-      {"time":"11:00","title":"Pastéis de Belém","type":"food","text":"The custard tarts, still warm. The queue for take-away moves fast.","address":"Pastéis de Belém","lat":38.6975,"lng":-9.2032},
+      {"time":"09:30","title":"Mosteiro dos Jerónimos","type":"museum","text":"Go early: the queue grows during the morning.","tag":"Ticket needed","cost":36,"address":"Mosteiro dos Jerónimos","lat":38.6979,"lng":-9.2068},
+      {"time":"11:00","title":"Pastéis de Belém","type":"food","text":"The custard tarts, still warm. The queue for take-away moves fast.","cost":6.4,"address":"Pastéis de Belém","lat":38.6975,"lng":-9.2032},
       {"time":"12:00","title":"Torre de Belém","type":"sight","text":"A walk along the river to the tower.","address":"Torre de Belém","lat":38.6916,"lng":-9.216},
-      {"time":"14:30","title":"MAAT","type":"museum","text":"You can walk on the roof of the museum for free.","address":"MAAT Lisboa","lat":38.6959,"lng":-9.1937},
+      {"time":"14:30","title":"MAAT","type":"museum","text":"You can walk on the roof of the museum for free.","cost":22,"address":"MAAT Lisboa","lat":38.6959,"lng":-9.1937},
       {"time":"16:30","title":"LX Factory","type":"shop","text":"Shops and cafés in an old factory, under the bridge.","address":"LX Factory Lisboa","lat":38.7034,"lng":-9.1789},
       {"time":"18:00","title":"Cais do Sodré","travel":"train","text":"Back towards the centre on the Cascais line from Alcântara-Mar, a few minutes.","address":"Cais do Sodré station","lat":38.7056,"lng":-9.1446},
-      {"time":"18:30","title":"Dinner in Cacilhas","type":"food","travel":"boat","text":"The ferry crosses the river in about ten minutes. Fish restaurants along the quay, and the city lit up across the water.","booking":"advised","address":"Cacilhas ferry terminal","lat":38.6873,"lng":-9.1475}
+      {"time":"18:30","title":"Dinner in Cacilhas","type":"food","travel":"boat","text":"The ferry crosses the river in about ten minutes. Fish restaurants along the quay, and the city lit up across the water.","booking":"advised","cost":54,"address":"Cacilhas ferry terminal","lat":38.6873,"lng":-9.1475}
     ]},
    {"date": "2027-05-16", "city": "Sintra", "title": "A day out of town", "stay": {"name":"Casa do Exemplo (invented)","address":"Baixa, Lisboa","note":"This hotel does not exist: it shows where the check-in notes go. **Bold** works here too."}, "notes": ["A day with two alternative plans: pick one with the buttons below. The app remembers the choice."],
     "plans": [
       {"name": "Sintra", "stops": [
-        {"time":"08:40","title":"Train from Rossio","travel":"train","text":"About 40 minutes. This stop has no coordinates on purpose."},
+        {"time":"08:40","title":"Train from Rossio","travel":"train","text":"About 40 minutes. This stop has no coordinates on purpose.","cost":9.2},
         {"time":"09:30","title":"Sintra station","text":"From here a bus climbs to the palaces.","address":"Sintra train station","lat":38.799,"lng":-9.3859},
-        {"time":"10:15","title":"Palácio da Pena","type":"sight","text":"Bus 434 from the station, fifteen minutes uphill. The coloured palace on top of the hill.","tag":"Ticket needed","address":"Palácio da Pena","lat":38.7876,"lng":-9.3906,"travel":"bus"},
-        {"time":"13:30","title":"Quinta da Regaleira","type":"park","text":"Gardens, tunnels and the spiral well.","address":"Quinta da Regaleira","lat":38.7963,"lng":-9.396},
+        {"time":"10:15","title":"Palácio da Pena","type":"sight","text":"Bus 434 from the station, fifteen minutes uphill. The coloured palace on top of the hill.","tag":"Ticket needed","cost":40,"address":"Palácio da Pena","lat":38.7876,"lng":-9.3906,"travel":"bus"},
+        {"time":"13:30","title":"Quinta da Regaleira","type":"park","text":"Gardens, tunnels and the spiral well.","cost":30,"address":"Quinta da Regaleira","lat":38.7963,"lng":-9.396},
         {"time":"15:30","title":"Sintra old town","type":"walk","text":"A coffee and a pastry before the train back.","address":"Palácio Nacional de Sintra","lat":38.7976,"lng":-9.3907}
       ]},
       {"name": "Cascais", "stops": [
-        {"time":"09:20","title":"Train from Cais do Sodré","travel":"train","text":"About 40 minutes along the coast. Sit on the left for the sea."},
+        {"time":"09:20","title":"Train from Cais do Sodré","travel":"train","text":"About 40 minutes along the coast. Sit on the left for the sea.","cost":9.2},
         {"time":"10:00","title":"Cascais station","text":"From here the beach is a two-minute walk.","address":"Cascais train station","lat":38.7005,"lng":-9.4177},
         {"time":"10:30","title":"Praia da Rainha","type":"park","text":"A small beach between the rocks.","address":"Praia da Rainha Cascais","lat":38.6977,"lng":-9.4194},
         {"time":"12:00","title":"Boca do Inferno","type":"view","text":"A walk along the cliff to the sea arch.","address":"Boca do Inferno Cascais","lat":38.6913,"lng":-9.4307}
@@ -513,14 +587,14 @@ which one and why, and changes nothing. The result is checked like any trip file
     ]},
    {"date": "2027-05-17", "city": "Porto", "title": "Porto in a day", "stay": "On the way home", "notes": ["Leave the luggage at the station lockers in São Bento and travel light.","The flight home is at 21:30: be at the airport by 19:30."],
     "stops": [
-      {"time":"07:39","title":"Alfa Pendular to Porto","travel":"train","tag":"Booked","text":"From Santa Apolónia, about three hours. Seats are assigned: check the coach number."},
+      {"time":"07:39","title":"Alfa Pendular to Porto","travel":"train","tag":"Booked","cost":62,"text":"From Santa Apolónia, about three hours. Seats are assigned: check the coach number."},
       {"time":"10:45","title":"São Bento station","type":"sight","text":"Look up in the hall: twenty thousand azulejo tiles telling the history of Portugal.","address":"Estação de São Bento, Porto","lat":41.1456,"lng":-8.6105},
-      {"time":"11:15","title":"Livraria Lello","type":"shop","tag":"Ticket needed","text":"The bookshop with the red staircase. The ticket is deducted from a book you buy.","address":"Livraria Lello, Porto","lat":41.1468,"lng":-8.6148},
-      {"time":"Lunch","title":"A francesinha","type":"food","text":"The Porto sandwich: bread, meats, melted cheese and a beer sauce. One is enough for two.","closed":["sun"],"address":"Rua de Passos Manuel, Porto","lat":41.1474,"lng":-8.6067},
+      {"time":"11:15","title":"Livraria Lello","type":"shop","tag":"Ticket needed","cost":20,"text":"The bookshop with the red staircase. The ticket is deducted from a book you buy.","address":"Livraria Lello, Porto","lat":41.1468,"lng":-8.6148},
+      {"time":"Lunch","title":"A francesinha","type":"food","text":"The Porto sandwich: bread, meats, melted cheese and a beer sauce. One is enough for two.","cost":32,"closed":["sun"],"address":"Rua de Passos Manuel, Porto","lat":41.1474,"lng":-8.6067},
       {"time":"14:30","title":"Ribeira","type":"walk","text":"Down the steep lanes to the river front, among the coloured houses.","address":"Cais da Ribeira, Porto","lat":41.1406,"lng":-8.6131},
       {"time":"15:30","title":"Dom Luís I bridge","type":"view","text":"Cross on the upper deck, with the metro, for the view over the river and the port cellars.","address":"Ponte Luís I, Porto","lat":41.1399,"lng":-8.6094},
       {"time":"17:00","title":"Back to São Bento for the luggage","type":"sight","travel":"metro","text":"Metro line D from Jardim do Morro, two stops.","address":"Estação de São Bento, Porto","lat":41.1456,"lng":-8.6105},
-      {"time":"18:30","title":"Metro to the airport","travel":"metro","text":"Line E from Trindade, about thirty minutes."},
+      {"time":"18:30","title":"Metro to the airport","travel":"metro","text":"Line E from Trindade, about thirty minutes.","cost":5.2},
       {"time":"21:30","title":"Flight home","travel":"plane","tag":"Booked","address":"Aeroporto Francisco Sá Carneiro, Porto","lat":41.2481,"lng":-8.6814}
     ]}
  ],

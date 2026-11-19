@@ -12,6 +12,7 @@ import { icon } from "./icons.js";
 import { TRAVEL, TYPES } from "./trip.js";
 import { clockMinutes, dayAfter } from "./edit.js";
 import { ask } from "./ask.js";
+import { parseAmount, formatPlain, formatMoney, symbolOf, currencies, currencyName } from "./money.js";
 
 let dialog = null;
 
@@ -71,6 +72,8 @@ export function openStopEditor(o){
   };
   const s0 = o.stop || {};
   const closed0 = Array.isArray(s0.closed) ? s0.closed : [];
+  const tripCurrency = o.trip.currency || "";
+  const money = moneyField("stop-cost", o.money, s0.cost, s0.currency || (s0.cost !== undefined && tripCurrency) || "", t("fCostHelp"));
   // The time: hour and minutes from two lists, or words ("Evening") for a time that is
   // not a clock time. A stop that has words keeps them. Not <input type="time">: Chrome
   // on Android opens its own clock, whose Set button falls off narrow screens.
@@ -148,6 +151,8 @@ export function openStopEditor(o){
     ${choice("type", TYPES, t("fType"))}
     ${choice("travel", TRAVEL, t("fTravel"))}
     ${choice("booking", ["advised", "required", "booked"], t("fBooking"))}
+
+    ${money.html}
 
     <div class="field">
       <span class="label" id="closed-label">${esc(t("fClosed"))}</span>
@@ -336,6 +341,7 @@ export function openStopEditor(o){
     }
     const day = e.target.closest("[data-closed]");
     if(day){ day.setAttribute("aria-pressed", String(day.getAttribute("aria-pressed") !== "true")); return; }
+    if(money.click(e)) return;
     for(const kind of ["type", "travel", "booking"]){
       const b = e.target.closest(`[data-${kind}]`);
       if(b){ setChoice(kind, b.dataset[kind]); return; }
@@ -373,6 +379,9 @@ export function openStopEditor(o){
   });
   dlg.addEventListener("close", closePicker, {once: true});
   $("#stop-day").addEventListener("change", fillPlans);
+  const dateNow = () => days[+$("#stop-day").value].date;
+  money.wire(dlg, dateNow);
+  $("#stop-day").addEventListener("change", () => money.update(dateNow()));
 
   form.addEventListener("submit", e => {
     e.preventDefault();
@@ -382,6 +391,14 @@ export function openStopEditor(o){
       box.textContent = t("titleRequired");
       box.hidden = false;
       $("#stop-title").focus();
+      return;
+    }
+    const cost = money.read();
+    if(cost.error){
+      const box = $("[data-error]");
+      box.textContent = cost.error;
+      box.hidden = false;
+      $("#stop-cost-amount").focus();
       return;
     }
     const day = days[+$("#stop-day").value];
@@ -396,6 +413,9 @@ export function openStopEditor(o){
       text: $("#stop-text").value.trim() || undefined,
       local: $("#stop-local").value.trim() || undefined,
       booking: st.booking || undefined,
+      cost: cost.cost,
+      // A cost in the trip's currency says nothing more.
+      currency: cost.cost !== undefined && cost.currency !== tripCurrency ? cost.currency : undefined,
       // Days of the week from the buttons; dates the file had stay as they are.
       closed: [...[...dlg.querySelectorAll('[data-closed][aria-pressed="true"]')].map(b => b.dataset.closed), ...closed0.filter(d => !WEEK.includes(d))],
       address,
@@ -500,4 +520,154 @@ export function openDayEditor(o){
     });
   });
   dlg.showModal();
+}
+
+/* ---------- money ---------- */
+
+/*
+ * The cost of a stop or an expense: the amount, then its currency on two buttons, the
+ * one spent on the trip and the traveller's own, or any other from a list. Under it,
+ * what it makes in the traveller's currency on its day.
+ *   m: {local, home, convert(amount, currency, date) → {value, on, estimate} | null}
+ *   amount, currency: what the stop or expense has
+ */
+function moneyField(id, m, amount, currency, help){
+  const lang = getLang();
+  m = {local: "", home: "", convert: () => null, ...m};
+  const quick = [...new Set([m.local, m.home].filter(Boolean))];
+  let cur = currency || m.local || m.home || "EUR";
+  const other = !quick.includes(cur);
+  const label = c => `${symbolOf(c, lang) === c ? "" : symbolOf(c, lang) + " "}${c}`;
+  const all = currencies();
+  const html = `<div class="field money" data-money="${id}">
+      <label for="${id}-amount">${esc(t("fCost"))}</label>
+      <div class="amount"><span class="sym" aria-hidden="true" data-sym>${esc(symbolOf(cur, lang))}</span><input id="${id}-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(formatPlain(amount, lang))}"></div>
+      <div class="seg wrap" role="radiogroup" aria-label="${esc(t("fCurrency"))}">
+        ${quick.map(c => `<button type="button" role="radio" data-cur="${c}" aria-checked="${!other && c === cur}"><span>${esc(label(c))}</span></button>`).join("")}<button type="button" role="radio" data-cur="" aria-checked="${other}"><span>${esc(t("otherCurrency"))}</span></button>
+      </div>
+      <select id="${id}-other" aria-label="${esc(t("fCurrency"))}"${other ? "" : " hidden"}>${all.map(c => `<option value="${c}"${c === cur ? " selected" : ""}>${esc(c + " · " + currencyName(c, lang))}</option>`).join("")}</select>
+      <p class="foot money-hint" data-money-hint aria-live="polite"></p>
+      ${help ? `<p class="foot">${esc(help)}</p>` : ""}
+    </div>`;
+  let dlg = null, dateOf = () => "";
+  const $ = sel => dlg.querySelector(`[data-money="${id}"] ${sel}`);
+  function setCur(c){
+    cur = c;
+    dlg.querySelectorAll(`[data-money="${id}"] [data-cur]`).forEach(b => b.setAttribute("aria-checked", String(b.dataset.cur === c || (!b.dataset.cur && !quick.includes(c)))));
+    $("[data-sym]").textContent = symbolOf(c, lang);
+    update();
+  }
+  function update(){
+    // The dialog may hold another form by now (rates arrive later).
+    const hint = $("[data-money-hint]"), input = $("input");
+    if(!hint || !input) return;
+    const text = input.value.trim();
+    const n = parseAmount(text);
+    hint.classList.remove("bad");
+    if(!text){ hint.textContent = ""; return; }
+    if(n === null){ hint.textContent = t("costBad"); hint.classList.add("bad"); return; }
+    if(!m.home || cur === m.home){ hint.textContent = ""; return; }
+    const c = m.convert(n, cur, dateOf());
+    hint.textContent = !c ? t("costNoRate", {c: m.home})
+      : (c.estimate ? "≈ " : "= ") + formatMoney(c.value, m.home, lang) + " · " + t(c.estimate ? "rateEstimate" : "rateOf", {d: shortDate(c.on, lang)});
+  }
+  return {
+    html,
+    wire(d, when){
+      dlg = d; dateOf = when;
+      $("input").addEventListener("input", update);
+      $("select").addEventListener("change", e => setCur(e.target.value));
+      if(m.onRates) m.onRates(update);
+      update();
+    },
+    update(){ update(); },
+    click(e){
+      const b = e.target.closest(`[data-money="${id}"] [data-cur]`);
+      if(!b) return false;
+      const sel = $("select");
+      if(b.dataset.cur){ sel.hidden = true; setCur(b.dataset.cur); }
+      else{ sel.hidden = false; setCur(sel.value); sel.focus(); }
+      return true;
+    },
+    // {cost, currency}; cost undefined when empty; {error} when it is not a number.
+    read(){
+      const text = $("input").value.trim();
+      if(!text) return {cost: undefined, currency: cur};
+      const n = parseAmount(text);
+      return n === null ? {error: t("costBad")} : {cost: n, currency: cur};
+    }
+  };
+}
+
+// "18 nov": the day of a rate.
+const shortDate = (date, lang) => new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", timeZone: "UTC"}).format(new Date(date + "T12:00:00Z"));
+
+/**
+ * The form for an expense outside the stops: what it was, when it was paid, how much.
+ * @param {object} o
+ *   expense              the expense to change (absent: a new one)
+ *   money                as for the stop form (local, home, convert)
+ *   tripCurrency         the trip's currency, left out of the expense when it is that one
+ *   today                the date a new expense gets
+ *   onSave(expense)      {title, date, cost, currency}
+ *   onDelete()
+ */
+export function openExpenseEditor(o){
+  const dlg = ensureDialog();
+  const x = o.expense || {}, editing = !!o.expense;
+  const $ = sel => dlg.querySelector(sel);
+  const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", "");
+  dlg.innerHTML = `
+  <form method="dialog" class="sheet-form" novalidate>
+    <div class="sheet-head">
+      <h2 id="sheet-title">${esc(t(editing ? "editExpenseTitle" : "newExpenseTitle"))}</h2>
+      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
+    </div>
+    <p class="foot">${esc(t("expenseHelp"))}</p>
+    <div class="field">
+      <label for="exp-title">${esc(t("fExpense"))}</label>
+      <input id="exp-title" type="text" autocomplete="off" placeholder="${esc(t("fExpensePh"))}" value="${esc(x.title || "")}">
+    </div>
+    <div class="field">
+      <label for="exp-date">${esc(t("fPaidOn"))}</label>
+      <input id="exp-date" type="date" value="${esc(x.date || o.today || "")}">
+    </div>
+    ${money.html}
+    <p class="errbox" data-error role="alert" hidden></p>
+    <div class="sheet-actions">
+      ${editing ? `<button type="button" class="btn small danger" data-delete>${esc(t("deleteExpense"))}</button>` : ""}
+      <span class="grow"></span>
+      <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
+      <button type="submit" class="btn primary">${esc(t("save"))}</button>
+    </div>
+  </form>`;
+  const dateNow = () => $("#exp-date").value || o.today || "";
+  money.wire(dlg, dateNow);
+  $("#exp-date").addEventListener("change", () => money.update());
+  dlg.onclick = async e => {
+    if(e.target === dlg) return;
+    if(e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(money.click(e)) return;
+    if(e.target.closest("[data-delete]")){
+      const answer = await ask({title: t("deleteExpenseTitle"), text: t("deleteExpenseText", {t: x.title}),
+        actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("deleteExpense"), kind: "danger"}]});
+      if(answer !== "yes") return;
+      dlg.close();
+      o.onDelete();
+    }
+  };
+  $("form").addEventListener("submit", e => {
+    e.preventDefault();
+    const title = $("#exp-title").value.trim(), cost = money.read();
+    const fail = (text, focus) => { const box = $("[data-error]"); box.textContent = text; box.hidden = false; $(focus).focus(); };
+    if(!title) return fail(t("expenseTitleRequired"), "#exp-title");
+    if(cost.error) return fail(cost.error, "#exp-cost-amount");
+    if(cost.cost === undefined) return fail(t("costRequired"), "#exp-cost-amount");
+    const date = $("#exp-date").value;
+    dlg.close();
+    o.onSave({title, date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, cost: cost.cost,
+      currency: cost.currency !== o.tripCurrency ? cost.currency : undefined});
+  });
+  dlg.showModal();
+  if(!editing) $("#exp-title").focus();
 }

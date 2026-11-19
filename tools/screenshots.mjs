@@ -56,14 +56,24 @@ await withApp(async ({run, until, theme, capture}) => {
   await shoot("new-stop.png");
   await run(`document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
 
-  // 5. A day with alternative plans, in the dark theme.
+  // 5. What the trip costs, at the end of Info: in dollars (the phone is en-US), at the
+  //    rate of today for days still to come.
+  await run(`location.hash = "#info";`);
+  await until("the costs", `document.querySelector("[data-costs]")`);
+  await run(`const d = document.querySelector("[data-costs]"); if(!d.open) d.querySelector("summary").click();`);
+  await until("the summary", `document.querySelector(".chero")`);
+  await until("the rates", `!document.querySelector(".chero .big").textContent.includes("NaN") && !document.querySelector(".costsbody .warnline")`, 20000).catch(() => {});
+  await run(`scrollTo(0, document.querySelector("[data-costs]").getBoundingClientRect().top + scrollY - document.querySelector(".strip").offsetHeight - 14);`);
+  await shoot("costs.png");
+
+  // 6. A day with alternative plans, in the dark theme.
   await theme("dark");
   await run(`location.hash = "#day-3";`);   // the map was closed before the new stop
   await until("day 3", `document.querySelector("[data-plan]")`);
   await run(`scrollTo(0, 0);`);
   await shoot("plans-dark.png");
 
-  // 6. Trips, in the dark theme: the version, and the reminder to save the changed trip.
+  // 7. Trips, in the dark theme: the version, and the reminder to save the changed trip.
   await run(`location.hash = "#trips";`);
   await until("the trips page", `document.querySelector(".unsaved")`);
   await run(`scrollTo(0, 0);`);

@@ -14,7 +14,11 @@
 //     {"removeDay": {"day": "2027-04-12"}},
 //     {"addPlan": {"day": "2027-04-11", "plan": {"name": "If it rains", "stops": […]}, "first": "Sunny"}},
 //     {"setPlan": {"day": "2027-04-11", "plan": "<plan id>", "set": {"name": "…"}}},
-//     {"removePlan": {"day": "2027-04-11", "plan": "<plan id>"}}
+//     {"removePlan": {"day": "2027-04-11", "plan": "<plan id>"}},
+//     {"setTrip": {"set": {"currency": "JPY"}}},
+//     {"addExpense": {"expense": {"title": "Flights", "date": "2027-02-01", "cost": 640, "currency": "EUR"}}},
+//     {"setExpense": {"expense": "<expense id>", "set": {"cost": 610}}},
+//     {"removeExpense": {"expense": "<expense id>"}}
 //   ]}
 //
 // In "set", null removes a field. A stop goes in time order. A day without plans that
@@ -23,11 +27,13 @@
 // like any trip file.
 
 import { FIELDS, FORMAT, validateTrip } from "./trip.js";
-import { addStop, updateStop, removeStop, ensureIds, addPlan, renamePlan, removePlan } from "./edit.js";
+import { addStop, updateStop, removeStop, ensureIds, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense } from "./edit.js";
 
 export const CHANGES = "travel-in-my-pocket/changes";
 
-const KINDS = "add, update, remove, setDay, addDay, removeDay, addPlan, setPlan or removePlan";
+const KINDS = "add, update, remove, setDay, addDay, removeDay, addPlan, setPlan, removePlan, setTrip, addExpense, setExpense or removeExpense";
+// What setTrip may change: the rest has its own changes, or is the app's.
+const TRIP_SET = Object.keys(FIELDS.trip).filter(k => !["format", "days", "expenses", "id", "version", "googleMapsKey"].includes(k));
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const clone = v => JSON.parse(JSON.stringify(v));
 
@@ -36,22 +42,28 @@ export const isChanges = data => isObj(data) && data.format === CHANGES;
 
 /**
  * The trip in a few lines per day, for an assistant asked to change it: dates, cities,
- * titles, and each stop's id, time, title, kind and way of travelling. Descriptions and
- * positions stay out: the assistant does not need them to say what to change.
+ * titles, and each stop's id, time, title, kind, way of travelling and cost; then the
+ * expenses. Descriptions and positions stay out: the assistant does not need them to
+ * say what to change.
  */
 export function outline(trip){
   const stop = s => {
-    const extra = [s.type, s.travel && "by " + s.travel, s.booking && "booking " + s.booking, s.closed && "closed " + s.closed.join(" "), s.lat === undefined && "no position"].filter(Boolean);
+    const extra = [s.type, s.travel && "by " + s.travel, s.booking && "booking " + s.booking, s.closed && "closed " + s.closed.join(" "),
+      s.cost !== undefined && `cost ${s.cost}${s.currency ? " " + s.currency : ""}`, s.lat === undefined && "no position"].filter(Boolean);
     return `[${s.id}] ${s.time ? s.time + " " : ""}${s.title}${extra.length ? " (" + extra.join(", ") + ")" : ""}`;
   };
   const stay = d => !d.stay ? "" : ` · night: ${typeof d.stay === "string" ? d.stay : d.stay.name}`;
   const n = trip.days.length;
-  const lines = [`Trip "${trip.title}", id ${trip.id}, ${n} day${n === 1 ? "" : "s"}.`];
+  const lines = [`Trip "${trip.title}", id ${trip.id}, ${n} day${n === 1 ? "" : "s"}${trip.currency ? `, costs in ${trip.currency}` : ""}.`];
   for(const d of trip.days){
     lines.push("", `${d.date}${d.city ? " · " + d.city : ""}${d.title ? " · " + d.title : ""}${stay(d)}`);
     for(const n of d.notes || []) lines.push(`  note: ${n}`);
     if(d.plans) for(const p of d.plans){ lines.push(`  plan [${p.id}] ${p.name}:`); p.stops.forEach(s => lines.push("    " + stop(s))); }
     else d.stops.forEach(s => lines.push("  " + stop(s)));
+  }
+  if(trip.expenses && trip.expenses.length){
+    lines.push("", "Expenses outside the stops:");
+    for(const x of trip.expenses) lines.push(`  [${x.id}] ${x.date ? x.date + " " : ""}${x.title}: ${x.cost}${x.currency ? " " + x.currency : ""}`);
   }
   return lines.join("\n");
 }
@@ -75,8 +87,11 @@ export function changesBrief(){
     `  {"addPlan": {"day": "YYYY-MM-DD", "plan": {"name": "…", "stops": [{…}, …]}, "first": "…"}}  an alternative plan for the day (a rainy day, a lazy morning); the traveller picks one. On a day without plans, "first" names the plan made of the stops it has now`,
     `  {"setPlan": {"day": "YYYY-MM-DD", "plan": "<plan id>", "set": {"name": "…"}}}  renames a plan`,
     `  {"removePlan": {"day": "YYYY-MM-DD", "plan": "<plan id>"}}  with one plan left, the day has plain stops again`,
+    `  {"setTrip": {"set": {…}}}  the trip's ${TRIP_SET.join(", ")}`,
+    `  {"addExpense": {"expense": {"title": "…", "cost": 0, "currency": "EUR", "date": "YYYY-MM-DD"}}}  money spent outside the stops (flights, hotels)`,
+    `  {"setExpense": {"expense": "<id>", "set": {…}}}  /  {"removeExpense": {"expense": "<id>"}}`,
     "",
-    `On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them.`
+    `On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them. A cost is for everyone, in all, in the trip's currency unless the stop says another; write only prices you know.`
   ].join("\n");
 }
 
@@ -168,6 +183,25 @@ export function applyChanges(trip, data){
         const res = removePlan(out, x.day, x.plan);
         out = res.trip;
         moves.push(...res.marks);
+        counts.removed++;
+      }else if(kind === "setTrip"){
+        const other = Object.keys(x.set || {}).filter(k => !TRIP_SET.includes(k));
+        if(!isObj(x.set) || other.length) throw new Error(`"set" can change only ${TRIP_SET.join(", ")} of the trip`);
+        out = withSet(out, x.set);
+        counts.changed++;
+      }else if(kind === "addExpense"){
+        if(!isObj(x.expense)) throw new Error(`"expense" must be an object`);
+        const {id, ...expense} = x.expense;
+        out = addExpense(out, expense).trip;
+        counts.added++;
+      }else if(kind === "setExpense"){
+        const old = (out.expenses || []).find(e => e.id === x.expense);
+        if(!old) throw new Error(`there is no expense "${x.expense}"`);
+        out = updateExpense(out, old.id, withSet(old, x.set));
+        counts.changed++;
+      }else if(kind === "removeExpense"){
+        if(!(out.expenses || []).some(e => e.id === x.expense)) throw new Error(`there is no expense "${x.expense}"`);
+        out = removeExpense(out, x.expense);
         counts.removed++;
       }else{
         throw new Error(`"${kind}" is not a change: use ${KINDS}`);

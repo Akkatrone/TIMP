@@ -11,9 +11,11 @@ import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
 import { versionStore } from "./objects.js";
 import { REPO_URL } from "./config.js";
-import { openStopEditor, openDayEditor } from "./editor.js";
+import { openStopEditor, openDayEditor, openExpenseEditor } from "./editor.js";
 import { ask } from "./ask.js";
-import { addStop, updateStop, removeStop, addDay, updateDay, removeDay } from "./edit.js";
+import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense } from "./edit.js";
+import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
+import { keptRates, fetchMonth } from "./rates.js";
 import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText } from "./trips.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
@@ -32,7 +34,7 @@ const S = {
   records: [],            // [{id, trip, importedAt, fileName}]
   rec: null,              // the open one
   state: {done: {}, skipped: {}, plans: {}},
-  ui: {mapOpen: false, mapView: "live", expandAll: false, route: true},
+  ui: {mapOpen: false, mapView: "live", expandAll: false, route: true, costsOpen: false, costView: "sum", costCur: ""},
   langPref: "auto",       // "auto" follows the trip, or a language chosen on this device
   theme: document.documentElement.dataset.theme || "auto",   // set early by js/theme.js
   openStops: new Map(),   // descriptions opened or closed one by one, until the page is closed
@@ -41,7 +43,10 @@ const S = {
   useGoogle: true,        // false: always OpenStreetMap, even with a key (saves Google map loads)
   importError: null,      // {title, items, all}: items shown, all copied for an assistant
   online: navigator.onLine !== false,
-  version: ""
+  version: "",
+  home: homeOf(navigator.language),   // the traveller's own currency
+  rates: {},              // exchange rates of the days the trip needs (js/money.js)
+  openCosts: new Set()    // stops whose cost shows what it makes at home, until the page is closed
 };
 
 const $app = document.getElementById("app");
@@ -140,7 +145,7 @@ function setTheme(value){
 function syncThemeColor(){
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
     if(!m.dataset.auto) m.dataset.auto = m.getAttribute("content");
-    m.setAttribute("content", S.theme === "auto" ? m.dataset.auto : (S.theme === "dark" ? "#101316" : "#f2f3f1"));
+    m.setAttribute("content", S.theme === "auto" ? m.dataset.auto : (S.theme === "dark" ? "#0d1012" : "#eceeeb"));
   });
 }
 
@@ -162,8 +167,10 @@ async function openRecord(rec){
     await store.delKV("active");
   }
   S.openStops.clear();
+  S.openCosts.clear();
   applyLang();
   document.title = rec ? rec.trip.title : "TIMP";
+  await loadRates();
 }
 
 // Saves a trip record and makes it the open one. `exported` is the version the
@@ -313,7 +320,7 @@ const goToDay = date => { const k = trip().days.findIndex(d => d.date === date);
 function newStop(prefill, newDay = false){
   const here = currentPlace(), ti = todayIndex();
   const dayIndex = route().name === "day" ? here.dayIndex : (ti >= 0 ? ti : 0);
-  openStopEditor({...editorBase(), dayIndex, planId: here.planId, prefill, newDay,
+  openStopEditor({...editorBase(), money: moneyOptions(), dayIndex, planId: here.planId, prefill, newDay,
     onSave: ({stop, date, plan, newDay}) => applyEdit(tr => addStop(withDay(tr, newDay), {date, plan}, stop), newDay ? "dayAdded" : "stopAdded", newDay ? {n: trip().days.length + 1} : {})
       .then(() => goToDay(date))
       .catch(err => toast(String(err.message || err)))});
@@ -336,12 +343,21 @@ function editStop(stopId){
   const stop = list.find(s => s.id === stopId);
   if(!stop) return;
   const ref = {date: d.date, plan: here.planId, id: stop.id};
-  openStopEditor({...editorBase(), dayIndex: here.dayIndex, planId: here.planId, stop,
+  openStopEditor({...editorBase(), money: moneyOptions(), dayIndex: here.dayIndex, planId: here.planId, stop,
     onSave: ({stop: next, date, plan, newDay}) => applyEdit(tr => {
       const out = updateStop(withDay(tr, newDay), ref, next, {date, plan});
       return {trip: out.trip, marks: [{date: ref.date, plan: ref.plan, from: ref.id, to: out.ref.id, toDate: date, toPlan: plan}]};
     }, "stopSaved").catch(err => toast(String(err.message || err))),
     onDelete: () => applyEdit(tr => ({trip: removeStop(tr, ref)}), "stopDeleted").catch(err => toast(String(err.message || err)))});
+}
+
+// An expense outside the stops: a new one, or the one with this id.
+function editExpense(id){
+  const tr = trip(), x = id ? (tr.expenses || []).find(e => e.id === id) : null;
+  if(id && !x) return;
+  openExpenseEditor({expense: x, money: moneyOptions(), tripCurrency: tr.currency || "", today: tripToday(),
+    onSave: e => applyEdit(cur => x ? {trip: updateExpense(cur, x.id, e)} : addExpense(cur, e), x ? "expenseSaved" : "expenseAdded").catch(err => toast(String(err.message || err))),
+    onDelete: () => applyEdit(cur => ({trip: removeExpense(cur, x.id)}), "expenseDeleted").catch(err => toast(String(err.message || err)))});
 }
 
 /* ---------- the trip as a file ---------- */
@@ -585,6 +601,17 @@ function themePicker(){
     `<button type="button" data-theme-choice="${id}" aria-pressed="${S.theme === id}">${esc(name)}</button>`).join("")}</div></section>`;
 }
 
+// The traveller's own currency: what costs are converted into.
+function homePicker(){
+  const lang = getLang();
+  const common = ["EUR", "USD", "GBP", "CHF", "JPY"];
+  const all = [...new Set([S.home, ...common, ...currencies()])];
+  const opt = c => `<option value="${c}"${c === S.home ? " selected" : ""}>${esc(c + " · " + currencyName(c, lang))}</option>`;
+  return `<section class="sec"><h2>${esc(t("homeCurrency"))}</h2><div class="field">
+    <select id="home-cur" aria-label="${esc(t("homeCurrency"))}">${all.map(opt).join("")}</select>
+    <p class="foot">${esc(t("homeCurrencyHelp"))}</p></div></section>`;
+}
+
 function renderWelcome(){
   return `
   <section class="hero">
@@ -651,6 +678,7 @@ function renderTrips(){
   </section>
   ${langPicker()}
   ${themePicker()}
+  ${homePicker()}
   ${installSteps()}
   <section class="sec"><h2>${esc(t("aiTitleShort"))}</h2>
     ${aiSection(true)}
@@ -700,7 +728,126 @@ function renderInfo(){
   return `
   <h1>${esc(tr.title)}</h1>
   ${stays ? `<section class="sec"><h2>${esc(t("whereYouSleep"))}</h2>${stays}</section>` : ""}
-  ${sections}`;
+  ${sections}
+  ${costsSection()}`;
+}
+
+/* ---------- what the trip cost ---------- */
+
+// The currencies the totals can be shown in: the traveller's, the trip's, euro or dollar.
+function costCurrencies(){
+  return [...new Set([S.home, localCurrency(), S.home === "EUR" ? "USD" : "EUR"])].slice(0, 3);
+}
+
+// At the end of Info, folded: what the trip costs, as a summary or as a receipt.
+function costsSection(){
+  const tr = trip(), lang = getLang();
+  const items = costItems(tr).filter(x => !x.skipped);
+  const choices = costCurrencies();
+  const to = choices.includes(S.ui.costCur) ? S.ui.costCur : S.home;
+  const all = sumIn(items, to);
+  const approx = all.estimate || all.missing.length ? "≈ " : "";
+  const head = items.length ? `<span class="tot">${esc(approx + money(all.value, to, {round: true}))}</span>` : "";
+  let body = "";
+  if(S.ui.costsOpen){
+    const view = S.ui.costView === "receipt" ? "receipt" : "sum";
+    const seg = (attr, list, cur, label) => `<div class="seg" role="group" aria-label="${esc(label)}">${list.map(([id, name]) => `<button type="button" ${attr}="${esc(id)}" aria-pressed="${id === cur}">${esc(name)}</button>`).join("")}</div>`;
+    body = `<div class="costtools">${seg("data-cost-view", [["sum", t("costSummary")], ["receipt", t("costReceipt")]], view, t("costView"))}${seg("data-cost-cur", choices.map(c => [c, c]), to, t("fCurrency"))}</div>` +
+      (!items.length ? `<p class="foot">${esc(t("costNone"))}</p>` : view === "sum" ? costSummary(items, to, all) : costReceipt(items, to, all)) +
+      `<button type="button" class="btn small" data-expense-add>${esc(t("addExpense"))}</button>` +
+      (all.missing.length ? `<p class="foot warnline">${esc(t(S.online ? "costMissingOnline" : "costMissing", {a: all.missing.map(x => money(x.amount, x.currency)).join(" + ")}))}</p>` : "") +
+      `<p class="foot">${esc(t("costNote"))}</p>`;
+  }
+  return `<details class="costs" data-costs${S.ui.costsOpen ? " open" : ""}><summary><span class="h">${esc(t("tripCost"))}</span>${head}<span class="chev">${CHEVRON}</span></summary><div class="costsbody">${body}</div></details>`;
+}
+
+// Approximate when any rate is an estimate.
+const approxMoney = (r, to, o) => (r.estimate ? "≈ " : "") + money(r.value, to, o);
+
+// The summary: the total, done and still to do, then day by day, by kind of place, and
+// the expenses outside the stops (a tap changes one).
+function costSummary(items, to, all){
+  const tr = trip(), lang = getLang();
+  const stops = items.filter(x => x.kind === "stop"), outside = items.filter(x => x.kind === "expense");
+  const done = sumIn(items.filter(x => x.done), to), todo = sumIn(items.filter(x => !x.done), to);
+  const inStops = sumIn(stops, to), inOutside = sumIn(outside, to);
+  // Day by day
+  const byDay = tr.days.map((d, i) => {
+    const list = stops.filter(x => x.day === i);
+    if(!list.length) return null;
+    const sum = sumIn(list, to), curs = [...new Set(list.map(x => x.currency))];
+    const own = curs.length === 1 && curs[0] !== to ? money(list.reduce((a, x) => a + x.amount, 0), curs[0]) : "";
+    return {d, i, sum, own};
+  }).filter(x => x && x.sum.value > 0);
+  const max = Math.max(1, ...byDay.map(x => x.sum.value));
+  const days = byDay.map(x => `<a class="crow" href="#day-${x.i + 1}" style="--c:${cityVar(x.d.city)}"><span class="n">${x.i + 1}</span>` +
+    `<span class="w"><b>${esc(x.d.city || dateParts(x.d.date, lang).long)}<small>${esc(dateParts(x.d.date, lang).short)}</small></b><span class="bar"><i style="width:${(x.sum.value / max * 100).toFixed(1)}%"></i></span></span>` +
+    `<span class="a">${esc(approxMoney(x.sum, to, {round: true}))}${x.own ? `<small>${esc(x.own)}</small>` : ""}</span></a>`).join("");
+  // By kind of place: a stop without one that is a journey counts as getting around.
+  const kinds = new Map();
+  for(const x of stops){
+    const k = x.stop.type || (x.stop.travel ? "travel" : "");
+    if(!kinds.has(k)) kinds.set(k, []);
+    kinds.get(k).push(x);
+  }
+  const kindRows = [...kinds].map(([k, list]) => ({k, list, sum: sumIn(list, to)})).filter(x => x.sum.value > 0).sort((a, b) => b.sum.value - a.sum.value);
+  const kindName = k => k === "travel" ? t("costTravel") : k && TYPES.includes(k) ? t("type_" + k) : t("type_none");
+  const kindIcon = x => x.k === "travel" ? icon(x.list[0].stop.travel, 16) : x.k && TYPES.includes(x.k) ? icon(x.k, 16) : "";
+  const kindsHTML = kindRows.map(x => `<div class="crow" style="--c:${x.k && TYPE_COLORS[x.k] ? TYPE_COLORS[x.k] : "var(--muted)"}"><span class="n ic">${kindIcon(x)}</span>` +
+    `<span class="w"><b>${esc(kindName(x.k))}<small>${esc(x.list.length === 1 ? t("stopsOne") : t("stopsCount", {n: x.list.length}))}</small></b></span>` +
+    `<span class="a">${esc(approxMoney(x.sum, to, {round: true}))}<small>${inStops.value ? Math.round(x.sum.value / inStops.value * 100) : 0}%</small></span></div>`).join("");
+  // Outside the stops
+  const outsideHTML = outside.map(x => {
+    const c = conv(x.amount, x.currency, to, x.date);
+    const sub = [x.expense.date ? dateParts(x.expense.date, lang).short : "", x.currency !== to ? money(x.amount, x.currency) : ""].filter(Boolean).join(" · ");
+    return `<button type="button" class="crow" data-expense="${esc(x.expense.id)}" style="--c:var(--muted)"><span class="n ic">${esc(symbolOf(x.currency, lang))}</span>` +
+      `<span class="w"><b>${esc(x.expense.title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>` +
+      `<span class="a">${c ? esc(approxMoney(c, to, {round: true})) : esc(money(x.amount, x.currency))}</span></button>`;
+  }).join("");
+  const total = all.value || 1;
+  return `<div class="chero">
+      <span class="lab">${esc(t("costTotal"))}</span>
+      <span class="big">${esc((all.estimate || all.missing.length ? "≈ " : "") + money(all.value, to, {round: true}))}</span>
+      <span class="sub">${esc([stops.length ? t("costInStops", {a: money(inStops.value, to, {round: true})}) : "", outside.length ? t("costOutside", {a: money(inOutside.value, to, {round: true})}) : ""].filter(Boolean).join(" · "))}</span>
+      <span class="split" aria-hidden="true"><i class="done" style="flex:${done.value}"></i><i class="todo" style="flex:${Math.max(todo.value, todo.value ? total * .03 : 0)}"></i></span>
+      <span class="legend"><span><i class="done"></i>${esc(t("costDone"))} <b>${esc(approxMoney(done, to, {round: true}))}</b></span><span><i class="todo"></i>${esc(t("costTodo"))} <b>${esc(approxMoney(todo, to, {round: true}))}</b></span></span>
+    </div>` +
+    (days ? `<h3 class="ch">${esc(t("costByDay"))}</h3><div class="clist">${days}</div>` : "") +
+    (kindsHTML ? `<h3 class="ch">${esc(t("costByKind"))}</h3><div class="clist">${kindsHTML}</div>` : "") +
+    (outsideHTML ? `<h3 class="ch">${esc(t("costOutsideTitle"))}</h3><div class="clist">${outsideHTML}</div>` : "");
+}
+
+// The receipt: every cost in a column, day by day, with the rate of the day.
+function costReceipt(items, to, all){
+  const tr = trip(), lang = getLang();
+  const line = (name, amount, cls = "") => `<div class="ln${cls}"><span class="t">${esc(name)}</span><span class="f"></span><span>${esc(amount)}</span></div>`;
+  let html = "";
+  tr.days.forEach((d, i) => {
+    const list = items.filter(x => x.kind === "stop" && x.day === i);
+    if(!list.length) return;
+    const p = dateParts(d.date, lang);
+    html += `<div class="dy" style="--c:${cityVar(d.city)}"><b>${i + 1}</b> · ${esc(p.short)}${d.city ? " · " + esc(d.city) : ""}</div>`;
+    html += list.map(x => line(x.stop.title, x.amount === 0 ? t("free") : money(x.amount, x.currency))).join("");
+    const curs = [...new Set(list.map(x => x.currency))];
+    const sum = sumIn(list, to);
+    if(curs.length === 1 && curs[0] !== to){
+      const c = conv(1, to, curs[0], d.date);
+      html += line(c ? `${c.estimate ? t("rateGuess") + " " : ""}1 ${symbolOf(to, lang)} = ${formatRate(c.value, lang)} ${symbolOf(curs[0], lang)}` : "", sum.missing.length ? "" : approxMoney(sum, to), " sub");
+    }else if(curs.length > 1 || sum.missing.length) html += line("", approxMoney(sum, to), " sub");
+  });
+  const outside = items.filter(x => x.kind === "expense");
+  if(outside.length){
+    html += `<div class="dy">${esc(t("costOutsideTitle"))}</div>`;
+    for(const x of outside){
+      html += line(x.expense.title, money(x.amount, x.currency));
+      if(x.currency !== to){ const c = conv(x.amount, x.currency, to, x.date); if(c) html += line("", approxMoney(c, to), " sub"); }
+    }
+  }
+  const todo = sumIn(items.filter(x => !x.done), to);
+  const first = dateParts(tr.days[0].date, lang).short, last = dateParts(tr.days[tr.days.length - 1].date, lang).short;
+  return `<div class="receipt"><div class="hd"><b>${esc(tr.title)}</b>${esc(first === last ? first : first + " – " + last)}</div>${html}` +
+    `<div class="tot"><span>${esc(t("costTotal"))}</span><span>${esc((all.estimate || all.missing.length ? "≈ " : "") + money(all.value, to))}</span></div>` +
+    (todo.value ? line(t("costTodoOf"), approxMoney(todo, to), " sub") : "") + `</div>`;
 }
 
 function effectiveView(){
@@ -774,6 +921,139 @@ function comingFrom(dayIndex, list, k, skipped){
   return "";
 }
 
+/* ---------- money ---------- */
+
+// The currency of a place, when the trip does not say: from where its stops are.
+const REGION_CURRENCY = {jp: "JPY", kr: "KRW", na: "USD", eu: "EUR"};
+function localCurrency(){
+  const tr = trip();
+  if(tr.currency) return tr.currency;
+  const here = tr.days.flatMap(d => d.plans ? d.plans.flatMap(p => p.stops) : d.stops).find(s => s.lat !== undefined);
+  return REGION_CURRENCY[regionOf(here || {}, tr.timezone)] || S.home;
+}
+// A stop's or an expense's currency.
+const costCurrency = x => x.currency || localCurrency();
+const tripToday = () => todayIn(trip().timezone) || new Date().toISOString().slice(0, 10);
+const money = (amount, currency, o) => formatMoney(amount, currency, getLang(), o);
+const shortDay = date => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", timeZone: "UTC"}).format(new Date(date + "T12:00:00Z"));
+
+// Rates are asked for a month at a time, only when a cost on screen needs them, and
+// only once while the app is open (again after a failure, when back online).
+const ratesAsked = new Set();
+let ratesWanted = new Set(), ratesTimer = 0, ratesListener = null;
+function conv(amount, from, to, date){
+  const today = tripToday();
+  const c = convert(amount, from, to, date, S.rates, today);
+  if(!c) for(const m of monthsFor([date], today)) if(!ratesAsked.has(m)) ratesWanted.add(m);
+  return c;
+}
+function askRates(){
+  if(!ratesWanted.size || !S.online || ratesTimer) return;
+  ratesTimer = setTimeout(async () => {
+    const months = [...ratesWanted];
+    ratesWanted = new Set();
+    let got = false;
+    for(const m of months){
+      if(ratesAsked.has(m)) continue;
+      ratesAsked.add(m);
+      try{ Object.assign(S.rates, await fetchMonth(m)); got = true; }
+      catch(e){ ratesFailed.add(m); }
+    }
+    ratesTimer = 0;
+    if(got){ renderKeepingFocus(); if(ratesListener) ratesListener(); }
+  }, 30);
+}
+const ratesFailed = new Set();
+function retryRates(){ for(const m of ratesFailed) ratesAsked.delete(m); ratesFailed.clear(); }
+
+// The rates kept on the phone for the trip's costs; the months not over yet are asked
+// for again once, for today's rate.
+async function loadRates(){
+  S.rates = {};
+  if(!trip()) return;
+  const {rates, stale} = await keptRates(monthsFor(costItems(trip()).map(x => x.date), tripToday()));
+  S.rates = rates;
+  for(const m of stale) ratesWanted.add(m);
+}
+
+// The sum of some costs in a currency, converted on their days.
+function sumIn(items, to){
+  let value = 0, estimate = false;
+  const missing = new Map();
+  for(const x of items){
+    const c = conv(x.amount, x.currency, to, x.date);
+    if(c){ value += c.value; estimate = estimate || c.estimate; }
+    else missing.set(x.currency, (missing.get(x.currency) || 0) + x.amount);
+  }
+  return {value, estimate, missing: [...missing].map(([currency, amount]) => ({amount, currency}))};
+}
+
+/**
+ * Every cost of the trip: the stops of the plan chosen for each day, then the expenses
+ * outside the stops. done: a stop ticked, or an expense paid by today; skipped stops
+ * are marked, and left out of every sum.
+ */
+function costItems(tr){
+  const items = [];
+  tr.days.forEach((d, i) => {
+    const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
+    (plan ? plan.stops : d.stops).forEach((s, k) => {
+      if(typeof s.cost !== "number") return;
+      const key = stopKey(d, plan ? plan.id : null, s, k);
+      const done = !!S.state.done[key];
+      items.push({kind: "stop", day: i, date: d.date, stop: s, amount: s.cost, currency: costCurrency(s), done, skipped: !done && !!S.state.skipped[key]});
+    });
+  });
+  const first = tr.days[0].date, today = tripToday();
+  for(const x of tr.expenses || []){
+    if(typeof x.cost !== "number") continue;
+    const date = x.date || first;
+    items.push({kind: "expense", expense: x, date, amount: x.cost, currency: costCurrency(x), done: date <= today, skipped: false});
+  }
+  return items;
+}
+
+// What the form needs to write a cost and show what it makes at home.
+function moneyOptions(){
+  return {local: localCurrency(), home: S.home,
+    convert: (amount, currency, date) => { const c = conv(amount, currency, S.home, date); askRates(); return c; },
+    onRates: fn => { ratesListener = fn; }};
+}
+
+// The cost in the margin of a stop: small, in the currency it is paid in.
+const costShort = s => s.cost === 0 ? t("free") : money(s.cost, costCurrency(s), {compact: true});
+
+// The last line of an opened stop: its cost, and with one more tap what it makes at home.
+function costRow(s, id, date){
+  const cur = costCurrency(s), lang = getLang();
+  const amount = s.cost === 0 ? t("free") : money(s.cost, cur);
+  if(s.cost === 0 || cur === S.home) return `<div class="costrow"><span class="costbtn"><span class="l">${esc(t("cost"))}</span><span class="y">${esc(amount)}</span></span></div>`;
+  const shown = S.openCosts.has(id);
+  let rate = "";
+  if(shown){
+    const c = conv(s.cost, cur, S.home, date);
+    rate = c
+      ? `<p class="rate"><b>${c.estimate ? "≈" : "="} ${esc(money(c.value, S.home))}</b><span>${esc(t(c.estimate ? "rateEstimateFull" : "rateOfFull", {d: shortDay(c.on), r: `1 ${symbolOf(S.home, lang)} = ${formatRate(c.rate, lang)} ${symbolOf(cur, lang)}`}))}</span></p>`
+      : `<p class="rate">${esc(t(S.online ? "rateLoading" : "rateOffline", {c: S.home}))}</p>`;
+  }
+  return `<div class="costrow"><button type="button" class="costbtn" data-cost-rate="${esc(id)}" aria-expanded="${shown}" aria-label="${esc(t("costIn", {c: S.home}))}"><span class="l">${esc(t("cost"))}</span><span class="y">${esc(amount)}</span><span class="to">${esc(symbolOf(S.home, lang))}<span class="chev">${CHEVRON}</span></span></button>${rate}</div>`;
+}
+
+// The day's total, by its progress: in the currency of its costs, and what it makes at home.
+function dayTotal(items){
+  const paid = items.filter(x => !x.skipped);
+  const sum = paid.reduce((a, x) => a + x.amount, 0);
+  if(!paid.length || !sum) return "";
+  const curs = [...new Set(paid.map(x => x.currency))];
+  const home = sumIn(paid, S.home);
+  const homeText = home.missing.length ? "" : (home.estimate ? "≈ " : "") + money(home.value, S.home, {round: true});
+  if(curs.length === 1){
+    const own = money(sum, curs[0], {compact: true});
+    return ` · <span class="daycost"><b>${esc(own)}</b>${curs[0] !== S.home && homeText ? " · " + esc(homeText) : ""}</span>`;
+  }
+  return homeText ? ` · <span class="daycost"><b>${esc(homeText)}</b></span>` : "";
+}
+
 function stopsHTML(day, planId, list, parts, paint){
   const dayIndex = trip().days.indexOf(day);
   const skippedAt = j => { const k = stopKey(day, planId, list[j], j); return !S.state.done[k] && !!S.state.skipped[k]; };
@@ -783,14 +1063,17 @@ function stopsHTML(day, planId, list, parts, paint){
     const q = placeQuery(s);
     // Left column: when, where on the map, how you get there.
     const dark = parts && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
-    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}</div>`;
+    // The cost, small, under them: in the currency it is paid in.
+    const hasCost = typeof s.cost === "number";
+    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s))}</span>` : ""}</div>`;
     // Middle: a label above the title, the title with its kind, the description that folds, the links.
     // The name as on the sign, under the title, in its own language (for the glyphs).
     const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
-    const titleRow = `<div class="h"><h3>${chip("type", s.type)}${esc(s.title)}</h3>${s.text ? `<span class="chev">${CHEVRON}</span>` : ""}</div>` +
+    const titleRow = `<div class="h"><h3>${chip("type", s.type)}${esc(s.title)}</h3>${s.text || hasCost ? `<span class="chev">${CHEVRON}</span>` : ""}</div>` +
       (s.local ? `<p class="local"${lang ? ` lang="${lang}"` : ""}>${esc(s.local)}</p>` : "");
-    const head = s.text
-      ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}">${titleRow}<p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p></div>`
+    // Opened, a stop shows all its description, and its cost as the last line.
+    const head = s.text || hasCost
+      ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}">${titleRow}${s.text ? `<p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p>` : ""}</div>`
       : titleRow;
     // What could leave the traveller at a closed door, while the stop is still ahead.
     const closed = closedOn(s, day.date);
@@ -813,7 +1096,8 @@ function stopsHTML(day, planId, list, parts, paint){
     const side = `<div class="side"><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button>` +
       (items ? `<button class="more" type="button" data-more="${esc(id)}" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="${esc(t("moreActions"))}: ${esc(s.title)}">${DOTS}</button>` +
         `<div class="menu" role="menu"${menuOpen ? "" : " hidden"}>${items}</div>` : "") + `</div>`;
-    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}">${left}<div class="body">${eyebrow}${head}${notices}${meta}</div>${side}</li>`;
+    const cost = hasCost && open ? costRow(s, id, day.date) : "";
+    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}${hasCost ? " has-cost" : ""}">${left}<div class="body">${eyebrow}${head}${notices}${meta}${cost}</div>${side}</li>`;
   }).join("") + `</ol>`;
 }
 
@@ -838,7 +1122,8 @@ function renderDay(i){
   // For the map: is the stop at this position in the list done or skipped?
   const gone = k => !!(S.state.done[keys[k]] || S.state.skipped[keys[k]]);
   const isSkipped = k => !S.state.done[keys[k]] && !!S.state.skipped[keys[k]];
-  const anyText = list.some(s => s.text);
+  const anyText = list.some(s => s.text || typeof s.cost === "number");
+  const costsToday = costItems(tr).filter(x => x.kind === "stop" && x.day === i);
   const stay = stayOf(d.stay);
   const zs = zonesOf(list, isSkipped);
   // What the cards on the map add to a pin: the name as on the sign, directions from
@@ -884,7 +1169,7 @@ function renderDay(i){
   </section>
   <div class="headrow">
     ${d.title ? `<h1>${esc(d.title)}</h1>` : ""}
-    <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}</span></div>
+    <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}</span></div>
     <div class="tools">${
       (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
       (anyText ? `<button type="button" class="iconbtn" data-expand aria-pressed="${S.ui.expandAll}" aria-label="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}" title="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}">${S.ui.expandAll ? FOLD : UNFOLD}</button>` : "") +
@@ -969,6 +1254,22 @@ function render(){
   $app.style.minHeight = "";
   if(scrollTop() !== y) scrollToY(y);
   markFabs();
+  askRates();
+}
+
+// The page drawn again by itself (rates arrived): what had the focus keeps it.
+function renderKeepingFocus(){
+  const a = document.activeElement;
+  let sel = null;
+  if(a && a !== document.body && $app.contains(a)){
+    if(a.id) sel = "#" + CSS.escape(a.id);
+    else{
+      const attr = a.getAttributeNames().find(n => n.startsWith("data-"));
+      if(attr) sel = `[${attr}="${CSS.escape(a.getAttribute(attr))}"]`;
+    }
+  }
+  render();
+  if(sel) refocus(sel);
 }
 
 /* ---------- events ---------- */
@@ -1014,8 +1315,28 @@ $app.addEventListener("click", e => {
   if(edit){ S.menuFor = null; render(); editStop(edit.dataset.edit); return; }
   if(e.target.closest("[data-day-edit]")){ S.menuFor = null; render(); editDay(); return; }
   if(e.target.closest("[data-day-add]")){ S.menuFor = null; render(); newStop(undefined, true); return; }
+  const rate = e.target.closest("[data-cost-rate]");
+  if(rate){
+    const id = rate.dataset.costRate;
+    if(S.openCosts.has(id)) S.openCosts.delete(id); else S.openCosts.add(id);
+    render();
+    refocus(`[data-cost-rate="${CSS.escape(id)}"]`);
+    return;
+  }
   const tap = e.target.closest("[data-open]");
   if(tap){ toggleStop(tap.dataset.open); return; }
+  for(const [attr, field] of [["data-cost-view", "costView"], ["data-cost-cur", "costCur"]]){
+    const b = e.target.closest(`[${attr}]`);
+    if(!b) continue;
+    S.ui[field] = b.getAttribute(attr);
+    saveUi();
+    render();
+    refocus(`[${attr}="${CSS.escape(b.getAttribute(attr))}"]`);
+    return;
+  }
+  if(e.target.closest("[data-expense-add]")){ editExpense(null); return; }
+  const expense = e.target.closest("[data-expense]");
+  if(expense){ editExpense(expense.dataset.expense); return; }
   if(e.target.closest("[data-expand]")){
     S.ui.expandAll = !S.ui.expandAll;
     S.openStops.clear();
@@ -1205,6 +1526,23 @@ $app.addEventListener("submit", e => {
   });
 });
 
+// What the trip cost, folded at the end of Info: open or closed, remembered.
+$app.addEventListener("toggle", e => {
+  if(!e.target.matches || !e.target.matches("[data-costs]") || S.ui.costsOpen === e.target.open) return;
+  S.ui.costsOpen = e.target.open;
+  saveUi();
+  render();
+}, true);
+
+$app.addEventListener("change", e => {
+  if(e.target.id !== "home-cur") return;
+  S.home = e.target.value;
+  store.setKV("home", S.home).catch(() => {});
+  S.openCosts.clear();
+  render();
+  refocus("#home-cur");
+});
+
 $file.addEventListener("change", async () => {
   const f = $file.files && $file.files[0];
   if(!f) return;
@@ -1223,7 +1561,7 @@ document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().incl
 window.addEventListener("resize", markCut);
 // When the phone switches between light and dark, maps follow it.
 if(darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if(S.theme === "auto") render(); });
-window.addEventListener("online", () => { S.online = true; render(); });
+window.addEventListener("online", () => { S.online = true; retryRates(); render(); });
 window.addEventListener("offline", () => { S.online = false; render(); });
 
 /* ---------- offline support ---------- */
@@ -1313,7 +1651,8 @@ async function start(){
     for(const trip of legacy) await versions.put(trip);
     await store.clearLegacyVersions();
   }
-  const [records, activeId, ui, key, lang, useGoogle] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle")]);
+  const [records, activeId, ui, key, lang, useGoogle, home] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle"), store.getKV("home")]);
+  if(typeof home === "string" && /^[A-Z]{3}$/.test(home)) S.home = home;
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);
@@ -1327,7 +1666,8 @@ async function start(){
     await store.putTrip(rec);
     await versions.put(ready);
   }
-  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll, route: ui.route !== false};
+  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll, route: ui.route !== false,
+    costsOpen: !!ui.costsOpen, costView: ui.costView === "receipt" ? "receipt" : "sum", costCur: typeof ui.costCur === "string" ? ui.costCur : ""};
   if(typeof key === "string") S.deviceKey = key;
   syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);

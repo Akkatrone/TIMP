@@ -12,7 +12,9 @@ merged, however useful it is otherwise.
    request that carries trip data. Trip files are read locally and stored in IndexedDB.
    Two exceptions, only when a stop is added or changed: its name and address go to
    Google or OpenStreetMap to look up its position, and a Google Maps link pasted or
-   shared goes to the link resolver (`worker/`), which keeps nothing.
+   shared goes to the link resolver (`worker/`), which keeps nothing. And one for costs
+   in another currency: the month whose exchange rates are needed goes to Frankfurter
+   (every currency against the euro: no amount, place or currency of the trip).
 2. **It works offline.** Everything except the interactive map must work in airplane
    mode, on iPhone and Android, after the app has been opened once.
 3. **Anyone can host it.** The app is static files. No build step is needed to run it

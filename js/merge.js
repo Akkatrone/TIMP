@@ -11,7 +11,7 @@
 // Without a base (the two never shared a version this device still has), nothing
 // counts as removed and every difference is settled by the same winner.
 //
-// Days are matched by date, plans and stops by id; anything else field by field.
+// Days are matched by date, plans, stops and expenses by id; anything else field by field.
 // No DOM here.
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -113,8 +113,9 @@ export function mergeTrips(base, ours, theirs){
   const stops = m.list(s => s.id, (z, a, b) => m.fields(z, a, b));
   const plans = m.list(p => p.id, (z, a, b) => m.fields(z, a, b, {stops}));
   const days = m.list(d => d.date, (z, a, b) => m.fields(z, a, b, {stops, plans}));
+  const expenses = m.list(x => x.id, (z, a, b) => m.fields(z, a, b));
 
-  const trip = m.fields(base ? strip(base) : undefined, strip(ours), strip(theirs), {days});
+  const trip = m.fields(base ? strip(base) : undefined, strip(ours), strip(theirs), {days, expenses});
   trip.days.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
   return trip;
 }

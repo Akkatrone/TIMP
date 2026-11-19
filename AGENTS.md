@@ -43,7 +43,7 @@ Someone wants their itinerary turned into a file for the app. No code changes.
    ```
 
 5. Tell the person what you could not verify (coordinates, prices, opening hours,
-   closing days, booking rules) and how to load the file on a phone.
+   closing days, booking rules, costs) and how to load the file on a phone.
 
 ## Request B: change the app
 
@@ -69,6 +69,8 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/trip.js` | The trip format: `FIELDS` (one table for every field), checks, JSON Schema, conversion from format 1. No DOM. |
 | `js/geo.js` | Map zones, the offline sketch, the colours of pins and lines. No DOM. |
 | `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
+| `js/money.js` | Amounts as people type them, in their currency, and what they make in another at the rate of their own day. No DOM, no network. |
+| `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
 | `js/places.js` | What the app works out about a place: its part of the world, its review site (Tabelog, Naver, Yelp, TheFork), closing days, the language of its local name. No DOM. |
 | `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |
@@ -104,7 +106,9 @@ seems to need it: say so instead.
    request that carries trip data. Two exceptions, both when a stop is added or
    changed: its name and address go to Google or OpenStreetMap to find its position,
    and a Google Maps link pasted or shared goes to the link resolver (`worker/`),
-   which keeps nothing.
+   which keeps nothing. And one for costs in another currency: the month whose
+   exchange rates are needed goes to Frankfurter, always asking for every currency
+   against the euro (`js/rates.js`), so no amount, place or currency of the trip.
 2. **It works offline.** Everything except the interactive map, after one online visit.
 3. **Anyone can host it.** Static files only; running it needs no build and no
    installed dependency. The link resolver is optional: without it the app loses only

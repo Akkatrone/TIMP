@@ -25,6 +25,9 @@ export const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const HASH = /^[0-9a-f]{16}$/;
 const HTTPS = /^https:\/\/[^\s<>"]+$/;
+// A currency, as its ISO 4217 code.
+const CURRENCY = /^[A-Z]{3}$/;
+const CURRENCY_HINT = "a currency code like \"JPY\"";
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string" && v.trim() !== "";
@@ -65,14 +68,16 @@ export const FIELDS = {
     days: {type: "list", of: "day", min: 1, req: true, doc: "One entry per date, in date order."},
     lang: {type: "text", values: ["en", "it"], soft: true, doc: "Language of the app while this trip is open. Without it, the phone's."},
     timezone: {type: "text", test: realTimezone, hint: "an IANA time zone such as \"Europe/Rome\"", doc: "Time zone of the destination: decides which day is today."},
-    info: {type: "list", of: "section", doc: "Sections of the Info page: useful numbers, words, how to get around."},
+    info: {type: "list", of: "section", doc: "Sections of the Info page: numbers, words, transport."},
+    currency: {type: "text", pattern: CURRENCY, hint: CURRENCY_HINT, doc: "The currency of every cost without its own."},
+    expenses: {type: "list", of: "expense", min: 1, doc: "Money spent outside the stops: flights, hotels, passes."},
     googleMapsKey: {type: "text", private: true, doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app. Keep it when you change a file the app saved."},
     version: {type: "any", byApp: true, doc: "Written by the app. Keep it as it is."}
   },
   day: {
     date: {type: "text", req: true, test: realDate, hint: "a real date as \"YYYY-MM-DD\"", doc: "The date."},
-    city: {type: "text", doc: "Where the day is spent: a city or an area. Days in the same city share a colour."},
+    city: {type: "text", doc: "Where the day is spent: a city or an area."},
     title: {type: "text", doc: "What the day is about, in a few words."},
     stay: {type: "stay", doc: "Where the night is spent: a name, or an object with name, address and note."},
     notes: {type: "list", of: "text", doc: "Things to remember that day, shown at the top."},
@@ -86,18 +91,27 @@ export const FIELDS = {
   },
   stop: {
     title: {type: "text", req: true, doc: "The name of the place or of the activity."},
-    local: {type: "text", doc: "The name in the local language and script, as on the sign (\"一蘭 渋谷店\"): to recognise the place, show it to staff, and search it."},
+    local: {type: "text", doc: "The name in the local script, as on the sign (\"一蘭 渋谷店\"): to show staff, and to search it."},
     time: {type: "text", doc: "When: \"09:30\", or words like \"Evening\"."},
     type: {type: "text", values: TYPES, soft: true, doc: "What kind of place it is; it gives the stop its icon and pin."},
     travel: {type: "text", values: TRAVEL, soft: true, doc: "How you get there from the stop before."},
     text: {type: "text", doc: "What to know: what to see, what to order, tickets. **bold** is allowed."},
     tag: {type: "text", doc: "A short label shown on the stop, like \"Booked 19:30\" or \"Optional\"."},
-    booking: {type: "text", values: BOOKING, soft: true, doc: "\"required\": no entry without booking (the app warns until it is done); \"advised\": better booked; \"booked\": done."},
-    closed: {type: "list", of: "text", min: 1, item: {type: "text", pattern: /^(sun|mon|tue|wed|thu|fri|sat|\d{4}-\d{2}-\d{2})$/, test: closedDay, hint: "\"mon\" to \"sun\", or a date as \"YYYY-MM-DD\""}, doc: "When the place is closed: days of the week (\"mon\"…\"sun\") and dates. The app warns when the stop falls on one."},
-    address: {type: "text", doc: "Where it is, as you would search it in Google Maps: a street address, or name and town."},
-    lat: {type: "number", min: -90, max: 90, doc: "Latitude, with `lng`. Gives the stop its pin on the map."},
+    booking: {type: "text", values: BOOKING, soft: true, doc: "\"required\": no entry without it (the app warns); \"advised\": better booked; \"booked\": done."},
+    cost: {type: "number", min: 0, max: 1e12, doc: "What it costs in all, for everyone: tickets, meal, ride. 0: free."},
+    currency: {type: "text", pattern: CURRENCY, hint: CURRENCY_HINT, doc: "The currency of `cost`, if not the trip's."},
+    closed: {type: "list", of: "text", min: 1, item: {type: "text", pattern: /^(sun|mon|tue|wed|thu|fri|sat|\d{4}-\d{2}-\d{2})$/, test: closedDay, hint: "\"mon\" to \"sun\", or a date as \"YYYY-MM-DD\""}, doc: "Days of the week and dates the place is closed: the app warns on them."},
+    address: {type: "text", doc: "As you would search it in Google Maps: a street address, or name and town."},
+    lat: {type: "number", min: -90, max: 90, doc: "Latitude, with `lng`: the pin on the map."},
     lng: {type: "number", min: -180, max: 180, doc: "Longitude, with `lat`."},
     link: {type: "text", pattern: HTTPS, hint: "an https:// address", doc: "A Google Maps link to the exact place."},
+    id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
+  },
+  expense: {
+    title: {type: "text", req: true, doc: "What it was: \"Flights\", \"Hotel, 3 nights\"."},
+    cost: {type: "number", req: true, min: 0, max: 1e12, doc: "How much, in all."},
+    currency: {type: "text", pattern: CURRENCY, hint: CURRENCY_HINT, doc: "The currency of `cost`, if not the trip's."},
+    date: {type: "text", test: realDate, hint: "a real date as \"YYYY-MM-DD\"", doc: "When it was paid: the day of its rate. Without it, the trip's first day."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
   },
   stay: {
@@ -179,6 +193,7 @@ const RULES = {
     days.forEach((d, i) => {
       if(i && isObj(d) && isObj(days[i - 1]) && isStr(d.date) && !(d.date > days[i - 1].date)) err(`days[${i}].date`, "must come after the day before: one entry per date, in order");
     });
+    unique(t.expenses, "expenses", err);
     if(t.version !== undefined){
       const v = t.version, ok = isObj(v) && HASH.test(v.id) && ["parents", "history"].every(k => Array.isArray(v[k]) && v[k].every(x => HASH.test(x)));
       if(!ok) err("version", "is written by the app: keep it as it is, or remove it");
@@ -192,8 +207,9 @@ const RULES = {
     const all = lists.flatMap(l => Array.isArray(l) ? l : []);
     if(all.length && all.every(s => !isObj(s) || s.lat === undefined)) warn(path, "no stop has lat/lng: this day has no map");
   },
-  stop(s, path, err){
+  stop(s, path, err, warn){
     if((s.lat === undefined) !== (s.lng === undefined)) err(path, "\"lat\" and \"lng\" go together");
+    if(s.currency !== undefined && s.cost === undefined) warn(path, "\"currency\" without \"cost\" says nothing");
   }
 };
 
@@ -262,16 +278,16 @@ export function formatBrief(){
     const f = FIELDS[k][name];
     if(f.type === "fixed") return `  ${name} (required): ${JSON.stringify(f.value)}`;
     const what = f.type === "list" ? `list of ${f.item ? f.item.hint : f.of}` : f.type === "stay" ? "text or stay"
-      : f.type === "number" ? `number from ${f.min} to ${f.max}` : f.values ? f.values.join("|") : f.hint || f.type;
+      : f.type === "number" ? (f.max >= 1e9 ? `number, ${f.min} or more` : `number from ${f.min} to ${f.max}`) : f.values ? f.values.join("|") : f.hint || f.type;
     return `  ${name}${f.req ? " (required)" : ""}: ${what}. ${f.doc}`;
   };
   const block = k => `${k}:\n` + Object.entries(FIELDS[k]).filter(([, f]) => !f.byApp && !f.private).map(([n]) => kind(k, n)).join("\n");
   return [
     `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block: double quotes, no comments, no trailing commas. Use only these fields; invent none.`,
     "",
-    ...["trip", "day", "plan", "stop", "stay", "section", "item"].map(block),
+    ...Object.keys(FIELDS).map(block),
     "",
-    "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings or hotels. Give lat/lng only for places you are sure about; otherwise an address.",
+    "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. Give lat/lng only for places you are sure about; otherwise an address.",
     "",
     "Example:",
     JSON.stringify(EXAMPLE)

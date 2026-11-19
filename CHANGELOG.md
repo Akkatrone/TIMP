@@ -4,6 +4,39 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.7.0
+
+What the trip costs, and stops as cards.
+
+- **Stops are cards**, as in the lists of Android (Gmail, Settings): a light card on a
+  darker page, a little apart, rounder at the two ends of the list. In the dark theme
+  the page is nearly black and the cards dark grey. Done and skipped stops sink halfway
+  into the page.
+- **What a stop costs**: written in its form (the amount as you type it, "16.000" or
+  "4,50", and its currency on two buttons, the trip's and yours, or any other). It
+  shows small under the stop's time, in the currency it is paid in; an opened stop has
+  it as its last line, and one more tap shows what it makes in your currency, with the
+  rate. Next to "2/5 done", the day's total.
+- **At the rate of its day**: each cost is converted at the rate of the day it is paid,
+  a stop on its day, an expense on the date it was paid, not the day you look at it.
+  Days still to come use today's rate, marked ≈, as an estimate that may change.
+- **Expenses outside the stops**: flights, hotels, passes, often paid before leaving,
+  each with the date it was paid.
+- **What the trip costs**, folded at the end of Info: the total in your currency, the
+  dollar, the euro or the trip's, how much is done and how much still to come; day by
+  day, by kind of place, and the expenses. Or the same as a receipt.
+- **Your currency** is a setting of the phone (Trips), taken from its language at
+  first: two people on the same trip can each see their own.
+- The rates come from Frankfurter (frankfurter.dev, open source, the median of about
+  90 central banks for every day). What leaves the phone is only which month: the
+  request is always "every currency against the euro, this month", never an amount, a
+  place or the trip's currency. Each month is kept on the phone, so costs convert
+  offline once it is there. A new exception to "the trip never leaves the device",
+  written in the README.
+- Trip format: optional `cost` and `currency` on a stop, `currency` and `expenses` on
+  the trip. Changes from an assistant can set them: `setTrip`, `addExpense`,
+  `setExpense`, `removeExpense`. Older apps load these files and ignore the costs.
+
 ## 3.6.1
 
 What a first try on real phones showed.

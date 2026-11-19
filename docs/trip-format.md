@@ -73,6 +73,8 @@ an `address` and its position (`lat`, `lng`):
 | `lang` | no | Language of the app while this trip is open: `"en"` or `"it"`. Without it, the phone's. |
 | `timezone` | no | IANA time zone of the destination, like `"Europe/Rome"`: decides which day is "today". Without it, the phone's. |
 | `info` | no | Sections of the Info page. |
+| `currency` | no | The currency money is spent in, as its code: `"JPY"`, `"EUR"`. Every `cost` without its own `currency` is in it. See [Costs](#costs). |
+| `expenses` | no | Money spent outside the stops: flights, hotels, passes. See [Costs](#costs). |
 | `googleMapsKey` | no | A Google Maps key for everyone who loads the trip. See [Google Maps key](#google-maps-key). |
 | `id` | written by the app | Identifies the trip on the phone. Without it the app makes one from the title and the first date, so a corrected file for the same trip updates it. Keep it when you change a file the app saved. |
 | `version` | written by the app | Keep it exactly as it is.<!-- llms.txt: skip --> See [Versions](#versions).<!-- llms.txt: end --> |
@@ -101,6 +103,8 @@ an `address` and its position (`lat`, `lng`):
 | `text` | no | What to know: what to see, what to order, tickets. |
 | `tag` | no | A short label above the title, like `"Booked 19:30"` or `"Optional"`. |
 | `booking` | no | `"required"`: no entry without booking, and the stop shows a warning until it is done; `"advised"`: better booked; `"booked"`: done, shown as Booked (the time and the people go in `tag`). |
+| `cost` | no | What the stop costs, in all, for everyone on the trip: the tickets, the meal, the ride. A number, `0` for free. See [Costs](#costs). |
+| `currency` | no | The currency of `cost`, when it is not the trip's `currency`: `"EUR"` for a ticket bought from home. |
 | `closed` | no | When the place is closed: days of the week (`"mon"` … `"sun"`) and dates (`"2027-05-03"`). The stop shows a warning when its day is one of them, also after it is moved. |
 | `address` | no | Where it is, as you would search it in Google Maps: a street address, or name and town (`"Pantheon, Rome"`). Used by the Map and Directions links. |
 | `lat`, `lng` | no | The position, both or neither. Gives the stop its pin on the map. |
@@ -118,6 +122,39 @@ A stop of `type` `food` also gets a link to the reviews people read in that part
 world, searched by its `local` name or its title: Tabelog in Japan, Naver Map in Korea,
 Yelp in the United States and Canada, TheFork in Europe. The app picks the site from
 the position, or from the trip's `timezone`; nothing about it goes in the file.
+
+## Costs
+
+A trip can say what it costs. Each stop has its `cost`; the money spent outside the
+stops, often before leaving, goes in `expenses`:
+
+```json
+"currency": "JPY",
+"expenses": [
+  {"title": "Flights Rome – Tokyo", "date": "2027-02-01", "cost": 1280, "currency": "EUR"},
+  {"title": "Ryokan in Kyoto, 3 nights", "date": "2027-03-10", "cost": 96000}
+]
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `title` | yes | What it was. |
+| `cost` | yes | How much, in all, for everyone. |
+| `currency` | no | Its currency, when it is not the trip's. |
+| `date` | no | When it was paid, `"YYYY-MM-DD"`. Without it, the first day of the trip. |
+| `id` | written by the app | Lets edits and merges follow the expense. |
+
+Amounts are written in the currency they are paid in. The app converts each one into
+the traveller's own currency at the rate of its day: a stop on the date of its day, an
+expense on the date it was paid. Days still to come use today's rate, as an estimate
+that changes until then. The traveller's currency is a setting of the phone, not of
+the file: two people on the same trip can each see their own. Write only prices you
+know (tickets, trains, a booked dinner), never a guess; the traveller corrects them
+with what was really spent.
+
+On the stop it shows small, under its time; an opened stop shows it in full, and a tap
+on it shows what it makes at home. The end of the Info page sums it all up: day by day,
+by kind of place, and the expenses, or as a receipt.
 
 ## Info
 
@@ -217,7 +254,12 @@ as one new version (Paste, at the bottom of the app):
   {"addPlan": {"day": "2027-04-11", "first": "Sunny", "plan": {"name": "If it rains", "stops": [
     {"time": "10:00", "title": "Vatican Museums", "type": "museum"}]}}},
   {"setPlan": {"day": "2027-04-11", "plan": "sunny", "set": {"name": "Squares"}}},
-  {"removePlan": {"day": "2027-04-12", "plan": "lazy-morning"}}
+  {"removePlan": {"day": "2027-04-12", "plan": "lazy-morning"}},
+  {"update": {"day": "2027-04-10", "stop": "colosseum", "set": {"cost": 36}}},
+  {"setTrip": {"set": {"currency": "EUR"}}},
+  {"addExpense": {"expense": {"title": "Train Rome – Naples", "date": "2027-03-01", "cost": 58}}},
+  {"setExpense": {"expense": "train-rome-naples", "set": {"cost": 49}}},
+  {"removeExpense": {"expense": "hotel-deposit"}}
 ]}
 ```
 
@@ -226,7 +268,8 @@ Stops are named by their `id`, plans by theirs (`"plan": "…"` next to `"day"`)
 alternative plan; on a day that has none yet, the stops it has become the first plan,
 named by `first`, and their ticks follow. A day left with one plan by `removePlan` has
 plain stops again. `setPlan` changes only the name: the stops of a plan change one by
-one. The changes are applied in order, all or none: if one is wrong, the app lists
+one. `setTrip` changes the trip's `title`, `lang`, `timezone`, `info` or `currency`;
+`addExpense`, `setExpense` and `removeExpense` its `expenses`, named by their `id`. The changes are applied in order, all or none: if one is wrong, the app lists
 which one and why, and changes nothing. The result is checked like any trip file.
 `trip` may be left out: the changes then apply to the trip open on the phone.
 <!-- llms.txt: skip -->The rules are in [`js/changes.js`](../js/changes.js).<!-- llms.txt: end -->
@@ -258,6 +301,9 @@ warnings: the file loads, and the command-line checker shows them.
 Only what a trip file, or a list of changes, can say differently. Files written for an
 older version still load.
 
+- **3.7**: what things cost: `cost` and `currency` on a stop; `currency` and
+  `expenses` on the trip. Changes can set them: `setTrip`, `addExpense`, `setExpense`,
+  `removeExpense`.
 - **3.5**: three optional stop fields: `local` (the name as on the sign), `booking`
   (`required`, `advised`, `booked`) and `closed` (days of the week and dates).
 - **3.4**: changes can add, rename and remove a day's plans: `addPlan`, `setPlan`,

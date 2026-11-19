@@ -73,6 +73,10 @@ export function ensureIds(trip){
     });
   };
   out.days.forEach(d => d.plans ? d.plans.forEach(p => fix(p.stops, d.date, p.id)) : fix(d.stops, d.date, null));
+  if(Array.isArray(out.expenses)){
+    const taken = new Set(out.expenses.filter(x => x.id).map(x => x.id));
+    out.expenses.forEach(x => { if(!x.id){ x.id = newId(x.title, taken); taken.add(x.id); } });
+  }
   return {trip: out, renamed};
 }
 
@@ -219,6 +223,48 @@ export function removePlan(trip, date, id){
   return {trip: out, marks};
 }
 
+/* ---------- expenses: money spent outside the stops ---------- */
+
+// The trip's expenses stay in date order; one without a date counts as the first day.
+const EXPENSE_ORDER = ["id", ...Object.keys(FIELDS.expense)];
+function sortExpenses(trip){
+  const first = trip.days.length ? trip.days[0].date : "";
+  const when = x => x.date || first;
+  trip.expenses.sort((a, b) => when(a) < when(b) ? -1 : when(a) > when(b) ? 1 : 0);
+}
+
+/** Adds an expense (without an id). Returns {trip, id}. */
+export function addExpense(trip, expense){
+  const out = clone(trip);
+  const list = out.expenses || (out.expenses = []);
+  const x = {id: newId(expense.title, new Set(list.map(e => e.id))), ...clean(expense)};
+  list.push(orderLike({}, x, EXPENSE_ORDER));
+  sortExpenses(out);
+  return {trip: out, id: x.id};
+}
+
+/** Replaces the expense with this id; its id stays. */
+export function updateExpense(trip, id, expense){
+  const out = clone(trip);
+  const list = out.expenses || [];
+  const i = list.findIndex(x => x.id === id);
+  if(i < 0) throw new Error(`no expense ${id}`);
+  list[i] = orderLike(list[i], {...clean(expense), id}, EXPENSE_ORDER);
+  sortExpenses(out);
+  return out;
+}
+
+/** Removes an expense; the list goes when it is empty. */
+export function removeExpense(trip, id){
+  const out = clone(trip);
+  const list = out.expenses || [];
+  const i = list.findIndex(x => x.id === id);
+  if(i < 0) throw new Error(`no expense ${id}`);
+  list.splice(i, 1);
+  if(!list.length) delete out.expenses;
+  return out;
+}
+
 // Empty fields are left out of the file.
 function clean(stop){
   return Object.fromEntries(Object.entries(stop).filter(([, v]) => v !== undefined && v !== null && v !== ""));
@@ -227,7 +273,7 @@ function clean(stop){
 // Keeps the field order the stop had, so a small edit is a small change in the file.
 const ORDER = ["id", ...Object.keys(FIELDS.stop)];
 const DAY_ORDER = Object.keys(FIELDS.day);
-function orderLike(old, next){
-  const keys = [...new Set([...Object.keys(old), ...ORDER, ...Object.keys(next)])].filter(k => k in next);
+function orderLike(old, next, order = ORDER){
+  const keys = [...new Set([...Object.keys(old), ...order, ...Object.keys(next)])].filter(k => k in next);
   return Object.fromEntries(keys.map(k => [k, next[k]]));
 }
