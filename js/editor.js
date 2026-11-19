@@ -7,7 +7,7 @@ import { t, getLang } from "./i18n.js";
 import { esc, dateParts, weekdayName } from "./util.js";
 import { parseMapsInput, queryOf } from "./gmaps.js";
 import { geocode, areaAround, resolveLink } from "./geocode.js";
-import { loadLeaflet } from "./livemap.js";
+import { newMap } from "./livemap.js";
 import { icon } from "./icons.js";
 import { TRAVEL, TYPES } from "./trip.js";
 import { clockMinutes, dayAfter } from "./edit.js";
@@ -264,21 +264,18 @@ export function openStopEditor(o){
     $("[data-pick]").setAttribute("aria-expanded", "true");
     const el = box.querySelector(".live");
     try{
-      const L = await loadLeaflet();
-      if(box.hidden || !dlg.open) return;
-      el.innerHTML = "";
       const a = area();
-      const start = st.lat !== undefined ? [st.lat, st.lng] : a ? [(a.south + a.north) / 2, (a.west + a.east) / 2] : [0, 0];
-      const map = L.map(el, {zoomControl: true});
-      map.attributionControl.setPrefix(false);
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);
-      map.setView(start, st.lat !== undefined ? 17 : a ? 14 : 2);
-      const icon = L.divIcon({className: "pinwrap", html: `<span class="pin pickpin">+</span>`, iconSize: [0, 0]});
-      const marker = L.marker(start, {icon, draggable: true, keyboard: false}).addTo(map);
+      const start = st.lat !== undefined ? [st.lng, st.lat] : a ? [(a.west + a.east) / 2, (a.south + a.north) / 2] : [0, 0];
+      el.innerHTML = "";
+      const {ml, map} = await newMap(el, {center: start, zoom: st.lat !== undefined ? 17 : a ? 14 : 1}, o.dark);
+      if(box.hidden || !dlg.open){ map.remove(); return; }
+      const node = document.createElement("div");
+      node.className = "pinwrap";
+      node.innerHTML = `<span class="pin pickpin">+</span>`;
+      const marker = new ml.Marker({element: node, draggable: true}).setLngLat(start).addTo(map);
       const put = ll => { st.lat = Math.round(ll.lat * 1e5) / 1e5; st.lng = Math.round(ll.lng * 1e5) / 1e5; st.source = "map"; showPos(); };
-      marker.on("dragend", () => put(marker.getLatLng()));
-      map.on("click", e => { marker.setLatLng(e.latlng); put(e.latlng); });
+      marker.on("dragend", () => put(marker.getLngLat()));
+      map.on("click", e => { marker.setLngLat(e.lngLat); put(e.lngLat); });
       pick = {map, marker};
       el.scrollIntoView({block: "nearest", behavior: "smooth"});
     }catch(err){
@@ -294,7 +291,7 @@ export function openStopEditor(o){
   }
   // A position found or pasted moves the pin on the open map.
   function movePick(){
-    if(pick && st.lat !== undefined){ pick.marker.setLatLng([st.lat, st.lng]); pick.map.setView([st.lat, st.lng], Math.max(pick.map.getZoom(), 16)); }
+    if(pick && st.lat !== undefined){ pick.marker.setLngLat([st.lng, st.lat]); pick.map.jumpTo({center: [st.lng, st.lat], zoom: Math.max(pick.map.getZoom(), 16)}); }
   }
 
   // What the traveller pasted or typed in the first field.

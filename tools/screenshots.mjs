@@ -36,7 +36,7 @@ await withApp(async ({run, until, theme, capture}) => {
   await run(`location.hash = "#day-2";`);
   await until("day 2", `document.querySelectorAll(".stop").length === 7`);
   await run(`for(const i of [0, 1]) document.querySelectorAll("[data-tick]")[i].click(); document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
-  await until("the map tiles", `document.querySelectorAll(".leaflet-tile").length > 0 && document.querySelectorAll(".leaflet-tile").length === document.querySelectorAll(".leaflet-tile-loaded").length`, 40000);
+  await until("the map drawn", `document.querySelector(".live .canvas[data-ready]")`, 40000);
   await run(scrollToTitle);
   await new Promise(r => setTimeout(r, 600)); // tiles fade in
   await shoot("map.png");

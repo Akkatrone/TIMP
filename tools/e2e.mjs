@@ -114,20 +114,21 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("the interactive map does the same, and keeps the map when a stop is ticked", async () => {
     await click('[data-view="live"]');
-    await until("the map", `document.querySelector(".live .leaflet-container") && document.querySelectorAll(".live .pin").length === 5`);
+    await until("the map", `document.querySelector(".live .maplibregl-map") && document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await count(".live .pin.gone"), 3);
-    const lines = `[...document.querySelectorAll(".live .leaflet-overlay-pane path")]`;
-    assert.equal(await run(`return ${lines}.length;`), 3);
-    assert.equal(await run(`return ${lines}.filter(p => p.getAttribute("stroke-dasharray")).length;`), 1);
+    // A map drawn by the phone has no elements to count: it says what it draws.
+    const lines = `+document.querySelector(".live .canvas").dataset.legs`;
+    assert.equal(await run(`return ${lines};`), 3);
+    assert.equal(await run(`return +document.querySelector(".live .canvas").dataset.dashed;`), 1);
     await run(`window.__map = document.querySelector(".live");`);
     await click("[data-tick]", 3);
     assert.equal(await run(`return window.__map === document.querySelector(".live");`), true);
     assert.equal(await count(".live .pin.gone"), 4);
     // Restoring the skipped stop puts it back on the route: the map is drawn again.
     await click(".stop.skipped [data-skip]");
-    await until("the route through stop 2", `${lines}.length === 4`);
+    await until("the route through stop 2", `${lines} === 4`);
     await click(".stop:nth-child(2) [data-skip]");
-    await until("the route past stop 2", `${lines}.length === 3`);
+    await until("the route past stop 2", `${lines} === 3`);
     // Under the open map, ⋯ and Edit leave the page where it is: it used to jump up by
     // the map's height, from the second time on.
     for(let round = 0; round < 3; round++){
@@ -209,17 +210,17 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("the lines between the stops can be hidden on both maps, and the choice is kept", async () => {
     await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
-    const lines = `document.querySelectorAll(".live .leaflet-overlay-pane path").length`;
+    const lines = `+(document.querySelector(".live .canvas") || {dataset: {}}).dataset.legs`;
     await until("the lines", `${lines} > 0`);
-    // Hiding them keeps the map as it is: the same map, its zoom and its place.
-    await run(`window.__map = document.querySelector(".live .leaflet-container"); window.__view = document.querySelector(".live .leaflet-map-pane").style.transform;`);
+    // Hiding them keeps the map as it is: the same map, drawn once.
+    await run(`window.__map = document.querySelector(".live .maplibregl-canvas");`);
     await click("[data-route]");
     await until("no lines", `${lines} === 0 && document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await run(`return document.querySelector("[data-route]").getAttribute("aria-pressed");`), "false");
-    assert.equal(await run(`return document.querySelector(".live .leaflet-container") === window.__map && document.querySelector(".live .leaflet-map-pane").style.transform === window.__view;`), true, "the map was not drawn again");
+    assert.equal(await run(`return document.querySelector(".live .maplibregl-canvas") === window.__map;`), true, "the map was not drawn again");
     await click("[data-route]");
     await until("the lines back", `${lines} > 0`);
-    assert.equal(await run(`return document.querySelector(".live .leaflet-container") === window.__map;`), true);
+    assert.equal(await run(`return document.querySelector(".live .maplibregl-canvas") === window.__map;`), true);
     await click("[data-route]");
     await until("no lines", `${lines} === 0`);
     await click('[data-view="schema"]');
@@ -249,7 +250,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded");`), "true", "a hold opens it");
     await run(`document.querySelector('[data-view="live"]').click();`);
     await press(700);
-    await until("the card of the third stop", `document.querySelector(".live .leaflet-popup") && document.querySelector(".live .leaflet-popup").textContent.includes("Miradouro de Santa Luzia")`);
+    await until("the card of the third stop", `document.querySelector(".live .maplibregl-popup") && document.querySelector(".live .maplibregl-popup").textContent.includes("Miradouro de Santa Luzia")`);
     // The sketch: the badge of that stop pulses.
     await click('[data-view="schema"]');
     await until("the sketch", `document.querySelector(".mapsvg")`);
@@ -284,7 +285,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelector("[data-map]")`);
     await run(`document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
-    await until("a dark map", `document.querySelector(".live.dark .leaflet-container")`);
+    await until("a dark map", `document.querySelector(".live.dark .maplibregl-map")`);
     await click("[data-map]");
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector('[data-theme-choice="auto"]')`);
@@ -386,8 +387,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     const [w, n, e, so] = url.searchParams.get("viewbox").split(",").map(Number);
     assert.ok(w < -9.14 && e > -9.13 && so < 38.71 && n > 38.72, "the box is around the day's stops in Lisbon");
     await run(`document.querySelector("[data-pick]").click();`);
-    await until("the map in the form", `document.querySelector(".live.pick.leaflet-container") && document.querySelector(".live.pick .pickpin")`);
-    await run(`const m = document.querySelector(".live.pick"), r = m.getBoundingClientRect(); m.dispatchEvent(new MouseEvent("click", {bubbles: true, clientX: r.left + r.width / 2 + 40, clientY: r.top + r.height / 2 + 30}));`);
+    await until("the map in the form", `document.querySelector(".live.pick.maplibregl-map") && document.querySelector(".live.pick .pickpin")`);
+    await run(`const m = document.querySelector(".live.pick .maplibregl-canvas"), r = m.getBoundingClientRect(), at = {bubbles: true, clientX: r.left + r.width / 2 + 40, clientY: r.top + r.height / 2 + 30, button: 0};
+      for(const type of ["mousedown", "mouseup", "click"]) m.dispatchEvent(new MouseEvent(type, at));`);
     await until("a position put by hand", `/placed on the map/.test(document.querySelector("[data-pos]").textContent)`);
     assert.notEqual(await run(`return document.querySelector("[data-pos]").textContent;`), "38.71000, -9.13660 · placed on the map");
     await run(`document.querySelector("dialog.sheet [data-close]").click();`);
@@ -521,7 +523,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("the new status", `document.querySelector('[data-map-status="statusGoogleDevice"]')`);
 
     await openLiveMap();
-    await until("Google to refuse key A and the map to fall back", `document.querySelector(".live .leaflet-container")`, 30000);
+    await until("Google to refuse key A and the map to fall back", `document.querySelector(".live .maplibregl-map")`, 30000);
     assert.deepEqual(await run(`return ${googleScripts};`), [KEY_A]);
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector("[data-map-status]")`);
@@ -533,7 +535,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("a fresh page", `!window.__samePage && document.querySelector("[data-map-status]")`);
     assert.equal(await status(), "statusGoogleDevice");
     await openLiveMap();
-    await until("Google to refuse key B", `document.querySelector(".live .leaflet-container")`, 30000);
+    await until("Google to refuse key B", `document.querySelector(".live .maplibregl-map")`, 30000);
     assert.deepEqual(await run(`return ${googleScripts};`), [KEY_B]);
 
     // Turned off: no request to Google at all, even with a key.
@@ -543,7 +545,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("the status", `document.querySelector('[data-map-status="statusOsmChosen"]')`);
     await reload();
     await openLiveMap();
-    await until("OpenStreetMap", `document.querySelector(".live .leaflet-container")`);
+    await until("OpenStreetMap", `document.querySelector(".live .maplibregl-map")`);
     assert.deepEqual(await run(`return ${googleScripts};`), []);
 
     // Leave the device as it was.
@@ -800,10 +802,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     await until("the pins", `document.querySelector('.live .pin[aria-label="Pastéis de Belém"]')`);
     await run(`document.querySelector('.live .pin[aria-label="Pastéis de Belém"]').click();`);
-    await until("the card", `document.querySelector(".live .leaflet-popup .local")`);
-    assert.equal(await run(`return document.querySelector(".live .leaflet-popup .local").textContent;`), "Antiga Confeitaria de Belém");
-    assert.ok(await run(`return !!document.querySelector('.live .leaflet-popup a[aria-label="Reviews on TheFork"]');`));
-    assert.equal(await run(`return new URL([...document.querySelectorAll(".live .leaflet-popup a")].find(a => a.textContent.startsWith("Directions")).href).searchParams.get("origin");`), "Mosteiro dos Jerónimos");
+    await until("the card", `document.querySelector(".live .maplibregl-popup .local")`);
+    assert.equal(await run(`return document.querySelector(".live .maplibregl-popup .local").textContent;`), "Antiga Confeitaria de Belém");
+    assert.ok(await run(`return !!document.querySelector('.live .maplibregl-popup a[aria-label="Reviews on TheFork"]');`));
+    assert.equal(await run(`return new URL([...document.querySelectorAll(".live .maplibregl-popup a")].find(a => a.textContent.startsWith("Directions")).href).searchParams.get("origin");`), "Mosteiro dos Jerónimos");
     await click("[data-map]");
     // Booked: the warning goes, Booked shows; the closing day stays until the stop moves.
     await run(`document.querySelector('[data-edit="pasteis"]').click();`);

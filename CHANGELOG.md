@@ -4,6 +4,21 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.10.0
+
+Maps you can read, wherever you are.
+
+- **The map of OpenStreetMap is drawn by the phone** (MapLibre, with OpenFreeMap's
+  vector tiles), instead of being a mosaic of pictures. Names are in the app's
+  language, or in Latin letters, and under them as on the signs when the place writes
+  in another script: "Kyoto" over "京都市", "Shibuya Station" over "渋谷駅",
+  "Jongno 3-ga" over "종로3가". In Europe nothing changes but the look.
+- **A real dark map** in the dark theme, instead of the light one turned around.
+- **Sturdier**: if OpenFreeMap does not answer, the same map comes as pictures from
+  OpenStreetMap, as before. A phone without WebGL keeps the sketch.
+- MapLibre takes the place of Leaflet. It is downloaded the first time a map is
+  opened, not with the app: the interactive map needs a connection anyway.
+
 ## 3.9.0
 
 Ready for trips that are not only yours.

@@ -74,7 +74,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
 | `js/private.js` | Private expenses: in the file and on the phone, never in a version or a merge; what to do with those a loaded file brings. No DOM. |
 | `js/places.js` | What the app works out about a place: its part of the world, its review site (Tabelog, Naver, Yelp, TheFork), closing days, the language of its local name. No DOM. |
-| `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
+| `js/livemap.js` | Interactive map: Google Maps, or MapLibre with OpenStreetMap from OpenFreeMap (names in the app's language over the local ones). |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |
 | `js/editor.js` | The add / edit stop form, and the day form. |
 | `js/ask.js` | Question dialog for confirmations and choices; never use `confirm()`. |
@@ -97,7 +97,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `tools/`, `test/` | Checks, build, tests. `tools/e2e.mjs` drives a real browser. |
 | `tools/lib/llms.mjs` | Builds `llms.txt` (format for chat assistants) from the docs, with the version of `package.json`; text between `<!-- llms.txt: skip -->` and `<!-- llms.txt: end -->` stays out. A change to what a file can say goes in "What changed, version by version" in `docs/trip-format.md`. It is published with the site and kept at the root of the repository: never edit it, run `node tools/check-llms.mjs --fix` after changing `docs/`, `js/trip.js`, the example or the version in `package.json` (`npm run check` fails otherwise). |
 | `worker/` | The optional link resolver (Cloudflare Workers): a Google Maps link in, name, address, position and kind out. Keeps nothing. |
-| `vendor/` | Third-party code, unmodified. Do not edit. |
+| `vendor/` | Third-party code, unmodified (MapLibre: see its README). Do not edit. |
 
 ### What a change must respect
 

@@ -45,8 +45,6 @@ const FILES = [
   "js/trips.js",
   "js/util.js",
   "js/version.js",
-  "vendor/leaflet/leaflet.css",
-  "vendor/leaflet/leaflet.js",
   "icons/apple-touch-icon.png",
   "icons/icon-192.png",
   "icons/icon-512.png",

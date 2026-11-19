@@ -1,38 +1,113 @@
 // The interactive map, shown only when there is a connection.
-// Google Maps if a key is available, otherwise OpenStreetMap through Leaflet.
+// Google Maps if a key is available, otherwise OpenStreetMap through MapLibre: a map
+// the phone draws from vector tiles (OpenFreeMap), with names the traveller can read.
 // Both draw the same things: numbered pins, a straight line along the route, a small card per pin.
 
 import { esc, mapsUrl, dirUrl } from "./util.js";
 import { legsOf, bridgesOf, midpoint, pinGone, legGone } from "./geo.js";
 import { icon } from "./icons.js";
-import { t } from "./i18n.js";
+import { t, getLang } from "./i18n.js";
 import { loadGoogle, googleRefusedKey, whenGoogleRefuses } from "./google.js";
 
-let leafletPromise = null;
 const active = new Set();           // live maps currently on screen
 
-// Leaflet, loaded once, the first time a map needs it (also the editor's map to pick a point).
-export function loadLeaflet(){
-  if(!leafletPromise){
-    leafletPromise = new Promise((resolve, reject) => {
+/* ---------- MapLibre and OpenFreeMap ---------- */
+
+// The map of OpenStreetMap as vector tiles: free, no key, no cookies (openfreemap.org),
+// in a light and a dark style.
+const STYLE_URL = dark => "https://tiles.openfreemap.org/styles/" + (dark ? "dark" : "liberty");
+const OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+// The same map as images, from OpenStreetMap itself, when the vector one cannot be had;
+// in the dark theme its light turned around (a minimum brightness above the maximum).
+const raster = dark => ({version: 8, sources: {osm: {type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19, attribution: OSM}},
+  layers: [{id: "osm", type: "raster", source: "osm",
+    paint: dark ? {"raster-brightness-min": 0.88, "raster-brightness-max": 0.1, "raster-hue-rotate": 180, "raster-saturation": -0.3} : {}}]});
+
+function hasWebGL(){
+  try{ const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }
+  catch(e){ return false; }
+}
+
+let mapLibre = null;
+// MapLibre, loaded once, the first time a map needs it (also the editor's map to pick
+// a point). It needs WebGL; without it, the day keeps its sketch map.
+export function loadMapLibre(){
+  if(!mapLibre){
+    mapLibre = (async () => {
+      if(!hasWebGL()) throw new Error("webgl");
       const css = document.createElement("link");
       css.rel = "stylesheet";
-      css.href = "vendor/leaflet/leaflet.css";
+      css.href = "vendor/maplibre/maplibre-gl.css";
       document.head.appendChild(css);
-      const js = document.createElement("script");
-      js.src = "vendor/leaflet/leaflet.js";
-      js.onload = () => resolve(window.L);
-      js.onerror = () => reject(new Error("leaflet"));
-      document.head.appendChild(js);
-    }).catch(e => { leafletPromise = null; throw e; });
+      // Shipped as .js (any static host serves it as JavaScript); its worker is named here.
+      const ml = await import(new URL("../vendor/maplibre/maplibre-gl.js", import.meta.url).href);
+      ml.setWorkerUrl(new URL("../vendor/maplibre/maplibre-gl-worker.js", import.meta.url).href);
+      return ml;
+    })().catch(e => { mapLibre = null; throw e; });
   }
-  return leafletPromise;
+  return mapLibre;
 }
+
+// Names in the app's language, else in Latin letters, and under them the name as on
+// the signs when it is in another script: "Kyoto" over "京都市". Buildings stay flat.
+function readable(style, lang){
+  const own = ["coalesce", ["get", "name:" + lang], ["get", "name:latin"], ["get", "name"]];
+  const both = sep => ["case", ["all", ["has", "name:nonlatin"], ["!=", ["get", "name:nonlatin"], own]], ["concat", own, sep, ["get", "name:nonlatin"]], own];
+  return {...style, layers: style.layers.filter(l => l.type !== "fill-extrusion").map(l => {
+    const field = l.layout && l.layout["text-field"];
+    const text = field ? JSON.stringify(field) : "";
+    if(!text.includes("name")) return l;
+    return {...l, layout: {...l.layout, "text-field": both(text.includes("\\n") ? "\n" : " ")}};
+  })};
+}
+
+const styles = new Map();   // "<lang>|<dark>" → the style, asked for once
+// The vector style, or the images of OpenStreetMap when it does not come.
+export function mapStyle(dark){
+  const key = getLang() + "|" + !!dark;
+  if(!styles.has(key)){
+    const ask = new AbortController();
+    const late = setTimeout(() => ask.abort(), 8000);
+    styles.set(key, fetch(STYLE_URL(dark), {signal: ask.signal})
+      .then(r => r.ok ? r.json() : Promise.reject(new Error("style " + r.status)))
+      .then(style => readable(style, getLang()))
+      .catch(() => { styles.delete(key); return raster(dark); })
+      .finally(() => clearTimeout(late)));
+  }
+  return styles.get(key).then(style => structuredClone(style));
+}
+
+/** A MapLibre map in `canvas`, kept north up, with zoom buttons. */
+export async function newMap(canvas, options, dark = false){
+  const ml = await loadMapLibre();
+  const style = await mapStyle(dark);
+  const map = new ml.Map({container: canvas, style, attributionControl: {compact: true}, dragRotate: false, pitchWithRotate: false, touchPitch: false, ...options});
+  map.touchZoomRotate.disableRotation();
+  map.keyboard.disableRotation();
+  map.addControl(new ml.NavigationControl({showCompass: false}), "top-left");
+  // Vector tiles that keep failing before any arrives: the images of OpenStreetMap instead.
+  let failed = 0, arrived = !style.sources.openmaptiles;
+  map.on("sourcedata", e => { if(e.sourceId === "openmaptiles" && e.tile) arrived = true; });
+  map.on("error", e => {
+    if(arrived || e.sourceId !== "openmaptiles") return;
+    if(++failed === 4) map.setStyle(raster(dark));
+  });
+  return {ml, map};
+}
+
+// A marker MapLibre places by its corner: an empty box at the point, the pin centred on it by CSS.
+const at = el => {
+  const box = document.createElement("div");
+  box.className = "pinwrap";
+  box.appendChild(el);
+  return box;
+};
+const lngLat = ll => [ll[1], ll[0]];
 
 // When Google rejects the key, every map on screen switches to OpenStreetMap.
 whenGoogleRefuses(() => [...active].forEach(m => m.onGoogleRefused()));
 
-// Google shows the title in the popup's own header (`withTitle` false), Leaflet inside it.
+// Google shows the title in the popup's own header (`withTitle` false), MapLibre inside it.
 // The app may add to a pin: `local` (the name as on the sign, with its `lang`), `dir`
 // (directions from the stop before) and `review` ({site, url}, for a place to eat).
 function popupNode(pt, withTitle = true){
@@ -77,59 +152,75 @@ function pinNode(pt, color, paint){
   return el;
 }
 
-// In the dark theme the tiles are darkened by CSS (.live.dark), see css/app.css.
-async function drawLeaflet(canvas, zones, color, paint){
-  const L = await loadLeaflet();
-  const map = L.map(canvas, {zoomControl: true});
-  map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
-  }).addTo(map);
-  const legs = [], pins = [], marks = [];
-  // A jump between zones (Hakone → Kyoto) is thinner: it is not a walk.
-  const style = (leg, isGone) => ({weight: leg.bridge ? 3 : 4, opacity: isGone || leg.bridge ? 0.55 : 0.75, dashArray: isGone ? "5 10" : null});
-  // The route is always drawn; showRoute hides it or shows it again, map untouched.
-  routeOf(zones).forEach(leg => {
-    legs.push({...leg, line: L.polyline([leg.from.ll, leg.to.ll], {color: paint ? paint.leg(leg) : color, interactive: false, ...style(leg, false)}).addTo(map)});
-    if(leg.travel){
-      const el = travelNode(leg, paint ? paint.leg(leg) : color);
-      const m = L.marker(midpoint(leg.from.ll, leg.to.ll), {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), interactive: false, keyboard: false, zIndexOffset: -1000}).addTo(map);
-      marks.push({leg, el, m});
-    }
+async function drawOsm(canvas, zones, color, dark, paint){
+  const {ml, map} = await newMap(canvas, {}, dark);
+  const route = routeOf(zones);
+  let gone = () => false, routeOn = true;
+  // The legs as lines: a jump between zones (Hakone → Kyoto) is thinner, it is not a
+  // walk; legs to stops done or skipped are dashed (a layer of their own).
+  const lines = () => ({type: "FeatureCollection", features: route.map(leg => {
+    const off = legGone(leg, gone);
+    return {type: "Feature", properties: {color: paint ? paint.leg(leg) : color, w: leg.bridge ? 3 : 4, o: off || leg.bridge ? 0.55 : 0.75, gone: off},
+      geometry: {type: "LineString", coordinates: [lngLat(leg.from.ll), lngLat(leg.to.ll)]}};
+  })});
+  const paintOf = {"line-color": ["get", "color"], "line-width": ["get", "w"], "line-opacity": ["get", "o"]};
+  // Called again when the style changes (vector tiles that do not come).
+  const addRoute = () => {
+    if(map.getSource("route")) return;
+    map.addSource("route", {type: "geojson", data: lines()});
+    const visibility = routeOn ? "visible" : "none";
+    map.addLayer({id: "route", type: "line", source: "route", filter: ["!", ["get", "gone"]], layout: {"line-cap": "round", visibility}, paint: paintOf});
+    map.addLayer({id: "route-gone", type: "line", source: "route", filter: ["get", "gone"], layout: {visibility}, paint: {...paintOf, "line-dasharray": [1.25, 2.5]}});
+  };
+  map.on("style.load", addRoute);
+  if(map.isStyleLoaded()) addRoute();
+  const marks = route.filter(leg => leg.travel).map(leg => {
+    const el = travelNode(leg, paint ? paint.leg(leg) : color);
+    return {leg, el, m: new ml.Marker({element: at(el)}).setLngLat(lngLat(midpoint(leg.from.ll, leg.to.ll))).addTo(map)};
   });
-  zones.forEach(z => {
-    z.pts.forEach(pt => {
-      const el = pinNode(pt, color, paint);
-      const m = L.marker(pt.ll, {icon: L.divIcon({className: "pinwrap", html: el, iconSize: [0, 0]}), title: pt.name}).addTo(map);
-      m.bindPopup(popupNode(pt), {offset: [0, -10], maxWidth: 250});
-      pins.push({pt, el, m});
-    });
-  });
-  // Legs and pins of stops that are done or skipped turn dashed.
-  const mark = gone => {
-    legs.forEach(l => l.line.setStyle(style(l, legGone(l, gone))));
-    marks.forEach(m => m.el.classList.toggle("gone", legGone(m.leg, gone)));
+  const pins = zones.flatMap(z => z.pts.map(pt => {
+    const el = pinNode(pt, color, paint);
+    const popup = new ml.Popup({offset: 14, maxWidth: "250px"}).setDOMContent(popupNode(pt));
+    const m = new ml.Marker({element: at(el)}).setLngLat(lngLat(pt.ll)).setPopup(popup).addTo(map);
+    return {pt, el, m};
+  }));
+  // What the map draws, said on the page (a canvas has no elements to count): the
+  // lines on show and how many are dashed; "ready" once the tiles are drawn.
+  const say = () => {
+    canvas.dataset.legs = routeOn ? route.length : 0;
+    canvas.dataset.dashed = routeOn ? route.filter(leg => legGone(leg, gone)).length : 0;
+  };
+  map.on("idle", () => { canvas.dataset.ready = "1"; });
+  const mark = fn => {
+    gone = fn;
+    say();
+    const src = map.getSource("route");
+    if(src) src.setData(lines());
+    marks.forEach(k => k.el.classList.toggle("gone", legGone(k.leg, gone)));
     pins.forEach(p => p.el.classList.toggle("gone", pinGone(p.pt, gone)));
   };
   const fit = zi => {
     const pts = (zi == null ? zones : [zones[zi]]).flatMap(z => z.pts);
-    if(pts.length === 1) map.setView(pts[0].ll, 15);
-    else map.fitBounds(L.latLngBounds(pts.map(p => p.ll)), {padding: [36, 36], maxZoom: 16});
+    if(pts.length === 1){ map.jumpTo({center: lngLat(pts[0].ll), zoom: 15}); return; }
+    const b = new ml.LngLatBounds();
+    pts.forEach(p => b.extend(lngLat(p.ll)));
+    map.fitBounds(b, {padding: 36, maxZoom: 16, animate: false});
   };
   fit(null);
   const showRoute = on => {
-    legs.forEach(l => on ? l.line.addTo(map) : l.line.remove());
+    routeOn = on;
+    say();
+    for(const id of ["route", "route-gone"]) if(map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
     marks.forEach(k => on ? k.m.addTo(map) : k.m.remove());
   };
   // The pin of the stop at `idx` in the day's list, in the middle, with its card.
   const focus = idx => {
     const p = pins.find(x => x.pt.items.some(it => it.idx === idx));
     if(!p) return;
-    map.setView(p.pt.ll, Math.max(map.getZoom(), 16));
-    p.m.openPopup();
+    map.jumpTo({center: lngLat(p.pt.ll), zoom: Math.max(map.getZoom(), 16)});
+    if(!p.m.getPopup().isOpen()) p.m.togglePopup();
   };
-  return {fit, mark, showRoute, focus, refresh: () => map.invalidateSize(), destroy: () => map.remove()};
+  return {fit, mark, showRoute, focus, refresh: () => map.resize(), destroy: () => map.remove()};
 }
 
 async function drawGoogle(canvas, zones, color, key, dark, paint){
@@ -260,7 +351,7 @@ export function createLiveMap({zones, color, googleKey, dark, route = true, pain
     try{
       // The canvas must be on the page (with a size) before a map is drawn into it.
       el.appendChild(fresh);
-      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, paint) : await drawLeaflet(fresh, zones, color, paint);
+      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, paint) : await drawOsm(fresh, zones, color, dark, paint);
       if(dead){ made.destroy(); return; }
       const msg = el.querySelector(".msg");
       if(msg) msg.remove();

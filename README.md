@@ -39,8 +39,9 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 - Tick the stops you have done, or skip the ones you leave out. The app remembers both.
 - Each stop at a glance: time, pin number and how you get there on the left, a label
   like "Booking needed" above the title, Map and Directions always one tap away.
-- A map for every day: interactive when you are online (Google Maps or OpenStreetMap),
-  a sketch to scale when you are not. Each pin has the colour of its kind of place,
+- A map for every day: interactive when you are online (Google Maps, or OpenStreetMap
+  drawn by the phone, with names you can read: "Kyoto" over "京都市"), a sketch to scale
+  when you are not. Each pin has the colour of its kind of place,
   lighter in the morning and darker after sunset; what is behind you is drawn dashed,
   and the lines between the stops can be hidden. Hold a stop's number in the list to
   see it on the map.
@@ -324,9 +325,12 @@ real routes and transport times, tap "Directions" on a stop.
 - Trip files are read on the device and stored in the browser's local database
   (IndexedDB). They are never sent to the server that hosts the app.
 - The app has no accounts, no analytics, no cookies and no third-party fonts or scripts
-  at startup. The only library, Leaflet, is served with the app.
-- When you open the interactive map, map images are requested from OpenStreetMap or
-  Google, who therefore see your IP address and the area you look at.
+  at startup. The only library, MapLibre, is served with the app and loaded only when
+  you open the interactive map.
+- When you open the interactive map, its data is requested from
+  [OpenFreeMap](https://openfreemap.org/) (OpenStreetMap as vector tiles: no key, no
+  cookies), from OpenStreetMap when OpenFreeMap does not answer, or from Google. They
+  see your IP address and the area you look at.
 - "Map" and "Directions" links open Google Maps.
 - When you add or change a stop and its position has to be looked up, its name and
   address are sent to Google (with a key) or to OpenStreetMap. A Google Maps short link
@@ -419,5 +423,6 @@ your real trip file: issues are public.
 [MIT](LICENSE) © 2026 Francesco Falqui. You are free to use, change and redistribute
 the project; the licence asks that the copyright notice stays in every copy.
 
-Leaflet is distributed under its own
-[BSD 2-Clause license](vendor/leaflet/LICENSE). Map data © OpenStreetMap contributors.
+MapLibre is distributed under its own
+[BSD 3-Clause license](vendor/maplibre/LICENSE). Map data © OpenStreetMap contributors,
+vector tiles © OpenMapTiles, served by OpenFreeMap.
