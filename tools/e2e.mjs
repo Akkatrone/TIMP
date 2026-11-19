@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { withApp } from "./lib/browser.mjs";
 import { prepare } from "../js/trips.js";
-import { commit } from "../js/version.js";
+import { commit, relation, commonBase, commitMerge } from "../js/version.js";
+import { mergeTrips } from "../js/merge.js";
 import { addStop } from "../js/edit.js";
 import { splitPrivate } from "../js/private.js";
 
@@ -1049,7 +1050,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   await step("the Content-Security-Policy blocked nothing the app needs", async () => {
     assert.deepEqual(blocked(), []);
   });
-}).then(() => withApp(accountSteps, {api: fakeService(), host: "localhost"})).then(() => {
+}).then(() => { const api = fakeService(); return withApp(ctx => accountSteps({...ctx, service: api.state}), {api, host: "localhost"}); }).then(() => {
   console.log(`e2e: OK (${passed} checks)`);
 }).catch(e => {
   console.error("e2e: FAILED");
@@ -1061,9 +1062,13 @@ await withApp(async ({run, until, reload, blocked}) => {
 function fakeService(){
   const b64 = s => Buffer.from(s).toString("base64url");
   const users = new Map(), keys = new Map(), codes = new Set(["TEST-CODE-0000-0001"]), sessions = new Map(), challenges = new Map();
+  const trips = new Map(), privs = new Map();   // the service's trips and private expenses
   let n = 0;
+  const clone = v => JSON.parse(JSON.stringify(v));
+  const summary = t => { const h = t.versions.get(t.head); return {id: t.id, localId: t.localId, title: h.title, head: t.head, role: "owner", visibility: "private",
+    firstDay: h.days[0].date, lastDay: h.days[h.days.length - 1].date, days: h.days.length, updatedAt: "2026-11-19T00:00:00.000Z"}; };
   const client = cred => JSON.parse(Buffer.from(cred.response.clientDataJSON, "base64url").toString());
-  return async (method, path, body, headers) => {
+  const handler = async (method, path, body, headers) => {
     const ok = b => ({status: 200, body: b}), no = (status, error) => ({status, body: {error}});
     const user = handle => ({id: "u-" + handle, handle, name: "", since: "2026-11-19T00:00:00.000Z"});
     const session = handle => { const token = "tok-" + ++n; sessions.set(token, handle); return ok({token, user: user(handle)}); };
@@ -1094,15 +1099,49 @@ function fakeService(){
       if(!c || cd.type !== "webauthn.get" || cd.challenge !== c.challenge || !keys.has(cred.id) || !cred.response.signature) return no(401, "sign-in: failed");
       return session(keys.get(cred.id));
     }
+    const who = sessions.get(String(headers.authorization || "").replace("Bearer ", ""));
+    const m = path.match(/^\/v1\/trips(?:\/([^/]+)(?:\/(push|private|versions)(?:\/([^/]+))?)?)?$/);
+    if(m && !who) return no(401, "sign in first");
+    if(m && method === "GET" && !m[1]) return ok({trips: [...trips.values()].filter(t => t.owner === who).map(summary)});
+    if(m && method === "POST" && !m[1]){
+      const trip = body.trip, had = [...trips.values()].find(t => t.owner === who && t.localId === trip.id);
+      if(!had){
+        const id = "t" + ++n;
+        trips.set(id, {id, owner: who, localId: trip.id, head: trip.version.id, versions: new Map([[trip.version.id, clone(trip)]])});
+        return ok({trip: id, kind: "new", head: trip.version.id});
+      }
+      m[1] = had.id; m[2] = "push";
+    }
+    if(m && m[1] && m[2] === "push"){
+      const t = trips.get(m[1]), trip = body.trip, head = t.versions.get(t.head), kind = relation(head, trip);
+      if(kind === "same" || kind === "older") return ok({trip: t.id, kind, head: t.head});
+      t.versions.set(trip.version.id, clone(trip));
+      if(kind === "newer"){ t.head = trip.version.id; return ok({trip: t.id, kind, head: t.head}); }
+      const baseId = commonBase(head, trip, new Set(t.versions.keys()));
+      const merged = await commitMerge(mergeTrips(baseId ? t.versions.get(baseId) : null, head, trip), head, trip);
+      t.versions.set(merged.version.id, merged);
+      t.head = merged.version.id;
+      return ok({trip: t.id, kind, head: t.head, merged});
+    }
+    if(m && m[1] && m[2] === "versions") return ok(clone(trips.get(m[1]).versions.get(m[3])));
+    if(m && m[1] && m[2] === "private"){
+      const k = who + "|" + m[1], cur = privs.get(k) || {data: null, rev: 0};
+      if(method === "GET") return ok(cur);
+      if(body.rev !== cur.rev) return {status: 409, body: {error: "private: changed on another phone", current: cur}};
+      privs.set(k, {data: body.data, rev: cur.rev + 1});
+      return ok(privs.get(k));
+    }
     if(method === "POST" && path === "/v1/auth/logout"){
       sessions.delete(String(headers.authorization || "").replace("Bearer ", ""));
       return ok({ok: true});
     }
     return no(404, "not found");
   };
+  handler.state = {trips, privs};
+  return handler;
 }
 
-async function accountSteps({run, until, reload, page, blocked}){
+async function accountSteps({run, until, reload, page, blocked, service}){
   const text = sel => run(`const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent : null;`);
   await step("an account: made with an invitation code and a passkey, kept on the phone, signed out and in again", async () => {
     // A passkey as a phone makes it: kept on the device, opened with the fingerprint.
@@ -1129,6 +1168,31 @@ async function accountSteps({run, until, reload, page, blocked}){
     await until("signed out", `document.querySelector(".acct [data-act='signin']")`);
     await run(`document.querySelector(".acct [data-act='signin']").click();`);
     await until("signed in again", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`, 15000);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("signed in, trips go to the account and come back: a change made on another phone arrives here", async () => {
+    // A trip on this phone (the example, with its private expenses): it goes up by itself.
+    await run(`document.querySelector('[data-act="demo"]').click();`);
+    await until("the trip", `document.querySelectorAll(".stop").length > 0`);
+    for(let i = 0; i < 50 && !service.trips.size; i++) await new Promise(r => setTimeout(r, 200));
+    assert.equal(service.trips.size, 1, "the trip went up");
+    for(let i = 0; i < 50 && !service.privs.size; i++) await new Promise(r => setTimeout(r, 200));
+    assert.deepEqual([...service.privs.values()][0].data.expenses.map(x => x.cost), [24, 18], "and its private expenses, for this account only");
+    // Another phone of the same account adds a stop.
+    const t = [...service.trips.values()][0], head = t.versions.get(t.head);
+    const other = await commit(addStop(head, {date: "2027-05-14"}, {time: "22:00", title: "Added on the other phone"}).trip, head);
+    t.versions.set(other.version.id, other);
+    t.head = other.version.id;
+    await run(`location.hash = "#trips";`);
+    await until("synced", `document.querySelector('[data-sync="ok"]')`, 15000);
+    assert.equal(await text(".tripcard .where"), "On your account");
+    await run(`document.querySelector('[data-act="sync"]').click();`);
+    await run(`location.hash = "#day-1";`);
+    await until("the other phone's stop", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Added on the other phone"))`, 15000);
+    await run(`location.hash = "#trips";`);
+    await until("synced again", `document.querySelector('[data-sync="ok"]')`, 15000);
+    assert.equal(await run(`return !!document.querySelector(".tripcard .unsaved");`), false, "on the account: no file needed to keep it");
     assert.deepEqual(blocked(), []);
   });
 }

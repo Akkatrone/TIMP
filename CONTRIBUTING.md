@@ -16,7 +16,8 @@ merged, however useful it is otherwise.
    in another currency: the month whose exchange rates are needed goes to Frankfurter
    (every currency against the euro: no amount, place or currency of the trip). And
    an optional account, only on a copy with a sharing service: a name and the public
-   half of a passkey go to it.
+   half of a passkey go to it, and, signed in, the traveller's trips and private
+   expenses.
 2. **It works offline.** Everything except the interactive map must work in airplane
    mode, on iPhone and Android, after the app has been opened once.
 3. **Anyone can host it.** The app is static files. No build step is needed to run it

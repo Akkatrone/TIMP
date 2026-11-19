@@ -22,7 +22,8 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi } from "./share.js";
+import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, accountError } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -53,6 +54,7 @@ const S = {
   rates: {},              // exchange rates of the days the trip needs (js/money.js)
   owner: "",              // this phone's code for its private expenses, made with the first one
   account: null,          // the sharing service's account on this phone ({id, handle, …}), or null
+  sync: "",               // "", "busy", "ok", "offline", "error": the last sync with the service
   openCosts: new Set()    // stops whose cost shows what it makes at home, until the page is closed
 };
 
@@ -195,9 +197,12 @@ async function keepRecord(rec){
   S.records = S.records.filter(r => r.id !== rec.id).concat(rec);
   if(S.rec && S.rec.id === rec.id){ S.rec = rec; document.title = rec.trip.title; }
   else await openRecord(rec);
+  syncSoon();
 }
 
-const needsSaving = rec => !!rec && (rec.exported !== rec.trip.version.id || !!rec.privUnsaved);
+// A trip on the service, as it is here: a file adds nothing to keep it safe.
+const synced = rec => !!(rec && rec.share && rec.share.head === rec.trip.version.id && canonical(rec.share.privBase || null) === canonical(rec.priv || null));
+const needsSaving = rec => !!rec && !synced(rec) && (rec.exported !== rec.trip.version.id || !!rec.privUnsaved);
 
 // The private expenses of the open trip, and this phone's owner code, made when needed.
 const privOf = () => (S.rec && S.rec.priv) || null;
@@ -736,7 +741,7 @@ function renderWelcome(){
     <h1>TIMP</h1>
     <p class="lead name">Travel in my pocket</p>
     <p class="lead">${esc(t("tagline"))}</p>
-    <p class="lead">${esc(t("welcomeLead"))}</p>
+    <p class="lead">${esc(t(hasService() ? "welcomeLeadShare" : "welcomeLead"))}</p>
   </section>
   ${errorBox()}
   <div class="actions">
@@ -763,8 +768,62 @@ function accountSection(){
     `<span class="who"><b>${esc(t("account"))}</b><small>${esc(t("accountShort"))}</small></span>` +
     `<span class="acts"><button type="button" class="btn small" data-act="signin">${esc(t("signIn"))}</button><button type="button" class="btn small primary" data-act="signup">${esc(t("signUp"))}</button></span></section>`;
   return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${esc(u.handle.slice(0, 1).toUpperCase())}</span>` +
-    `<span class="who"><b>@${esc(u.handle)}</b><small>${esc(t("signedIn"))}</small></span>` +
-    `<span class="acts"><button type="button" class="btn small" data-act="signout">${esc(t("signOut"))}</button></span></section>`;
+    `<span class="who"><b>@${esc(u.handle)}</b><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn"))}</small></span>` +
+    `<span class="acts"><button type="button" class="btn small" data-act="sync"${S.sync === "busy" ? " disabled" : ""}>${esc(t("syncNow"))}</button><button type="button" class="btn small" data-act="signout">${esc(t("signOut"))}</button></span></section>`;
+}
+
+/* ---------- sync with the sharing service ---------- */
+
+// Trips go to the service and come from it (js/sync.js): those of this phone, those of
+// the same account made on another phone, those shared with this account. One sync at
+// a time; one asked for meanwhile runs after it.
+let syncing = null, syncAgain = false, syncTimer = 0;
+const syncSoon = (ms = 1500) => { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms); };
+
+async function keepSynced(next){
+  await store.putTrip(next);
+  S.records = S.records.map(r => r.id === next.id ? next : r);
+  if(S.rec && S.rec.id === next.id) S.rec = next;
+}
+
+function syncNow(){
+  if(!hasService() || !S.account || !S.online) return Promise.resolve();
+  if(syncing){ syncAgain = true; return syncing; }
+  S.sync = "busy";
+  syncing = (async () => {
+    const before = canonical(S.records.map(r => [r.id, r.trip.version.id, r.share && r.share.head]));
+    try{
+      const api = serviceApi(), remote = await api.list();
+      for(const r of remote){
+        if(S.records.some(x => x.share && x.share.id === r.id)) continue;
+        const trip = await api.version(r.id, r.head);
+        const here = S.records.find(x => x.id === trip.id);
+        // The same trip, on this phone already (from a file): linked, then joined below.
+        if(here && !here.share){ await keepSynced({...here, share: {id: r.id, role: r.role}}); continue; }
+        if(here) continue;   // another trip with the same id: it stays on the service
+        await versions.put(trip);
+        const rec = {id: trip.id, trip, importedAt: Date.now(), fileName: "", exported: trip.version.id, share: {id: r.id, role: r.role, head: r.head}};
+        await store.putTrip(rec);
+        S.records.push(rec);
+      }
+      for(const rec of [...S.records]){
+        const remoteOf = remote.find(r => rec.share && r.id === rec.share.id) || null;
+        let next = await syncTrip(versions, rec, remoteOf, api);
+        next = await syncPrivate(next, api);
+        if(next !== rec) await keepSynced(next);
+      }
+      S.sync = "ok";
+    }catch(e){
+      S.sync = e && e.status === 0 ? "offline" : "error";
+      if(e && e.status === 401){ S.account = null; }
+    }finally{
+      syncing = null;
+      const after = canonical(S.records.map(r => [r.id, r.trip.version.id, r.share && r.share.head]));
+      if(after !== before || route().name === "trips") renderKeepingFocus();
+      if(syncAgain){ syncAgain = false; syncSoon(500); }
+    }
+  })();
+  return syncing;
 }
 
 async function accountSignIn(){
@@ -774,6 +833,7 @@ async function accountSignIn(){
     S.account = user;
     render();
     toast(t("welcomeBack", {h: user.handle}));
+    syncNow();
   }catch(e){ toast(accountError(e)); }
 }
 
@@ -786,6 +846,7 @@ function renderTrips(){
       <div class="t"><span>${esc(r.trip.title)}</span>${cur ? `<span class="badge-on">${esc(t("current"))}</span>` : ""}</div>
       <div class="s">${esc(t("daysCount", {n: r.trip.days.length}))} · ${esc(t("loadedOn", {d: when}))}</div>
       <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
+      ${r.share ? `<div class="s where">${esc(t(r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
       <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button><button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
     </div>`;
@@ -1609,9 +1670,10 @@ $app.addEventListener("click", e => {
   else if(a === "copy-prompt-full") copyText(aiMessageFull(), t("copiedPrompt"));
   else if(a === "copy-edit" && S.rec) copyText(aiEditMessage(), t("copiedEdit"));
   else if(a === "demo") loadDemo();
-  else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); }, onSignIn: accountSignIn});
+  else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn});
+  else if(a === "sync") syncNow();
   else if(a === "signin") accountSignIn();
-  else if(a === "signout") signOut().then(() => { S.account = null; render(); toast(t("signedOut")); });
+  else if(a === "signout") signOut().then(() => { S.account = null; S.sync = ""; render(); toast(t("signedOut")); });
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
   else if(a === "history") showHistory(act.dataset.id);
@@ -1756,7 +1818,8 @@ document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().incl
 window.addEventListener("resize", markCut);
 // When the phone switches between light and dark, maps follow it.
 if(darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if(S.theme === "auto") render(); });
-window.addEventListener("online", () => { S.online = true; retryRates(); render(); });
+window.addEventListener("online", () => { S.online = true; retryRates(); render(); syncSoon(200); });
+document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") syncSoon(800); });
 window.addEventListener("offline", () => { S.online = false; render(); });
 
 /* ---------- offline support ---------- */
@@ -1872,6 +1935,7 @@ async function start(){
   render();
   setupServiceWorker();
   takeSharedPlace();
+  syncNow();
 }
 
 start().catch(e => {

@@ -8,6 +8,7 @@ export const STRINGS = {
   en: {
     tagline: "A pocket travel guide that works without internet.",
     welcomeLead: "The app is the same for everyone. Your trip is a file that stays on this device: it is never uploaded anywhere.",
+    welcomeLeadShare: "The app is the same for everyone. Your trip stays on this device; only with an account, if you make one, does it go to it too, encrypted, to be on your other phones and shared with whom you choose.",
     loadTrip: "Load a trip file",
     tryDemo: "Try the example trip",
     installTitle: "Before you leave",
@@ -115,6 +116,9 @@ export const STRINGS = {
     codeInvalid: "That code does not work: wrong, expired or used.", handleTaken: "That name is taken: try another.",
     handleBad: "A name of 3 to 30 letters, digits, dots or dashes.", accountOffline: "This needs a connection.",
     accountBusy: "Too many attempts: try again later.", accountFailed: "It did not work. Try again.",
+    syncNow: "Sync now", syncBusy: "Syncing…", syncOk: "Synced with your account", syncOffline: "Offline: syncs when the connection is back",
+    syncError: "Sync did not work: it will try again", onAccount: "On your account", sharedEdit: "Shared with you: you can change it",
+    sharedRead: "Shared with you, read only: your changes stay on this phone",
     // Private expenses: the traveller's own, outside the shared trip
     kindTrip: "Trip", kindPrivate: "Private", fKind: "Trip or private",
     privateHelp: "Private: yours only. It goes in the file only when you save it with private expenses.",
@@ -214,6 +218,7 @@ export const STRINGS = {
   it: {
     tagline: "Una guida di viaggio tascabile che funziona senza internet.",
     welcomeLead: "L'app è uguale per tutti. Il tuo viaggio è un file che resta su questo dispositivo: non viene caricato da nessuna parte.",
+    welcomeLeadShare: "L'app è uguale per tutti. Il tuo viaggio resta su questo dispositivo; solo con un account, se lo crei, va anche lì, cifrato, per averlo sugli altri telefoni e condividerlo con chi scegli.",
     loadTrip: "Carica un file viaggio",
     tryDemo: "Prova il viaggio di esempio",
     installTitle: "Prima di partire",
@@ -321,6 +326,9 @@ export const STRINGS = {
     codeInvalid: "Il codice non funziona: sbagliato, scaduto o già usato.", handleTaken: "Questo nome è già preso: provane un altro.",
     handleBad: "Un nome da 3 a 30 lettere, numeri, punti o trattini.", accountOffline: "Serve la connessione.",
     accountBusy: "Troppi tentativi: riprova più tardi.", accountFailed: "Non ha funzionato. Riprova.",
+    syncNow: "Sincronizza", syncBusy: "Sincronizzazione…", syncOk: "Sincronizzato con il tuo account", syncOffline: "Offline: sincronizzo quando torna la rete",
+    syncError: "Sincronizzazione non riuscita: riprovo", onAccount: "Sul tuo account", sharedEdit: "Condiviso con te: puoi modificarlo",
+    sharedRead: "Condiviso con te in sola lettura: le tue modifiche restano su questo telefono",
     // Spese private: solo del viaggiatore, fuori dal viaggio condiviso
     kindTrip: "Viaggio", kindPrivate: "Privata", fKind: "Del viaggio o privata",
     privateHelp: "Privata: solo tua. Va nel file solo quando lo salvi con le spese private.",

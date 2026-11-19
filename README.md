@@ -344,8 +344,10 @@ real routes and transport times, tap "Directions" on a stop.
   the request like any web service. Its code is [worker/resolve.js](worker/resolve.js).
 - An account is optional, and only on a copy of the app that has a sharing service.
   Making one sends that service a name and the public half of a passkey (the key
-  itself never leaves the phone): no password, no email. Without an account nothing
-  changes.
+  itself never leaves the phone): no password, no email. Signed in, your trips and
+  your private expenses go to it too, encrypted where they are kept, so that they are
+  on your other phones and shared only with the people you invite. Without an account
+  nothing changes.
 - A saved trip file goes only where you send it. When the trip has private expenses,
   the app asks each time whether they go in the file.
 - A Content-Security-Policy in `index.html` lets the page load code only from the app

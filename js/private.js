@@ -131,3 +131,37 @@ export function unlinkStop(priv, date, id){
   if(!priv || !atStop(priv, date, id).length) return priv;
   return {...priv, expenses: priv.expenses.map(x => x.stop === id && x.date === date ? (({stop, ...rest}) => rest)(x) : x)};
 }
+
+/* ---------- with the sharing service (js/sync.js) ---------- */
+
+// The same content, whatever the order of the fields.
+const sameExpense = (a, b) => {
+  const c = v => v && typeof v === "object" ? JSON.stringify(Object.keys(v).sort().reduce((o, k) => (o[k] = v[k], o), {})) : JSON.stringify(v);
+  return c(a) === c(b);
+};
+
+/**
+ * The private expenses changed on this phone and on the service since the last sync
+ * (`base`), joined by id, as two copies of a trip are:
+ *   changed on one side only: that side;  on both: this phone's;
+ *   gone on one side and untouched on the other: gone;  gone on one, changed on the other: kept;
+ *   new on either side: kept.
+ * @returns {owner, expenses} or null when none are left
+ */
+export function mergePrivate(base, local, server){
+  const map = s => new Map((s ? s.expenses : []).map(x => [x.id, x]));
+  const B = map(base), L = map(local), S = map(server);
+  const out = [];
+  for(const id of new Set([...L.keys(), ...S.keys()])){
+    const b = B.get(id), l = L.get(id), s = S.get(id);
+    if(l && s) out.push(sameExpense(l, b) ? s : l);
+    else if(l){ if(!b || !sameExpense(l, b)) out.push(l); }
+    else if(s){ if(!b || !sameExpense(s, b)) out.push(s); }
+  }
+  if(!out.length) return null;
+  // The same order on every phone: by date, then by id.
+  const key = x => (x.date || "") + "\u0000" + x.id;
+  out.sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+  const owner = (local && local.owner) || (server && server.owner) || (base && base.owner);
+  return {...(owner ? {owner} : {}), expenses: out};
+}

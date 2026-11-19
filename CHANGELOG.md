@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.12.0
+
+Your trips on every phone.
+
+- **Sync**: signed in, your trips go to your account and come back on your other
+  phones, by themselves: after every change, when the connection comes back, when you
+  open the app, or with "Sync now". The same rules as two files: what one side has is
+  taken, what both changed is joined, the same version on every phone.
+- **Private expenses** sync too, for you only: joined by expense, what changed wins and
+  what you delete goes from your other phones as well.
+- **Trips shared with you** come down; read-only ones keep your changes on your phone.
+- A synced trip no longer asks to be saved as a file: the account keeps it. Files work
+  as before.
+
 ## 3.11.0
 
 An account, if you want one.

@@ -126,3 +126,15 @@ export async function signOut(){
   if(s) await call("logout", {token: s.token}).catch(() => {});
   await delKV(SESSION).catch(() => {});
 }
+
+/** The service as js/sync.js uses it: the routes of the contract, with this phone's session. */
+export function serviceApi(){
+  return {
+    list: async () => (await call("trips")).trips,
+    create: trip => call("createTrip", {body: {trip}}),
+    push: (id, trip) => call("push", {params: {id}, body: {trip}}),
+    version: (id, version) => call("version", {params: {id, version}}),
+    getPrivate: id => call("getPrivate", {params: {id}}),
+    putPrivate: (id, data, rev) => call("putPrivate", {params: {id}, body: {data, rev}})
+  };
+}
