@@ -1103,6 +1103,7 @@ function fakeService(){
     const m = path.match(/^\/v1\/trips(?:\/([^/]+)(?:\/(push|private|versions)(?:\/([^/]+))?)?)?$/);
     if(m && !who) return no(401, "sign in first");
     if(m && method === "GET" && !m[1]) return ok({trips: [...trips.values()].filter(t => t.owner === who).map(summary)});
+    if(m && m[1] && !m[2] && method === "DELETE"){ trips.delete(m[1]); return ok({ok: true}); }
     if(m && method === "POST" && !m[1]){
       const trip = body.trip, had = [...trips.values()].find(t => t.owner === who && t.localId === trip.id);
       if(!had){
@@ -1194,5 +1195,36 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("synced again", `document.querySelector('[data-sync="ok"]')`, 15000);
     assert.equal(await run(`return !!document.querySelector(".tripcard .unsaved");`), false, "on the account: no file needed to keep it");
     assert.deepEqual(blocked(), []);
+  });
+
+  await step("a trip on the account: taken off this phone only stays away, comes back on request, or is deleted everywhere", async () => {
+    const card = `document.querySelector('[data-act="remove"][data-id="demo-lisbon"]')`;
+    const remove = async choice => {
+      await run(`${card}.click();`);
+      await until("the question", `document.querySelector("dialog.ask[open]")`);
+      assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask [data-answer]")].map(b => b.textContent);`), ["Cancel", "This phone only", "From my account"]);
+      await answer(choice);
+    };
+    const answer = id => run(`document.querySelector('dialog.ask [data-answer="${id}"]').click(); await new Promise(r => setTimeout(r, 600));`);
+    await run(`location.hash = "#trips";`);
+    await until("the trip", card);
+    await remove("here");
+    assert.match(await text("#toast"), /Taken off this phone: it is still on your account\./);
+    assert.equal(service.trips.size, 1, "still on the account");
+    // A sync does not bring it back.
+    await run(`location.hash = "#trips";`);
+    await until("the account", `document.querySelector('[data-act="sync"]')`);
+    await run(`document.querySelector('[data-act="sync"]').click();`);
+    await until("synced", `document.querySelector('[data-sync="ok"]') && !document.querySelector('[data-sync="busy"]')`, 15000);
+    await new Promise(r => setTimeout(r, 500));
+    assert.equal(await run(`return !!${card};`), false, "not downloaded again");
+    // On request, it comes back.
+    await run(`document.querySelector('[data-act="unhide"]').click();`);
+    await until("back", card, 15000);
+    // From the account: gone everywhere.
+    await remove("all");
+    assert.match(await text("#toast"), /Deleted from your account and every phone\./);
+    assert.equal(service.trips.size, 0);
+    assert.equal(await run(`return !!${card};`), false);
   });
 }

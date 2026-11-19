@@ -22,7 +22,7 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip } from "./share.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, accountError } from "./account.js";
 
@@ -55,6 +55,7 @@ const S = {
   owner: "",              // this phone's code for its private expenses, made with the first one
   account: null,          // the sharing service's account on this phone ({id, handle, …}), or null
   sync: "",               // "", "busy", "ok", "offline", "error": the last sync with the service
+  hidden: new Set(),      // trips of the account taken off this phone only: not downloaded again
   openCosts: new Set()    // stops whose cost shows what it makes at home, until the page is closed
 };
 
@@ -201,7 +202,7 @@ async function keepRecord(rec){
 }
 
 // A trip on the service, as it is here: a file adds nothing to keep it safe.
-const synced = rec => !!(rec && rec.share && rec.share.head === rec.trip.version.id && canonical(rec.share.privBase || null) === canonical(rec.priv || null));
+const synced = rec => !!(rec && rec.share && !rec.share.gone && rec.share.head === rec.trip.version.id && canonical(rec.share.privBase || null) === canonical(rec.priv || null));
 const needsSaving = rec => !!rec && !synced(rec) && (rec.exported !== rec.trip.version.id || !!rec.privUnsaved);
 
 // The private expenses of the open trip, and this phone's owner code, made when needed.
@@ -540,9 +541,29 @@ async function loadDemo(){
 async function removeRecord(id){
   const rec = S.records.find(r => r.id === id);
   if(!rec) return;
-  const answer = await ask({title: t("removeTripTitle"), text: t("removeConfirm", {t: rec.trip.title}),
-    actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("remove"), kind: "danger"}]});
-  if(answer !== "yes") return;
+  const onAccount = !!(rec.share && rec.share.id && !rec.share.gone && S.account);
+  let message = "removed";
+  if(!onAccount){
+    const answer = await ask({title: t("removeTripTitle"), text: t("removeConfirm", {t: rec.trip.title}),
+      actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("remove"), kind: "danger"}]});
+    if(answer !== "yes") return;
+  }else{
+    // On the account: from this phone only, or from the account (the owner), or out of
+    // the sharing (someone it was shared with).
+    const own = rec.share.role === "owner";
+    const answer = await ask({title: t("removeTripTitle"), text: t(own ? "removeSyncedText" : "removeSharedText", {t: rec.trip.title}),
+      actions: [{id: "no", label: t("cancel")}, {id: "here", label: t("removeHere")}, {id: "all", label: t(own ? "removeEverywhere" : "leaveShare"), kind: "danger"}]});
+    if(answer !== "here" && answer !== "all") return;
+    if(answer === "all"){
+      try{ own ? await deleteFromAccount(rec.share.id) : await leaveTrip(rec.share.id, S.account.id); }
+      catch(e){ toast(e && e.status === 0 ? t("removeNeedsNet") : accountError(e)); return; }
+      message = own ? "removedEverywhere" : "leftShare";
+    }else{
+      S.hidden.add(rec.share.id);
+      await store.setKV("share:hidden", [...S.hidden]);
+      message = "removedHere";
+    }
+  }
   await store.deleteTrip(id);
   await store.delKV("state:" + id);
   await versions.drop(id);
@@ -550,7 +571,7 @@ async function removeRecord(id){
   if(S.rec && S.rec.id === id) await openRecord(S.records[S.records.length - 1] || null);
   if(!S.rec && location.hash) history.replaceState(null, "", location.pathname + location.search);
   render();
-  toast(t("removed"));
+  toast(t(message));
 }
 
 /* ---------- rendering ---------- */
@@ -769,7 +790,9 @@ function accountSection(){
     `<span class="acts"><button type="button" class="btn small" data-act="signin">${esc(t("signIn"))}</button><button type="button" class="btn small primary" data-act="signup">${esc(t("signUp"))}</button></span></section>`;
   return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${esc(u.handle.slice(0, 1).toUpperCase())}</span>` +
     `<span class="who"><b>@${esc(u.handle)}</b><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn"))}</small></span>` +
-    `<span class="acts"><button type="button" class="btn small" data-act="sync"${S.sync === "busy" ? " disabled" : ""}>${esc(t("syncNow"))}</button><button type="button" class="btn small" data-act="signout">${esc(t("signOut"))}</button></span></section>`;
+    `<span class="acts"><button type="button" class="btn small" data-act="sync"${S.sync === "busy" ? " disabled" : ""}>${esc(t("syncNow"))}</button>` +
+    (S.hidden.size ? `<button type="button" class="btn small" data-act="unhide">${esc(t("hiddenBack", {n: S.hidden.size}))}</button>` : "") +
+    `<button type="button" class="btn small" data-act="signout">${esc(t("signOut"))}</button></span></section>`;
 }
 
 /* ---------- sync with the sharing service ---------- */
@@ -795,7 +818,7 @@ function syncNow(){
     try{
       const api = serviceApi(), remote = await api.list();
       for(const r of remote){
-        if(S.records.some(x => x.share && x.share.id === r.id)) continue;
+        if(S.hidden.has(r.id) || S.records.some(x => x.share && x.share.id === r.id)) continue;
         const trip = await api.version(r.id, r.head);
         const here = S.records.find(x => x.id === trip.id);
         // The same trip, on this phone already (from a file): linked, then joined below.
@@ -807,11 +830,17 @@ function syncNow(){
         S.records.push(rec);
       }
       for(const rec of [...S.records]){
+        if(rec.share && rec.share.gone) continue;
         const remoteOf = remote.find(r => rec.share && r.id === rec.share.id) || null;
+        // Deleted from the account on another phone, or no longer shared with this
+        // account: the copy here stays, on this phone only, and is not sent again.
+        if(rec.share && rec.share.id && !remoteOf){ await keepSynced({...rec, share: {...rec.share, gone: true}}); continue; }
         let next = await syncTrip(versions, rec, remoteOf, api);
         next = await syncPrivate(next, api);
         if(next !== rec) await keepSynced(next);
       }
+      // A new phone: nothing open yet, the trips just arrived: one is opened, so they show.
+      if(!S.rec && S.records.length) await openRecord(S.records[S.records.length - 1]);
       S.sync = "ok";
     }catch(e){
       S.sync = e && e.status === 0 ? "offline" : "error";
@@ -819,7 +848,7 @@ function syncNow(){
     }finally{
       syncing = null;
       const after = canonical(S.records.map(r => [r.id, r.trip.version.id, r.share && r.share.head]));
-      if(after !== before || route().name === "trips") renderKeepingFocus();
+      if(after !== before || route().name === "trips" || !document.querySelector(".stop, .tripcard")) renderKeepingFocus();
       if(syncAgain){ syncAgain = false; syncSoon(500); }
     }
   })();
@@ -846,7 +875,7 @@ function renderTrips(){
       <div class="t"><span>${esc(r.trip.title)}</span>${cur ? `<span class="badge-on">${esc(t("current"))}</span>` : ""}</div>
       <div class="s">${esc(t("daysCount", {n: r.trip.days.length}))} · ${esc(t("loadedOn", {d: when}))}</div>
       <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
-      ${r.share ? `<div class="s where">${esc(t(r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
+      ${r.share ? `<div class="s where">${esc(t(r.share.gone ? "goneFromAccount" : r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
       <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button><button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
     </div>`;
@@ -1672,6 +1701,7 @@ $app.addEventListener("click", e => {
   else if(a === "demo") loadDemo();
   else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn});
   else if(a === "sync") syncNow();
+  else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "signin") accountSignIn();
   else if(a === "signout") signOut().then(() => { S.account = null; S.sync = ""; render(); toast(t("signedOut")); });
   else if(a === "remove") removeRecord(act.dataset.id);
@@ -1912,7 +1942,11 @@ async function start(){
   const [records, activeId, ui, key, lang, useGoogle, home, owner] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle"), store.getKV("home"), store.getKV("owner")]);
   if(typeof home === "string" && /^[A-Z]{3}$/.test(home)) S.home = home;
   if(typeof owner === "string") S.owner = owner;
-  if(hasService()) S.account = ((await shareSession()) || {}).user || null;
+  if(hasService()){
+    S.account = ((await shareSession()) || {}).user || null;
+    const hidden = await store.getKV("share:hidden");
+    if(Array.isArray(hidden)) S.hidden = new Set(hidden);
+  }
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);

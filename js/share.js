@@ -138,3 +138,9 @@ export function serviceApi(){
     putPrivate: (id, data, rev) => call("putPrivate", {params: {id}, body: {data, rev}})
   };
 }
+
+/** The owner deletes a trip from the account: gone for every phone and every person. */
+export const deleteFromAccount = id => call("deleteTrip", {params: {id}});
+
+/** Leaves a trip someone shared with this account. */
+export const leaveTrip = (id, userId) => call("removeMember", {params: {id, user: userId}});

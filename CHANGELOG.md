@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.12.1
+
+Deleting a trip that is on your account.
+
+- **Delete asks where**: from this phone only (it stays on your account and your other
+  phones, and is not downloaded here again, until "Bring back trips taken off"), or
+  from your account (gone from every phone, also for the people you shared it with).
+  A trip shared with you: this phone only, or leave the sharing.
+- **A trip deleted on another phone, or no longer shared with you**, stays on this
+  phone, marked "No longer on your account", and is no longer sent: before, every sync
+  failed on it.
+- **A new phone** that signs in shows the trips that arrive from the account: before,
+  they came but nothing opened them.
+
 ## 3.12.0
 
 Your trips on every phone.
