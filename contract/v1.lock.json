@@ -1,0 +1,424 @@
+{
+ "api": "1",
+ "shapes": {
+  "user": {
+   "id": {
+    "type": "text",
+    "req": true
+   },
+   "handle": {
+    "type": "text",
+    "req": true
+   },
+   "name": {
+    "type": "text"
+   },
+   "since": {
+    "type": "text",
+    "req": true
+   }
+  },
+  "session": {
+   "token": {
+    "type": "text",
+    "req": true
+   },
+   "user": {
+    "type": "user",
+    "req": true
+   }
+  },
+  "ceremony": {
+   "challengeId": {
+    "type": "text",
+    "req": true
+   },
+   "publicKey": {
+    "type": "any",
+    "req": true
+   }
+  },
+  "tripSummary": {
+   "id": {
+    "type": "text",
+    "req": true
+   },
+   "localId": {
+    "type": "text",
+    "req": true
+   },
+   "title": {
+    "type": "text",
+    "req": true
+   },
+   "head": {
+    "type": "text",
+    "req": true
+   },
+   "role": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "owner",
+     "edit",
+     "read"
+    ]
+   },
+   "visibility": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "private",
+     "people",
+     "link",
+     "public"
+    ]
+   },
+   "firstDay": {
+    "type": "text",
+    "req": true,
+    "null": true
+   },
+   "lastDay": {
+    "type": "text",
+    "req": true,
+    "null": true
+   },
+   "days": {
+    "type": "number",
+    "req": true
+   },
+   "updatedAt": {
+    "type": "text",
+    "req": true
+   }
+  },
+  "pushResult": {
+   "trip": {
+    "type": "text",
+    "req": true
+   },
+   "kind": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "new",
+     "same",
+     "newer",
+     "older",
+     "diverged"
+    ]
+   },
+   "head": {
+    "type": "text",
+    "req": true
+   },
+   "merged": {
+    "type": "any"
+   }
+  },
+  "versionInfo": {
+   "id": {
+    "type": "text",
+    "req": true
+   },
+   "parents": {
+    "type": "list",
+    "of": "text",
+    "req": true
+   },
+   "date": {
+    "type": "text",
+    "req": true,
+    "null": true
+   },
+   "by": {
+    "type": "text",
+    "req": true
+   }
+  },
+  "privateSet": {
+   "data": {
+    "type": "any",
+    "req": true,
+    "null": true
+   },
+   "rev": {
+    "type": "number",
+    "req": true
+   }
+  },
+  "invite": {
+   "token": {
+    "type": "text",
+    "req": true
+   },
+   "role": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "read",
+     "edit"
+    ]
+   },
+   "expires": {
+    "type": "text",
+    "req": true
+   }
+  },
+  "member": {
+   "id": {
+    "type": "text"
+   },
+   "handle": {
+    "type": "text",
+    "req": true
+   },
+   "role": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "owner",
+     "edit",
+     "read"
+    ]
+   }
+  },
+  "ok": {
+   "ok": {
+    "type": "bool",
+    "req": true
+   }
+  },
+  "error": {
+   "error": {
+    "type": "text",
+    "req": true
+   },
+   "current": {
+    "type": "any"
+   }
+  }
+ },
+ "routes": {
+  "health": {
+   "method": "GET",
+   "path": "/v1/health",
+   "auth": false,
+   "answer": {
+    "ok": {
+     "type": "bool",
+     "req": true
+    },
+    "api": {
+     "type": "list",
+     "of": "text",
+     "req": true
+    }
+   }
+  },
+  "registerOptions": {
+   "method": "POST",
+   "path": "/v1/auth/register/options",
+   "auth": false,
+   "body": {
+    "code": {
+     "type": "text",
+     "req": true
+    },
+    "handle": {
+     "type": "text",
+     "req": true
+    }
+   },
+   "answer": "ceremony"
+  },
+  "register": {
+   "method": "POST",
+   "path": "/v1/auth/register",
+   "auth": false,
+   "body": {
+    "challengeId": {
+     "type": "text",
+     "req": true
+    },
+    "credential": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "session"
+  },
+  "loginOptions": {
+   "method": "POST",
+   "path": "/v1/auth/login/options",
+   "auth": false,
+   "body": {},
+   "answer": "ceremony"
+  },
+  "login": {
+   "method": "POST",
+   "path": "/v1/auth/login",
+   "auth": false,
+   "body": {
+    "challengeId": {
+     "type": "text",
+     "req": true
+    },
+    "credential": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "session"
+  },
+  "logout": {
+   "method": "POST",
+   "path": "/v1/auth/logout",
+   "auth": true,
+   "body": {},
+   "answer": "ok"
+  },
+  "me": {
+   "method": "GET",
+   "path": "/v1/me",
+   "auth": true,
+   "answer": "user"
+  },
+  "trips": {
+   "method": "GET",
+   "path": "/v1/trips",
+   "auth": true,
+   "answer": {
+    "trips": {
+     "type": "list",
+     "of": "tripSummary",
+     "req": true
+    }
+   }
+  },
+  "createTrip": {
+   "method": "POST",
+   "path": "/v1/trips",
+   "auth": true,
+   "body": {
+    "trip": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "pushResult"
+  },
+  "trip": {
+   "method": "GET",
+   "path": "/v1/trips/:id",
+   "auth": true,
+   "answer": "tripSummary"
+  },
+  "deleteTrip": {
+   "method": "DELETE",
+   "path": "/v1/trips/:id",
+   "auth": true,
+   "answer": "ok"
+  },
+  "history": {
+   "method": "GET",
+   "path": "/v1/trips/:id/history",
+   "auth": true,
+   "answer": {
+    "versions": {
+     "type": "list",
+     "of": "versionInfo",
+     "req": true
+    }
+   }
+  },
+  "version": {
+   "method": "GET",
+   "path": "/v1/trips/:id/versions/:version",
+   "auth": true,
+   "answer": "any"
+  },
+  "push": {
+   "method": "POST",
+   "path": "/v1/trips/:id/push",
+   "auth": true,
+   "body": {
+    "trip": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "pushResult"
+  },
+  "getPrivate": {
+   "method": "GET",
+   "path": "/v1/trips/:id/private",
+   "auth": true,
+   "answer": "privateSet"
+  },
+  "putPrivate": {
+   "method": "PUT",
+   "path": "/v1/trips/:id/private",
+   "auth": true,
+   "body": {
+    "data": {
+     "type": "any",
+     "req": true,
+     "null": true
+    },
+    "rev": {
+     "type": "number",
+     "req": true
+    }
+   },
+   "answer": "privateSet"
+  },
+  "invite": {
+   "method": "POST",
+   "path": "/v1/trips/:id/invites",
+   "auth": true,
+   "body": {
+    "role": {
+     "type": "text",
+     "req": true,
+     "values": [
+      "read",
+      "edit"
+     ]
+    }
+   },
+   "answer": "invite"
+  },
+  "acceptInvite": {
+   "method": "POST",
+   "path": "/v1/invites/accept",
+   "auth": true,
+   "body": {
+    "token": {
+     "type": "text",
+     "req": true
+    }
+   },
+   "answer": "tripSummary"
+  },
+  "members": {
+   "method": "GET",
+   "path": "/v1/trips/:id/members",
+   "auth": true,
+   "answer": {
+    "members": {
+     "type": "list",
+     "of": "member",
+     "req": true
+    }
+   }
+  },
+  "removeMember": {
+   "method": "DELETE",
+   "path": "/v1/trips/:id/members/:user",
+   "auth": true,
+   "answer": "ok"
+  }
+ }
+}

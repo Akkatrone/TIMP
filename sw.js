@@ -38,6 +38,7 @@ const FILES = [
   "js/places.js",
   "js/private.js",
   "js/rates.js",
+  "js/share-api.js",
   "js/store.js",
   "js/sun.js",
   "js/theme.js",

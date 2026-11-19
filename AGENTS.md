@@ -72,6 +72,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
 | `js/money.js` | Amounts as people type them, in their currency, and what they make in another at the rate of their own day. No DOM, no network. |
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
+| `js/share-api.js` | The contract with the sharing service (accounts, sync, sharing): every route, what it takes and answers; checks and an OpenAPI page made from it. Inside a version only additions: `contract/v1.lock.json` is the released contract and `node tools/check-contract.mjs` fails on a change that would break it (`--fix` records additions). No DOM. |
 | `js/private.js` | Private expenses: in the file and on the phone, never in a version or a merge; what to do with those a loaded file brings. No DOM. |
 | `js/places.js` | What the app works out about a place: its part of the world, its review site (Tabelog, Naver, Yelp, TheFork), closing days, the language of its local name. No DOM. |
 | `js/livemap.js` | Interactive map: Google Maps, or MapLibre with OpenStreetMap from OpenFreeMap (names in the app's language over the local ones). |
