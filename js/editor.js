@@ -51,8 +51,12 @@ const looksLikeAddress = s => /,|\d/.test(String(s || ""));
  *   stop                        the stop to change (absent: a new stop)
  *   prefill                     text to read as if pasted (a shared place)
  *   timezone, googleKey, dark
- *   onSave({stop, date, plan, newDay})  the stop as filled in, and where it goes;
- *                               newDay ({date, city}) when that day is still to be made
+ *   money                       for the costs: see moneyField
+ *   privateCost                 {cost, currency}: what the traveller paid there only for
+ *                               themselves, or null
+ *   onSave({stop, date, plan, newDay, priv})  the stop as filled in, and where it goes;
+ *                               newDay ({date, city}) when that day is still to be made;
+ *                               priv: the private cost {cost, currency}, or null
  *   onDelete()                  remove the stop being changed
  */
 export function openStopEditor(o){
@@ -73,7 +77,21 @@ export function openStopEditor(o){
   const s0 = o.stop || {};
   const closed0 = Array.isArray(s0.closed) ? s0.closed : [];
   const tripCurrency = o.trip.currency || "";
-  const money = moneyField("stop-cost", o.money, s0.cost, s0.currency || (s0.cost !== undefined && tripCurrency) || "", t("fCostHelp"));
+  // Two costs at most: what the trip pays there, and what only the traveller pays.
+  // Each says which it is; changing one changes the other too.
+  const mine = o.privateCost || null, hasCost = s0.cost !== undefined, both = hasCost && !!mine;
+  const first = hasCost || !mine ? "trip" : "private";
+  const other = k => k === "trip" ? "private" : "trip";
+  const own = (c, has) => c || (has && tripCurrency) || "";
+  const addCost = () => {
+    const b = dlg.querySelector("[data-add-cost]");
+    b.textContent = t(money.kind() === "trip" ? "addPrivateCost" : "addTripCost");
+  };
+  const money = moneyField("stop-cost", o.money, hasCost ? s0.cost : mine ? mine.cost : undefined,
+    hasCost ? own(s0.currency, true) : mine ? own(mine.currency, true) : "", t("fCostHelp"),
+    {kind: first, onKind: k => { money2.setKind(other(k)); addCost(); }});
+  const money2 = moneyField("stop-cost2", o.money, both ? mine.cost : undefined, both ? own(mine.currency, true) : "", t("fCostHelp"),
+    {kind: other(first), label: t("fCostOther"), hidden: !both, onKind: k => { money.setKind(other(k)); addCost(); }});
   // The time: hour and minutes from two lists, or words ("Evening") for a time that is
   // not a clock time. A stop that has words keeps them. Not <input type="time">: Chrome
   // on Android opens its own clock, whose Set button falls off narrow screens.
@@ -153,6 +171,8 @@ export function openStopEditor(o){
     ${choice("booking", ["advised", "required", "booked"], t("fBooking"))}
 
     ${money.html}
+    ${money2.html}
+    <div class="addcost"${both ? " hidden" : ""}><button type="button" class="linkbtn" data-add-cost>${esc(t(first === "trip" ? "addPrivateCost" : "addTripCost"))}</button></div>
 
     <div class="field">
       <span class="label" id="closed-label">${esc(t("fClosed"))}</span>
@@ -341,7 +361,13 @@ export function openStopEditor(o){
     }
     const day = e.target.closest("[data-closed]");
     if(day){ day.setAttribute("aria-pressed", String(day.getAttribute("aria-pressed") !== "true")); return; }
-    if(money.click(e)) return;
+    if(money.click(e) || money2.click(e)) return;
+    if(e.target.closest("[data-add-cost]")){
+      e.target.closest(".addcost").hidden = true;
+      money2.show();
+      $("#stop-cost2-amount").focus();
+      return;
+    }
     for(const kind of ["type", "travel", "booking"]){
       const b = e.target.closest(`[data-${kind}]`);
       if(b){ setChoice(kind, b.dataset[kind]); return; }
@@ -381,7 +407,8 @@ export function openStopEditor(o){
   $("#stop-day").addEventListener("change", fillPlans);
   const dateNow = () => days[+$("#stop-day").value].date;
   money.wire(dlg, dateNow);
-  $("#stop-day").addEventListener("change", () => money.update(dateNow()));
+  money2.wire(dlg, dateNow);
+  $("#stop-day").addEventListener("change", () => { money.update(); money2.update(); });
 
   form.addEventListener("submit", e => {
     e.preventDefault();
@@ -393,14 +420,17 @@ export function openStopEditor(o){
       $("#stop-title").focus();
       return;
     }
-    const cost = money.read();
-    if(cost.error){
+    const costs = [money.read(), money2.read()];
+    const bad = costs.findIndex(c => c.error);
+    if(bad >= 0){
       const box = $("[data-error]");
-      box.textContent = cost.error;
+      box.textContent = costs[bad].error;
       box.hidden = false;
-      $("#stop-cost-amount").focus();
+      $(bad ? "#stop-cost2-amount" : "#stop-cost-amount").focus();
       return;
     }
+    const cost = costs.find(c => !c.private && c.cost !== undefined) || {};
+    const priv = costs.find(c => c.private && c.cost !== undefined);
     const day = days[+$("#stop-day").value];
     // What Map and Directions search for: the address, or else the name in its town.
     const address = st.address || (day.city ? `${title}, ${day.city}` : undefined);
@@ -427,7 +457,8 @@ export function openStopEditor(o){
     if(st.lat === undefined){ delete stop.lat; delete stop.lng; }
     dlg.close();
     const newDay = day.isNew ? (day.city ? {date: day.date, city: day.city} : {date: day.date}) : null;
-    o.onSave({stop, date: day.date, plan: day.plans ? $("#stop-plan").value : null, newDay});
+    o.onSave({stop, date: day.date, plan: day.plans ? $("#stop-plan").value : null, newDay,
+      priv: priv ? {cost: priv.cost, currency: priv.currency !== tripCurrency ? priv.currency : undefined} : null});
   });
 
   fillPlans();
@@ -528,10 +559,13 @@ export function openDayEditor(o){
  * The cost of a stop or an expense: the amount, then its currency on two buttons, the
  * one spent on the trip and the traveller's own, or any other from a list. Under it,
  * what it makes in the traveller's currency on its day.
- *   m: {local, home, convert(amount, currency, date) → {value, on, estimate} | null}
+ *   m: {local, home, convert(amount, currency, date) → {value, on, estimate} | null, onRates(fn)}
  *   amount, currency: what the stop or expense has
+ *   o.kind: "trip" or "private": shows the choice between the two, the trip's cost or
+ *     the traveller's own (js/private.js); o.onKind(kind) when the traveller changes it.
+ *   o.label: the field's name; o.hidden: it starts hidden (the second cost of a stop).
  */
-function moneyField(id, m, amount, currency, help){
+function moneyField(id, m, amount, currency, help, o = {}){
   const lang = getLang();
   m = {local: "", home: "", convert: () => null, ...m};
   const quick = [...new Set([m.local, m.home].filter(Boolean))];
@@ -539,18 +573,29 @@ function moneyField(id, m, amount, currency, help){
   const other = !quick.includes(cur);
   const label = c => `${symbolOf(c, lang) === c ? "" : symbolOf(c, lang) + " "}${c}`;
   const all = currencies();
-  const html = `<div class="field money" data-money="${id}">
-      <label for="${id}-amount">${esc(t("fCost"))}</label>
+  let kind = o.kind || "";
+  const helpOf = () => kind === "private" ? t("privateHelp") : help;
+  const kinds = kind ? `<div class="seg kind" role="radiogroup" aria-label="${esc(t("fKind"))}">${["trip", "private"].map(k => `<button type="button" role="radio" data-kind="${k}" aria-checked="${k === kind}"><span>${esc(t(k === "trip" ? "kindTrip" : "kindPrivate"))}</span></button>`).join("")}</div>` : "";
+  const html = `<div class="field money" data-money="${id}"${o.hidden ? " hidden" : ""}>
+      <label for="${id}-amount">${esc(o.label || t("fCost"))}</label>
       <div class="amount"><span class="sym" aria-hidden="true" data-sym>${esc(symbolOf(cur, lang))}</span><input id="${id}-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(formatPlain(amount, lang))}"></div>
       <div class="seg wrap" role="radiogroup" aria-label="${esc(t("fCurrency"))}">
         ${quick.map(c => `<button type="button" role="radio" data-cur="${c}" aria-checked="${!other && c === cur}"><span>${esc(label(c))}</span></button>`).join("")}<button type="button" role="radio" data-cur="" aria-checked="${other}"><span>${esc(t("otherCurrency"))}</span></button>
       </div>
       <select id="${id}-other" aria-label="${esc(t("fCurrency"))}"${other ? "" : " hidden"}>${all.map(c => `<option value="${c}"${c === cur ? " selected" : ""}>${esc(c + " · " + currencyName(c, lang))}</option>`).join("")}</select>
+      ${kinds}
       <p class="foot money-hint" data-money-hint aria-live="polite"></p>
-      ${help ? `<p class="foot">${esc(help)}</p>` : ""}
+      <p class="foot" data-money-help${helpOf() ? "" : " hidden"}>${esc(helpOf())}</p>
     </div>`;
   let dlg = null, dateOf = () => "";
   const $ = sel => dlg.querySelector(`[data-money="${id}"] ${sel}`);
+  function setKind(k){
+    kind = k;
+    dlg.querySelectorAll(`[data-money="${id}"] [data-kind]`).forEach(b => b.setAttribute("aria-checked", String(b.dataset.kind === k)));
+    const h = $("[data-money-help]");
+    h.textContent = helpOf();
+    h.hidden = !helpOf();
+  }
   function setCur(c){
     cur = c;
     dlg.querySelectorAll(`[data-money="${id}"] [data-cur]`).forEach(b => b.setAttribute("aria-checked", String(b.dataset.cur === c || (!b.dataset.cur && !quick.includes(c)))));
@@ -581,7 +626,15 @@ function moneyField(id, m, amount, currency, help){
       update();
     },
     update(){ update(); },
+    kind: () => kind,
+    setKind,
+    show(){ dlg.querySelector(`[data-money="${id}"]`).hidden = false; update(); },
     click(e){
+      const k = e.target.closest(`[data-money="${id}"] [data-kind]`);
+      if(k){
+        if(k.dataset.kind !== kind){ setKind(k.dataset.kind); if(o.onKind) o.onKind(kind); }
+        return true;
+      }
       const b = e.target.closest(`[data-money="${id}"] [data-cur]`);
       if(!b) return false;
       const sel = $("select");
@@ -589,12 +642,13 @@ function moneyField(id, m, amount, currency, help){
       else{ sel.hidden = false; setCur(sel.value); sel.focus(); }
       return true;
     },
-    // {cost, currency}; cost undefined when empty; {error} when it is not a number.
+    // {cost, currency, private}; cost undefined when empty or hidden; {error} when it
+    // is not a number.
     read(){
-      const text = $("input").value.trim();
-      if(!text) return {cost: undefined, currency: cur};
+      const text = $("input").value.trim(), priv = kind === "private";
+      if(!text || dlg.querySelector(`[data-money="${id}"]`).hidden) return {cost: undefined, currency: cur, private: priv};
       const n = parseAmount(text);
-      return n === null ? {error: t("costBad")} : {cost: n, currency: cur};
+      return n === null ? {error: t("costBad")} : {cost: n, currency: cur, private: priv};
     }
   };
 }
@@ -606,17 +660,18 @@ const shortDate = (date, lang) => new Intl.DateTimeFormat(lang, {day: "numeric",
  * The form for an expense outside the stops: what it was, when it was paid, how much.
  * @param {object} o
  *   expense              the expense to change (absent: a new one)
+ *   private              true for one of the traveller's private expenses
  *   money                as for the stop form (local, home, convert)
  *   tripCurrency         the trip's currency, left out of the expense when it is that one
  *   today                the date a new expense gets
- *   onSave(expense)      {title, date, cost, currency}
+ *   onSave(expense, private)  {title, date, cost, currency, stop?}, and whether it is private
  *   onDelete()
  */
 export function openExpenseEditor(o){
   const dlg = ensureDialog();
   const x = o.expense || {}, editing = !!o.expense;
   const $ = sel => dlg.querySelector(sel);
-  const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", "");
+  const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", t("fCostHelp"), {kind: o.private ? "private" : "trip"});
   dlg.innerHTML = `
   <form method="dialog" class="sheet-form" novalidate>
     <div class="sheet-head">
@@ -665,8 +720,10 @@ export function openExpenseEditor(o){
     if(cost.cost === undefined) return fail(t("costRequired"), "#exp-cost-amount");
     const date = $("#exp-date").value;
     dlg.close();
+    // Paid at a stop: still there if it stays private, on the same day.
+    const stop = cost.private && x.stop && date === x.date ? x.stop : undefined;
     o.onSave({title, date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, cost: cost.cost,
-      currency: cost.currency !== o.tripCurrency ? cost.currency : undefined});
+      currency: cost.currency !== o.tripCurrency ? cost.currency : undefined, stop}, cost.private);
   });
   dlg.showModal();
   if(!editing) $("#exp-title").focus();

@@ -123,6 +123,24 @@ test("a stop can say what it costs; the trip its currency and the expenses outsi
   assert.equal(tripSchema().$defs.expense.properties.currency.pattern, "^[A-Z]{3}$");
 });
 
+test("private expenses: the traveller's own, with the stop they were paid at and whose they are", () => {
+  const ok = errorsAfter(t => {
+    t.days[0].stops[0].id = "colosseum";
+    t.private = {owner: "p-3f9a1c0b7d2e", expenses: [{title: "Gelato", cost: 4.5}, {title: "Colosseum", cost: 18, date: "2027-04-10", stop: "colosseum"}]};
+  });
+  assert.deepEqual(ok, []);
+  assert.deepEqual(errorsAfter(t => { t.private = {expenses: [{title: "Gelato", cost: 4.5}]}; }), [], "no owner yet: an assistant wrote it");
+  assert.ok(hasError(errorsAfter(t => { t.private = {owner: "p-1"}; }), "private.expenses: is required"));
+  assert.ok(hasError(errorsAfter(t => { t.private = {expenses: []}; }), "private.expenses: must not be empty"));
+  assert.ok(hasError(errorsAfter(t => { t.private = {owner: "Mario Rossi", expenses: [{title: "A", cost: 1}]}; }), "private.owner: must be a code written by the app"));
+  assert.ok(hasError(errorsAfter(t => { t.private = {expenses: [{id: "a", title: "A", cost: 1}, {id: "a", title: "B", cost: 2}]}; }), "private.expenses[1].id"));
+  // a stop goes with its day; and only private expenses have one: the trip's cost at a stop is the stop's
+  assert.ok(hasError(errorsAfter(t => { t.private = {expenses: [{title: "A", cost: 1, stop: "colosseum"}]}; }), "\"stop\" needs \"date\""));
+  assert.ok(hasError(errorsAfter(t => { t.expenses = [{title: "A", cost: 1, date: "2027-04-10", stop: "colosseum"}]; }), "only private expenses have a stop"));
+  assert.ok(tripSchema().$defs.private.properties.expenses);
+  assert.deepEqual(tripSchema().$defs.private.required, ["expenses"]);
+});
+
 test("every kind of place and way of travelling has its icon", () => {
   for(const v of [...TYPES, ...TRAVEL]) assert.ok(hasIcon(v), v);
 });

@@ -216,13 +216,17 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .stop.skipped .time .cost{text-decoration:line-through}
 .stop.has-cost .chev{display:block}
 .costrow{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:grid;gap:4px}
-.costbtn{display:flex;align-items:baseline;gap:10px;width:100%;border:0;background:none;color:var(--ink);padding:2px 0;text-align:left;font:inherit;cursor:pointer;min-height:32px;-webkit-tap-highlight-color:transparent}
+.costbtn{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;width:100%;border:0;background:none;color:var(--ink);padding:2px 0;text-align:left;font:inherit;cursor:pointer;min-height:32px;-webkit-tap-highlight-color:transparent}
 span.costbtn{cursor:auto}
 .costbtn .l{font:500 .66rem var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .costbtn .y{font:600 .95rem var(--f-mono);font-variant-numeric:tabular-nums}
 .costbtn .to{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font:600 .8rem var(--f-mono);color:var(--link)}
 .costbtn .to .chev{display:block;margin:0;transform:rotate(-90deg)}
 .costbtn[aria-expanded="true"] .to .chev{transform:none}
+.costbtn .pv{order:9;flex:1 0 100%;display:inline-flex;align-items:center;gap:5px;min-width:0;font:500 .8rem var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.costbtn .pv.in{order:0;flex:0 1 auto}
+.costbtn .y .lock{margin-right:5px;color:var(--muted)}
+.lock{width:11px;height:11px;flex:none;display:inline-block;vertical-align:-1px}
 .costrow .rate{margin:0;display:grid;gap:2px;font-size:.8rem;line-height:1.4;color:var(--muted)}
 .costrow .rate b{font:600 .95rem var(--f-mono);font-variant-numeric:tabular-nums;color:var(--ink)}
 .daycost b{color:var(--ink);font-weight:600}
@@ -472,6 +476,15 @@ button.crow{cursor:pointer}
 .money-hint{font-family:var(--f-mono)}
 .money-hint:empty{display:none}
 .money-hint.bad{color:var(--err)}
+/* Whose a cost is: the trip's, or the traveller's own */
+.sheet .money .seg.kind{display:inline-flex;border-radius:999px}
+.sheet .money .seg.kind button{border-radius:999px;padding:6px 16px}
+.sheet .money .seg.kind button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.sheet .addcost{margin:-6px 0 4px}
+.crow .n .lock{width:13px;height:13px}
+.receipt .ln .t .lock{margin-right:5px;color:var(--muted)}
+.ask-check{display:flex;align-items:flex-start;gap:10px;margin:0 0 16px;font-size:.93rem;cursor:pointer}
+.ask-check input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--ink)}
 /* a list to pick from, outside the forms (the traveller's currency) */
 .sec .field select{-webkit-appearance:none;appearance:none;font:500 1rem var(--f-body);padding:10px 30px 10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%238a9199' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center/14px;color:var(--ink);width:100%;max-width:420px;min-height:44px}
 

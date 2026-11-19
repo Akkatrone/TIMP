@@ -256,7 +256,7 @@ test("the format in short has every field an assistant writes, a valid example, 
   for(const [kind, fields] of Object.entries(FIELDS)){
     for(const [name, f] of Object.entries(fields)){
       const listed = new RegExp(`^  ${name}( \\(required\\))?:`, "m").test(brief.split(`\n${kind}:\n`)[1] || "");
-      assert.equal(listed, !f.byApp && !f.private, `${kind}.${name}`);
+      assert.equal(listed, !f.byApp && f.inBrief !== false, `${kind}.${name}`);
     }
   }
   assert.deepEqual(validateTrip(JSON.parse(brief.split("\n").pop())).errors, []);

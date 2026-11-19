@@ -116,18 +116,25 @@ Tell the traveller which closing days and booking rules were not verified.
 
 ### Costs
 
-The app adds up what the trip costs, at the exchange rate of each day. Give it what you
-know, and nothing you do not:
+The app adds up what the trip costs the traveller who holds it, at the exchange rate of
+each day. Every amount is **what that traveller pays**: their own share of what is split
+with others. You know from the conversation who shares what; the app does not need to
+know how many people travel. Give it what you know, and nothing you do not:
 
 - `currency` on the trip: the money of the destination (`"JPY"` in Japan).
-- `cost` on a stop, as a number: what it costs **in all, for everyone travelling**
-  (two museum tickets at ¥1,200 are `2400`). Only prices you know: tickets, trains,
-  a booked menu. A free sight is `0`; a price you are not sure of stays out, or goes in
-  `text` as something to check.
+- `cost` on a stop, as a number: what the traveller pays there. A museum ticket at
+  ¥1,200 is `1200`, whoever comes along; a dinner for two at ¥12,000 split in half is
+  `6000`. Only prices you know: tickets, trains, a booked menu. A free sight is `0`; a
+  price you are not sure of stays out, or goes in `text` as something to check.
 - `currency` on a stop only when it is paid in another money (a ticket bought from home).
 - `expenses` for what is paid outside the stops, often before leaving: flights,
   hotels, rail passes, insurance, each with `title`, `cost` and the `date` it was paid.
-  Only the ones the traveller told you about.
+  A double room for two at €200 a night is `100` a night for the traveller. Only the
+  ones the traveller told you about.
+- `private` for what the traveller spends only for themselves and does not want in the
+  shared trip: shopping, a meal alone. `{"expenses": [...]}`, written like the trip's
+  expenses. Only when the traveller asks for it. In a file the app saved, keep
+  `private.owner` exactly as it is; never write one yourself.
 
 ## 4. Facts that go out of date
 
@@ -198,6 +205,8 @@ again.
   them: the app then updates the trip, keeps what was ticked, and makes a new version.
   Never write or change `version` yourself.
 - Keep the `id` of every stop that still exists, even if it is renamed or moved.
+- Keep `private` and its `owner` as they are, unless the traveller asked to change
+  their private expenses.
 - Change only what was asked. Do not rewrite texts nobody mentioned.
 - Check the file again.
 
@@ -221,7 +230,7 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 - Colours, icons or map settings: the file has none.
 - Long paragraphs in `text`. The traveller reads this standing up.
 - Links to review or booking pages you did not get from the traveller.
-- Prices you guessed, or a price per person in `cost` (it is for everyone, in all).
+- Prices you guessed, or the total for everyone in `cost`: it is the traveller's share.
 - Comments or trailing commas in the JSON.
 - HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.
 <!-- llms.txt: skip -->

@@ -48,9 +48,12 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
   and a moon by the stops after dark.
 - One tap to open any stop in Google Maps, with directions.
 - An Info page for hotels, phone numbers, money, useful phrases.
-- What the trip costs: each stop's cost, small by its time; flights and hotels paid
-  before leaving; and at the end of Info the total in your currency, day by day and
-  by kind of place, or as a receipt. Each cost is converted at the rate of its own day.
+- What the trip costs you: each stop's cost (your share, when it is split), small by
+  its time; flights and hotels paid before leaving; and at the end of Info the total in
+  your currency, day by day and by kind of place, or as a receipt. Each cost is
+  converted at the rate of its own day.
+- Private expenses, for what you buy only for yourself: on your phone, out of the
+  versions and merges, and in a file only when you save it with them.
 - Works on iPhone and Android. Installs on the Home Screen, no app store.
 - Interface in English and Italian: it follows the trip file, or the language you choose.
 - Light and dark theme: it follows the phone, or the one you choose. Maps follow it too.
@@ -335,7 +338,8 @@ real routes and transport times, tap "Directions" on a stop.
   trip is sent.
 - The link resolver keeps nothing: no storage, no logs. Cloudflare, which runs it, sees
   the request like any web service. Its code is [worker/resolve.js](worker/resolve.js).
-- A saved trip file goes only where you send it.
+- A saved trip file goes only where you send it. When the trip has private expenses,
+  the app asks each time whether they go in the file.
 - A Content-Security-Policy in `index.html` lets the page load code only from the app
   itself and from Google's map servers, and send requests only to the map, address and
   exchange-rate services above. Text in a trip file is always escaped; the policy is a second lock in

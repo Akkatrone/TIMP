@@ -17,10 +17,11 @@ import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpen
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
 import { keptRates, fetchMonth } from "./rates.js";
 import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText } from "./trips.js";
+import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop } from "./private.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
-import { shortId } from "./version.js";
+import { shortId, canonical } from "./version.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -28,10 +29,12 @@ const FOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M
 const PLUS = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 const CLIP = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5.5" y="4.5" width="13" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M9 4.5h6v2.5H9z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12h6M9 15.5h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const DOTS = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="12.5" cy="8" r="1.5" fill="currentColor"/></svg>';
+const LOCK = '<svg class="lock" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" fill="currentColor"/><path d="M5.5 7V5.2a2.5 2.5 0 015 0V7" stroke="currentColor" stroke-width="1.6"/></svg>';
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const S = {
-  records: [],            // [{id, trip, importedAt, fileName}]
+  records: [],            // [{id, trip, importedAt, fileName, exported, priv, privUnsaved}]
+                          // priv: the traveller's private expenses (js/private.js), outside the versions
   rec: null,              // the open one
   state: {done: {}, skipped: {}, plans: {}},
   ui: {mapOpen: false, mapView: "live", expandAll: false, route: true, costsOpen: false, costView: "sum", costCur: ""},
@@ -46,6 +49,7 @@ const S = {
   version: "",
   home: homeOf(navigator.language),   // the traveller's own currency
   rates: {},              // exchange rates of the days the trip needs (js/money.js)
+  owner: "",              // this phone's code for its private expenses, made with the first one
   openCosts: new Set()    // stops whose cost shows what it makes at home, until the page is closed
 };
 
@@ -182,7 +186,14 @@ async function keepRecord(rec){
   else await openRecord(rec);
 }
 
-const needsSaving = rec => !!rec && rec.exported !== rec.trip.version.id;
+const needsSaving = rec => !!rec && (rec.exported !== rec.trip.version.id || !!rec.privUnsaved);
+
+// The private expenses of the open trip, and this phone's owner code, made when needed.
+const privOf = () => (S.rec && S.rec.priv) || null;
+function ownerNow(prefer){
+  if(!S.owner){ S.owner = prefer || newOwner(); store.setKV("owner", S.owner).catch(() => {}); }
+  return S.owner;
+}
 
 // A list of changes written by an AI assistant (js/changes.js): applied to the trip it
 // names, or to the open one, as one new version, like an edit made on this phone.
@@ -190,14 +201,16 @@ async function importChanges(data){
   const rec = data.trip ? S.records.find(r => r.id === data.trip) : S.rec;
   const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); scrollToY(0); };
   if(!rec) return fail([data.trip ? t("changesNoTrip", {id: data.trip}) : t("changesNoOpen")]);
-  const res = applyChanges(rec.trip, data);
+  const res = applyChanges(rec.trip, data, rec.priv || null, S.owner);
   if(!res.ok) return fail(res.errors);
+  if(res.priv && !res.priv.owner) res.priv.owner = ownerNow();
   S.importError = null;
   if(S.rec !== rec) await openRecord(rec);
-  await applyEdit(() => ({trip: res.trip, marks: res.moves}), "changesApplied", res.counts);
+  await applyEdit(() => ({trip: res.trip, marks: res.moves, priv: res.priv}), "changesApplied", res.counts);
 }
 
-async function importText(text, name){
+// demo: the example's private expenses are taken without asking.
+async function importText(text, name, {demo = false} = {}){
   let data;
   try{ data = JSON.parse(text); }
   catch(e){
@@ -211,16 +224,21 @@ async function importText(text, name){
   if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12), all: res.errors}; render(); scrollToY(0); return; }
   S.importError = null;
   try{
-    const {trip: incoming} = await prepare(data);
+    // The private expenses travel apart: they never enter a version (js/private.js).
+    const {trip: shared, priv: theirs} = splitPrivate(data);
+    const {trip: incoming} = await prepare(shared);
     const local = S.records.find(r => r.id === incoming.id);
-    let rec, message, offer = false;
+    const pv = demo && theirs ? {action: "mine"} : privateOnLoad(local ? local.priv || null : null, theirs, S.owner);
+    const check = pv.action === "ask" ? {label: t("privCheck", {n: theirs.expenses.length}), checked: pv.yes} : null;
+    let rec, message, offer = false, kind = "new";
     if(!local){
       await versions.put(incoming);
       rec = {id: incoming.id, trip: incoming, importedAt: Date.now(), fileName: name || "", exported: incoming.version.id};
       message = t("imported", {t: incoming.title});
     }else{
       const x = await inspect(versions, local.trip, incoming);
-      const choice = x.kind === "diverged" ? await chooseMerge(x) : x.kind === "newer" ? "take" : "keep";
+      kind = x.kind;
+      const choice = x.kind === "diverged" ? await chooseMerge(x, check) : x.kind === "newer" ? "take" : "keep";
       if(choice === null) return;   // the traveller cancelled: nothing changes
       const trip = await apply(versions, x, choice);
       const v = shortId(trip.version.id);
@@ -228,13 +246,21 @@ async function importText(text, name){
       if(x.kind === "same") message = t("recvSame", {v});
       else if(x.kind === "newer"){ rec.exported = trip.version.id; message = t("recvNewer", {t: trip.title, v}); }
       else if(x.kind === "older"){
-        // Nothing changes, unless the traveller wants this older file back.
+        // Nothing changes, unless the traveller wants this older file back; its private
+        // expenses are older too.
         toast(t("recvOlder", {v}), {label: t("backToFile"), run: () => backToFile(x)});
         return;
       }
       else if(choice === "theirs"){ message = t("recvTheirs", {v}); offer = true; }
       else { const c = counts(diffTrips(local.trip, trip)); message = t("recvMerged", {a: c.added, c: c.changed, r: c.removed, v}); offer = true; }
     }
+    // The file's private expenses: taken when they are this phone's, or when the
+    // traveller says so (in the merge question, or in one of their own).
+    const take = pv.action === "mine" || (pv.action === "ask" && (kind === "diverged" ? check.checked : await askPrivate(theirs, pv.yes)));
+    if(take){
+      rec.priv = joinPrivate(local ? local.priv || null : null, theirs, ownerNow(theirs.owner));
+      message += " " + t("privLoaded", {n: theirs.expenses.length});
+    }else if(pv.action === "other") message += " " + t("privOther");
     await keepRecord(rec);
     store.askPersistence();
     if(location.hash) history.replaceState(null, "", location.pathname + location.search);
@@ -247,9 +273,11 @@ async function importText(text, name){
   }
 }
 
-// Both the file and this phone changed: show what, and ask what to do.
-async function chooseMerge(x){
+// Both the file and this phone changed: show what, and ask what to do. `check`: the box
+// for the file's private expenses, when there is a question about them.
+async function chooseMerge(x, check){
   const answer = await ask({
+    check: check || undefined,
     title: t("divTitle"),
     text: [
       {title: t("divInFile"), items: describe(x.theirs, 4)},
@@ -259,6 +287,15 @@ async function chooseMerge(x){
     actions: [{id: "cancel", label: t("cancel")}, {id: "theirs", label: t("useFile")}, {id: "merge", label: t("mergeBoth"), kind: "primary"}]
   });
   return answer === "theirs" || answer === "merge" ? answer : null;
+}
+
+// A file with private expenses that may not be this traveller's: add them or not.
+// `yes`: they are no one's yet (an assistant wrote them), and adding is suggested.
+async function askPrivate(priv, yes){
+  const n = priv.expenses.length;
+  const answer = await ask({title: t("privTitle"), text: t(yes ? "privTextNew" : "privText", {n}),
+    actions: [{id: "no", label: t("privSkip")}, {id: "yes", label: t("privTake"), kind: yes ? "primary" : ""}]});
+  return answer === "yes";
 }
 
 // An older file loaded on purpose: its content comes back as a new version.
@@ -286,17 +323,20 @@ function showHistory(id){
 /* ---------- editing stops ---------- */
 
 // Applies an edit to the open trip: a new version, kept on the phone, then offered
-// as a file. `change(trip)` returns {trip, marks?}: marks move ticks with a stop.
-async function applyEdit(change, message, extra = {}){
-  const cur = S.rec.trip;
+// as a file. `change(trip)` returns {trip, marks?, priv?}: marks move ticks with a
+// stop; priv, the private expenses after the edit (no version: privMessage says so).
+async function applyEdit(change, message, extra = {}, privMessage = "privSaved"){
+  const cur = S.rec.trip, had = privOf();
   const out = change(cur);
   const {trip: next, changed} = await saveEdit(versions, cur, out.trip);
-  if(!changed) return;
+  const priv = out.priv === undefined ? had : out.priv && out.priv.expenses.length ? out.priv : null;
+  const privChanged = canonical(priv) !== canonical(had);
+  if(!changed && !privChanged) return;
   if(out.marks && out.marks.length){ S.state = moveMarks(S.state, out.marks); saveState(); }
-  const rec = {...S.rec, trip: next};
+  const rec = {...S.rec, trip: next, priv, ...(privChanged ? {privUnsaved: true} : {})};
   await keepRecord(rec);
   render();
-  offerSave(rec, t(message, {v: shortId(next.version.id), ...extra}));
+  offerSave(rec, changed ? t(message, {v: shortId(next.version.id), ...extra}) : t(privMessage));
 }
 
 function currentPlace(){
@@ -321,7 +361,10 @@ function newStop(prefill, newDay = false){
   const here = currentPlace(), ti = todayIndex();
   const dayIndex = route().name === "day" ? here.dayIndex : (ti >= 0 ? ti : 0);
   openStopEditor({...editorBase(), money: moneyOptions(), dayIndex, planId: here.planId, prefill, newDay,
-    onSave: ({stop, date, plan, newDay}) => applyEdit(tr => addStop(withDay(tr, newDay), {date, plan}, stop), newDay ? "dayAdded" : "stopAdded", newDay ? {n: trip().days.length + 1} : {})
+    onSave: ({stop, date, plan, newDay, priv: paid}) => applyEdit(tr => {
+      const out = addStop(withDay(tr, newDay), {date, plan}, stop);
+      return {trip: out.trip, priv: paid ? setAtStop(privOf(), out.trip, ownerNow(), {date, stop: out.ref.id, title: stop.title}, paid, null) : undefined};
+    }, newDay ? "dayAdded" : "stopAdded", newDay ? {n: trip().days.length + 1} : {}, "privAdded")
       .then(() => goToDay(date))
       .catch(err => toast(String(err.message || err)))});
 }
@@ -343,21 +386,41 @@ function editStop(stopId){
   const stop = list.find(s => s.id === stopId);
   if(!stop) return;
   const ref = {date: d.date, plan: here.planId, id: stop.id};
+  // What the traveller paid there for themselves: the form shows the first one.
+  const paid = atStop(privOf(), d.date, stop.id)[0] || null;
   openStopEditor({...editorBase(), money: moneyOptions(), dayIndex: here.dayIndex, planId: here.planId, stop,
-    onSave: ({stop: next, date, plan, newDay}) => applyEdit(tr => {
+    privateCost: paid && {cost: paid.cost, currency: paid.currency},
+    onSave: ({stop: next, date, plan, newDay, priv: cost}) => applyEdit(tr => {
       const out = updateStop(withDay(tr, newDay), ref, next, {date, plan});
-      return {trip: out.trip, marks: [{date: ref.date, plan: ref.plan, from: ref.id, to: out.ref.id, toDate: date, toPlan: plan}]};
+      const marks = [{date: ref.date, plan: ref.plan, from: ref.id, to: out.ref.id, toDate: date, toPlan: plan}];
+      const priv = setAtStop(followStops(privOf(), marks), out.trip, cost ? ownerNow() : "", {date, stop: out.ref.id, title: next.title}, cost, paid && paid.id);
+      return {trip: out.trip, marks, priv};
     }, "stopSaved").catch(err => toast(String(err.message || err))),
-    onDelete: () => applyEdit(tr => ({trip: removeStop(tr, ref)}), "stopDeleted").catch(err => toast(String(err.message || err)))});
+    // What was paid there privately stays, under its own name.
+    onDelete: () => applyEdit(tr => ({trip: removeStop(tr, ref), priv: unlinkStop(privOf(), ref.date, ref.id)}), "stopDeleted").catch(err => toast(String(err.message || err)))});
 }
 
-// An expense outside the stops: a new one, or the one with this id.
-function editExpense(id){
-  const tr = trip(), x = id ? (tr.expenses || []).find(e => e.id === id) : null;
+// An expense outside the stops, of the trip or private: a new one, or the one with
+// this id. Changing which it is moves it from one list to the other.
+function editExpense(id, isPrivate = false){
+  const tr = trip(), list = isPrivate ? (privOf() ? privOf().expenses : []) : (tr.expenses || []);
+  const x = id ? list.find(e => e.id === id) : null;
   if(id && !x) return;
-  openExpenseEditor({expense: x, money: moneyOptions(), tripCurrency: tr.currency || "", today: tripToday(),
-    onSave: e => applyEdit(cur => x ? {trip: updateExpense(cur, x.id, e)} : addExpense(cur, e), x ? "expenseSaved" : "expenseAdded").catch(err => toast(String(err.message || err))),
-    onDelete: () => applyEdit(cur => ({trip: removeExpense(cur, x.id)}), "expenseDeleted").catch(err => toast(String(err.message || err)))});
+  const fail = err => toast(String(err.message || err));
+  openExpenseEditor({expense: x, private: isPrivate, money: moneyOptions(), tripCurrency: tr.currency || "", today: tripToday(),
+    onSave: (e, toPrivate) => applyEdit(cur => {
+      let next = cur, priv = privOf();
+      const {stop, ...shared} = e;
+      if(x && isPrivate === toPrivate){
+        if(toPrivate) priv = updatePrivate(priv, cur, x.id, e); else next = updateExpense(cur, x.id, shared);
+      }else{
+        if(x){ if(isPrivate) priv = removePrivate(priv, cur, x.id); else next = removeExpense(cur, x.id); }
+        if(toPrivate) priv = addPrivate(priv, next, ownerNow(), e).priv; else next = addExpense(next, shared).trip;
+      }
+      return {trip: next, priv};
+    }, x ? "expenseSaved" : "expenseAdded", {}, x ? "privSaved" : "privAdded").catch(fail),
+    onDelete: () => applyEdit(cur => isPrivate ? {trip: cur, priv: removePrivate(privOf(), cur, x.id)} : {trip: removeExpense(cur, x.id)},
+      "expenseDeleted", {}, "privDeleted").catch(fail)});
 }
 
 /* ---------- the trip as a file ---------- */
@@ -376,8 +439,17 @@ let shareRefused = false;
 
 // Hands the file over: the share sheet where the phone has one and takes the file
 // (WhatsApp, Drive, Files…), a download otherwise. Marks the version as saved.
+// With private expenses, the traveller says first whether they go in the file: kept
+// for themselves, left out for someone else.
 async function saveFile(rec){
-  const file = new File([fileText(rec.trip)], fileName(rec.trip), {type: "application/json"});
+  let priv = null;
+  if(rec.priv && rec.priv.expenses.length){
+    const answer = await ask({title: t("saveFile"), text: t("saveWhich", {n: rec.priv.expenses.length}),
+      actions: [{id: "cancel", label: t("cancel")}, {id: "without", label: t("saveWithout")}, {id: "with", label: t("saveWith"), kind: "primary"}]});
+    if(answer !== "with" && answer !== "without") return;
+    if(answer === "with") priv = rec.priv;
+  }
+  const file = new File([fileText(rec.trip, priv)], fileName(rec.trip), {type: "application/json"});
   try{
     if(!shareRefused && navigator.canShare && navigator.canShare({files: [file]})){
       try{
@@ -394,7 +466,7 @@ async function saveFile(rec){
     toast(t("fileFailed"));
     return;
   }
-  const done = {...rec, exported: rec.trip.version.id};
+  const done = {...rec, exported: rec.trip.version.id, ...(priv ? {privUnsaved: false} : {})};
   await keepRecord(done);
   render();
   toast(t("fileSaved", {f: file.name}));
@@ -408,7 +480,7 @@ async function loadDemo(){
   try{
     const r = await fetch("examples/demo-trip.json");
     if(!r.ok) throw new Error(String(r.status));
-    await importText(await r.text(), "demo-trip.json");
+    await importText(await r.text(), "demo-trip.json", {demo: true});
   }catch(e){
     S.importError = {title: t("importFailed"), items: [String(e && e.message || e)]};
     render();
@@ -506,7 +578,7 @@ function aiSection(folded){
 // in the chat: a newer one tells it to read the guide again. Only on a published copy.
 const appVersion = () => (/^\d+\.\d+\.\d+/.exec(S.version) || [""])[0];
 const versionLine = () => appVersion() ? "\n\n" + t("aiVersion", {v: appVersion(), url: llmsUrl()}) : "";
-const aiEditMessage = () => t("aiEditPrompt") + versionLine() + "\n\n" + changesBrief() + "\n\n" + outline(S.rec.trip);
+const aiEditMessage = () => t("aiEditPrompt") + versionLine() + "\n\n" + changesBrief() + "\n\n" + outline(S.rec.trip, privOf());
 
 function aiEditSection(){
   return `<details class="aihow"><summary>${esc(t("aiEditTitle"))}</summary>
@@ -764,16 +836,16 @@ function costsSection(){
 // Approximate when any rate is an estimate.
 const approxMoney = (r, to, o) => (r.estimate ? "≈ " : "") + money(r.value, to, o);
 
-// The summary: the total, done and still to do, then day by day, by kind of place, and
-// the expenses outside the stops (a tap changes one).
+// The summary: the total, done and still to do, then day by day, by kind of place, the
+// expenses outside the stops and the private ones (a tap changes one).
 function costSummary(items, to, all){
   const tr = trip(), lang = getLang();
-  const stops = items.filter(x => x.kind === "stop"), outside = items.filter(x => x.kind === "expense");
+  const stops = items.filter(x => x.kind === "stop"), outside = items.filter(x => x.kind === "expense"), privs = items.filter(x => x.kind === "private");
   const done = sumIn(items.filter(x => x.done), to), todo = sumIn(items.filter(x => !x.done), to);
   const inStops = sumIn(stops, to), inOutside = sumIn(outside, to);
-  // Day by day
+  // Day by day: the stops, and what was paid privately that day.
   const byDay = tr.days.map((d, i) => {
-    const list = stops.filter(x => x.day === i);
+    const list = items.filter(x => (x.kind === "stop" || x.kind === "private") && x.day === i);
     if(!list.length) return null;
     const sum = sumIn(list, to), curs = [...new Set(list.map(x => x.currency))];
     const own = curs.length === 1 && curs[0] !== to ? money(list.reduce((a, x) => a + x.amount, 0), curs[0]) : "";
@@ -796,38 +868,47 @@ function costSummary(items, to, all){
   const kindsHTML = kindRows.map(x => `<div class="crow" style="--c:${x.k && TYPE_COLORS[x.k] ? TYPE_COLORS[x.k] : "var(--muted)"}"><span class="n ic">${kindIcon(x)}</span>` +
     `<span class="w"><b>${esc(kindName(x.k))}<small>${esc(x.list.length === 1 ? t("stopsOne") : t("stopsCount", {n: x.list.length}))}</small></b></span>` +
     `<span class="a">${esc(approxMoney(x.sum, to, {round: true}))}<small>${inStops.value ? Math.round(x.sum.value / inStops.value * 100) : 0}%</small></span></div>`).join("");
-  // Outside the stops
-  const outsideHTML = outside.map(x => {
+  // Outside the stops, and the private ones: a tap changes one.
+  const rows = (list, attr, mark) => list.map(x => {
     const c = conv(x.amount, x.currency, to, x.date);
     const sub = [x.expense.date ? dateParts(x.expense.date, lang).short : "", x.currency !== to ? money(x.amount, x.currency) : ""].filter(Boolean).join(" · ");
-    return `<button type="button" class="crow" data-expense="${esc(x.expense.id)}" style="--c:var(--muted)"><span class="n ic">${esc(symbolOf(x.currency, lang))}</span>` +
-      `<span class="w"><b>${esc(x.expense.title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>` +
+    return `<button type="button" class="crow" ${attr}="${esc(x.expense.id)}" style="--c:var(--muted)"><span class="n ic">${mark || esc(symbolOf(x.currency, lang))}</span>` +
+      `<span class="w"><b>${esc(mark ? privateTitle(x.expense) : x.expense.title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>` +
       `<span class="a">${c ? esc(approxMoney(c, to, {round: true})) : esc(money(x.amount, x.currency))}</span></button>`;
   }).join("");
+  const outsideHTML = rows(outside, "data-expense"), privHTML = rows(privs, "data-private-expense", LOCK);
   const total = all.value || 1;
+  // Under the total: in the stops and outside them; with private expenses, the trip's and those.
+  const round = r => money(r.value, to, {round: true});
+  const sub = privs.length ? [t("costTripPart", {a: round(sumIn([...stops, ...outside], to))}), t("costPrivatePart", {a: round(sumIn(privs, to))})]
+    : [stops.length ? t("costInStops", {a: round(inStops)}) : "", outside.length ? t("costOutside", {a: round(inOutside)}) : ""];
   return `<div class="chero">
       <span class="lab">${esc(t("costTotal"))}</span>
       <span class="big">${esc((all.estimate || all.missing.length ? "≈ " : "") + money(all.value, to, {round: true}))}</span>
-      <span class="sub">${esc([stops.length ? t("costInStops", {a: money(inStops.value, to, {round: true})}) : "", outside.length ? t("costOutside", {a: money(inOutside.value, to, {round: true})}) : ""].filter(Boolean).join(" · "))}</span>
+      <span class="sub">${esc(sub.filter(Boolean).join(" · "))}</span>
       <span class="split" aria-hidden="true"><i class="done" style="flex:${done.value}"></i><i class="todo" style="flex:${Math.max(todo.value, todo.value ? total * .03 : 0)}"></i></span>
       <span class="legend"><span><i class="done"></i>${esc(t("costDone"))} <b>${esc(approxMoney(done, to, {round: true}))}</b></span><span><i class="todo"></i>${esc(t("costTodo"))} <b>${esc(approxMoney(todo, to, {round: true}))}</b></span></span>
     </div>` +
     (days ? `<h3 class="ch">${esc(t("costByDay"))}</h3><div class="clist">${days}</div>` : "") +
     (kindsHTML ? `<h3 class="ch">${esc(t("costByKind"))}</h3><div class="clist">${kindsHTML}</div>` : "") +
-    (outsideHTML ? `<h3 class="ch">${esc(t("costOutsideTitle"))}</h3><div class="clist">${outsideHTML}</div>` : "");
+    (outsideHTML ? `<h3 class="ch">${esc(t("costOutsideTitle"))}</h3><div class="clist">${outsideHTML}</div>` : "") +
+    (privHTML ? `<h3 class="ch">${esc(t("costPrivateTitle"))}</h3><div class="clist">${privHTML}</div>` : "");
 }
 
-// The receipt: every cost in a column, day by day, with the rate of the day.
+// The receipt: every cost in a column, day by day, with the rate of the day. Private
+// expenses have a lock; those of a day outside the trip come last.
 function costReceipt(items, to, all){
   const tr = trip(), lang = getLang();
-  const line = (name, amount, cls = "") => `<div class="ln${cls}"><span class="t">${esc(name)}</span><span class="f"></span><span>${esc(amount)}</span></div>`;
+  const line = (name, amount, cls = "", mark = "") => `<div class="ln${cls}"><span class="t">${mark}${esc(name)}</span><span class="f"></span><span>${esc(amount)}</span></div>`;
+  const item = x => x.kind === "private" ? line(privateTitle(x.expense), money(x.amount, x.currency), "", LOCK)
+    : line(x.stop.title, x.amount === 0 ? t("free") : money(x.amount, x.currency));
   let html = "";
   tr.days.forEach((d, i) => {
-    const list = items.filter(x => x.kind === "stop" && x.day === i);
+    const list = items.filter(x => (x.kind === "stop" || x.kind === "private") && x.day === i);
     if(!list.length) return;
     const p = dateParts(d.date, lang);
     html += `<div class="dy" style="--c:${cityVar(d.city)}"><b>${i + 1}</b> · ${esc(p.short)}${d.city ? " · " + esc(d.city) : ""}</div>`;
-    html += list.map(x => line(x.stop.title, x.amount === 0 ? t("free") : money(x.amount, x.currency))).join("");
+    html += list.map(item).join("");
     const curs = [...new Set(list.map(x => x.currency))];
     const sum = sumIn(list, to);
     if(curs.length === 1 && curs[0] !== to){
@@ -840,6 +921,14 @@ function costReceipt(items, to, all){
     html += `<div class="dy">${esc(t("costOutsideTitle"))}</div>`;
     for(const x of outside){
       html += line(x.expense.title, money(x.amount, x.currency));
+      if(x.currency !== to){ const c = conv(x.amount, x.currency, to, x.date); if(c) html += line("", approxMoney(c, to), " sub"); }
+    }
+  }
+  const away = items.filter(x => x.kind === "private" && x.day < 0);
+  if(away.length){
+    html += `<div class="dy">${esc(t("costPrivateTitle"))}</div>`;
+    for(const x of away){
+      html += item(x);
       if(x.currency !== to){ const c = conv(x.amount, x.currency, to, x.date); if(c) html += line("", approxMoney(c, to), " sub"); }
     }
   }
@@ -989,54 +1078,83 @@ function sumIn(items, to){
 }
 
 /**
- * Every cost of the trip: the stops of the plan chosen for each day, then the expenses
- * outside the stops. done: a stop ticked, or an expense paid by today; skipped stops
- * are marked, and left out of every sum.
+ * Every cost of the trip: the stops of the plan chosen for each day, the expenses
+ * outside the stops, then the private ones. done: a stop ticked, or an expense paid
+ * by today (a private one paid at a stop: that stop ticked); skipped stops are marked,
+ * and left out of every sum. day: the index of the day, -1 for a date outside the trip.
  */
 function costItems(tr){
-  const items = [];
+  const items = [], ticked = new Map();
   tr.days.forEach((d, i) => {
     const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
     (plan ? plan.stops : d.stops).forEach((s, k) => {
-      if(typeof s.cost !== "number") return;
       const key = stopKey(d, plan ? plan.id : null, s, k);
       const done = !!S.state.done[key];
+      ticked.set(d.date + "|" + s.id, done);
+      if(typeof s.cost !== "number") return;
       items.push({kind: "stop", day: i, date: d.date, stop: s, amount: s.cost, currency: costCurrency(s), done, skipped: !done && !!S.state.skipped[key]});
     });
   });
   const first = tr.days[0].date, today = tripToday();
+  const dayOf = date => tr.days.findIndex(d => d.date === date);
   for(const x of tr.expenses || []){
     if(typeof x.cost !== "number") continue;
     const date = x.date || first;
-    items.push({kind: "expense", expense: x, date, amount: x.cost, currency: costCurrency(x), done: date <= today, skipped: false});
+    items.push({kind: "expense", expense: x, day: dayOf(date), date, amount: x.cost, currency: costCurrency(x), done: date <= today, skipped: false});
+  }
+  const priv = S.rec && S.rec.trip === tr ? privOf() : null;
+  for(const x of priv ? priv.expenses : []){
+    if(typeof x.cost !== "number") continue;
+    const date = x.date || first, at = x.stop ? ticked.get(date + "|" + x.stop) : undefined;
+    items.push({kind: "private", expense: x, day: dayOf(date), date, amount: x.cost, currency: costCurrency(x), done: at !== undefined ? at : date <= today, skipped: false});
   }
   return items;
 }
 
-// What the form needs to write a cost and show what it makes at home.
-function moneyOptions(){
-  return {local: localCurrency(), home: S.home,
-    convert: (amount, currency, date) => { const c = conv(amount, currency, S.home, date); askRates(); return c; },
-    onRates: fn => { ratesListener = fn; }};
+// The name of a private expense: the stop's, while it is paid at one that exists.
+function privateTitle(x){
+  const d = x.stop && trip().days.find(d => d.date === x.date);
+  const s = d && (d.plans ? d.plans.flatMap(p => p.stops) : d.stops).find(s => s.id === x.stop);
+  return s ? s.title : x.title;
 }
 
-// The cost in the margin of a stop: small, in the currency it is paid in.
-const costShort = s => s.cost === 0 ? t("free") : money(s.cost, costCurrency(s), {compact: true});
+// What a form needs to write its costs and show what they make at home. The rates that
+// arrive later update the fields of the last form opened.
+function moneyOptions(){
+  const fields = [];
+  return {local: localCurrency(), home: S.home,
+    convert: (amount, currency, date) => { const c = conv(amount, currency, S.home, date); askRates(); return c; },
+    onRates: fn => { fields.push(fn); ratesListener = () => fields.forEach(f => f()); }};
+}
 
-// The last line of an opened stop: its cost, and with one more tap what it makes at home.
-function costRow(s, id, date){
-  const cur = costCurrency(s), lang = getLang();
-  const amount = s.cost === 0 ? t("free") : money(s.cost, cur);
-  if(s.cost === 0 || cur === S.home) return `<div class="costrow"><span class="costbtn"><span class="l">${esc(t("cost"))}</span><span class="y">${esc(amount)}</span></span></div>`;
+// What the traveller paid privately at a stop, in one text: "¥1,500", "¥1,500 + €4".
+const paidText = (paid, o) => paid.map(x => money(x.cost, costCurrency(x), o)).join(" + ");
+
+// The cost in the margin of a stop: small, in the currency it is paid in. The trip's;
+// without one, the private one.
+const costShort = (s, paid) => typeof s.cost !== "number" ? paidText(paid.slice(0, 1), {compact: true})
+  : s.cost === 0 ? t("free") : money(s.cost, costCurrency(s), {compact: true});
+
+// The last line of an opened stop: its cost and what was paid there privately, and with
+// one more tap what they make at home.
+function costRow(s, id, date, paid){
+  const lang = getLang(), has = typeof s.cost === "number";
+  const parts = [...(has ? [{amount: s.cost, currency: costCurrency(s), date}] : []), ...paid.map(x => ({amount: x.cost, currency: costCurrency(x), date}))];
+  const amount = has ? (s.cost === 0 ? t("free") : money(s.cost, costCurrency(s))) : paidText(paid);
+  // Private only: a lock by the amount. Both: the private one on a line of its own.
+  const mine = !paid.length ? "" : has ? `<span class="pv">${LOCK}${esc(paidText(paid) + " " + t("privateMark"))}</span>` : `<span class="pv in">${esc(t("privateMark"))}</span>`;
+  const label = `<span class="l">${esc(t("cost"))}</span><span class="y">${has ? "" : LOCK}${esc(amount)}</span>${mine}`;
+  const away = parts.filter(p => p.amount > 0 && p.currency !== S.home);
+  if(!away.length) return `<div class="costrow"><span class="costbtn">${label}</span></div>`;
   const shown = S.openCosts.has(id);
   let rate = "";
   if(shown){
-    const c = conv(s.cost, cur, S.home, date);
-    rate = c
-      ? `<p class="rate"><b>${c.estimate ? "≈" : "="} ${esc(money(c.value, S.home))}</b><span>${esc(t(c.estimate ? "rateEstimateFull" : "rateOfFull", {d: shortDay(c.on), r: `1 ${symbolOf(S.home, lang)} = ${formatRate(c.rate, lang)} ${symbolOf(cur, lang)}`}))}</span></p>`
+    const c = conv(away[0].amount, away[0].currency, S.home, date), sum = sumIn(parts, S.home);
+    rate = c && !sum.missing.length
+      ? `<p class="rate"><b>${sum.estimate ? "≈" : "="} ${esc(money(sum.value, S.home))}</b><span>${esc(t(c.estimate ? "rateEstimateFull" : "rateOfFull", {d: shortDay(c.on), r: `1 ${symbolOf(S.home, lang)} = ${formatRate(c.rate, lang)} ${symbolOf(away[0].currency, lang)}`}))}</span></p>`
       : `<p class="rate">${esc(t(S.online ? "rateLoading" : "rateOffline", {c: S.home}))}</p>`;
   }
-  return `<div class="costrow"><button type="button" class="costbtn" data-cost-rate="${esc(id)}" aria-expanded="${shown}" aria-label="${esc(t("costIn", {c: S.home}))}"><span class="l">${esc(t("cost"))}</span><span class="y">${esc(amount)}</span><span class="to">${esc(symbolOf(S.home, lang))}<span class="chev">${CHEVRON}</span></span></button>${rate}</div>`;
+  return `<div class="costrow"><button type="button" class="costbtn" data-cost-rate="${esc(id)}" aria-expanded="${shown}" aria-label="${esc(t("costIn", {c: S.home}))}">${label}<span class="to">${esc(symbolOf(S.home, lang))}<span class="chev">${CHEVRON}</span></span></button>${rate}</div>`;
 }
 
 // The day's total, by its progress: in the currency of its costs, and what it makes at home.
@@ -1064,8 +1182,9 @@ function stopsHTML(day, planId, list, parts, paint){
     // Left column: when, where on the map, how you get there.
     const dark = parts && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
     // The cost, small, under them: in the currency it is paid in.
-    const hasCost = typeof s.cost === "number";
-    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s))}</span>` : ""}</div>`;
+    const paid = atStop(privOf(), day.date, s.id);
+    const hasCost = typeof s.cost === "number" || paid.length > 0;
+    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</div>`;
     // Middle: a label above the title, the title with its kind, the description that folds, the links.
     // The name as on the sign, under the title, in its own language (for the glyphs).
     const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
@@ -1096,7 +1215,7 @@ function stopsHTML(day, planId, list, parts, paint){
     const side = `<div class="side"><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button>` +
       (items ? `<button class="more" type="button" data-more="${esc(id)}" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="${esc(t("moreActions"))}: ${esc(s.title)}">${DOTS}</button>` +
         `<div class="menu" role="menu"${menuOpen ? "" : " hidden"}>${items}</div>` : "") + `</div>`;
-    const cost = hasCost && open ? costRow(s, id, day.date) : "";
+    const cost = hasCost && open ? costRow(s, id, day.date, paid) : "";
     return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}${hasCost ? " has-cost" : ""}">${left}<div class="body">${eyebrow}${head}${notices}${meta}${cost}</div>${side}</li>`;
   }).join("") + `</ol>`;
 }
@@ -1122,8 +1241,8 @@ function renderDay(i){
   // For the map: is the stop at this position in the list done or skipped?
   const gone = k => !!(S.state.done[keys[k]] || S.state.skipped[keys[k]]);
   const isSkipped = k => !S.state.done[keys[k]] && !!S.state.skipped[keys[k]];
-  const anyText = list.some(s => s.text || typeof s.cost === "number");
-  const costsToday = costItems(tr).filter(x => x.kind === "stop" && x.day === i);
+  const anyText = list.some(s => s.text || typeof s.cost === "number" || atStop(privOf(), d.date, s.id).length);
+  const costsToday = costItems(tr).filter(x => (x.kind === "stop" || x.kind === "private") && x.day === i);
   const stay = stayOf(d.stay);
   const zs = zonesOf(list, isSkipped);
   // What the cards on the map add to a pin: the name as on the sign, directions from
@@ -1337,6 +1456,8 @@ $app.addEventListener("click", e => {
   if(e.target.closest("[data-expense-add]")){ editExpense(null); return; }
   const expense = e.target.closest("[data-expense]");
   if(expense){ editExpense(expense.dataset.expense); return; }
+  const own = e.target.closest("[data-private-expense]");
+  if(own){ editExpense(own.dataset.privateExpense, true); return; }
   if(e.target.closest("[data-expand]")){
     S.ui.expandAll = !S.ui.expandAll;
     S.openStops.clear();
@@ -1651,8 +1772,9 @@ async function start(){
     for(const trip of legacy) await versions.put(trip);
     await store.clearLegacyVersions();
   }
-  const [records, activeId, ui, key, lang, useGoogle, home] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle"), store.getKV("home")]);
+  const [records, activeId, ui, key, lang, useGoogle, home, owner] = await Promise.all([store.listTrips(), store.getKV("active"), store.getKV("ui"), store.getKV("googleKey"), store.getKV("lang"), store.getKV("useGoogle"), store.getKV("home"), store.getKV("owner")]);
   if(typeof home === "string" && /^[A-Z]{3}$/.test(home)) S.home = home;
+  if(typeof owner === "string") S.owner = owner;
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);

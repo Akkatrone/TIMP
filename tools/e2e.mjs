@@ -10,6 +10,7 @@ import { withApp } from "./lib/browser.mjs";
 import { prepare } from "../js/trips.js";
 import { commit } from "../js/version.js";
 import { addStop } from "../js/edit.js";
+import { splitPrivate } from "../js/private.js";
 
 let passed = 0;
 async function step(name, fn){
@@ -402,9 +403,15 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`window.__files = []; const make = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { window.__files.push(b); return make(b); }; HTMLAnchorElement.prototype.click = function(){ window.__name = this.download; };`);
     // As Chrome on Android does: the share sheet exists, but refuses a .json file.
     await run(`navigator.canShare = () => true; navigator.share = () => Promise.reject(new DOMException("Permission denied", "NotAllowedError"));`);
-    await run(`document.querySelector('[data-act="save"]').click(); await new Promise(r => setTimeout(r, 400));`);
+    await run(`document.querySelector('[data-act="save"]').click();`);
+    // The example's private expenses came with it: the app asks whether they go in the file.
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask [data-answer]")].map(b => b.textContent);`), ["Cancel", "Without", "With private expenses"]);
+    await answer("with");
     assert.equal(await run(`return window.__files.length;`), 1, "refused by the share sheet, the file is downloaded instead");
     saved = JSON.parse(await run(`return await window.__files[0].text();`));
+    assert.deepEqual(saved.private.expenses.map(x => x.cost), [24, 18]);
+    assert.match(saved.private.owner, /^p-[0-9a-f]{12}$/, "this phone's code: the example's were no one's");
     const name = await run(`return window.__name;`);
     assert.equal(name, `demo-lisbon-${saved.version.id.slice(0, 7)}.json`);
     assert.equal((await versionOnPhone()).id, saved.version.id);
@@ -413,7 +420,7 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("a file changed on another phone is joined with this one, and offered for saving", async () => {
     // The other phone: the same example trip, with its own new stop.
-    const {trip: root} = await prepare(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8")));
+    const {trip: root} = await prepare(splitPrivate(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"))).trip);
     const other = await commit(addStop(root, {date: "2027-05-15"}, {time: "21:00", title: "Fado evening"}).trip, root);
     await sendFile(other);
     // Both changed: the app shows what, and asks.
@@ -804,7 +811,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector('[data-edit="castelo"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-cost-amount")`);
     assert.equal(await run(`return document.getElementById("stop-cost-amount").value;`), "30");
-    assert.deepEqual(await run(`return [...document.querySelectorAll('[data-money] [data-cur]')].map(b => b.textContent + ":" + b.getAttribute("aria-checked"));`), ["€ EUR:true", "$ USD:false", "Other…:false"]);
+    assert.deepEqual(await run(`return [...document.querySelectorAll('[data-money="stop-cost"] [data-cur]')].map(b => b.textContent + ":" + b.getAttribute("aria-checked"));`), ["€ EUR:true", "$ USD:false", "Other…:false"]);
     await run(`const a = document.getElementById("stop-cost-amount"); a.value = "1.234,5"; a.dispatchEvent(new Event("input"));`);
     assert.match(await run(`return document.querySelector("[data-money-hint]").textContent;`), /^≈ \$1,543\.13 · rate of .+, may change$/);
     await run(`const a = document.getElementById("stop-cost-amount"); a.value = "twelve"; a.dispatchEvent(new Event("input"));`);
@@ -849,6 +856,100 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return ${stop("se")}.querySelector("[data-cost-rate]");`), null);
     assert.equal(await run(`return !!${stop("castelo")}.querySelector("[data-cost-rate]");`), true, "dollars still convert");
     await run(`const st = await import(new URL("js/store.js", location.href)); await st.delKV("home");`);
+  });
+
+  await step("private expenses: by a stop or alone, out of the versions; a mistake moves with one tap; a file carries them only if asked", async () => {
+    const rec = id => run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get(${JSON.stringify(id)}); g.onsuccess = () => r(g.result); }; });`);
+    const toastText = () => run(`return document.getElementById("toast").textContent;`);
+    const before = await rec("demo-lisbon");
+    assert.deepEqual(before.priv.expenses.map(x => x.cost), [24, 18]);
+    assert.equal(before.trip.private, undefined, "never in the trip's versions");
+    const owner = before.priv.owner;
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector('[data-edit="castelo"]')`);
+    const stop = id => `document.querySelector('[data-edit="${id}"]').closest(".stop")`;
+    // Under the amount: the trip's or private. A second cost for the same stop, private.
+    await run(`document.querySelector('[data-edit="castelo"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-cost-amount")`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll('[data-money="stop-cost"] [data-kind]')].map(b => b.textContent + ":" + b.getAttribute("aria-checked"));`), ["Trip:true", "Private:false"]);
+    assert.equal(await run(`return document.querySelector('[data-money="stop-cost2"]').hidden;`), true);
+    await run(`document.querySelector("[data-add-cost]").click();`);
+    assert.equal(await run(`return document.querySelector('[data-money="stop-cost2"] [data-kind="private"]').getAttribute("aria-checked");`), "true");
+    await run(`const a = document.getElementById("stop-cost2-amount"); a.value = "12"; a.dispatchEvent(new Event("input"));`);
+    await submit();
+    assert.match(await toastText(), /^Private expense saved\.Save the file/, "no version: nothing about one");
+    const after = await rec("demo-lisbon");
+    assert.equal(after.trip.version.id, before.trip.version.id, "no new version");
+    assert.deepEqual(after.priv.expenses.filter(x => x.stop === "castelo").map(x => [x.cost, x.date, x.currency]), [[12, "2027-05-14", undefined]]);
+    // Opened, the stop shows both.
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".costrow .y").textContent;`), "$40");
+    assert.equal(await run(`return ${stop("castelo")}.querySelector(".costrow .pv").textContent;`), "€12 private");
+    // A mistake: the trip's cost was the private one. One choice changes both.
+    await run(`document.querySelector('[data-edit="castelo"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-cost2-amount")`);
+    assert.equal(await run(`return document.querySelector('[data-money="stop-cost2"]').hidden;`), false);
+    await run(`document.querySelector('[data-money="stop-cost"] [data-kind="private"]').click();`);
+    assert.equal(await run(`return document.querySelector('[data-money="stop-cost2"] [data-kind="trip"]').getAttribute("aria-checked");`), "true");
+    await submit();
+    const fixed = await rec("demo-lisbon");
+    const castelo = fixed.trip.days[0].stops.find(s => s.id === "castelo");
+    assert.deepEqual([castelo.cost, castelo.currency], [12, undefined]);
+    assert.deepEqual(fixed.priv.expenses.filter(x => x.stop === "castelo").map(x => [x.cost, x.currency]), [[40, "USD"]]);
+    assert.notEqual(fixed.trip.version.id, after.trip.version.id, "the trip's cost changed: a new version");
+    // Info: the trip's costs and the private ones, apart; a tap moves one to the trip and back.
+    await run(`location.hash = "#info";`);
+    await until("the summary", `document.querySelector(".chero")`);
+    assert.match(await run(`return document.querySelector(".chero .sub").textContent;`), /^Trip €[\d,]+ · Private \$[\d,]+$|^Trip .+ · Private .+$/);
+    const privRows = () => run(`return [...document.querySelectorAll("[data-private-expense] b")].map(b => b.textContent);`);
+    assert.equal((await privRows()).length, 3);
+    assert.ok((await privRows()).includes("Azulejo tiles to take home (invented)"));
+    await run(`document.querySelector('[data-private-expense="azulejo-tiles-to-take-home-invented"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #exp-title")`);
+    assert.equal(await run(`return document.querySelector('[data-money="exp-cost"] [data-kind="private"]').getAttribute("aria-checked");`), "true");
+    await run(`document.querySelector('[data-money="exp-cost"] [data-kind="trip"]').click();`);
+    await submit();
+    assert.equal((await privRows()).length, 2);
+    const moved = await run(`return [...document.querySelectorAll("[data-expense]")].find(b => b.textContent.includes("Azulejo")).dataset.expense;`);
+    await run(`document.querySelector('[data-expense="${moved}"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #exp-title")`);
+    await run(`document.querySelector('[data-money="exp-cost"] [data-kind="private"]').click();`);
+    await submit();
+    assert.equal((await privRows()).length, 3);
+    assert.equal((await rec("demo-lisbon")).trip.expenses.length, 2, "back out of the trip");
+    // Saving: without them for someone else (the same version), with them for oneself.
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="save"][data-id="demo-lisbon"]')`);
+    // The page was reloaded since the first file: catch the download again.
+    await run(`window.__files = []; const make = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { window.__files.push(b); return make(b); }; HTMLAnchorElement.prototype.click = function(){ window.__name = this.download; };`);
+    await run(`navigator.canShare = () => false;`);
+    await run(`document.querySelector('[data-act="save"][data-id="demo-lisbon"]').click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    await answer("without");
+    const without = JSON.parse(await run(`return await window.__files[0].text();`));
+    assert.equal(without.private, undefined);
+    assert.equal(await run(`return !!document.querySelector(".unsaved");`), true, "the private ones are not saved yet");
+    await run(`document.querySelector('[data-act="save"][data-id="demo-lisbon"]').click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    await answer("with");
+    const withThem = JSON.parse(await run(`return await window.__files[1].text();`));
+    assert.equal(withThem.version.id, without.version.id, "the same version, with or without them");
+    assert.deepEqual([withThem.private.owner, withThem.private.expenses.length], [owner, 3]);
+    assert.equal(await run(`return !!document.querySelector(".unsaved");`), false);
+    // Someone else's file: their private expenses stay out, this phone's are never mixed with them.
+    await sendFile({...withThem, private: {owner: "p-bbbbbbbbbbbb", expenses: [{title: "A watch", cost: 900}]}});
+    assert.match(await toastText(), /someone else's: left out/);
+    assert.equal((await rec("demo-lisbon")).priv.expenses.length, 3);
+    // A file an assistant wrote, with private expenses that are no one's yet: asked, and taken.
+    await sendFile({format: "travel-in-my-pocket/2", title: "A weekend", days: [{date: "2027-06-05", stops: [{title: "Bookshop"}]}], private: {expenses: [{title: "Two books", cost: 30}]}});
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await run(`return document.querySelector("dialog.ask h2").textContent;`), "Private expenses in the file");
+    await answer("yes");
+    assert.match(await toastText(), /Private expenses added: 1\./);
+    const weekend = await rec("a-weekend-2027-06-05");
+    assert.deepEqual([weekend.priv.owner, weekend.priv.expenses[0].title], [owner, "Two books"]);
+    await run(`location.hash = "#trips";`);
+    await until("the trips page", `document.querySelector('[data-act="open"][data-id="demo-lisbon"]')`);
+    await run(`document.querySelector('[data-act="open"][data-id="demo-lisbon"]').click(); await new Promise(r => setTimeout(r, 300));`);
   });
 
   await step("a .json file shared on Android is loaded, through the service worker", async () => {

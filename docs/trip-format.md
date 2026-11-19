@@ -75,6 +75,7 @@ an `address` and its position (`lat`, `lng`):
 | `info` | no | Sections of the Info page. |
 | `currency` | no | The currency money is spent in, as its code: `"JPY"`, `"EUR"`. Every `cost` without its own `currency` is in it. See [Costs](#costs). |
 | `expenses` | no | Money spent outside the stops: flights, hotels, passes. See [Costs](#costs). |
+| `private` | no | The traveller's own spending, not shared with the trip. See [Private expenses](#private-expenses). |
 | `googleMapsKey` | no | A Google Maps key for everyone who loads the trip. See [Google Maps key](#google-maps-key). |
 | `id` | written by the app | Identifies the trip on the phone. Without it the app makes one from the title and the first date, so a corrected file for the same trip updates it. Keep it when you change a file the app saved. |
 | `version` | written by the app | Keep it exactly as it is.<!-- llms.txt: skip --> See [Versions](#versions).<!-- llms.txt: end --> |
@@ -103,7 +104,7 @@ an `address` and its position (`lat`, `lng`):
 | `text` | no | What to know: what to see, what to order, tickets. |
 | `tag` | no | A short label above the title, like `"Booked 19:30"` or `"Optional"`. |
 | `booking` | no | `"required"`: no entry without booking, and the stop shows a warning until it is done; `"advised"`: better booked; `"booked"`: done, shown as Booked (the time and the people go in `tag`). |
-| `cost` | no | What the stop costs, in all, for everyone on the trip: the tickets, the meal, the ride. A number, `0` for free. See [Costs](#costs). |
+| `cost` | no | What the traveller pays there: the ticket, the meal, the ride; their share when it is split. A number, `0` for free. See [Costs](#costs). |
 | `currency` | no | The currency of `cost`, when it is not the trip's `currency`: `"EUR"` for a ticket bought from home. |
 | `closed` | no | When the place is closed: days of the week (`"mon"` … `"sun"`) and dates (`"2027-05-03"`). The stop shows a warning when its day is one of them, also after it is moved. |
 | `address` | no | Where it is, as you would search it in Google Maps: a street address, or name and town (`"Pantheon, Rome"`). Used by the Map and Directions links. |
@@ -125,8 +126,10 @@ the position, or from the trip's `timezone`; nothing about it goes in the file.
 
 ## Costs
 
-A trip can say what it costs. Each stop has its `cost`; the money spent outside the
-stops, often before leaving, goes in `expenses`:
+A trip can say what it costs the traveller who holds it. Every amount is what they pay:
+their share of what is split, so a double room for two at 200 is 100, and a taxi shared
+by three is a third. How many people travel does not matter to the app. Each stop has
+its `cost`; the money spent outside the stops, often before leaving, goes in `expenses`:
 
 ```json
 "currency": "JPY",
@@ -139,7 +142,7 @@ stops, often before leaving, goes in `expenses`:
 | Field | Required | Meaning |
 |---|---|---|
 | `title` | yes | What it was. |
-| `cost` | yes | How much, in all, for everyone. |
+| `cost` | yes | What the traveller pays: their share when it is split. |
 | `currency` | no | Its currency, when it is not the trip's. |
 | `date` | no | When it was paid, `"YYYY-MM-DD"`. Without it, the first day of the trip. |
 | `id` | written by the app | Lets edits and merges follow the expense. |
@@ -155,6 +158,35 @@ with what was really spent.
 On the stop it shows small, under its time; an opened stop shows it in full, and a tap
 on it shows what it makes at home. The end of the Info page sums it all up: day by day,
 by kind of place, and the expenses, or as a receipt.
+
+### Private expenses
+
+What the traveller spends only for themselves, a watch or a thousand onigiri, is not
+part of the shared trip. It goes in `private`:
+
+```json
+"private": {
+  "owner": "p-3f9a1c0b7d2e",
+  "expenses": [
+    {"title": "Souvenirs, Nishiki Market", "date": "2027-04-12", "cost": 4500},
+    {"title": "Fushimi Inari", "date": "2027-04-11", "cost": 1500, "stop": "fushimi-inari"}
+  ]
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `expenses` | yes | The private expenses, written like the trip's. |
+| `stop` | no | In a private expense only: the `id` of the stop where it was paid, on the day in its `date`, which it then needs. The stop shows it ("¥1,500 private"). If the stop is deleted, the expense stays, with its own title. |
+| `owner` | written by the app | Whose they are: a random code made by the traveller's phone. Keep it exactly as it is; never write or change it. |
+
+Private expenses are never part of a version: they take no part in merges, and a file
+with them or without them is the same version of the trip. The app writes them in a
+file only when the traveller saves it with them: it asks each time. A phone that loads a
+file with its own `owner` takes them; any other phone asks first. A file without `owner`
+(an assistant wrote it) suggests taking them, and they become the expenses of whoever
+loads it. The Info page counts them with the trip's costs, apart: the trip's, and the
+private ones.
 
 ## Info
 
@@ -221,7 +253,7 @@ The app writes a `version` into every file it saves:
 
 | Field | Meaning |
 |---|---|
-| `id` | 16 hex characters: the start of the SHA-256 of the trip's content (without `version`, keys in a fixed order) and of its parents. The same content from the same parents has the same id on every device. |
+| `id` | 16 hex characters: the start of the SHA-256 of the trip's content (without `version` and `private`, keys in a fixed order) and of its parents. The same content from the same parents has the same id on every device. |
 | `parents` | The version this one was made from; two after a merge; none for the first. |
 | `history` | Every earlier version, newest first. It tells a newer file from an older one, or from one that changed separately. |
 | `date` | When the version was made. Not part of the id. |
@@ -259,7 +291,8 @@ as one new version (Paste, at the bottom of the app):
   {"setTrip": {"set": {"currency": "EUR"}}},
   {"addExpense": {"expense": {"title": "Train Rome – Naples", "date": "2027-03-01", "cost": 58}}},
   {"setExpense": {"expense": "train-rome-naples", "set": {"cost": 49}}},
-  {"removeExpense": {"expense": "hotel-deposit"}}
+  {"removeExpense": {"expense": "hotel-deposit"}},
+  {"addExpense": {"private": true, "expense": {"title": "Leather gloves", "date": "2027-04-11", "cost": 45}}}
 ]}
 ```
 
@@ -269,7 +302,9 @@ alternative plan; on a day that has none yet, the stops it has become the first 
 named by `first`, and their ticks follow. A day left with one plan by `removePlan` has
 plain stops again. `setPlan` changes only the name: the stops of a plan change one by
 one. `setTrip` changes the trip's `title`, `lang`, `timezone`, `info` or `currency`;
-`addExpense`, `setExpense` and `removeExpense` its `expenses`, named by their `id`. The changes are applied in order, all or none: if one is wrong, the app lists
+`addExpense`, `setExpense` and `removeExpense` its `expenses`, named by their `id`; with
+`"private": true` next to `"expense"`, the traveller's private expenses, which change on
+the phone, outside the trip's versions. The changes are applied in order, all or none: if one is wrong, the app lists
 which one and why, and changes nothing. The result is checked like any trip file.
 `trip` may be left out: the changes then apply to the trip open on the phone.
 <!-- llms.txt: skip -->The rules are in [`js/changes.js`](../js/changes.js).<!-- llms.txt: end -->
@@ -301,6 +336,10 @@ warnings: the file loads, and the command-line checker shows them.
 Only what a trip file, or a list of changes, can say differently. Files written for an
 older version still load.
 
+- **3.8**: a `cost` is what the traveller pays, their share of what is split; in 3.7
+  it was the total for everyone. Private expenses: `private`, with its `expenses` (a
+  private one can name the `stop` where it was paid) and `owner`, outside versions and
+  merges. Changes reach them with `"private": true`.
 - **3.7**: what things cost: `cost` and `currency` on a stop; `currency` and
   `expenses` on the trip. Changes can set them: `setTrip`, `addExpense`, `setExpense`,
   `removeExpense`.

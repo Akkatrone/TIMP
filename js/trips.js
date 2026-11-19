@@ -9,6 +9,7 @@ import { ensureIds } from "./edit.js";
 import { ensureVersion, childOf, commit, commitMerge, relation, commonBase, isIntact } from "./version.js";
 import { mergeTrips } from "./merge.js";
 import { diffTrips } from "./diff.js";
+import { withPrivate } from "./private.js";
 
 /**
  * Makes a trip ready for versions: in format 2, with ids, with a version. Files
@@ -112,7 +113,10 @@ export function fileName(trip){
   return `${trip.id}-${String(trip.version.id).slice(0, 7)}.json`;
 }
 
-/** The trip as a file: readable JSON, the version near the top. */
-export function fileText(trip){
-  return JSON.stringify(trip, null, 1) + "\n";
+/**
+ * The trip as a file: readable JSON, the version near the top. With `priv`, the
+ * traveller's private expenses go at the end (js/private.js).
+ */
+export function fileText(trip, priv = null){
+  return JSON.stringify(withPrivate(trip, priv), null, 1) + "\n";
 }

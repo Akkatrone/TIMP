@@ -4,6 +4,31 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.8.0
+
+What the trip costs you, and what you keep for yourself.
+
+- **A cost is what you pay**: your share of what is split with others, so a double
+  room for two is half its price. The app no longer needs to know how many travel:
+  the trip's total is what it costs the person who holds it. In 3.7 a cost was the
+  total for everyone; costs written then are worth a look.
+- **Private expenses**, for what you buy only for yourself: a watch, a thousand
+  onigiri. Under every amount, Trip or Private; a stop can have both, its cost and
+  what you spent there privately ("€30 · ¥1,500 private"). A mistake is one tap away:
+  change the choice and save, and the expense moves.
+- **Kept out of the shared trip**: private expenses are on your phone and in your
+  file, but never in a version or a merge. The trip with or without them is the same
+  version, so a friend who skips them shares the trip with you as before.
+- **You choose what a file carries**: Save the file asks, when there are private
+  expenses, whether they go in it (for you) or not (for someone else).
+- **A file with private expenses** is recognised: your own are taken; someone else's
+  are asked about, in the merge question or in one of their own, and left out unless
+  you say so. Those an assistant wrote, no one's yet, become yours if you take them.
+- **Info** counts them apart: the trip's costs and the private ones, a list of them,
+  and a lock on the receipt.
+- **AI assistants** see them in the outline and change them with `"private": true`;
+  the format guide says a cost is the traveller's share.
+
 ## 3.7.0
 
 What the trip costs, and stops as cards.

@@ -462,4 +462,19 @@
    ]
   }
  ]
+,
+ "private": {
+  "expenses": [
+   {
+    "title": "Azulejo tiles to take home (invented)",
+    "date": "2027-05-15",
+    "cost": 24
+   },
+   {
+    "title": "Port wine, a bottle for home (invented)",
+    "date": "2027-05-17",
+    "cost": 18
+   }
+  ]
+ }
 }

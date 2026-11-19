@@ -36,6 +36,7 @@ const FILES = [
   "js/money.js",
   "js/objects.js",
   "js/places.js",
+  "js/private.js",
   "js/rates.js",
   "js/store.js",
   "js/sun.js",

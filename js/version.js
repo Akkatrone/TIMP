@@ -15,9 +15,11 @@ export const SHORT = 7;        // characters shown, as Git does
 
 export const shortId = id => String(id || "").slice(0, SHORT);
 
-// The trip without its version: what the id is computed from.
+// The trip without its version: what the id is computed from. Private expenses are
+// never part of a version either (js/private.js): a file with or without them is the
+// same version of the trip.
 export function contentOf(trip){
-  const {version, ...rest} = trip;
+  const {version, private: own, ...rest} = trip;
   return rest;
 }
 

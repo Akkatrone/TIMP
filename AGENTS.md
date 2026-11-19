@@ -32,7 +32,8 @@ Someone wants their itinerary turned into a file for the app. No code changes.
 3. Save the file as `private/<trip-id>.json`.
    **Updating a trip that already exists:** start from the latest file the app saved
    (the person finds it in Trips → Save the file). Keep the trip `id`, every stop `id`,
-   and the `version` block exactly as they are: never write or change `version`. The
+   the `version` block and `private.owner` exactly as they are: never write or change
+   `version` or `owner`. The
    app sees that the content changed and makes a new version from it, then merges it
    with the copies on other phones. Starting from an older copy works too, but the
    changes made in the app since then come back only through that merge.
@@ -71,6 +72,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
 | `js/money.js` | Amounts as people type them, in their currency, and what they make in another at the rate of their own day. No DOM, no network. |
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
+| `js/private.js` | Private expenses: in the file and on the phone, never in a version or a merge; what to do with those a loaded file brings. No DOM. |
 | `js/places.js` | What the app works out about a place: its part of the world, its review site (Tabelog, Naver, Yelp, TheFork), closing days, the language of its local name. No DOM. |
 | `js/livemap.js` | Interactive map: Google Maps, or Leaflet + OpenStreetMap. |
 | `js/google.js` | Google's script, loaded once, shared by map and address search. |

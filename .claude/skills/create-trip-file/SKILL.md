@@ -18,8 +18,8 @@ Then:
 - Save the file as `private/<trip-id>.json`. Git ignores that folder. Never save a
   real trip anywhere else in the repository and never commit one.
 - Changing a trip that already exists: start from the latest file the app saved. Keep
-  the trip `id`, every stop `id` and the `version` block as they are; never write or
-  change `version`. The app makes a new version from your work.
+  the trip `id`, every stop `id`, the `version` block and `private.owner` as they are;
+  never write or change `version` or `owner`. The app makes a new version from your work.
 - Check it, and read the map summary it prints:
 
   ```bash

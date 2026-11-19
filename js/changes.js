@@ -18,16 +18,19 @@
 //     {"setTrip": {"set": {"currency": "JPY"}}},
 //     {"addExpense": {"expense": {"title": "Flights", "date": "2027-02-01", "cost": 640, "currency": "EUR"}}},
 //     {"setExpense": {"expense": "<expense id>", "set": {"cost": 610}}},
-//     {"removeExpense": {"expense": "<expense id>"}}
+//     {"removeExpense": {"expense": "<expense id>"}},
+//     {"addExpense": {"private": true, "expense": {"title": "Souvenirs", "cost": 3000, "date": "2027-04-10", "stop": "<stop id>"}}}
 //   ]}
 //
 // In "set", null removes a field. A stop goes in time order. A day without plans that
 // gets one has two: its stops become the first, named by "first"; a day left with one
-// plan goes back to plain stops. Everything is checked against FIELDS once applied,
-// like any trip file.
+// plan goes back to plain stops. "private": true on an expense change is for the
+// traveller's private expenses (js/private.js): they change on this phone, outside the
+// trip's versions. Everything is checked against FIELDS once applied, like any trip file.
 
 import { FIELDS, FORMAT, validateTrip } from "./trip.js";
 import { addStop, updateStop, removeStop, ensureIds, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense } from "./edit.js";
+import { withPrivate, addPrivate, updatePrivate, removePrivate, followStops, unlinkStop } from "./private.js";
 
 export const CHANGES = "travel-in-my-pocket/changes";
 
@@ -43,10 +46,10 @@ export const isChanges = data => isObj(data) && data.format === CHANGES;
 /**
  * The trip in a few lines per day, for an assistant asked to change it: dates, cities,
  * titles, and each stop's id, time, title, kind, way of travelling and cost; then the
- * expenses. Descriptions and positions stay out: the assistant does not need them to
- * say what to change.
+ * expenses, and the traveller's private ones when `priv` has any. Descriptions and
+ * positions stay out: the assistant does not need them to say what to change.
  */
-export function outline(trip){
+export function outline(trip, priv = null){
   const stop = s => {
     const extra = [s.type, s.travel && "by " + s.travel, s.booking && "booking " + s.booking, s.closed && "closed " + s.closed.join(" "),
       s.cost !== undefined && `cost ${s.cost}${s.currency ? " " + s.currency : ""}`, s.lat === undefined && "no position"].filter(Boolean);
@@ -64,6 +67,10 @@ export function outline(trip){
   if(trip.expenses && trip.expenses.length){
     lines.push("", "Expenses outside the stops:");
     for(const x of trip.expenses) lines.push(`  [${x.id}] ${x.date ? x.date + " " : ""}${x.title}: ${x.cost}${x.currency ? " " + x.currency : ""}`);
+  }
+  if(priv && priv.expenses.length){
+    lines.push("", "Private expenses (the traveller's own, not shared with the trip):");
+    for(const x of priv.expenses) lines.push(`  [${x.id}] ${x.date ? x.date + " " : ""}${x.title}: ${x.cost}${x.currency ? " " + x.currency : ""}${x.stop ? ` (at [${x.stop}])` : ""}`);
   }
   return lines.join("\n");
 }
@@ -90,23 +97,26 @@ export function changesBrief(){
     `  {"setTrip": {"set": {…}}}  the trip's ${TRIP_SET.join(", ")}`,
     `  {"addExpense": {"expense": {"title": "…", "cost": 0, "currency": "EUR", "date": "YYYY-MM-DD"}}}  money spent outside the stops (flights, hotels)`,
     `  {"setExpense": {"expense": "<id>", "set": {…}}}  /  {"removeExpense": {"expense": "<id>"}}`,
+    `  "private": true next to "expense", in these three: the traveller's private expenses (shopping, a meal alone), not shared with the trip. A private one paid at a stop has "stop": "<stop id>" and that day as "date"`,
     "",
-    `On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them. A cost is for everyone, in all, in the trip's currency unless the stop says another; write only prices you know.`
+    `On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them. A cost is what the traveller pays (their share of what is split), in the trip's currency unless the stop says another; write only prices you know.`
   ].join("\n");
 }
 
 /**
- * Applies a changes file to a trip.
- * @returns {{ok: true, trip: object, moves: object[], counts: {added, changed, removed}} | {ok: false, errors: string[]}}
+ * Applies a changes file to a trip, and to its private expenses.
+ * @param priv   the private expenses on this phone, or null
+ * @param owner  this phone's owner code, for the first private expense
+ * @returns {{ok: true, trip: object, priv: object|null, moves: object[], counts: {added, changed, removed}} | {ok: false, errors: string[]}}
  *   moves: for ticks to follow moved stops (see moveMarks in js/trips.js).
  */
-export function applyChanges(trip, data){
+export function applyChanges(trip, data, priv = null, owner = ""){
   const errors = [];
   if(!isChanges(data)) return {ok: false, errors: [`format: must be "${CHANGES}"`]};
   if(data.trip !== undefined && data.trip !== trip.id) return {ok: false, errors: [`trip: these changes are for "${data.trip}", the open trip is "${trip.id}"`]};
   if(!Array.isArray(data.changes) || !data.changes.length) return {ok: false, errors: ["changes: must be a non-empty list"]};
 
-  let out = clone(trip);
+  let out = clone(trip), mine = priv;
   const moves = [], counts = {added: 0, changed: 0, removed: 0};
   const dayOf = date => out.days.find(d => d.date === date);
   const stopIn = (date, plan, id) => {
@@ -122,6 +132,21 @@ export function applyChanges(trip, data){
     const next = {...obj};
     for(const [k, v] of Object.entries(set)) if(v === null) delete next[k]; else next[k] = v;
     return next;
+  };
+
+  // The expense a change names, among the trip's or the private ones.
+  const expenseOf = x => {
+    const list = x.private ? (mine ? mine.expenses : []) : (out.expenses || []);
+    const found = list.find(e => e.id === x.expense);
+    if(!found) throw new Error(`there is no ${x.private ? "private " : ""}expense "${x.expense}"`);
+    return found;
+  };
+  // A private expense paid at a stop names a stop of that day.
+  const atStop = e => {
+    if(e.stop === undefined) return;
+    const d = dayOf(e.date);
+    const all = d ? (d.plans ? d.plans.flatMap(p => p.stops) : d.stops) : [];
+    if(!all.some(s => s.id === e.stop)) throw new Error(`there is no stop "${e.stop}" on ${e.date === undefined ? "the day in \"date\"" : e.date}`);
   };
 
   data.changes.forEach((c, i) => {
@@ -150,6 +175,7 @@ export function applyChanges(trip, data){
       }else if(kind === "remove"){
         stopIn(x.day, x.plan, x.stop);
         out = removeStop(out, {date: x.day, plan: x.plan || null, id: x.stop});
+        mine = unlinkStop(mine, x.day, x.stop);
         counts.removed++;
       }else if(kind === "setDay"){
         const d = dayOf(x.day);
@@ -192,16 +218,19 @@ export function applyChanges(trip, data){
       }else if(kind === "addExpense"){
         if(!isObj(x.expense)) throw new Error(`"expense" must be an object`);
         const {id, ...expense} = x.expense;
-        out = addExpense(out, expense).trip;
+        if(x.private){ atStop(expense); mine = addPrivate(mine, out, owner, expense).priv; }
+        else out = addExpense(out, expense).trip;
         counts.added++;
       }else if(kind === "setExpense"){
-        const old = (out.expenses || []).find(e => e.id === x.expense);
-        if(!old) throw new Error(`there is no expense "${x.expense}"`);
-        out = updateExpense(out, old.id, withSet(old, x.set));
+        const old = expenseOf(x);
+        const next = withSet(old, x.set);
+        if(x.private){ atStop(next); mine = updatePrivate(mine, out, old.id, next); }
+        else out = updateExpense(out, old.id, next);
         counts.changed++;
       }else if(kind === "removeExpense"){
-        if(!(out.expenses || []).some(e => e.id === x.expense)) throw new Error(`there is no expense "${x.expense}"`);
-        out = removeExpense(out, x.expense);
+        expenseOf(x);
+        if(x.private) mine = removePrivate(mine, out, x.expense);
+        else out = removeExpense(out, x.expense);
         counts.removed++;
       }else{
         throw new Error(`"${kind}" is not a change: use ${KINDS}`);
@@ -212,8 +241,10 @@ export function applyChanges(trip, data){
   });
   if(errors.length) return {ok: false, errors};
   out = ensureIds(out).trip;   // stops of a new day get their ids
+  mine = followStops(mine, moves);
+  if(mine && !mine.expenses.length) mine = null;
   // The result is checked like any trip file.
-  const check = validateTrip({...out, format: FORMAT});
+  const check = validateTrip({...withPrivate(out, mine), format: FORMAT});
   if(!check.ok) return {ok: false, errors: check.errors.map(e => "after the changes, " + e)};
-  return {ok: true, trip: out, moves, counts};
+  return {ok: true, trip: out, priv: mine, moves, counts};
 }

@@ -58,7 +58,8 @@ function realTimezone(s){
  *   number: `min`, `max`.
  * soft: a value outside `values` is a warning, not an error.
  * byApp: written by the app; a file may leave it out.
- * private: never written by an assistant (left out of formatBrief).
+ * inBrief: false: left out of formatBrief, which an assistant follows to write a new file
+ *   (a key it must never write; a link to a stop id the file does not have yet).
  * A type can also be a union: "stay" is a text or an object (see `stayOrText`).
  */
 export const FIELDS = {
@@ -71,7 +72,8 @@ export const FIELDS = {
     info: {type: "list", of: "section", doc: "Sections of the Info page: numbers, words, transport."},
     currency: {type: "text", pattern: CURRENCY, hint: CURRENCY_HINT, doc: "The currency of every cost without its own."},
     expenses: {type: "list", of: "expense", min: 1, doc: "Money spent outside the stops: flights, hotels, passes."},
-    googleMapsKey: {type: "text", private: true, doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
+    private: {type: "private", doc: "The traveller's own spending, not shared."},
+    googleMapsKey: {type: "text", inBrief: false, doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app. Keep it when you change a file the app saved."},
     version: {type: "any", byApp: true, doc: "Written by the app. Keep it as it is."}
   },
@@ -98,7 +100,7 @@ export const FIELDS = {
     text: {type: "text", doc: "What to know: what to see, what to order, tickets. **bold** is allowed."},
     tag: {type: "text", doc: "A short label shown on the stop, like \"Booked 19:30\" or \"Optional\"."},
     booking: {type: "text", values: BOOKING, soft: true, doc: "\"required\": no entry without it (the app warns); \"advised\": better booked; \"booked\": done."},
-    cost: {type: "number", min: 0, max: 1e12, doc: "What it costs in all, for everyone: tickets, meal, ride. 0: free."},
+    cost: {type: "number", min: 0, max: 1e12, doc: "What the traveller pays. 0: free."},
     currency: {type: "text", pattern: CURRENCY, hint: CURRENCY_HINT, doc: "The currency of `cost`, if not the trip's."},
     closed: {type: "list", of: "text", min: 1, item: {type: "text", pattern: /^(sun|mon|tue|wed|thu|fri|sat|\d{4}-\d{2}-\d{2})$/, test: closedDay, hint: "\"mon\" to \"sun\", or a date as \"YYYY-MM-DD\""}, doc: "Days of the week and dates the place is closed: the app warns on them."},
     address: {type: "text", doc: "As you would search it in Google Maps: a street address, or name and town."},
@@ -109,10 +111,15 @@ export const FIELDS = {
   },
   expense: {
     title: {type: "text", req: true, doc: "What it was: \"Flights\", \"Hotel, 3 nights\"."},
-    cost: {type: "number", req: true, min: 0, max: 1e12, doc: "How much, in all."},
+    cost: {type: "number", req: true, min: 0, max: 1e12, doc: "What the traveller pays."},
     currency: {type: "text", pattern: CURRENCY, hint: CURRENCY_HINT, doc: "The currency of `cost`, if not the trip's."},
     date: {type: "text", test: realDate, hint: "a real date as \"YYYY-MM-DD\"", doc: "When it was paid: the day of its rate. Without it, the trip's first day."},
+    stop: {type: "text", pattern: ID, hint: "a stop id", inBrief: false, doc: "Private expenses only: the id of the stop it was paid at, on the day in `date`."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
+  },
+  private: {
+    expenses: {type: "list", of: "expense", min: 1, req: true, doc: "Shopping, a meal alone."},
+    owner: {type: "text", pattern: ID, hint: "a code written by the app", byApp: true, doc: "Written by the app: whose they are. Keep it, never invent it."}
   },
   stay: {
     name: {type: "text", req: true, doc: "The name of the hotel or flat."},
@@ -194,6 +201,9 @@ const RULES = {
       if(i && isObj(d) && isObj(days[i - 1]) && isStr(d.date) && !(d.date > days[i - 1].date)) err(`days[${i}].date`, "must come after the day before: one entry per date, in order");
     });
     unique(t.expenses, "expenses", err);
+    (Array.isArray(t.expenses) ? t.expenses : []).forEach((x, i) => {
+      if(isObj(x) && x.stop !== undefined) err(`expenses[${i}].stop`, "only private expenses have a stop: what the trip pays at a stop is its \"cost\"");
+    });
     if(t.version !== undefined){
       const v = t.version, ok = isObj(v) && HASH.test(v.id) && ["parents", "history"].every(k => Array.isArray(v[k]) && v[k].every(x => HASH.test(x)));
       if(!ok) err("version", "is written by the app: keep it as it is, or remove it");
@@ -206,6 +216,12 @@ const RULES = {
     unique(d.plans, `${path}.plans`, err);
     const all = lists.flatMap(l => Array.isArray(l) ? l : []);
     if(all.length && all.every(s => !isObj(s) || s.lat === undefined)) warn(path, "no stop has lat/lng: this day has no map");
+  },
+  private(p, path, err){
+    unique(p.expenses, `${path}.expenses`, err);
+  },
+  expense(x, path, err){
+    if(x.stop !== undefined && x.date === undefined) err(path, "\"stop\" needs \"date\", the day of the stop");
   },
   stop(s, path, err, warn){
     if((s.lat === undefined) !== (s.lng === undefined)) err(path, "\"lat\" and \"lng\" go together");
@@ -281,13 +297,13 @@ export function formatBrief(){
       : f.type === "number" ? (f.max >= 1e9 ? `number, ${f.min} or more` : `number from ${f.min} to ${f.max}`) : f.values ? f.values.join("|") : f.hint || f.type;
     return `  ${name}${f.req ? " (required)" : ""}: ${what}. ${f.doc}`;
   };
-  const block = k => `${k}:\n` + Object.entries(FIELDS[k]).filter(([, f]) => !f.byApp && !f.private).map(([n]) => kind(k, n)).join("\n");
+  const block = k => `${k}:\n` + Object.entries(FIELDS[k]).filter(([, f]) => !f.byApp && f.inBrief !== false).map(([n]) => kind(k, n)).join("\n");
   return [
     `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block: double quotes, no comments, no trailing commas. Use only these fields; invent none.`,
     "",
     ...Object.keys(FIELDS).map(block),
     "",
-    "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. Give lat/lng only for places you are sure about; otherwise an address.",
+    "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. A cost is what the traveller pays: their share if split. Give lat/lng only for places you are sure about; otherwise an address.",
     "",
     "Example:",
     JSON.stringify(EXAMPLE)
