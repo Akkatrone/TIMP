@@ -1092,7 +1092,10 @@ function fakeService(){
   const summary = t => { const h = t.versions.get(t.head); return {id: t.id, localId: t.localId, title: h.title, head: t.head, role: "owner", visibility: "private",
     firstDay: h.days[0].date, lastDay: h.days[h.days.length - 1].date, days: h.days.length, updatedAt: "2026-11-19T00:00:00.000Z"}; };
   const client = cred => JSON.parse(Buffer.from(cred.response.clientDataJSON, "base64url").toString());
+  const calls = [], refuse = new Set();         // what the phone asked; local ids the service fails on
   const handler = async (method, path, body, headers) => {
+    calls.push(method + " " + path);
+    if(method === "POST" && path === "/v1/trips" && body.trip && refuse.has(body.trip.id)) return {status: 500, body: {error: "server: something went wrong"}};
     const ok = b => ({status: 200, body: b}), no = (status, error) => ({status, body: {error}});
     const user = handle => ({id: "u-" + handle, handle, name: "", since: "2026-11-19T00:00:00.000Z"});
     const session = handle => { const token = "tok-" + ++n; sessions.set(token, handle); return ok({token, user: user(handle)}); };
@@ -1181,7 +1184,7 @@ function fakeService(){
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs, chat};
+  handler.state = {trips, privs, chat, calls, refuse};
   return handler;
 }
 
@@ -1315,6 +1318,41 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("said", `/Unlinked: Claude\./.test(document.getElementById("toast").textContent)`);
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
     assert.equal(await run(`return !!document.querySelector("dialog.sheet");`), false);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("a trip the service fails on does not stop the others, and says why; one no longer on the account goes back on request", async () => {
+    // A trip made on another phone of the account, and the example here, which the service fails on.
+    const {trip: other} = await prepare({...splitPrivate(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"))).trip, id: "other-phone", title: "From the other phone"});
+    service.trips.set("t-other", {id: "t-other", owner: "fra", localId: "other-phone", head: other.version.id, versions: new Map([[other.version.id, other]])});
+    service.refuse.add("demo-lisbon");
+    service.calls.length = 0;
+    await run(`location.hash = "#trips";`);
+    await until("the account", `document.querySelector('[data-act="demo"]')`);
+    await run(`document.querySelector('[data-act="demo"]').click();`);
+    await until("the trip", `document.querySelectorAll(".stop").length > 0`);
+    await run(`location.hash = "#trips";`);
+    const demoCard = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="demo-lisbon"]'))`;
+    await until("said on its card", `${demoCard} && ${demoCard}.querySelector("[data-sync-error]")`, 15000);
+    assert.equal(await run(`return ${demoCard}.querySelector("[data-sync-error]").textContent;`), "Not synced: server: something went wrong. It will try again.");
+    assert.equal(await text(".acct small[data-sync]"), "1 trip(s) not synced: see the cards below");
+    const failedAt = service.calls.indexOf("POST /v1/trips");
+    assert.ok(failedAt >= 0 && service.calls.indexOf("GET /v1/trips/t-other/private") > failedAt, "the other trip was still synced after it: " + service.calls.join(", "));
+    // The service works again: the next sync takes it, the card says nothing more.
+    service.refuse.clear();
+    await run(`document.querySelector('[data-act="sync"]').click();`);
+    await until("synced", `document.querySelector('[data-sync="ok"]') && !${demoCard}.querySelector("[data-sync-error]")`, 15000);
+    assert.equal(service.trips.size, 2);
+    // Deleted from the account on another phone: kept here, marked; on request, back on the account.
+    const id = [...service.trips.values()].find(t => t.localId === "demo-lisbon").id;
+    service.trips.delete(id);
+    await run(`document.querySelector('[data-act="sync"]').click();`);
+    await until("marked", `${demoCard}.querySelector('[data-act="reup"]')`, 15000);
+    assert.equal(await run(`return ${demoCard}.querySelector(".where").textContent;`), "No longer on your account: on this phone only");
+    await run(`${demoCard}.querySelector('[data-act="reup"]').click();`);
+    await until("back", `/Back on your account\./.test(document.getElementById("toast").textContent)`, 15000);
+    assert.equal(await run(`return ${demoCard}.querySelector(".where").textContent;`), "On your account");
+    assert.ok([...service.trips.values()].some(t => t.localId === "demo-lisbon"), "on the account again, as a new trip");
     assert.deepEqual(blocked(), []);
   });
 }

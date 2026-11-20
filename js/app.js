@@ -54,7 +54,8 @@ const S = {
   rates: {},              // exchange rates of the days the trip needs (js/money.js)
   owner: "",              // this phone's code for its private expenses, made with the first one
   account: null,          // the sharing service's account on this phone ({id, handle, …}), or null
-  sync: "",               // "", "busy", "ok", "offline", "error": the last sync with the service
+  sync: "",               // "", "busy", "ok", "partial", "offline", "error": the last sync with the service
+  syncErrors: new Map(),  // trip id → why it did not sync (the others did), until the next sync
   hidden: new Set(),      // trips of the account taken off this phone only: not downloaded again
   drafts: {},             // what the traveller wrote for an assistant: {new: "…", "edit:<trip id>": "…"}
   openDetails: new Set(), // folded sections opened (data-keep), kept open when the page is drawn again
@@ -811,7 +812,7 @@ function accountSection(){
     `<span class="who"><b>${esc(t("account"))}</b><small>${esc(t("accountShort"))}</small></span>` +
     `<span class="acts"><button type="button" class="btn small" data-act="signin">${esc(t("signIn"))}</button><button type="button" class="btn small primary" data-act="signup">${esc(t("signUp"))}</button></span></section>`;
   return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${esc(u.handle.slice(0, 1).toUpperCase())}</span>` +
-    `<span class="who"><b>@${esc(u.handle)}</b><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn"))}</small></span>` +
+    `<span class="who"><b>@${esc(u.handle)}</b><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", partial: "syncPartial", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn", {n: S.syncErrors.size}))}</small></span>` +
     `<span class="acts"><button type="button" class="btn small" data-act="sync"${S.sync === "busy" ? " disabled" : ""}>${esc(t("syncNow"))}</button>` +
     (S.hidden.size ? `<button type="button" class="btn small" data-act="unhide">${esc(t("hiddenBack", {n: S.hidden.size}))}</button>` : "") +
     `<button type="button" class="btn small" data-act="chats">${esc(t("chatsTitle"))}</button>` +
@@ -852,19 +853,28 @@ function syncNow(){
         await store.putTrip(rec);
         S.records.push(rec);
       }
+      // One trip that does not go (refused, or the service failing on it) does not stop
+      // the others: it says why on its card, and is tried again at the next sync.
+      const errors = new Map();
       for(const rec of [...S.records]){
         if(rec.share && rec.share.gone) continue;
         const remoteOf = remote.find(r => rec.share && r.id === rec.share.id) || null;
         // Deleted from the account on another phone, or no longer shared with this
         // account: the copy here stays, on this phone only, and is not sent again.
         if(rec.share && rec.share.id && !remoteOf){ await keepSynced({...rec, share: {...rec.share, gone: true}}); continue; }
-        let next = await syncTrip(versions, rec, remoteOf, api);
-        next = await syncPrivate(next, api);
-        if(next !== rec) await keepSynced(next);
+        try{
+          let next = await syncTrip(versions, rec, remoteOf, api);
+          next = await syncPrivate(next, api);
+          if(next !== rec) await keepSynced(next);
+        }catch(e){
+          if(!e || e.status === 0 || e.status === 401) throw e;   // offline, or signed out: all of it waits
+          errors.set(rec.id, String(e.message || e).slice(0, 160));
+        }
       }
+      S.syncErrors = errors;
       // A new phone: nothing open yet, the trips just arrived: one is opened, so they show.
       if(!S.rec && S.records.length) await openRecord(S.records[S.records.length - 1]);
-      S.sync = "ok";
+      S.sync = errors.size ? "partial" : "ok";
     }catch(e){
       S.sync = e && e.status === 0 ? "offline" : "error";
       if(e && e.status === 401){ S.account = null; }
@@ -876,6 +886,18 @@ function syncNow(){
     }
   })();
   return syncing;
+}
+
+// A trip no longer on the account (deleted on another phone, no longer shared): on
+// request it goes on the account again, as the owner's, at the next sync.
+async function putBackOnAccount(id){
+  const rec = S.records.find(r => r.id === id);
+  if(!rec || !rec.share || !rec.share.gone) return;
+  const {share, ...rest} = rec;
+  await keepSynced(rest);
+  render();
+  await syncNow();
+  toast(t(S.syncErrors.has(id) ? "syncPartial" : "putBack", {n: S.syncErrors.size}));
 }
 
 async function accountSignIn(){
@@ -924,8 +946,9 @@ function renderTrips(){
       <div class="s">${esc(t("daysCount", {n: r.trip.days.length}))} · ${esc(t("loadedOn", {d: when}))}</div>
       <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
       ${r.share ? `<div class="s where">${esc(t(r.share.gone ? "goneFromAccount" : r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
+      ${S.syncErrors.has(r.id) ? `<div class="unsaved" role="status" data-sync-error>${esc(t("notSynced", {why: S.syncErrors.get(r.id)}))}</div>` : ""}
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button><button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
+      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
     </div>`;
   }).join("");
   const key = googleKey();
@@ -1775,6 +1798,7 @@ $app.addEventListener("click", e => {
   else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn});
   else if(a === "sync") syncNow();
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
+  else if(a === "reup") putBackOnAccount(act.dataset.id);
   else if(a === "signin") accountSignIn();
   else if(a === "chats") openLinkedApps(toast);
   else if(a === "signout") signOut().then(() => { S.account = null; S.sync = ""; render(); toast(t("signedOut")); });

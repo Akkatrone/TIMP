@@ -4,6 +4,19 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.14.1
+
+Sync that says what went wrong.
+
+- **One trip does not stop the others**: if the service fails on a trip, the others
+  still sync; that trip's card says "Not synced" and why, and the next sync tries it
+  again. Before, one failing trip stopped every trip after it, with only "Sync did not
+  work" to see.
+- **Put on my account**: a trip marked "No longer on your account" (deleted from the
+  account on another phone, or no longer shared with you) can go back on it, as yours.
+- The service let a trip deleted from the account block the same trip going on it
+  again (the example, loaded once more): fixed there.
+
 ## 3.14.0
 
 Linked chats.
