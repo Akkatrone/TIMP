@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.15.0
+
+Chats that change your trips; deleting for good asks for the trip's name.
+
+- **Delete from my account** now asks once more: write the trip's name, and only then
+  "Delete for good" can be pressed. It goes from every phone and for the people it is
+  shared with, so one tap is no longer enough. "This phone only" asks as before.
+- **Claude, ChatGPT and other chat apps can change your trips** (on the sharing
+  service): they change the version they read and their changes join those made on
+  your phones; anything they would take away or empty, they ask you first. They can
+  also put a new trip on your account. Your private expenses stay out of their reach.
+
 ## 3.14.1
 
 Sync that says what went wrong.

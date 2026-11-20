@@ -1267,8 +1267,19 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     // On request, it comes back.
     await run(`document.querySelector('[data-act="unhide"]').click();`);
     await until("back", card, 15000);
-    // From the account: gone everywhere.
+    // From the account: gone everywhere, only once the trip's name is written.
     await remove("all");
+    await until("the name asked", `document.querySelector("dialog.ask[open] .ask-type input")`);
+    assert.equal(await text("dialog.ask[open] #ask-title"), "Delete from your account?");
+    const forever = `document.querySelector('dialog.ask[open] [data-answer="yes"]')`;
+    const write = v => run(`const i = document.querySelector("dialog.ask[open] .ask-type input"); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event("input"));`);
+    assert.equal(await run(`return ${forever}.disabled;`), true, "nothing written: it cannot be pressed");
+    await write("Lisbon");
+    assert.equal(await run(`return ${forever}.disabled;`), true, "another name: still not");
+    assert.equal(service.trips.size, 1, "nothing deleted yet");
+    await write("  lisbon in my pocket   (EXAMPLE) ");
+    assert.equal(await run(`return ${forever}.disabled;`), false, "the name, whatever the case and spaces");
+    await run(`${forever}.click(); await new Promise(r => setTimeout(r, 600));`);
     assert.match(await text("#toast"), /Deleted from your account and every phone\./);
     assert.equal(service.trips.size, 0);
     assert.equal(await run(`return !!${card};`), false);

@@ -557,6 +557,13 @@ async function removeRecord(id){
     const answer = await ask({title: t("removeTripTitle"), text: t(own ? "removeSyncedText" : "removeSharedText", {t: rec.trip.title}),
       actions: [{id: "no", label: t("cancel")}, {id: "here", label: t("removeHere")}, {id: "all", label: t(own ? "removeEverywhere" : "leaveShare"), kind: "danger"}]});
     if(answer !== "here" && answer !== "all") return;
+    // From the account, for everyone, for good: once more, with the trip's name written.
+    if(answer === "all" && own){
+      const sure = await ask({title: t("removeForeverTitle"), text: t("removeForeverText", {t: rec.trip.title}),
+        type: {label: t("removeForeverLabel"), expected: rec.trip.title},
+        actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("removeForever"), kind: "danger", needsType: true}]});
+      if(sure !== "yes") return;
+    }
     if(answer === "all"){
       try{ own ? await deleteFromAccount(rec.share.id) : await leaveTrip(rec.share.id, S.account.id); }
       catch(e){ toast(e && e.status === 0 ? t("removeNeedsNet") : accountError(e)); return; }
