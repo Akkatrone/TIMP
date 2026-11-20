@@ -1076,6 +1076,56 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector(".fabs .fab").hidden || !!document.querySelector(".lock-note");`), false);
   });
 
+  await step("Trips: the open trip on top; the others a line each, grouped by when, sorted, found; a line opens to its trip", async () => {
+    // More trips on this phone: one under way, one coming, two past (two years).
+    await run(`
+      const st = await import(new URL("js/store.js", location.href)), tr = await import(new URL("js/trips.js", location.href));
+      const vs = (await import(new URL("js/objects.js", location.href))).versionStore(await st.backend());
+      const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+      const mk = async (id, title, from, n, city, at) => {
+        const days = Array.from({length: n}, (_, i) => ({date: day(from + i), city, stops: [{title: "Stop " + (i + 1)}]}));
+        const {trip} = await tr.prepare({format: "travel-in-my-pocket/2", id, title, days});
+        await vs.put(trip);
+        await st.putTrip({id, trip, importedAt: at, fileName: "", exported: trip.version.id});
+      };
+      await mk("now-trip", "Zagreb now", -1, 5, "Zagreb", 1);
+      await mk("next-trip", "Bergen next", 30, 3, "Bergen", 2);
+      await mk("past-a", "Athens before", -400, 3, "Athens", 3);
+      await mk("past-b", "Oslo before", -40, 2, "Oslo", 4);
+      await st.setKV("active", "now-trip");`);
+    await reload();
+    await run(`location.hash = "#trips";`);
+    await until("the page", `document.querySelector(".active-trip")`);
+    assert.equal(await text(".active-trip .t span"), "Zagreb now");
+    assert.match(await text(".active-trip .eyebrow"), /^Under way · day 2 of 5$/);
+    const groups = await run(`return [...document.querySelectorAll(".trip-group")].map(h => h.textContent);`);
+    assert.equal(groups[0], "Coming");
+    assert.ok(groups.slice(1).every(g => /^Past · \d{4}$/.test(g)), groups.join(", "));
+    const titles = () => run(`return [...document.querySelectorAll(".trip-row summary .t > span:first-child")].map(s => s.textContent);`);
+    assert.equal((await titles())[0], "Bergen next", "coming first");
+    assert.ok((await titles()).indexOf("Oslo before") < (await titles()).indexOf("Athens before"), "the latest past first");
+    // By name: one list, in order. Kept for next time.
+    await run(`const s = document.querySelector("[data-trips-sort]"); s.value = "name"; s.dispatchEvent(new Event("change", {bubbles: true}));`);
+    const byName = await titles();
+    assert.deepEqual(byName, [...byName].sort((a, b) => a.localeCompare(b, "en")));
+    assert.equal(await run(`return document.querySelectorAll(".trip-group").length;`), 0);
+    // Found by a city.
+    if(await run(`return !!document.querySelector("[data-trips-search]");`)){
+      await run(`const s = document.querySelector("[data-trips-search]"); s.value = "oslo"; s.dispatchEvent(new Event("input", {bubbles: true}));`);
+      assert.deepEqual(await titles(), ["Oslo before"]);
+      await run(`const s = document.querySelector("[data-trips-search]"); s.value = ""; s.dispatchEvent(new Event("input", {bubbles: true}));`);
+    }
+    // A line opens to its trip's details; Open makes it the open trip.
+    await run(`[...document.querySelectorAll(".trip-row")].find(d => d.textContent.includes("Bergen next")).querySelector("summary").click();`);
+    await run(`[...document.querySelectorAll(".trip-row")].find(d => d.textContent.includes("Bergen next")).querySelector('[data-act="open"]').click();`);
+    await until("opened", `document.querySelector(".stop")`);
+    await run(`location.hash = "#trips";`);
+    await until("the page", `document.querySelector(".active-trip")`);
+    assert.equal(await text(".active-trip .t span"), "Bergen next");
+    assert.match(await text(".active-trip .eyebrow"), /^In 30 days$/);
+    await run(`const s = document.querySelector("[data-trips-sort]"); s.value = "date"; s.dispatchEvent(new Event("change", {bubbles: true}));`);
+  });
+
   await step("a phone coming from 2.1 moves its full copies of versions into pieces", async () => {
     // Rebuild the 2.1 database: a trip, and two versions kept as full copies.
     const {trip: v1} = await prepare(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8")));

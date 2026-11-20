@@ -20,7 +20,7 @@ the app can be public and open source while your hotels and dates stay private.
 
 <p align="center">
   <img src="docs/screenshots/new-stop.png" width="24%" alt="The form to add a stop, filled in from a Google Maps link: name, day, time, how you get there, position">
-  <img src="docs/screenshots/trips-dark.png" width="24%" alt="The Trips page in the dark theme: the trip's version and a reminder to save the changed trip as a file">
+  <img src="docs/screenshots/trips-dark.png" width="24%" alt="The Trips page in the dark theme: the open trip on top, when it is, its version and a reminder to save it as a file">
   <img src="docs/screenshots/costs.png" width="24%" alt="What the trip costs, at the end of the Info page: the total in dollars, done and still to do, day by day">
 </p>
 

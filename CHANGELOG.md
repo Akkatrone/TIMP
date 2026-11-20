@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.19.0
+
+The Trips page, for people who travel a lot.
+
+- **The open trip on top**, in full: under way (which day of how many), coming (in how
+  many days) or over, its dates, and what you can do with it.
+- **My trips below**, one line each: title, dates, days, and small signs (locked,
+  shared, not synced). A line opens to the trip's details and its Open button.
+- **Grouped by when**: under way, coming, then past by year, the latest first. Or one
+  list **by name** or **by recently loaded**; the choice is kept.
+- **Find a trip** by its title or a city, when there are many.
+
 ## 3.18.0
 
 Locked trips.

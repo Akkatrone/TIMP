@@ -40,7 +40,8 @@ const S = {
                           // priv: the traveller's private expenses (js/private.js), outside the versions
   rec: null,              // the open one
   state: {done: {}, skipped: {}, plans: {}},
-  ui: {mapOpen: false, mapView: "live", expandAll: false, route: true, costsOpen: false, costView: "sum", costCur: ""},
+  ui: {mapOpen: false, mapView: "live", expandAll: false, route: true, costsOpen: false, costView: "sum", costCur: "", tripSort: "date"},
+  tripSearch: "",         // what the traveller looks for among their trips (Trips page)
   langPref: "auto",       // "auto" follows the trip, or a language chosen on this device
   theme: document.documentElement.dataset.theme || "auto",   // set early by js/theme.js
   openStops: new Map(),   // descriptions opened or closed one by one, until the page is closed
@@ -1043,21 +1044,87 @@ async function answerChatApp(id){
   try{ location.replace(await answerChat(id, yes, scopes)); }catch(e){ failed(e); }
 }
 
-function renderTrips(){
-  const lang = getLang();
-  const cards = S.records.slice().reverse().map(r => {
-    const cur = S.rec && S.rec.id === r.id;
-    const when = new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", year: "numeric"}).format(new Date(r.importedAt));
-    return `<div class="tripcard${cur ? " current" : ""}">
-      <div class="t"><span>${esc(r.trip.title)}</span>${isLocked(r) ? `<span class="badge-lock" data-locked>${esc(t("locked"))}</span>` : ""}${cur ? `<span class="badge-on">${esc(t("current"))}</span>` : ""}</div>
-      <div class="s">${esc(t("daysCount", {n: r.trip.days.length}))} · ${esc(t("loadedOn", {d: when}))}</div>
+// Where a trip is in time, seen from today where it happens: under way (which day),
+// coming (in how many days), or over.
+function tripWhen(tr){
+  const first = tr.days[0] && tr.days[0].date, last = tr.days.length && tr.days[tr.days.length - 1].date;
+  const today = todayIn(tr.timezone);
+  if(!first || today > last) return {phase: "past", first, last};
+  if(today < first) return {phase: "next", first, last, inDays: Math.round((Date.parse(first) - Date.parse(today)) / 864e5)};
+  return {phase: "now", first, last, day: tr.days.findIndex(d => d.date === today) + 1};
+}
+
+// A trip's dates as a short range: "14–17 May 2027".
+function dateRange(tr, lang){
+  const w = tripWhen(tr);
+  if(!w.first) return "";
+  const f = new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", year: "numeric", timeZone: "UTC"});
+  const a = new Date(w.first + "T00:00:00Z"), b = new Date(w.last + "T00:00:00Z");
+  try{ return f.formatRange(a, b); }catch(e){ return f.format(a) + " – " + f.format(b); }
+}
+
+// What a trip's card says and lets do: the same for the active trip and a row opened.
+function tripDetails(r, cur, lang){
+  const when = new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", year: "numeric"}).format(new Date(r.importedAt));
+  return `
+      <div class="s">${esc(t("loadedOn", {d: when}))}</div>
       <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
       ${r.share ? `<div class="s where">${esc(t(r.share.gone ? "goneFromAccount" : r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
       ${S.syncErrors.has(r.id) ? `<div class="unsaved" role="status" data-sync-error>${esc(t("notSynced", {why: S.syncErrors.get(r.id)}))}</div>` : ""}
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${!r.share || r.share.gone || r.share.role === "owner" ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
+      <div class="actions">${cur ? "" : `<button type="button" class="btn small primary" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${!r.share || r.share.gone || r.share.role === "owner" ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>`;
+}
+
+// Small signs on a trip's line: locked, shared, not synced.
+const tripSigns = r => (isLocked(r) ? `<span class="badge-lock" data-locked>${esc(t("locked"))}</span>` : "")
+  + (r.share && !r.share.gone && r.share.role !== "owner" ? `<span class="badge-lock">${esc(t("sharedBadge"))}</span>` : "")
+  + (S.syncErrors.has(r.id) ? `<span class="badge-warn">${esc(t("notSyncedBadge"))}</span>` : "");
+
+// The Trips page: the active trip on top, in full; the others below, a line each,
+// grouped (under way, coming, past by year) or in one list by name or by recent use,
+// found by title or city when there are many. A line opens to the trip's details.
+function renderTrips(){
+  const lang = getLang();
+  const active = S.rec ? S.records.find(r => r.id === S.rec.id) || null : null;
+  const w = active && tripWhen(active.trip);
+  const phase = !w ? "" : w.phase === "now" ? t("phaseNow", {d: w.day, n: active.trip.days.length}) : w.phase === "next" ? (w.inDays === 1 ? t("phaseTomorrow") : t("phaseNext", {n: w.inDays})) : t("phasePast");
+  const activeCard = !active ? "" : `<section class="active-trip" aria-label="${esc(t("activeTrip"))}">
+    <div class="tripcard current">
+      <div class="eyebrow">${esc(phase)}</div>
+      <div class="t"><span>${esc(active.trip.title)}</span>${tripSigns(active)}</div>
+      <div class="s">${esc(dateRange(active.trip, lang))} · ${esc(t("daysCount", {n: active.trip.days.length}))}</div>
+      ${tripDetails(active, true, lang)}
+    </div></section>`;
+  const others = S.records.filter(r => r !== active);
+  const q = (S.tripSearch || "").trim().toLowerCase();
+  const found = !q ? others : others.filter(r => [r.trip.title, ...r.trip.days.map(d => d.city || "")].some(x => String(x).toLowerCase().includes(q)));
+  const row = r => `<details class="tripcard trip-row" data-keep="trip:${esc(r.id)}"${S.openDetails.has("trip:" + r.id) ? " open" : ""}>
+      <summary><span class="t"><span>${esc(r.trip.title)}</span>${tripSigns(r)}</span><span class="s">${esc(dateRange(r.trip, lang))} · ${esc(t("daysCount", {n: r.trip.days.length}))}</span></summary>
+      ${tripDetails(r, false, lang)}
+    </details>`;
+  const sort = S.ui.tripSort || "date";
+  let list;
+  if(sort === "name") list = found.slice().sort((a, b) => a.trip.title.localeCompare(b.trip.title, lang)).map(row).join("");
+  else if(sort === "recent") list = found.slice().sort((a, b) => b.importedAt - a.importedAt).map(row).join("");
+  else{
+    const by = {now: [], next: [], past: new Map()};
+    for(const r of found){
+      const x = tripWhen(r.trip);
+      if(x.phase === "past"){ const y = (x.last || "").slice(0, 4); by.past.set(y, [...(by.past.get(y) || []), r]); }
+      else by[x.phase].push(r);
+    }
+    const start = r => r.trip.days[0] ? r.trip.days[0].date : "", end = r => r.trip.days.length ? r.trip.days[r.trip.days.length - 1].date : "";
+    const group = (title, rs) => rs.length ? `<h3 class="trip-group">${esc(title)}</h3>${rs.map(row).join("")}` : "";
+    list = group(t("groupNow"), by.now.sort((a, b) => start(a).localeCompare(start(b))))
+      + group(t("groupNext"), by.next.sort((a, b) => start(a).localeCompare(start(b))))
+      + [...by.past.keys()].sort().reverse().map(y => group(t("groupPast", {y}), by.past.get(y).sort((a, b) => end(b).localeCompare(end(a))))).join("");
+  }
+  const tools = others.length < 2 ? "" : `<div class="trip-tools">
+      ${others.length >= 6 ? `<input type="search" data-trips-search placeholder="${esc(t("searchTrips"))}" aria-label="${esc(t("searchTrips"))}" value="${esc(S.tripSearch || "")}">` : ""}
+      <select data-trips-sort aria-label="${esc(t("sortBy"))}">${["date", "name", "recent"].map(k => `<option value="${k}"${k === sort ? " selected" : ""}>${esc(t("sort_" + k))}</option>`).join("")}</select>
     </div>`;
-  }).join("");
+  const cards = activeCard + (others.length ? `<section class="sec my-trips"><div class="list-head"><h2>${esc(t("myTrips", {n: others.length}))}</h2></div>${tools}
+    ${list || `<p class="foot">${esc(t("noTripsFound"))}</p>`}</section>` : "");
   const key = googleKey();
   const status = !S.useGoogle ? "statusOsmChosen"
     : !key ? "statusNoKey"
@@ -1065,9 +1132,10 @@ function renderTrips(){
     : S.deviceKey ? "statusGoogleDevice" : "statusGoogleTrip";
   return `
   <h1>${esc(t("yourTrips"))}</h1>
-  ${accountSection()}
   ${errorBox()}
-  <section class="sec">${cards}
+  ${cards}
+  ${accountSection()}
+  <section class="sec">
     <div class="actions">
       <button type="button" class="btn primary" data-act="pick">${esc(t("updateTrip"))}</button>
       <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
@@ -1743,6 +1811,7 @@ function refocus(selector){
 }
 
 $app.addEventListener("input", e => {
+  if(e.target.matches && e.target.matches("[data-trips-search]")){ S.tripSearch = e.target.value; renderKeepingFocus(); return; }
   const box = e.target.closest && e.target.closest("[data-draft]");
   if(!box) return;
   setDraft(box.dataset.draft, box.value);
@@ -2028,6 +2097,7 @@ $app.addEventListener("toggle", e => {
 }, true);
 
 $app.addEventListener("change", e => {
+  if(e.target.matches && e.target.matches("[data-trips-sort]")){ S.ui.tripSort = e.target.value; saveUi(); render(); refocus("[data-trips-sort]"); return; }
   if(e.target.id !== "home-cur") return;
   S.home = e.target.value;
   store.setKV("home", S.home).catch(() => {});
@@ -2175,7 +2245,7 @@ async function start(){
     await versions.put(ready);
   }
   if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll, route: ui.route !== false,
-    costsOpen: !!ui.costsOpen, costView: ui.costView === "receipt" ? "receipt" : "sum", costCur: typeof ui.costCur === "string" ? ui.costCur : ""};
+    costsOpen: !!ui.costsOpen, costView: ui.costView === "receipt" ? "receipt" : "sum", costCur: typeof ui.costCur === "string" ? ui.costCur : "", tripSort: ["date", "name", "recent"].includes(ui.tripSort) ? ui.tripSort : "date"};
   if(typeof key === "string") S.deviceKey = key;
   syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);
