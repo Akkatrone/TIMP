@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.21.0
+
+Passkeys and devices.
+
+- **Trips → Account → Passkeys and devices**: the account's passkeys, with the device
+  each was made on, when added and when last used; the devices signed in, this one
+  marked.
+- **Add a passkey on this device**, so a lost phone does not lock you out. **Remove**
+  one you no longer use; never the last. Both ask for your passkey again when you did
+  not sign in during the last few minutes.
+- **Sign out all other devices**, at once: they need a passkey to come back.
+
 ## 3.20.0
 
 Sharing a trip, from the app.

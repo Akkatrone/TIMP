@@ -5,11 +5,11 @@
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
 import { ask } from "./ask.js";
-import { signUp, ShareError, linkedApps, unlinkApp } from "./share.js";
+import { signUp, ShareError, linkedApps, unlinkApp, passkeys, openSessions, endOtherSessions, removePasskey, addPasskey, needsSignIn, signInAgain } from "./share.js";
 
 /**
  * The account's sheet: who, and what can be done with it. Resolves with the action
- * chosen ("chats", "export", "signout", "delete"), or null when closed.
+ * chosen ("devices", "chats", "export", "signout", "delete"), or null when closed.
  */
 export function openAccountSheet(user){
   return new Promise(resolve => {
@@ -25,6 +25,7 @@ export function openAccountSheet(user){
       </div>
       <p class="foot">${esc(t("accountSince", {d: since}))}</p>
       <div class="me-actions">
+        <button type="button" class="btn" data-me="devices">${esc(t("devicesTitle"))}</button>
         <button type="button" class="btn" data-me="chats">${esc(t("chatsTitle"))}</button>
         <button type="button" class="btn" data-me="export">${esc(t("exportData"))}</button>
         <button type="button" class="btn" data-me="signout">${esc(t("signOut"))}</button>
@@ -52,6 +53,8 @@ export function accountError(e){
   if(/^code:/.test(e.message)) return t("codeInvalid");
   if(/^handle: already/.test(e.message)) return t("handleTaken");
   if(/^handle:/.test(e.message)) return t("handleBad");
+  if(/^passkey: already on this device/.test(e.message)) return t("passkeyHere");
+  if(/^passkey: another account/.test(e.message)) return t("passkeyOther");
   if(e.status === 429 || e.status === 503) return t("accountBusy");
   return t("accountFailed");
 }
@@ -169,4 +172,108 @@ export function openLinkedApps(toast){
   });
   dlg.showModal();
   linkedApps().then(list => { apps = list; draw(); }, failed);
+}
+
+/** A browser's User-Agent in a few words, "iPhone · Safari", "" if nothing is recognised. */
+export function deviceName(ua){
+  ua = String(ua || "");
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /CrOS/.test(ua) ? "ChromeOS"
+    : /Macintosh|Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
+  // The order matters: Edge, Opera and Samsung say Chrome too, and Chrome says Safari.
+  const app = /Edg(A|iOS)?\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /SamsungBrowser/.test(ua) ? "Samsung Internet"
+    : /Firefox|FxiOS/.test(ua) ? "Firefox" : /Chrome|CriOS/.test(ua) ? "Chrome" : /Safari/.test(ua) ? "Safari" : "";
+  return [os, app].filter(Boolean).join(" · ");
+}
+
+// Adding or taking off a passkey needs a sign-in of the last minutes (the service says
+// "sign in again"): the passkey is asked again, then the change is made. A passkey to
+// make needs a tap of its own (browsers allow one passkey prompt per tap): `again`
+// labels it. null if the person stopped.
+async function recently(fn, again){
+  try{ return await fn(); }
+  catch(e){
+    if(!needsSignIn(e)) throw e;
+    const go = await ask({title: t("itsYouQ"), text: t("itsYouText"), actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("usePasskey"), kind: "primary"}]});
+    if(go !== "yes" || !(await signInAgain())) return null;
+    if(again && await ask({title: t("itsYouDone"), actions: [{id: "no", label: t("cancel")}, {id: "yes", label: again, kind: "primary"}]}) !== "yes") return null;
+    return fn();
+  }
+}
+
+/**
+ * Who can get in: the account's passkeys (one more on this device, one taken off, never
+ * the last) and the devices signed in (all the others signed out in one go).
+ * @param toast  says something short over the page
+ */
+export function openDevices(toast){
+  const dlg = document.createElement("dialog");
+  dlg.className = "sheet";
+  dlg.setAttribute("aria-labelledby", "devices-title");
+  dlg.innerHTML = `
+  <div class="sheet-form devices">
+    <div class="sheet-head">
+      <h2 id="devices-title">${esc(t("devicesTitle"))}</h2>
+      <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
+    </div>
+    <section>
+      <h3 class="sheet-h">${esc(t("passkeysTitle"))}</h3>
+      <p class="foot">${esc(t("passkeysHelp"))}</p>
+      <div class="chats" data-keys aria-busy="true"><p class="foot">…</p></div>
+      <button type="button" class="btn" data-add-key>${FINGER}${esc(t("addPasskey"))}</button>
+    </section>
+    <section>
+      <h3 class="sheet-h">${esc(t("sessionsTitle"))}</h3>
+      <div class="chats" data-sessions aria-busy="true"><p class="foot">…</p></div>
+      <button type="button" class="btn danger" data-end-others hidden>${esc(t("endOthers"))}</button>
+    </section>
+  </div>`;
+  document.body.appendChild(dlg);
+  const $ = sel => dlg.querySelector(sel);
+  // The year only when it is not this one.
+  const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+    ...(new Date(d).getFullYear() !== new Date().getFullYear() ? {year: "numeric"} : {})}).format(new Date(d));
+  let keys = [], devices = [];
+  const draw = () => {
+    for(const box of [$("[data-keys]"), $("[data-sessions]")]) box.removeAttribute("aria-busy");
+    $("[data-keys]").innerHTML = keys.map((k, i) => `
+      <div class="chat" data-key="${esc(k.id)}">
+        <span class="who"><b>${esc(deviceName(k.device) || t("passkeyN", {n: i + 1}))}</b><small>${esc(t("passkeyAdded", {d: when(k.added)}))}</small><small>${esc(k.lastUsed ? t("chatsUsed", {d: when(k.lastUsed)}) : t("passkeyUnused"))}</small></span>
+        ${keys.length > 1 ? `<button type="button" class="btn small danger" data-remove-key="${esc(k.id)}">${esc(t("passkeyRemove"))}</button>` : ""}
+      </div>`).join("") + (keys.length === 1 ? `<p class="foot">${esc(t("passkeyLast"))}</p>` : "");
+    $("[data-sessions]").innerHTML = devices.map(d => `
+      <div class="chat" data-session="${esc(d.id)}"${d.current ? " data-current" : ""}>
+        <span class="who"><b>${esc(deviceName(d.device) || t("deviceUnknown"))}</b><small>${esc(d.current ? t("deviceThis") : t("deviceSince", {d: when(d.since)}))}</small></span>
+      </div>`).join("");
+    $("[data-end-others]").hidden = devices.length < 2;
+  };
+  const failed = e => { for(const box of [$("[data-keys]"), $("[data-sessions]")]){ box.removeAttribute("aria-busy"); box.innerHTML = `<p class="errbox" role="alert">${esc(accountError(e))}</p>`; } };
+  const load = () => Promise.all([passkeys(), openSessions()]).then(([k, d]) => { keys = k; devices = d; draw(); }, failed);
+  // One thing at a time: the buttons wait while the service answers.
+  const busy = async (b, fn) => {
+    b.disabled = true;
+    try{ await fn(); }catch(err){ toast(accountError(err)); }
+    finally{ b.disabled = false; }
+  };
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.addEventListener("click", async e => {
+    if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
+    const add = e.target.closest("[data-add-key]"), off = e.target.closest("[data-remove-key]"), others = e.target.closest("[data-end-others]");
+    if(add) busy(add, async () => {
+      if(await recently(addPasskey, t("addPasskey"))){ toast(t("passkeyAddedDone")); await load(); }
+    });
+    else if(off){
+      const yes = await ask({title: t("passkeyRemoveQ"), text: t("passkeyRemoveText"),
+        actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("passkeyRemove"), kind: "danger"}]});
+      if(yes === "yes") busy(off, async () => {
+        if(await recently(() => removePasskey(off.dataset.removeKey))){ toast(t("passkeyRemoved")); await load(); }
+      });
+    }
+    else if(others){
+      const yes = await ask({title: t("endOthersQ"), text: t("endOthersText"),
+        actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("endOthers"), kind: "danger"}]});
+      if(yes === "yes") busy(others, async () => { await endOtherSessions(); toast(t("endOthersDone")); await load(); });
+    }
+  });
+  dlg.showModal();
+  load();
 }

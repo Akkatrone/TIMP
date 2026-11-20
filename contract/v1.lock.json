@@ -169,6 +169,41 @@
     "req": true
    }
   },
+  "passkey": {
+   "id": {
+    "type": "text",
+    "req": true
+   },
+   "device": {
+    "type": "text"
+   },
+   "added": {
+    "type": "text",
+    "req": true
+   },
+   "lastUsed": {
+    "type": "text",
+    "req": true,
+    "null": true
+   }
+  },
+  "openSession": {
+   "id": {
+    "type": "text",
+    "req": true
+   },
+   "device": {
+    "type": "text"
+   },
+   "since": {
+    "type": "text",
+    "req": true
+   },
+   "current": {
+    "type": "bool",
+    "req": true
+   }
+  },
   "pendingInvite": {
    "id": {
     "type": "text",
@@ -259,6 +294,14 @@
     "type": "list",
     "of": "linkedApp",
     "req": true
+   },
+   "passkeys": {
+    "type": "list",
+    "of": "passkey"
+   },
+   "sessions": {
+    "type": "list",
+    "of": "any"
    },
    "audit": {
     "type": "list",
@@ -612,6 +655,66 @@
     }
    },
    "answer": "tripSummary"
+  },
+  "passkeys": {
+   "method": "GET",
+   "path": "/v1/account/passkeys",
+   "auth": true,
+   "answer": {
+    "passkeys": {
+     "type": "list",
+     "of": "passkey",
+     "req": true
+    }
+   }
+  },
+  "addPasskeyOptions": {
+   "method": "POST",
+   "path": "/v1/account/passkeys/options",
+   "auth": true,
+   "body": {},
+   "answer": "ceremony"
+  },
+  "addPasskey": {
+   "method": "POST",
+   "path": "/v1/account/passkeys",
+   "auth": true,
+   "body": {
+    "challengeId": {
+     "type": "text",
+     "req": true
+    },
+    "credential": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "ok"
+  },
+  "removePasskey": {
+   "method": "DELETE",
+   "path": "/v1/account/passkeys/:id",
+   "auth": true,
+   "answer": "ok"
+  },
+  "sessions": {
+   "method": "GET",
+   "path": "/v1/account/sessions",
+   "auth": true,
+   "answer": {
+    "sessions": {
+     "type": "list",
+     "of": "openSession",
+     "req": true
+    }
+   }
+  },
+  "endOtherSessions": {
+   "method": "POST",
+   "path": "/v1/account/sessions/end",
+   "auth": true,
+   "body": {},
+   "answer": "ok"
   },
   "exportAccount": {
    "method": "GET",

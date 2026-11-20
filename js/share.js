@@ -208,6 +208,63 @@ export async function deleteAccount(handle){
   return true;
 }
 
+/* ---------- who can get in: passkeys and devices ---------- */
+
+/** The account's passkeys: [{id, device, added, lastUsed}]. */
+export const passkeys = async () => (await call("passkeys")).passkeys;
+
+/** The devices signed in: [{id, device, since, current}]. */
+export const openSessions = async () => (await call("sessions")).sessions;
+
+/** Every other device signed out; this one stays. */
+export const endOtherSessions = () => call("endOtherSessions", {body: {}});
+
+/** A passkey off the account (never its last one). Needs a recent sign-in. */
+export const removePasskey = id => call("removePasskey", {params: {id}});
+
+/**
+ * A passkey of the account made on this device: true when added, null if the person
+ * closed the prompt. Needs a recent sign-in. A device that has one already says so
+ * (409 "passkey: already on this device").
+ */
+export async function addPasskey(){
+  const opt = await call("addPasskeyOptions", {body: {}});
+  let cred;
+  try{ cred = await navigator.credentials.create({publicKey: creationOptions(opt.publicKey)}); }
+  catch(e){
+    if(cancelled(e)) return null;
+    if(e && e.name === "InvalidStateError") throw new ShareError(409, "passkey: already on this device");
+    throw e;
+  }
+  await call("addPasskey", {body: {challengeId: opt.challengeId, credential: credentialJSON(cred)}});
+  return true;
+}
+
+/** The service wants a sign-in of the last minutes for this (a passkey added or taken off). */
+export const needsSignIn = e => e instanceof ShareError && e.status === 403 && /^sign in again/.test(e.message);
+
+/**
+ * The passkey asked again, now: a fresh session for the same account, the old one
+ * ended. true when done, null if the person closed the prompt; a passkey of another
+ * account changes nothing (403 "passkey: another account's").
+ */
+export async function signInAgain(){
+  const old = await session();
+  if(!old) throw new ShareError(401, "sign in first");
+  const opt = await call("loginOptions", {body: {}});
+  let cred;
+  try{ cred = await navigator.credentials.get({publicKey: requestOptions(opt.publicKey)}); }
+  catch(e){ if(cancelled(e)) return null; throw e; }
+  const s = await call("login", {body: {challengeId: opt.challengeId, credential: credentialJSON(cred)}});
+  if(s.user.id !== old.user.id){
+    await call("logout", {token: s.token}).catch(() => {});
+    throw new ShareError(403, "passkey: another account's");
+  }
+  await keep(s);
+  await call("logout", {token: old.token}).catch(() => {});
+  return true;
+}
+
 /* ---------- sharing a trip ---------- */
 
 // The owner invites one person: a link with a token, for one person, for 14 days. The

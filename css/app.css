@@ -595,6 +595,10 @@ button.crow{cursor:pointer}
 .chat .who small{font:500 .74rem var(--f-mono);color:var(--muted)}
 .sheet .passkey{display:grid;place-items:center;gap:6px;text-align:center;padding:6px 0 2px;color:var(--muted);font:400 .86rem var(--f-body)}
 .sheet .passkey svg{width:44px;height:44px;color:var(--ink)}
+.btn svg{width:20px;height:20px;flex:none}
+.devices section{display:grid;gap:10px}
+.devices .sheet-h{margin:6px 0 0}
+.chat[data-current] .who small{color:var(--ok)}
 
 /* Hover, only with a mouse: on a phone it would stay on after the tap. */
 @media (hover:hover){

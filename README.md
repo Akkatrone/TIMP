@@ -357,6 +357,12 @@ real routes and transport times, tap "Directions" on a stop.
   goes, and you allow or deny it there, with your passkey. The chat app gets a key of
   its own for that, never your passkey or your session. Trips → Account → Linked chats
   shows which chats can reach your trips, and unlinks one at once.
+- Who can get in is up to you: Trips → Account → Passkeys and devices lists your
+  passkeys and the devices signed in. Add a passkey on each phone you use, take one off
+  (never the last), sign out every other device at once. Adding or taking off a passkey
+  asks for your passkey again if you did not just sign in, so a phone left open is not
+  enough to change who can get in. The service keeps the name each browser gives
+  itself, to tell your devices apart.
 - Your data is yours: Trips → Account → Export my data gives you a copy of everything
   the service keeps about you; Delete account deletes all of it for good (your handle
   written again, then your passkey).

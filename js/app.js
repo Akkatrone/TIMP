@@ -25,7 +25,7 @@ import { shortId, canonical, contentOf } from "./version.js";
 import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { syncTrip, syncPrivate } from "./sync.js";
-import { openSignUp, openLinkedApps, openAccountSheet, accountError } from "./account.js";
+import { openSignUp, openLinkedApps, openAccountSheet, openDevices, accountError } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -960,7 +960,8 @@ function syncNow(){
 async function accountActions(){
   if(!S.account) return;
   const what = await openAccountSheet(S.account);
-  if(what === "chats") openLinkedApps(toast);
+  if(what === "devices") openDevices(toast);
+  else if(what === "chats") openLinkedApps(toast);
   else if(what === "export") exportMyData();
   else if(what === "signout"){ await signOut(); S.account = null; S.sync = ""; render(); toast(t("signedOut")); }
   else if(what === "delete") removeAccount();

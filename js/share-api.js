@@ -67,6 +67,18 @@ export const SHAPES = {
     role: text("What they will be able to do.", {values: ["read", "edit"]}),
     expires: text("Until when it can be accepted (ISO date).")
   },
+  passkey: {
+    id: text("The passkey's id."),
+    device: {type: "text", doc: "The device it was made on (its browser's words), empty if not known."},
+    added: text("When it was added (ISO date)."),
+    lastUsed: {type: "text", req: true, null: true, doc: "When it last signed in (ISO date), or null."}
+  },
+  openSession: {
+    id: text("The session's id (not its token)."),
+    device: {type: "text", doc: "What the device said it was, when it signed in (its browser)."},
+    since: text("When it signed in (ISO date)."),
+    current: {type: "bool", req: true, doc: "The device asking."}
+  },
   pendingInvite: {
     id: text("The invite's id (not its token: the token only its link has)."),
     role: text("What the person will be able to do.", {values: ["read", "edit"]}),
@@ -93,6 +105,8 @@ export const SHAPES = {
     trips: {type: "list", of: "any", req: true, doc: "Each trip the account owns or that is shared with it: {id, role, file} (file: the trip as it is now)."},
     privateExpenses: {type: "list", of: "any", req: true, doc: "The account's private expenses: {trip, data}, readable."},
     linkedApps: {type: "list", of: "linkedApp", req: true, doc: "The chat apps that can reach the trips."},
+    passkeys: {type: "list", of: "passkey", doc: "The account's passkeys (their public half stays on the service)."},
+    sessions: {type: "list", of: "any", doc: "The devices signed in: {device, since}."},
     audit: {type: "list", of: "any", req: true, doc: "What the service noted about this account (sign-ins, chats, deletions…), the last 180 days."}
   },
   linkedApp: {
@@ -147,6 +161,14 @@ export const ROUTES = {
   unlinkApp: {method: "DELETE", path: "/v1/oauth/apps/:id", auth: true, answer: "ok", doc: "Ends a link: the chat app's tokens stop working at once."},
   lockTrip: {method: "PUT", path: "/v1/trips/:id/lock", auth: true, body: {locked: {type: "bool", req: true, doc: "true to lock, false to unlock."}}, answer: "tripSummary",
     doc: "The owner locks a trip at its version (no changes, from anyone, no deleting), or unlocks it."},
+  passkeys: {method: "GET", path: "/v1/account/passkeys", auth: true, answer: {passkeys: {type: "list", of: "passkey", req: true}}, doc: "The account's passkeys."},
+  addPasskeyOptions: {method: "POST", path: "/v1/account/passkeys/options", auth: true, body: {}, answer: "ceremony",
+    doc: "Step one of adding a passkey on this device. Only with a recent sign-in (403 \"sign in again\" otherwise): a session alone never adds a key."},
+  addPasskey: {method: "POST", path: "/v1/account/passkeys", auth: true, body: {challengeId: text("From step one."), credential: {type: "any", req: true, doc: "The new passkey, as PublicKeyCredential.toJSON()."}}, answer: "ok",
+    doc: "Step two: the passkey made on this device joins the account."},
+  removePasskey: {method: "DELETE", path: "/v1/account/passkeys/:id", auth: true, answer: "ok", doc: "Takes a passkey off the account: never the last one; only with a recent sign-in."},
+  sessions: {method: "GET", path: "/v1/account/sessions", auth: true, answer: {sessions: {type: "list", of: "openSession", req: true}}, doc: "The devices signed in to the account."},
+  endOtherSessions: {method: "POST", path: "/v1/account/sessions/end", auth: true, body: {}, answer: "ok", doc: "Signs out every other device: their sessions end now."},
   exportAccount: {method: "GET", path: "/v1/account/export", auth: true, answer: "accountExport", doc: "Everything the service keeps about the account, readable: a copy to take away."},
   deleteAccount: {method: "POST", path: "/v1/account/delete", auth: true, body: {
     handle: text("The account's handle, written again by the person."),

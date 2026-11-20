@@ -37,3 +37,20 @@ test("a chat app's request: its id from the address, and only its own kinds of a
   for(const bad of ["javascript:alert(1)", "http://evil.example/cb", "data:text/html,x", "nonsense"]) assert.equal(chatAddress(bad), "", bad);
   assert.deepEqual(["localhost", "127.0.0.1", "claude.ai"].map(onThisComputer), [true, true, false]);
 });
+
+test("a device in a few words, from what its browser says", async () => {
+  const { deviceName } = await import("../js/account.js");
+  const ua = {
+    "iPhone · Safari": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "iPhone · Chrome": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0 Mobile/15E148 Safari/604.1",
+    "Android · Chrome": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "Android · Samsung Internet": "Mozilla/5.0 (Linux; Android 13; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/23.0 Chrome/115.0.0.0 Mobile Safari/537.36",
+    "Mac · Safari": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+    "Windows · Edge": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    "Linux · Firefox": "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    // Cut short by an older service (80 characters): the device still says what it is.
+    "iPhone": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KH",
+    "": ""
+  };
+  for(const [name, s] of Object.entries(ua)) assert.equal(deviceName(s), name);
+});

@@ -1181,6 +1181,7 @@ function fakeService(){
   const calls = [], refuse = new Set();         // what the phone asked; local ids the service fails on
   const deleted = [];                           // accounts deleted
   const invites = new Map(), members = new Map(); // token → {trip, role, usedBy, revoked}; trip → user → role
+  const flags = {stale: false};                 // the sign-in no longer recent (more than ten minutes ago)
   const handler = async (method, path, body, headers) => {
     calls.push(method + " " + path);
     if(method === "POST" && path === "/v1/trips" && body.trip && refuse.has(body.trip.id)) return {status: 500, body: {error: "server: something went wrong"}};
@@ -1212,6 +1213,7 @@ function fakeService(){
     if(method === "POST" && path === "/v1/auth/login"){
       const c = challenges.get(body.challengeId), cred = body.credential, cd = client(cred);
       if(!c || cd.type !== "webauthn.get" || cd.challenge !== c.challenge || !keys.has(cred.id) || !cred.response.signature) return no(401, "sign-in: failed");
+      flags.stale = false;
       return session(keys.get(cred.id));
     }
     const who = sessions.get(String(headers.authorization || "").replace("Bearer ", ""));
@@ -1268,6 +1270,39 @@ function fakeService(){
       privs.set(k, {data: body.data, rev: cur.rev + 1});
       return ok(privs.get(k));
     }
+    // Who can get in: the passkeys (one more, one taken off, never the last) and the
+    // devices signed in. Adding or taking off a passkey needs a recent sign-in.
+    if(path.startsWith("/v1/account/passkeys") || path.startsWith("/v1/account/sessions")){
+      if(!who) return no(401, "sign in first");
+      const token = String(headers.authorization || "").replace("Bearer ", "");
+      const mine = () => [...keys].filter(([, h]) => h === who).map(([id]) => ({id, device: "", added: "2026-11-19T00:00:00.000Z", lastUsed: null}));
+      if(path === "/v1/account/passkeys" && method === "GET") return ok({passkeys: mine()});
+      if(path === "/v1/account/sessions" && method === "GET")
+        return ok({sessions: [...sessions].filter(([, h]) => h === who).map(([tk]) => ({id: "s-" + tk, device: headers["user-agent"] || "", since: "2026-11-20T08:00:00.000Z", current: tk === token}))});
+      if(path === "/v1/account/sessions/end" && method === "POST"){ for(const [tk, h] of sessions) if(h === who && tk !== token) sessions.delete(tk); return ok({ok: true}); }
+      if(flags.stale) return no(403, "sign in again: this needs a sign-in from the last 10 minutes");
+      if(path === "/v1/account/passkeys/options" && method === "POST"){
+        const id = "c" + ++n, challenge = b64("challenge-" + id);
+        challenges.set(id, {challenge, handle: who, adding: true});
+        return ok({challengeId: id, publicKey: {challenge, rp: {id: "localhost", name: "TIMP"}, user: {id: b64("u-" + who), name: who, displayName: who},
+          pubKeyCredParams: [{type: "public-key", alg: -7}], excludeCredentials: mine().map(k => ({type: "public-key", id: k.id})),
+          authenticatorSelection: {residentKey: "required", userVerification: "required"}, attestation: "none"}});
+      }
+      if(path === "/v1/account/passkeys" && method === "POST"){
+        const c = challenges.get(body.challengeId), cred = body.credential, cd = client(cred);
+        if(!c || !c.adding || c.handle !== who || cd.type !== "webauthn.create" || cd.challenge !== c.challenge) return no(400, "passkey: could not be checked");
+        keys.set(cred.id, who);
+        return ok({ok: true});
+      }
+      const off = path.match(/^\/v1\/account\/passkeys\/([^/]+)$/);
+      if(off && method === "DELETE"){
+        const id = decodeURIComponent(off[1]);
+        if(keys.get(id) !== who || mine().length < 2) return no(409, "passkey: not this account's, or its last one (an account keeps one at least)");
+        keys.delete(id);
+        return ok({ok: true});
+      }
+      return no(404, "not found");
+    }
     // The account's data: a copy, and deleting it (the handle, and a passkey of it used now).
     if(path === "/v1/account/export" && method === "GET"){
       if(!who) return no(401, "sign in first");
@@ -1312,16 +1347,23 @@ function fakeService(){
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members};
+  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members, flags, sessions};
   return handler;
 }
 
 async function accountSteps({run, until, reload, page, blocked, service}){
   const text = sel => run(`const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent : null;`);
+  let authenticatorId = "";
+  const openMe = async () => {
+    await run(`location.hash = "#trips";`);
+    await until("the account", `document.querySelector('.acct [data-act="me"]')`);
+    await run(`document.querySelector('.acct [data-act="me"]').click();`);
+    await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me]")`);
+  };
   await step("an account: made with an invitation code and a passkey, kept on the phone, signed out and in again", async () => {
     // A passkey as a phone makes it: kept on the device, opened with the fingerprint.
     await page("WebAuthn.enable", {enableUI: false});
-    await page("WebAuthn.addVirtualAuthenticator", {options: {protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true}});
+    ({authenticatorId} = await page("WebAuthn.addVirtualAuthenticator", {options: {protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true}}));
     await run(`location.hash = "#trips";`);
     await until("the account section", `document.querySelector(".acct [data-act='signup']")`);
     assert.equal(await text(".acct .who b"), "Account");
@@ -1537,15 +1579,59 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.deepEqual(blocked(), []);
   });
 
-  await step("the account: a copy of its data; deleted for good with the handle and the passkey, the trips staying on the phone", async () => {
-    const openMe = async () => {
-      await run(`location.hash = "#trips";`);
-      await until("the account", `document.querySelector('.acct [data-act="me"]')`);
-      await run(`document.querySelector('.acct [data-act="me"]').click();`);
-      await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me]")`);
+  await step("passkeys and devices: one more after the passkey asked again, one taken off but never the last, the other devices signed out", async () => {
+    const openDevices = async () => {
+      await openMe();
+      await run(`document.querySelector("dialog.sheet[open] [data-me='devices']").click();`);
+      await until("the lists", `document.querySelector("dialog.sheet[open] [data-keys] .chat") && document.querySelector("dialog.sheet[open] [data-sessions] .chat")`);
     };
+    const answer = async (title, id = "yes") => {
+      await until(`asked: ${title}`, `document.querySelector("dialog.ask[open] #ask-title") && document.querySelector("dialog.ask[open] #ask-title").textContent === ${JSON.stringify(title)}`, 15000);
+      await run(`document.querySelector('dialog.ask[open] [data-answer="${id}"]').click();`);
+    };
+    const toastSays = re => until(`the toast: ${re}`, `${re}.test(document.getElementById("toast").textContent)`, 15000);
+    await openDevices();
+    // One passkey: no Remove, and why; one device, this one: nobody else to sign out.
+    assert.equal(await run(`return document.querySelectorAll("dialog.sheet[open] [data-remove-key]").length;`), 0);
+    assert.match(await text("dialog.sheet[open] [data-keys] .foot"), /only passkey/);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-end-others]").hidden;`), true);
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.sheet[open] [data-current] .who > *")].map(e => e.textContent);`), ["Linux · Chrome", "this device"]);
+    // The sign-in is old: the passkey asked again first, then the new one made; this
+    // device has one of the account already, and says so.
+    service.flags.stale = true;
+    await run(`document.querySelector("dialog.sheet[open] [data-add-key]").click();`);
+    await answer("Confirm it is you");
+    await answer("Confirmed. Go on?");
+    assert.equal(service.flags.stale, false, "signed in again");
+    await toastSays(/already has a passkey of your account/);
+    assert.equal([...service.sessions.values()].filter(h => h === "fra").length, 1, "the old session ended with the new one");
+    // A device without one (its passkeys gone): added, recent sign-in, no question.
+    await page("WebAuthn.clearCredentials", {authenticatorId});
+    await run(`document.querySelector("dialog.sheet[open] [data-add-key]").click();`);
+    await toastSays(/Passkey added/);
+    await until("two passkeys", `document.querySelectorAll("dialog.sheet[open] [data-keys] .chat").length === 2`);
+    // The older one taken off, asked first.
+    await run(`document.querySelector("dialog.sheet[open] [data-remove-key]").click();`);
+    await answer("Remove this passkey?");
+    await toastSays(/Passkey removed/);
+    await until("one passkey", `document.querySelectorAll("dialog.sheet[open] [data-keys] .chat").length === 1`);
+    // Another device signed in: signed out from here, this one stays.
+    service.sessions.set("tok-tablet", "fra");
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    await openDevices();
+    assert.equal(await run(`return document.querySelectorAll("dialog.sheet[open] [data-sessions] .chat").length;`), 2);
+    await run(`document.querySelector("dialog.sheet[open] [data-end-others]").click();`);
+    await answer("Sign out all other devices?");
+    await toastSays(/other devices are signed out/);
+    assert.equal(service.sessions.has("tok-tablet"), false);
+    await until("only this device", `document.querySelectorAll("dialog.sheet[open] [data-sessions] .chat").length === 1`);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("the account: a copy of its data; deleted for good with the handle and the passkey, the trips staying on the phone", async () => {
     await openMe();
-    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.sheet[open] [data-me]")].map(b => b.textContent);`), ["Linked chats", "Export my data", "Sign out", "Delete account"]);
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.sheet[open] [data-me]")].map(b => b.textContent);`), ["Passkeys and devices", "Linked chats", "Export my data", "Sign out", "Delete account"]);
     service.calls.length = 0;
     await run(`document.querySelector("dialog.sheet[open] [data-me='export']").click();`);
     await until("the copy made", `/Your data is in the file/.test(document.getElementById("toast").textContent)`, 15000);
