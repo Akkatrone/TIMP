@@ -91,6 +91,9 @@
    "updatedAt": {
     "type": "text",
     "req": true
+   },
+   "locked": {
+    "type": "bool"
    }
   },
   "pushResult": {
@@ -555,6 +558,18 @@
    "path": "/v1/oauth/apps/:id",
    "auth": true,
    "answer": "ok"
+  },
+  "lockTrip": {
+   "method": "PUT",
+   "path": "/v1/trips/:id/lock",
+   "auth": true,
+   "body": {
+    "locked": {
+     "type": "bool",
+     "req": true
+    }
+   },
+   "answer": "tripSummary"
   },
   "exportAccount": {
    "method": "GET",

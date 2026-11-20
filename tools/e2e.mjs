@@ -1040,6 +1040,42 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await count('[data-act="remove"][data-id="evil"]'), 0);
   });
 
+  await step("a locked trip stays at its version: no edit, no changes pasted, no deleting; unlocked, as before", async () => {
+    const card = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="demo-lisbon"]'))`;
+    await run(`location.hash = "#trips";`);
+    await until("the trip", `${card} && ${card}.querySelector('[data-act="lock"]')`);
+    const version = await run(`return ${card}.querySelector("[data-version]").dataset.version;`);
+    await run(`${card}.querySelector('[data-act="lock"]').click();`);
+    await until("asked", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await text("dialog.ask #ask-title"), "Lock this trip?");
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click(); await new Promise(r => setTimeout(r, 300));`);
+    assert.equal(await run(`return ${card}.querySelector("[data-locked]").textContent;`), "Locked");
+    assert.equal(await run(`return ${card}.querySelector('[data-act="lock"]').textContent;`), "Unlock");
+    // The day: said so, no + button.
+    await run(`${card}.querySelector('[data-act="open"]') && ${card}.querySelector('[data-act="open"]').click(); location.hash = "#day-1";`);
+    await until("the day", `document.querySelector(".lock-note")`);
+    assert.equal(await run(`return document.querySelector(".fabs .fab").hidden;`), true);
+    // Changes pasted (an assistant's): not taken.
+    const changes = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "comercio", set: {time: "09:45"}}}]};
+    await run(`location.hash = "#trips"; await new Promise(r => setTimeout(r, 200)); document.querySelector('[data-act="paste"]').click(); await new Promise(r => setTimeout(r, 200)); document.querySelector("#paste-text").value = ${JSON.stringify(JSON.stringify(changes))}; document.querySelector("#paste-text").closest("form").requestSubmit(); await new Promise(r => setTimeout(r, 600));`);
+    await until("refused", `/is locked: these changes were not taken/.test(document.querySelector("#app .errbox") ? document.querySelector("#app .errbox").textContent : "")`);
+    await run(`location.hash = "#trips";`);
+    await until("the trip", `${card}`);
+    assert.equal(await run(`return ${card}.querySelector("[data-version]").dataset.version;`), version, "still at its version");
+    // Deleting: refused, said.
+    await run(`${card}.querySelector('[data-act="remove"]').click();`);
+    await until("said", `/unlock it in Trips to delete it/.test(document.getElementById("toast").textContent)`);
+    assert.equal(await run(`return !!document.querySelector("dialog.ask[open]");`), false, "not even asked");
+    // Unlocked: as before.
+    await run(`${card}.querySelector('[data-act="lock"]').click();`);
+    await until("asked", `document.querySelector("dialog.ask[open]")`);
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click(); await new Promise(r => setTimeout(r, 300));`);
+    assert.equal(await run(`return !!${card}.querySelector("[data-locked]");`), false);
+    await run(`location.hash = "#day-1";`);
+    await until("the day", `document.querySelector(".stop")`);
+    assert.equal(await run(`return document.querySelector(".fabs .fab").hidden || !!document.querySelector(".lock-note");`), false);
+  });
+
   await step("a phone coming from 2.1 moves its full copies of versions into pieces", async () => {
     // Rebuild the 2.1 database: a trip, and two versions kept as full copies.
     const {trip: v1} = await prepare(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8")));

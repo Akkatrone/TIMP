@@ -142,6 +142,9 @@ export function serviceApi(){
 /** The owner deletes a trip from the account: gone for every phone and every person. */
 export const deleteFromAccount = id => call("deleteTrip", {params: {id}});
 
+/** The owner locks a trip on the account at its version, or unlocks it: its summary. */
+export const lockOnAccount = (id, locked) => call("lockTrip", {params: {id}, body: {locked}});
+
 /** Leaves a trip someone shared with this account. */
 export const leaveTrip = (id, userId) => call("removeMember", {params: {id, user: userId}});
 

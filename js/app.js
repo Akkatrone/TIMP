@@ -21,8 +21,8 @@ import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, a
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
-import { shortId, canonical } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount } from "./share.js";
+import { shortId, canonical, contentOf } from "./version.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount } from "./share.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, openLinkedApps, openAccountSheet, accountError } from "./account.js";
 
@@ -221,6 +221,7 @@ async function importChanges(data){
   const rec = data.trip ? S.records.find(r => r.id === data.trip) : S.rec;
   const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); scrollToY(0); };
   if(!rec) return fail([data.trip ? t("changesNoTrip", {id: data.trip}) : t("changesNoOpen")]);
+  if(isLocked(rec) && data.changes.some(c => !Object.values(c || {}).some(x => x && x.private))) return fail([t("lockedNoChanges", {t: rec.trip.title})]);
   // Written for the version the outline showed: when the trip changed since, applied
   // to that version and joined with what came after. A version this phone does not
   // have: tried on the trip as it is.
@@ -272,6 +273,12 @@ async function importText(text, name, {demo = false} = {}){
       message = t("imported", {t: incoming.title});
     }else{
       const x = await inspect(versions, local.trip, incoming);
+      // Locked: nothing of this file goes into it (another trip with the same id may go apart).
+      if(isLocked(local) && x.kind !== "same" && !x.unrelated){
+        S.importError = {title: t("importFailed"), items: [t("lockedNoFile", {t: local.trip.title})]};
+        render(); scrollToY(0);
+        return;
+      }
       asked = x.kind === "diverged" && !x.unrelated;
       const choice = x.kind !== "diverged" ? (x.kind === "newer" ? "take" : "keep")
         : x.unrelated ? await chooseUnrelated(x) : await chooseMerge(x, check);
@@ -354,6 +361,7 @@ async function askPrivate(priv, yes){
 
 // An older file loaded on purpose: its content comes back as a new version.
 async function backToFile(x){
+  if(!editable(S.records.find(r => r.id === x.local.id))) return;
   const trip = await apply(versions, x, "back");
   const rec = {...S.records.find(r => r.id === trip.id), trip};
   await keepRecord(rec);
@@ -366,6 +374,7 @@ function showHistory(id){
   const rec = S.records.find(r => r.id === id);
   if(!rec) return;
   openHistory({trip: rec.trip, versions, onRestore: async vid => {
+    if(!editable(rec)) return;
     const {trip} = await restore(versions, rec.trip, vid);
     const next = {...rec, trip};
     await keepRecord(next);
@@ -374,14 +383,43 @@ function showHistory(id){
   }}).catch(err => toast(String(err.message || err)));
 }
 
+/* ---------- locked trips ---------- */
+
+// A locked trip stays at its version: no edit, no file or chat taken into it, no
+// version brought back, no deleting, until it is unlocked. Ticks and private expenses
+// are not the trip's version: they stay free. On the account, the lock is the
+// service's (its owner's, for everyone); on this phone only, this phone's.
+const isLocked = rec => !!(rec && (rec.locked || (rec.share && !rec.share.gone && rec.share.locked)));
+const editable = (rec = S.rec) => { if(!isLocked(rec)) return true; toast(t("lockedNoEdit")); return false; };
+
+async function toggleLock(id){
+  const rec = S.records.find(r => r.id === id);
+  if(!rec) return;
+  const locked = isLocked(rec), title = rec.trip.title;
+  const yes = await ask({title: t(locked ? "unlockTitle" : "lockTitle"), text: t(locked ? "unlockText" : "lockText", {t: title}),
+    actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t(locked ? "unlock" : "lock"), kind: "primary"}]});
+  if(yes !== "yes") return;
+  let next;
+  if(rec.share && rec.share.id && !rec.share.gone && S.account){
+    // On the account: the owner's lock, for every phone and person; it needs the service.
+    try{ const r = await lockOnAccount(rec.share.id, !locked); next = {...rec, share: {...rec.share, locked: r.locked}}; }
+    catch(e){ toast(e && e.status === 0 ? t("removeNeedsNet") : accountError(e)); return; }
+  }else next = {...rec, locked: !locked};
+  await keepSynced(next);
+  render();
+  toast(t(locked ? "unlockedDone" : "lockedDone", {t: title}));
+}
+
 /* ---------- editing stops ---------- */
 
 // Applies an edit to the open trip: a new version, kept on the phone, then offered
 // as a file. `change(trip)` returns {trip, marks?, priv?}: marks move ticks with a
 // stop; priv, the private expenses after the edit (no version: privMessage says so).
+// A locked trip takes only what leaves its version alone (private expenses).
 async function applyEdit(change, message, extra = {}, privMessage = "privSaved"){
   const cur = S.rec.trip, had = privOf();
   const out = change(cur);
+  if(isLocked(S.rec) && canonical(contentOf(out.trip)) !== canonical(contentOf(cur))){ toast(t("lockedNoEdit")); return; }
   const {trip: next, changed} = await saveEdit(versions, cur, out.trip);
   const priv = out.priv === undefined ? had : out.priv && out.priv.expenses.length ? out.priv : null;
   const privChanged = canonical(priv) !== canonical(had);
@@ -412,6 +450,7 @@ const goToDay = date => { const k = trip().days.findIndex(d => d.date === date);
 // A new stop: on the day on screen, or today when the trip is under way; with
 // newDay, on a new day after the last.
 function newStop(prefill, newDay = false){
+  if(!editable()) return;
   const here = currentPlace(), ti = todayIndex();
   const dayIndex = route().name === "day" ? here.dayIndex : (ti >= 0 ? ti : 0);
   openStopEditor({...editorBase(), money: moneyOptions(), dayIndex, planId: here.planId, prefill, newDay,
@@ -425,6 +464,7 @@ function newStop(prefill, newDay = false){
 
 // The day on screen: its city, title, night and notes, or deleted with its stops.
 function editDay(){
+  if(!editable()) return;
   const i = currentPlace().dayIndex, d = trip().days[i];
   openDayEditor({day: d, number: i + 1, canDelete: trip().days.length > 1,
     onSave: set => applyEdit(tr => ({trip: updateDay(tr, d.date, set)}), "daySaved").catch(err => toast(String(err.message || err))),
@@ -434,6 +474,7 @@ function editDay(){
 }
 
 function editStop(stopId){
+  if(!editable()) return;
   const here = currentPlace();
   const d = trip().days[here.dayIndex];
   const list = d.plans ? d.plans.find(p => p.id === here.planId).stops : d.stops;
@@ -457,6 +498,7 @@ function editStop(stopId){
 // An expense outside the stops, of the trip or private: a new one, or the one with
 // this id. Changing which it is moves it from one list to the other.
 function editExpense(id, isPrivate = false){
+  if(!isPrivate && !editable()) return;
   const tr = trip(), list = isPrivate ? (privOf() ? privOf().expenses : []) : (tr.expenses || []);
   const x = id ? list.find(e => e.id === id) : null;
   if(id && !x) return;
@@ -551,6 +593,7 @@ async function loadDemo(){
 async function removeRecord(id){
   const rec = S.records.find(r => r.id === id);
   if(!rec) return;
+  if(isLocked(rec)){ toast(t("lockedNoDelete")); return; }
   const onAccount = !!(rec.share && rec.share.id && !rec.share.gone && S.account);
   let message = "removed";
   if(!onAccount){
@@ -876,8 +919,18 @@ function syncNow(){
         // account: the copy here stays, on this phone only, and is not sent again.
         if(rec.share && rec.share.id && !remoteOf){ await keepSynced({...rec, share: {...rec.share, gone: true}}); continue; }
         try{
-          let next = await syncTrip(versions, rec, remoteOf, api);
+          let next = rec;
+          if(remoteOf && remoteOf.locked){
+            // Locked by its owner: the account's version, taken if newer; nothing sent.
+            // Changes made here before the lock wait, said on the card, until it is unlocked.
+            if(remoteOf.head !== rec.trip.version.id){
+              const x = await inspect(versions, rec.trip, await api.version(remoteOf.id, remoteOf.head));
+              if(x.kind === "newer") next = {...rec, trip: await apply(versions, x, "take"), share: {...rec.share, head: remoteOf.head}};
+              else if(x.kind !== "same") errors.set(rec.id, t("lockedWaiting"));
+            }
+          }else next = await syncTrip(versions, rec, remoteOf, api);
           next = await syncPrivate(next, api);
+          if(remoteOf && !!remoteOf.locked !== !!(next.share && next.share.locked)) next = {...next, share: {...next.share, locked: !!remoteOf.locked}};
           if(next !== rec) await keepSynced(next);
         }catch(e){
           if(!e || e.status === 0 || e.status === 401) throw e;   // offline, or signed out: all of it waits
@@ -996,13 +1049,13 @@ function renderTrips(){
     const cur = S.rec && S.rec.id === r.id;
     const when = new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", year: "numeric"}).format(new Date(r.importedAt));
     return `<div class="tripcard${cur ? " current" : ""}">
-      <div class="t"><span>${esc(r.trip.title)}</span>${cur ? `<span class="badge-on">${esc(t("current"))}</span>` : ""}</div>
+      <div class="t"><span>${esc(r.trip.title)}</span>${isLocked(r) ? `<span class="badge-lock" data-locked>${esc(t("locked"))}</span>` : ""}${cur ? `<span class="badge-on">${esc(t("current"))}</span>` : ""}</div>
       <div class="s">${esc(t("daysCount", {n: r.trip.days.length}))} · ${esc(t("loadedOn", {d: when}))}</div>
       <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
       ${r.share ? `<div class="s where">${esc(t(r.share.gone ? "goneFromAccount" : r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
       ${S.syncErrors.has(r.id) ? `<div class="unsaved" role="status" data-sync-error>${esc(t("notSynced", {why: S.syncErrors.get(r.id)}))}</div>` : ""}
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
+      <div class="actions">${cur ? "" : `<button type="button" class="btn small" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${!r.share || r.share.gone || r.share.role === "owner" ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>
     </div>`;
   }).join("");
   const key = googleKey();
@@ -1574,6 +1627,7 @@ function renderDay(i){
   </section>
   <div class="headrow">
     ${d.title ? `<h1>${esc(d.title)}</h1>` : ""}
+    ${isLocked(S.rec) ? `<p class="lock-note" data-locked>${esc(t("lockedNote"))}</p>` : ""}
     <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}</span></div>
     <div class="tools">${
       (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
@@ -1635,7 +1689,7 @@ function render(){
   const r = route();
   renderStrip(r);
   $fabs.hidden = r.name === "welcome";
-  $fab.hidden = r.name !== "day";
+  $fab.hidden = r.name !== "day" || isLocked(S.rec);
   $fab.setAttribute("aria-label", t("addStop"));
   $fab.title = t("addStop");
   $fabPaste.querySelector("span").textContent = t("paste");
@@ -1853,6 +1907,7 @@ $app.addEventListener("click", e => {
   else if(a === "sync") syncNow();
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "reup") putBackOnAccount(act.dataset.id);
+  else if(a === "lock") toggleLock(act.dataset.id);
   else if(a === "signin") accountSignIn();
   else if(a === "me") accountActions();
   else if(a === "remove") removeRecord(act.dataset.id);

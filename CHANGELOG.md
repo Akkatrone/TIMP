@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.18.0
+
+Locked trips.
+
+- **Lock** on a trip's card (Trips): the trip stays at its version. No edits, no
+  changes pasted from an assistant or made by a linked chat, no file taken into it, no
+  older version brought back, no deleting, until you unlock it. Ticks and private
+  expenses still work: they are not the trip's version.
+- **On your account** the lock is the owner's, for every phone and for the people the
+  trip is shared with; a phone that had changes waiting says so on the card and keeps
+  them until the trip is unlocked. A trip on this phone only is locked on this phone.
+
 ## 3.17.0
 
 Private expenses for chats, only if you tick them.

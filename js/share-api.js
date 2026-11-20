@@ -43,7 +43,8 @@ export const SHAPES = {
     firstDay: {type: "text", req: true, null: true, doc: "Its first date."},
     lastDay: {type: "text", req: true, null: true, doc: "Its last date."},
     days: num("How many days."),
-    updatedAt: text("When it last changed here (ISO date).")
+    updatedAt: text("When it last changed here (ISO date)."),
+    locked: {type: "bool", doc: "Locked by its owner: it stays at its version; nobody sends changes or deletes it until it is unlocked."}
   },
   pushResult: {
     trip: text("The service's id of the trip."),
@@ -135,6 +136,8 @@ export const ROUTES = {
   oauthDeny: {method: "POST", path: "/v1/oauth/deny", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user refuses: the chat app is told."},
   linkedApps: {method: "GET", path: "/v1/oauth/apps", auth: true, answer: {apps: {type: "list", of: "linkedApp", req: true}}, doc: "The chat apps that can reach the user's trips, newest use first."},
   unlinkApp: {method: "DELETE", path: "/v1/oauth/apps/:id", auth: true, answer: "ok", doc: "Ends a link: the chat app's tokens stop working at once."},
+  lockTrip: {method: "PUT", path: "/v1/trips/:id/lock", auth: true, body: {locked: {type: "bool", req: true, doc: "true to lock, false to unlock."}}, answer: "tripSummary",
+    doc: "The owner locks a trip at its version (no changes, from anyone, no deleting), or unlocks it."},
   exportAccount: {method: "GET", path: "/v1/account/export", auth: true, answer: "accountExport", doc: "Everything the service keeps about the account, readable: a copy to take away."},
   deleteAccount: {method: "POST", path: "/v1/account/delete", auth: true, body: {
     handle: text("The account's handle, written again by the person."),

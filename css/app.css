@@ -351,6 +351,8 @@ span.costbtn{cursor:auto}
 .tripcard .t{font-weight:600;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
 .tripcard .s{color:var(--muted);font-size:.86rem}
 .badge-on{font:600 .68rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ok)}
+.badge-lock{font:600 .68rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.lock-note{font:500 .78rem var(--f-mono);color:var(--muted);margin:-4px 0 12px}
 .field{display:grid;gap:6px}
 .field label{font-weight:600;font-size:.9rem}
 .field input{font:500 1rem var(--f-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);width:100%;min-height:44px}
