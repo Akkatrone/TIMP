@@ -574,7 +574,8 @@ button.crow{cursor:pointer}
 /* The circle at the top right: You (the account, the settings). */
 .strip .gutter{display:flex;align-items:flex-start;gap:10px}
 #days{flex:1 1 auto;min-width:0}
-.me-btn{flex:none;width:40px;height:40px;margin-top:2px;border-radius:50%;display:grid;place-items:center;background:var(--card);color:var(--ink);border:1px solid var(--line);text-decoration:none;font:700 1rem var(--f-display)}
+#trips-chip{flex:none;margin-top:2px;min-height:47px}
+.me-btn{flex:none;width:40px;height:40px;margin-top:5px;border-radius:50%;display:grid;place-items:center;background:var(--card);color:var(--ink);border:1px solid var(--line);text-decoration:none;font:700 1rem var(--f-display)}
 .me-btn svg{width:22px;height:22px}
 .me-btn.signed{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .me-btn[aria-current="page"]{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--ink)}

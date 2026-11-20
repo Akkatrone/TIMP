@@ -650,8 +650,11 @@ function renderStrip(r){
     const dp = dateParts(d.date, lang), cur = r.name === "day" && r.i === i;
     return `<a class="dchip${i === ti ? " today" : ""}" href="#day-${i + 1}" style="--c:${cityVar(d.city)}"${cur ? ' aria-current="page"' : ""} aria-label="${esc(t("day"))} ${i + 1}, ${esc(dp.long)}${i === ti ? ", " + esc(t("today")) : ""}"><span class="n">${i + 1}</span><span class="w">${esc(dp.dow)}</span></a>`;
   }).join("") +
-    `<a class="dchip info" href="#info"${r.name === "info" ? ' aria-current="page"' : ""}>${esc(t("info"))}</a>` +
-    `<a class="dchip info" href="#trips"${r.name === "trips" ? ' aria-current="page"' : ""}>${esc(t("trips"))}</a>`;
+    `<a class="dchip info" href="#info"${r.name === "info" ? ' aria-current="page"' : ""}>${esc(t("info"))}</a>`;
+  // Trips stays in view on the right, next to the circle: the days scroll on their own.
+  const tripsChip = document.getElementById("trips-chip");
+  tripsChip.textContent = t("trips");
+  if(r.name === "trips") tripsChip.setAttribute("aria-current", "page"); else tripsChip.removeAttribute("aria-current");
   const active = $days.querySelector('[aria-current="page"]');
   if(active) $days.scrollLeft = active.offsetLeft - ($days.clientWidth - active.offsetWidth) / 2;
   markStrip();

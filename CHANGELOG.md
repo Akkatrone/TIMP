@@ -4,6 +4,11 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.24.1
+
+- **Trips** stays in view at the top right, next to the circle: on a phone the days
+  scroll on their own and no longer push it out of sight.
+
 ## 3.24.0
 
 You: the account and the settings in a place of their own.
