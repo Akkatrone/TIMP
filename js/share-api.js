@@ -109,7 +109,9 @@ export const SHAPES = {
  *   with a body); answer: a shape's name, or fields.
  */
 export const ROUTES = {
-  health: {method: "GET", path: "/v1/health", auth: false, answer: {ok: {type: "bool", req: true}, api: {type: "list", of: "text", req: true, doc: "The API versions served."}}, doc: "Whether the service is up, and which API versions it has."},
+  health: {method: "GET", path: "/v1/health", auth: false, answer: {ok: {type: "bool", req: true}, api: {type: "list", of: "text", req: true, doc: "The API versions served."},
+    version: {type: "text", doc: "The service's own release (SemVer), apart from the API version."},
+    commit: {type: "text", doc: "The commit that release was built from, where it says."}}, doc: "Whether the service is up, which API versions it has, which release runs."},
   registerOptions: {method: "POST", path: "/v1/auth/register/options", auth: false, body: {code: text("A sign-up code."), handle: text("The handle wanted.")}, answer: "ceremony", doc: "Sign-up, step one: the code and the handle are checked; the phone gets what its passkey signs."},
   register: {method: "POST", path: "/v1/auth/register", auth: false, body: {challengeId: text("From step one."), credential: {type: "any", req: true, doc: "The new passkey, as PublicKeyCredential.toJSON()."}}, answer: "session", doc: "Sign-up, step two: the account, its passkey, a session."},
   loginOptions: {method: "POST", path: "/v1/auth/login/options", auth: false, body: {}, answer: "ceremony", doc: "Sign-in, step one."},

@@ -295,6 +295,12 @@
      "type": "list",
      "of": "text",
      "req": true
+    },
+    "version": {
+     "type": "text"
+    },
+    "commit": {
+     "type": "text"
     }
    }
   },
