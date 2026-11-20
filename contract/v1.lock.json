@@ -94,6 +94,69 @@
    },
    "locked": {
     "type": "bool"
+   },
+   "publication": {
+    "type": "publication"
+   }
+  },
+  "publication": {
+   "page": {
+    "type": "text",
+    "req": true
+   },
+   "version": {
+    "type": "text",
+    "req": true
+   },
+   "level": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "link",
+     "public"
+    ]
+   },
+   "dates": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "hidden",
+     "real"
+    ]
+   },
+   "publishedAt": {
+    "type": "text",
+    "req": true
+   },
+   "updatedAt": {
+    "type": "text",
+    "req": true
+   }
+  },
+  "publicTrip": {
+   "trip": {
+    "type": "any",
+    "req": true
+   },
+   "by": {
+    "type": "text",
+    "req": true
+   },
+   "dates": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "hidden",
+     "real"
+    ]
+   },
+   "publishedAt": {
+    "type": "text",
+    "req": true
+   },
+   "updatedAt": {
+    "type": "text",
+    "req": true
    }
   },
   "pushResult": {
@@ -316,6 +379,10 @@
    "passkeys": {
     "type": "list",
     "of": "passkey"
+   },
+   "publications": {
+    "type": "list",
+    "of": "any"
    },
    "sessions": {
     "type": "list",
@@ -696,6 +763,41 @@
    "path": "/v1/oauth/apps/:id",
    "auth": true,
    "answer": "ok"
+  },
+  "publishTrip": {
+   "method": "PUT",
+   "path": "/v1/trips/:id/publication",
+   "auth": true,
+   "body": {
+    "version": {
+     "type": "text"
+    },
+    "dates": {
+     "type": "text",
+     "req": true,
+     "values": [
+      "hidden",
+      "real"
+     ]
+    },
+    "remove": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "publication"
+  },
+  "unpublishTrip": {
+   "method": "DELETE",
+   "path": "/v1/trips/:id/publication",
+   "auth": true,
+   "answer": "ok"
+  },
+  "publicTrip": {
+   "method": "GET",
+   "path": "/v1/public/:page",
+   "auth": false,
+   "answer": "publicTrip"
   },
   "lockTrip": {
    "method": "PUT",

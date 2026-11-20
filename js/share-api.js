@@ -44,7 +44,23 @@ export const SHAPES = {
     lastDay: {type: "text", req: true, null: true, doc: "Its last date."},
     days: num("How many days."),
     updatedAt: text("When it last changed here (ISO date)."),
-    locked: {type: "bool", doc: "Locked by its owner: it stays at its version; nobody sends changes or deletes it until it is unlocked."}
+    locked: {type: "bool", doc: "Locked by its owner: it stays at its version; nobody sends changes or deletes it until it is unlocked."},
+    publication: {type: "publication", doc: "Its page, if its owner published it (to its owner only)."}
+  },
+  publication: {
+    page: text("The page's id: the page is at /t/<page> on the service, its trip at /v1/public/<page>."),
+    version: text("The version published: changes made after it are not on the page."),
+    level: text("Who may read it.", {values: ["link", "public"]}),
+    dates: text("\"hidden\": moved to 2001, keeping each day's month and weekday; \"real\": as they are.", {values: ["hidden", "real"]}),
+    publishedAt: text("When it was first published (ISO date)."),
+    updatedAt: text("When it was last published again (ISO date).")
+  },
+  publicTrip: {
+    trip: {type: "any", req: true, doc: "The trip as published (js/publish.js): never private expenses, a Google key, its history or its id."},
+    by: text("The handle of who published it."),
+    dates: text("Whether its dates are the real ones.", {values: ["hidden", "real"]}),
+    publishedAt: text("When it was first published (ISO date)."),
+    updatedAt: text("When it was last published again (ISO date).")
   },
   pushResult: {
     trip: text("The service's id of the trip."),
@@ -113,6 +129,7 @@ export const SHAPES = {
     privateExpenses: {type: "list", of: "any", req: true, doc: "The account's private expenses: {trip, data}, readable."},
     linkedApps: {type: "list", of: "linkedApp", req: true, doc: "The chat apps that can reach the trips."},
     passkeys: {type: "list", of: "passkey", doc: "The account's passkeys (their public half stays on the service)."},
+    publications: {type: "list", of: "any", doc: "The account's published trips: {page, tripId, version, level, dates, publishedAt, updatedAt}."},
     sessions: {type: "list", of: "any", doc: "The devices signed in: {device, since}."},
     recovery: {type: "recoveryState", doc: "The recovery codes: when made, how many left (never the codes)."},
     audit: {type: "list", of: "any", req: true, doc: "What the service noted about this account (sign-ins, chats, deletions…), the last 180 days."}
@@ -169,6 +186,13 @@ export const ROUTES = {
   oauthDeny: {method: "POST", path: "/v1/oauth/deny", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user refuses: the chat app is told."},
   linkedApps: {method: "GET", path: "/v1/oauth/apps", auth: true, answer: {apps: {type: "list", of: "linkedApp", req: true}}, doc: "The chat apps that can reach the user's trips, newest use first."},
   unlinkApp: {method: "DELETE", path: "/v1/oauth/apps/:id", auth: true, answer: "ok", doc: "Ends a link: the chat app's tokens stop working at once."},
+  publishTrip: {method: "PUT", path: "/v1/trips/:id/publication", auth: true, body: {
+    version: {type: "text", doc: "The version to publish; the latest if not said."},
+    dates: text("\"hidden\" or \"real\".", {values: ["hidden", "real"]}),
+    remove: {type: "any", req: true, doc: "What found in it is taken out: {codes, phones, emails, stays}, each true or false (true if not said)."}
+  }, answer: "publication", doc: "Owner only. The service makes the copy (js/publish.js) from the version it holds, and the page: the same page if published before. Readable by anyone with its address."},
+  unpublishTrip: {method: "DELETE", path: "/v1/trips/:id/publication", auth: true, answer: "ok", doc: "Owner only. The page answers 410 from now on; copies already made by others stay theirs."},
+  publicTrip: {method: "GET", path: "/v1/public/:page", auth: false, answer: "publicTrip", doc: "A published trip, for anyone with its address: 404 if unknown, 410 if withdrawn."},
   lockTrip: {method: "PUT", path: "/v1/trips/:id/lock", auth: true, body: {locked: {type: "bool", req: true, doc: "true to lock, false to unlock."}}, answer: "tripSummary",
     doc: "The owner locks a trip at its version (no changes, from anyone, no deleting), or unlocks it."},
   passkeys: {method: "GET", path: "/v1/account/passkeys", auth: true, answer: {passkeys: {type: "list", of: "passkey", req: true}}, doc: "The account's passkeys."},
