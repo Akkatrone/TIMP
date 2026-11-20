@@ -81,6 +81,13 @@ export const SHAPES = {
   oauthRedirect: {
     redirect: text("Where the page goes now: the chat app's address, with its code or the refusal.")
   },
+  linkedApp: {
+    id: text("This link's id: one yes given to a chat app."),
+    client: text("The chat app's name (Claude, ChatGPT…)."),
+    scopes: {type: "list", of: "text", req: true, doc: "What it can do: trips:read, trips:write."},
+    since: text("When the user said yes (ISO date)."),
+    lastUsed: text("When it last renewed its access, about once an hour while used (ISO date).")
+  },
   error: {
     error: text("A short sentence, safe to show."),
     current: {type: "any", doc: "With 409 on private expenses: what is there now, to join and send again."}
@@ -115,7 +122,9 @@ export const ROUTES = {
   removeMember: {method: "DELETE", path: "/v1/trips/:id/members/:user", auth: true, answer: "ok", doc: "The owner takes someone off; anyone can leave."},
   oauthRequest: {method: "POST", path: "/v1/oauth/request", auth: true, body: {request: text("The id in the app's address (#authorize=…).")}, answer: "oauthRequest", doc: "A chat app asks to reach the user's trips (MCP): what it is and what it asks, to show before the answer."},
   oauthApprove: {method: "POST", path: "/v1/oauth/approve", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user allows it: a one-time code for the chat app, bound to this request."},
-  oauthDeny: {method: "POST", path: "/v1/oauth/deny", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user refuses: the chat app is told."}
+  oauthDeny: {method: "POST", path: "/v1/oauth/deny", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user refuses: the chat app is told."},
+  linkedApps: {method: "GET", path: "/v1/oauth/apps", auth: true, answer: {apps: {type: "list", of: "linkedApp", req: true}}, doc: "The chat apps that can reach the user's trips, newest use first."},
+  unlinkApp: {method: "DELETE", path: "/v1/oauth/apps/:id", auth: true, answer: "ok", doc: "Ends a link: the chat app's tokens stop working at once."}
 };
 
 /* ---------- checks ---------- */

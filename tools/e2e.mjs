@@ -1086,7 +1086,7 @@ function fakeService(){
   const b64 = s => Buffer.from(s).toString("base64url");
   const users = new Map(), keys = new Map(), codes = new Set(["TEST-CODE-0000-0001"]), sessions = new Map(), challenges = new Map();
   const trips = new Map(), privs = new Map();   // the service's trips and private expenses
-  const chat = {answered: ""};                  // a chat app's request
+  const chat = {answered: "", unlinked: false}; // a chat app's request, then its link
   let n = 0;
   const clone = v => JSON.parse(JSON.stringify(v));
   const summary = t => { const h = t.versions.get(t.head); return {id: t.id, localId: t.localId, title: h.title, head: t.head, role: "owner", visibility: "private",
@@ -1155,6 +1155,16 @@ function fakeService(){
       if(body.rev !== cur.rev) return {status: 409, body: {error: "private: changed on another phone", current: cur}};
       privs.set(k, {data: body.data, rev: cur.rev + 1});
       return ok(privs.get(k));
+    }
+    // The chats linked: Claude once the person said yes, until unlinked.
+    if(path === "/v1/oauth/apps" && method === "GET"){
+      if(!who) return no(401, "sign in first");
+      return ok({apps: chat.answered === "yes" && !chat.unlinked ? [{id: "fam-1", client: "Claude", scopes: ["trips:read", "trips:write"], since: "2026-11-20T09:00:00.000Z", lastUsed: "2026-11-20T10:00:00.000Z"}] : []});
+    }
+    if(path === "/v1/oauth/apps/fam-1" && method === "DELETE"){
+      if(!who) return no(401, "sign in first");
+      chat.unlinked = true;
+      return ok({ok: true});
     }
     // A chat app's request (Claude), answered by the person: the page goes back to it,
     // here the app's own address with the code, so the test can see where it went.
@@ -1277,6 +1287,34 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
     await until("back to the chat app", `location.search === "?chat=yes"`, 15000);
     assert.equal(service.chat.answered, "yes");
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("linked chats: what each can do and since when; unlinking asks first, then stops it", async () => {
+    await run(`location.hash = "#trips";`);
+    await until("the account", `document.querySelector('.acct [data-act="chats"]')`);
+    await run(`document.querySelector('.acct [data-act="chats"]').click();`);
+    await until("the list", `document.querySelector("dialog.sheet[open] [data-chat]")`);
+    assert.equal(await text("dialog.sheet[open] h2"), "Linked chats");
+    assert.equal(await text("dialog.sheet[open] [data-chat] b"), "Claude");
+    assert.equal(await text("dialog.sheet[open] [data-chat] small"), "reads and changes your trips");
+    assert.match(await run(`return document.querySelectorAll("dialog.sheet[open] [data-chat] small")[1].textContent;`), /^linked .+$/);
+    assert.match(await run(`return document.querySelectorAll("dialog.sheet[open] [data-chat] small")[2].textContent;`), /^last used .+$/);
+    // Cancel keeps it.
+    await run(`document.querySelector("dialog.sheet[open] [data-unlink]").click();`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await text("dialog.ask #ask-title"), "Unlink Claude?");
+    await run(`document.querySelector('dialog.ask [data-answer="no"]').click();`);
+    assert.equal(service.chat.unlinked, false);
+    await run(`document.querySelector("dialog.sheet[open] [data-unlink]").click();`);
+    await until("the question again", `document.querySelector("dialog.ask[open]")`);
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
+    await until("gone from the list", `!document.querySelector("dialog.sheet[open] [data-chat]")`);
+    assert.equal(service.chat.unlinked, true);
+    assert.match(await text("dialog.sheet[open] [data-chats]"), /No chat app is linked/);
+    await until("said", `/Unlinked: Claude\./.test(document.getElementById("toast").textContent)`);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    assert.equal(await run(`return !!document.querySelector("dialog.sheet");`), false);
     assert.deepEqual(blocked(), []);
   });
 }

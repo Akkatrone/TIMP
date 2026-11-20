@@ -551,6 +551,11 @@ button.crow{cursor:pointer}
 .acct .who b{font:600 1rem var(--f-body)}
 .acct .who small{font:500 .74rem var(--f-mono);color:var(--muted)}
 .acct .acts{display:flex;gap:6px;flex-wrap:wrap}
+.chats{display:grid;gap:10px}
+.chat{display:flex;align-items:center;gap:12px;background:var(--bg);border-radius:14px;padding:12px 14px}
+.chat .who{display:grid;gap:2px;flex:1 1 auto;min-width:0}
+.chat .who b{font:600 1rem var(--f-body)}
+.chat .who small{font:500 .74rem var(--f-mono);color:var(--muted)}
 .sheet .passkey{display:grid;place-items:center;gap:6px;text-align:center;padding:6px 0 2px;color:var(--muted);font:400 .86rem var(--f-body)}
 .sheet .passkey svg{width:44px;height:44px;color:var(--ink)}
 

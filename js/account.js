@@ -1,9 +1,11 @@
-// The form to make an account with the sharing service: a sign-up code, a handle, a
-// passkey. It only collects and asks js/share.js; what happens after is the caller's.
+// The account's sheets: the form to make an account with the sharing service (a sign-up
+// code, a handle, a passkey), and the chat apps linked to it. They only collect and ask
+// js/share.js; what happens after is the caller's.
 
-import { t } from "./i18n.js";
+import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
-import { signUp, ShareError } from "./share.js";
+import { ask } from "./ask.js";
+import { signUp, ShareError, linkedApps, unlinkApp } from "./share.js";
 
 const FINGER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 8.5a6.5 6.5 0 0111.6-2.4M18.9 9.2c.4 1.6.4 3.3.1 4.8M5.6 11.5v2.2c0 2.6 1 5 2.7 6.8"/><path d="M8.6 12v1.7a8.6 8.6 0 002.2 5.8M12 9.8a2.3 2.3 0 012.3 2.3v1.6c0 1.6.4 3.1 1.2 4.4"/><path d="M12 13v.8a11 11 0 001.7 5.9"/></svg>';
 
@@ -76,4 +78,58 @@ export function openSignUp(o){
   });
   dlg.showModal();
   $("#acct-code").focus();
+}
+
+/**
+ * The chat apps (Claude, ChatGPT…) that can reach the trips, each with what it can do,
+ * since when, when last used, and Unlink: its keys stop working at once.
+ * @param toast  says something short over the page
+ */
+export function openLinkedApps(toast){
+  const dlg = document.createElement("dialog");
+  dlg.className = "sheet";
+  dlg.setAttribute("aria-labelledby", "chats-title");
+  dlg.innerHTML = `
+  <div class="sheet-form">
+    <div class="sheet-head">
+      <h2 id="chats-title">${esc(t("chatsTitle"))}</h2>
+      <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
+    </div>
+    <p class="foot">${esc(t("chatsHelp"))}</p>
+    <div class="chats" data-chats aria-busy="true"><p class="foot">…</p></div>
+  </div>`;
+  document.body.appendChild(dlg);
+  const $list = dlg.querySelector("[data-chats]");
+  const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(d));
+  const can = scopes => t(scopes.includes("trips:write") ? (scopes.includes("trips:read") ? "chatsReadWrite" : "chatsWrite") : "chatsRead");
+  let apps = [];
+  const draw = () => {
+    $list.removeAttribute("aria-busy");
+    $list.innerHTML = !apps.length ? `<p class="foot">${esc(t("chatsNone"))}</p>` : apps.map(a => `
+      <div class="chat" data-chat="${esc(a.id)}">
+        <span class="who"><b>${esc(a.client)}</b><small>${esc(can(a.scopes))}</small><small>${esc(t("chatsSince", {d: when(a.since)}))}</small><small>${esc(t("chatsUsed", {d: when(a.lastUsed)}))}</small></span>
+        <button type="button" class="btn small danger" data-unlink="${esc(a.id)}">${esc(t("chatUnlink"))}</button>
+      </div>`).join("");
+  };
+  const failed = e => { $list.removeAttribute("aria-busy"); $list.innerHTML = `<p class="errbox" role="alert">${esc(accountError(e))}</p>`; };
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.addEventListener("click", async e => {
+    if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
+    const b = e.target.closest("[data-unlink]");
+    if(!b) return;
+    const app = apps.find(a => a.id === b.dataset.unlink);
+    if(!app) return;
+    const yes = await ask({title: t("chatUnlinkQ", {app: app.client}), text: t("chatUnlinkText"),
+      actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("chatUnlink"), kind: "danger"}]});
+    if(yes !== "yes") return;
+    b.disabled = true;
+    try{
+      await unlinkApp(app.id);
+      apps = apps.filter(a => a.id !== app.id);
+      draw();
+      toast(t("chatUnlinked", {app: app.client}));
+    }catch(err){ b.disabled = false; toast(accountError(err)); }
+  });
+  dlg.showModal();
+  linkedApps().then(list => { apps = list; draw(); }, failed);
 }

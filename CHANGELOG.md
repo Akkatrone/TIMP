@@ -4,6 +4,17 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.14.0
+
+Linked chats.
+
+- **Trips → Linked chats**: the chat apps that can reach your trips, what each can do,
+  since when and when it was last used. Unlink stops one at once; to link it again you
+  start from the chat.
+- **Chats can read your trips**: in a few words, the trip day by day with the ids of
+  its stops, then a day, a stop or the practical information in full. Your private
+  expenses stay out.
+
 ## 3.13.0
 
 Your trips in Claude and ChatGPT: the first step.

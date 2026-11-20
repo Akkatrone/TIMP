@@ -24,7 +24,7 @@ import { describe, openHistory } from "./history.js";
 import { shortId, canonical } from "./version.js";
 import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer } from "./share.js";
 import { syncTrip, syncPrivate } from "./sync.js";
-import { openSignUp, accountError } from "./account.js";
+import { openSignUp, openLinkedApps, accountError } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -814,6 +814,7 @@ function accountSection(){
     `<span class="who"><b>@${esc(u.handle)}</b><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn"))}</small></span>` +
     `<span class="acts"><button type="button" class="btn small" data-act="sync"${S.sync === "busy" ? " disabled" : ""}>${esc(t("syncNow"))}</button>` +
     (S.hidden.size ? `<button type="button" class="btn small" data-act="unhide">${esc(t("hiddenBack", {n: S.hidden.size}))}</button>` : "") +
+    `<button type="button" class="btn small" data-act="chats">${esc(t("chatsTitle"))}</button>` +
     `<button type="button" class="btn small" data-act="signout">${esc(t("signOut"))}</button></span></section>`;
 }
 
@@ -1775,6 +1776,7 @@ $app.addEventListener("click", e => {
   else if(a === "sync") syncNow();
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "signin") accountSignIn();
+  else if(a === "chats") openLinkedApps(toast);
   else if(a === "signout") signOut().then(() => { S.account = null; S.sync = ""; render(); toast(t("signedOut")); });
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }

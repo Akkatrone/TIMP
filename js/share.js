@@ -178,3 +178,9 @@ export async function answerChat(id, yes){
   if(!to) throw new ShareError(502, "redirect: not a chat app's address");
   return to;
 }
+
+/** The chat apps that can reach the trips: [{id, client, scopes, since, lastUsed}]. */
+export const linkedApps = async () => (await call("linkedApps")).apps;
+
+/** Ends a chat app's link: its keys stop working at once. */
+export const unlinkApp = id => call("unlinkApp", {params: {id}});

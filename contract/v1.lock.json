@@ -215,6 +215,29 @@
     "req": true
    }
   },
+  "linkedApp": {
+   "id": {
+    "type": "text",
+    "req": true
+   },
+   "client": {
+    "type": "text",
+    "req": true
+   },
+   "scopes": {
+    "type": "list",
+    "of": "text",
+    "req": true
+   },
+   "since": {
+    "type": "text",
+    "req": true
+   },
+   "lastUsed": {
+    "type": "text",
+    "req": true
+   }
+  },
   "error": {
    "error": {
     "type": "text",
@@ -480,6 +503,24 @@
     }
    },
    "answer": "oauthRedirect"
+  },
+  "linkedApps": {
+   "method": "GET",
+   "path": "/v1/oauth/apps",
+   "auth": true,
+   "answer": {
+    "apps": {
+     "type": "list",
+     "of": "linkedApp",
+     "req": true
+    }
+   }
+  },
+  "unlinkApp": {
+   "method": "DELETE",
+   "path": "/v1/oauth/apps/:id",
+   "auth": true,
+   "answer": "ok"
   }
  }
 }
