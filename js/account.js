@@ -190,11 +190,12 @@ export function deviceName(ua){
   return [os, app].filter(Boolean).join(" · ");
 }
 
-// Adding or taking off a passkey needs a sign-in of the last minutes (the service says
-// "sign in again"): the passkey is asked again, then the change is made. A passkey to
-// make needs a tap of its own (browsers allow one passkey prompt per tap): `again`
-// labels it. null if the person stopped.
-async function recently(fn, again){
+// Some things need a sign-in of the last minutes (the service says "sign in again"):
+// adding or taking off a passkey, recovery codes, linking a chat app. The passkey is
+// asked again, then the thing is done. A passkey to make needs a tap of its own
+// (browsers allow one passkey prompt per tap): `again` labels it. null if the person
+// stopped.
+export async function recently(fn, again){
   try{ return await fn(); }
   catch(e){
     if(!needsSignIn(e)) throw e;

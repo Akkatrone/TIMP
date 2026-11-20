@@ -1221,7 +1221,9 @@ function fakeService(){
       const r = recovery.get(c.recover);
       if(r.used) return no(401, "recovery: handle or code not valid");
       r.used = true;
+      // A reset: the other passkeys and every session go.
       for(const [tk, h] of sessions) if(h === c.handle) sessions.delete(tk);
+      for(const [k, h] of keys) if(h === c.handle) keys.delete(k);
       keys.set(cred.id, c.handle);
       return session(c.handle);
     }
@@ -1367,6 +1369,8 @@ function fakeService(){
       if(!who) return no(401, "sign in first");
       if(body.request !== "req-0123456789abcdef" || chat.answered) return no(404, "request: expired or unknown, start again from the chat app");
       if(path === "/v1/oauth/request") return ok({client: "Claude", redirectHost: "claude.ai", scopes: ["trips:read", "trips:write", "private:read", "private:write"], expires: "2026-11-19T00:10:00.000Z"});
+      // A link outlives sessions: a yes needs a recent sign-in.
+      if(path.endsWith("/approve") && flags.stale) return no(403, "sign in again: this needs a sign-in from the last 10 minutes");
       chat.answered = path.endsWith("/approve") ? "yes" : "no";
       chat.scopes = body.scopes;
       return ok({redirect: `${headers.origin}/?chat=${chat.answered}#back`});
@@ -1504,8 +1508,13 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     // The private expenses: asked by the chat app, left out unless ticked.
     assert.equal(await text("dialog.ask .ask-check span"), "Also my private expenses: read them and change them");
     assert.equal(await run(`return document.querySelector("dialog.ask .ask-check input").checked;`), false);
+    // The sign-in is not recent: the passkey asked again, then the yes goes.
+    service.flags.stale = true;
     await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
+    await until("asked to confirm", `document.querySelector("dialog.ask[open] #ask-title") && document.querySelector("dialog.ask[open] #ask-title").textContent === "Confirm it is you"`, 15000);
+    await run(`document.querySelector('dialog.ask[open] [data-answer="yes"]').click();`);
     await until("back to the chat app", `location.search === "?chat=yes"`, 15000);
+    assert.equal(service.flags.stale, false, "signed in again first");
     assert.equal(service.chat.answered, "yes");
     assert.deepEqual(service.chat.scopes, ["trips:read", "trips:write"], "allowed: the trips, not the private expenses");
     assert.deepEqual(blocked(), []);
@@ -1695,7 +1704,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     // The right one, typed loosely: a new passkey, signed in, every other device out.
     await run(`document.getElementById("rec-code").value = ${JSON.stringify(" " + codes[3].toLowerCase() + " ")}; document.querySelector("dialog.sheet[open] form").requestSubmit();`);
     await until("signed in", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`, 20000);
-    assert.match(await run(`return document.getElementById("toast").textContent;`), /^Signed in as @fra\. In Passkeys and devices/);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /^Signed in as @fra, with a new passkey: the others and the linked chats no longer work/);
     assert.deepEqual([...service.sessions.values()].filter(h => h === "fra").length, 1, "the old tablet signed out");
     assert.equal(service.recovery.get(codes[3]).used, true);
     assert.deepEqual(blocked(), []);

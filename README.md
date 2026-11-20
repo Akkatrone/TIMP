@@ -354,7 +354,8 @@ real routes and transport times, tap "Directions" on a stop.
   nothing changes.
 - A chat app (Claude, ChatGPT…) reaches your trips only if you connect it to your
   account: the app shows who asks, what it will be able to do and where the answer
-  goes, and you allow or deny it there, with your passkey. The chat app gets a key of
+  goes, and you allow or deny it there, with your passkey (asked again if you did not
+  just sign in). The chat app gets a key of
   its own for that, never your passkey or your session. Trips → Account → Linked chats
   shows which chats can reach your trips, and unlinks one at once.
 - Who can get in is up to you: Trips → Account → Passkeys and devices lists your
@@ -364,7 +365,9 @@ real routes and transport times, tap "Directions" on a stop.
   enough to change who can get in. The service keeps the name each browser gives
   itself, to tell your devices apart. Recovery codes, made there and shown once, let
   you back in if you lose every passkey: the service keeps only their hashes, each
-  works once, and using one signs every other device out.
+  works once, and using one replaces your passkeys with a new one on that phone, signs
+  every other device out and unlinks your chats. Whoever has a code can get in: keep
+  them away from your phone. Removing a passkey signs out the devices it opened.
 - Your data is yours: Trips → Account → Export my data gives you a copy of everything
   the service keeps about you; Delete account deletes all of it for good (your handle
   written again, then your passkey).

@@ -4,6 +4,19 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.23.0
+
+Safer account, after a security review.
+
+- **Linking a chat app** asks for your passkey again when you did not sign in during the
+  last few minutes: a link lasts longer than a session, so a phone left open is not
+  enough to make one.
+- **A recovery code resets who can get in**: the new passkey made on this phone replaces
+  all the others (a lost phone's passkey stops working), every other device is signed
+  out, and every linked chat is unlinked. The codes now say plainly that whoever has one
+  can get into the account.
+- **Removing a passkey** also signs out the devices that signed in with it.
+
 ## 3.22.1
 
 Faster with big trips.

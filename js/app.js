@@ -25,7 +25,7 @@ import { shortId, canonical, contentOf } from "./version.js";
 import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { syncTrip, syncPrivate } from "./sync.js";
-import { openSignUp, openLinkedApps, openAccountSheet, openDevices, openRecover, accountError } from "./account.js";
+import { openSignUp, openLinkedApps, openAccountSheet, openDevices, openRecover, accountError, recently } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1074,7 +1074,12 @@ async function answerChatApp(id){
     check, actions: [{id: "no", label: t("chatDeny")}, {id: "yes", label: t("chatAllow"), kind: "primary"}]}) === "yes";
   const scopes = req.scopes.filter(s => !s.startsWith("private:") || (check && check.checked));
   if(!scopes.length) yes = false;
-  try{ location.replace(await answerChat(id, yes, scopes)); }catch(e){ failed(e); }
+  // A yes needs a sign-in of the last minutes (a link outlives this session): the passkey
+  // is asked again if not. A no, never.
+  try{
+    const to = yes ? await recently(() => answerChat(id, true, scopes)) : await answerChat(id, false, scopes);
+    if(to) location.replace(to);
+  }catch(e){ failed(e); }
 }
 
 // Where a trip is in time, seen from today where it happens: under way (which day),
