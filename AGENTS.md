@@ -74,6 +74,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
 | `js/share.js` | The app's side of the sharing service: the account kept on the phone, passkeys (WebAuthn), calls checked against `js/share-api.js`, the answer to a chat app asking for the trips (`#authorize=`). Nothing runs without `SHARE_URL` in `js/config.js`. |
 | `js/sync.js` | Trips and the sharing service until they agree, with the rules of two files (inspect, apply): taken, joined, sent; read-only trips never sent. Private expenses joined three ways (`mergePrivate` in `js/private.js`). No DOM. |
+| `js/sharing.js` | The sheet to share a trip on the account: who sees it, invites not accepted yet (taken back), a new invite as a link. |
 | `js/account.js` | The account's sheets: the form to make one (invitation code, name, passkey), the account's own (linked chats, export, sign out, delete), the linked chats (what each can do, unlink). |
 | `js/share-api.js` | The contract with the sharing service (accounts, sync, sharing): every route, what it takes and answers; checks and an OpenAPI page made from it. Inside a version only additions: `contract/v1.lock.json` is the released contract and `node tools/check-contract.mjs` fails on a change that would break it (`--fix` records additions). No DOM. |
 | `js/private.js` | Private expenses: in the file and on the phone, never in a version or a merge; what to do with those a loaded file brings. No DOM. |

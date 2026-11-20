@@ -22,7 +22,8 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical, contentOf } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite } from "./share.js";
+import { openShareSheet } from "./sharing.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, openLinkedApps, openAccountSheet, accountError } from "./account.js";
 
@@ -1014,6 +1015,30 @@ async function accountSignIn(){
   }catch(e){ toast(accountError(e)); }
 }
 
+/* ---------- a trip shared with this person ---------- */
+
+// Someone sent an invite: its link opens the app with #invite=<token>. Signed in (or
+// once they sign in, or make an account), the trip joins theirs, shared with them.
+async function takeInvite(token){
+  history.replaceState(null, "", location.pathname + location.search);
+  if(!hasService()) return;
+  if(!S.account){
+    const go = await ask({title: t("inviteTitle"), text: t("inviteSignIn"),
+      actions: [{id: "no", label: t("cancel")}, {id: "up", label: t("signUp")}, {id: "in", label: t("signIn"), kind: "primary"}]});
+    if(go === "in") await accountSignIn();
+    else if(go === "up") await new Promise(done => openSignUp({onDone: user => { S.account = user; render(); done(); }, onSignIn: () => accountSignIn().then(done)}));
+    if(!S.account) return;
+  }
+  let summary;
+  try{ summary = await acceptInvite(token); }
+  catch(e){ toast(e && e.status === 404 ? t("inviteGone") : e && e.status === 410 ? t("inviteUsed") : accountError(e)); return; }
+  await syncNow();
+  const rec = S.records.find(r => r.share && r.share.id === summary.id);
+  if(rec){ await openRecord(rec); location.hash = "#day-1"; }
+  render();
+  toast(t("inviteAccepted", {t: summary.title}));
+}
+
 /* ---------- chat apps ---------- */
 
 // A chat app (Claude, ChatGPT…) asks to reach the trips: it sent the person here with
@@ -1072,7 +1097,7 @@ function tripDetails(r, cur, lang){
       ${r.share ? `<div class="s where">${esc(t(r.share.gone ? "goneFromAccount" : r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
       ${S.syncErrors.has(r.id) ? `<div class="unsaved" role="status" data-sync-error>${esc(t("notSynced", {why: S.syncErrors.get(r.id)}))}</div>` : ""}
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small primary" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${!r.share || r.share.gone || r.share.role === "owner" ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>`;
+      <div class="actions">${cur ? "" : `<button type="button" class="btn small primary" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${r.share && r.share.id && !r.share.gone && r.share.role === "owner" && S.account ? `<button type="button" class="btn small" data-act="share-trip" data-id="${esc(r.id)}">${esc(t("share"))}</button>` : ""}${!r.share || r.share.gone || r.share.role === "owner" ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>`;
 }
 
 // Small signs on a trip's line: locked, shared, not synced.
@@ -1977,6 +2002,7 @@ $app.addEventListener("click", e => {
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "reup") putBackOnAccount(act.dataset.id);
   else if(a === "lock") toggleLock(act.dataset.id);
+  else if(a === "share-trip"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec && rec.share) openShareSheet({rec, toast}); }
   else if(a === "signin") accountSignIn();
   else if(a === "me") accountActions();
   else if(a === "remove") removeRecord(act.dataset.id);
@@ -2120,6 +2146,8 @@ $file.addEventListener("change", async () => {
 window.addEventListener("hashchange", () => {
   const chat = chatRequestId(location.hash);
   if(chat){ answerChatApp(chat); return; }
+  const invite = inviteToken(location.hash);
+  if(invite){ takeInvite(invite); return; }
   S.importError = null; S.menuFor = null; render(); scrollToY(0);
 });
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
@@ -2250,12 +2278,13 @@ async function start(){
   syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);
   await readVersion();
-  const chat = chatRequestId(location.hash);
-  if(chat) history.replaceState(null, "", location.pathname + location.search);
+  const chat = chatRequestId(location.hash), invite = inviteToken(location.hash);
+  if(chat || invite) history.replaceState(null, "", location.pathname + location.search);
   render();
   setupServiceWorker();
   takeSharedPlace();
   if(chat) answerChatApp(chat);
+  if(invite) takeInvite(invite);
   syncNow();
 }
 

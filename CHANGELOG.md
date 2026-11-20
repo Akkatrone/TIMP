@@ -4,6 +4,16 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.20.0
+
+Sharing a trip, from the app.
+
+- **Share** on a trip of yours on the account: who sees it and what they may do (see
+  it, change it), with Take off; the invites not accepted yet, with Take back; a new
+  invite as a link, for one person, for 14 days, sent however you like.
+- **A link received** opens the app: sign in (or make an account), and the trip joins
+  yours, shared with you; on every phone of yours at the next sync.
+
 ## 3.19.0
 
 The Trips page, for people who travel a lot.

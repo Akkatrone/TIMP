@@ -207,3 +207,23 @@ export async function deleteAccount(handle){
   await delKV(SESSION).catch(() => {});
   return true;
 }
+
+/* ---------- sharing a trip ---------- */
+
+// The owner invites one person: a link with a token, for one person, for 14 days. The
+// token travels in the address's fragment (#invite=…), which no server ever sees, and is
+// sent to the service in a body, never in an address.
+
+/** The id of an invite in the app's address (#invite=…), or "". */
+export function inviteToken(hash){
+  const m = /^#invite=([A-Za-z0-9_-]{16,128})$/.exec(hash || "");
+  return m ? m[1] : "";
+}
+/** The link to send: this app's address with the invite. */
+export const inviteLink = token => location.origin + location.pathname + "#invite=" + token;
+
+export const createInvite = (id, role) => call("invite", {params: {id}, body: {role}});
+export const pendingInvites = async id => (await call("invites", {params: {id}})).invites;
+export const revokeInvite = (id, invite) => call("revokeInvite", {params: {id, invite}});
+export const tripMembers = async id => (await call("members", {params: {id}})).members;
+export const acceptInvite = token => call("acceptInvite", {body: {token}});

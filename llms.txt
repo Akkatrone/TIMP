@@ -9,7 +9,7 @@
 > look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
-**Version 3.19.0.** TIMP is under active development and this page changes with it.
+**Version 3.20.0.** TIMP is under active development and this page changes with it.
 Remember this version. Before you change a trip later in the conversation, or when a
 message from the app names a newer TIMP version, open this page again: if its version
 is newer, read "What's new" and use it. If you cannot open it, ask the traveller for

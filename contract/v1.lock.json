@@ -169,6 +169,24 @@
     "req": true
    }
   },
+  "pendingInvite": {
+   "id": {
+    "type": "text",
+    "req": true
+   },
+   "role": {
+    "type": "text",
+    "req": true,
+    "values": [
+     "read",
+     "edit"
+    ]
+   },
+   "expires": {
+    "type": "text",
+    "req": true
+   }
+  },
   "member": {
    "id": {
     "type": "text"
@@ -500,6 +518,24 @@
      "req": true
     }
    }
+  },
+  "invites": {
+   "method": "GET",
+   "path": "/v1/trips/:id/invites",
+   "auth": true,
+   "answer": {
+    "invites": {
+     "type": "list",
+     "of": "pendingInvite",
+     "req": true
+    }
+   }
+  },
+  "revokeInvite": {
+   "method": "DELETE",
+   "path": "/v1/trips/:id/invites/:invite",
+   "auth": true,
+   "answer": "ok"
   },
   "removeMember": {
    "method": "DELETE",

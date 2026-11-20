@@ -1180,6 +1180,7 @@ function fakeService(){
   const client = cred => JSON.parse(Buffer.from(cred.response.clientDataJSON, "base64url").toString());
   const calls = [], refuse = new Set();         // what the phone asked; local ids the service fails on
   const deleted = [];                           // accounts deleted
+  const invites = new Map(), members = new Map(); // token → {trip, role, usedBy, revoked}; trip → user → role
   const handler = async (method, path, body, headers) => {
     calls.push(method + " " + path);
     if(method === "POST" && path === "/v1/trips" && body.trip && refuse.has(body.trip.id)) return {status: 500, body: {error: "server: something went wrong"}};
@@ -1214,9 +1215,30 @@ function fakeService(){
       return session(keys.get(cred.id));
     }
     const who = sessions.get(String(headers.authorization || "").replace("Bearer ", ""));
+    // Sharing: invites (a token, once), what is pending, members; accepting one.
+    const sh = path.match(/^\/v1\/trips\/([^/]+)\/(invites|members)(?:\/([^/]+))?$/);
+    if(sh || path === "/v1/invites/accept"){
+      if(!who) return no(401, "sign in first");
+      if(path === "/v1/invites/accept"){
+        const inv = invites.get(body.token);
+        if(!inv || inv.revoked) return no(404, "invite: not found or expired");
+        if(inv.usedBy && inv.usedBy !== who) return no(410, "invite: already used");
+        inv.usedBy = who;
+        members.set(inv.trip, new Map([...(members.get(inv.trip) || []), [who, inv.role]]));
+        return ok({...summary(trips.get(inv.trip)), role: inv.role});
+      }
+      const [, id, what, sub] = sh, t = trips.get(id);
+      if(!t || t.owner !== who) return no(404, "trip: not found");
+      if(what === "invites" && method === "POST"){ const token = "invite-token-" + ++n + "-abcdefgh"; invites.set(token, {trip: id, role: body.role}); return ok({token, role: body.role, expires: "2026-12-04T00:00:00.000Z"}); }
+      if(what === "invites" && method === "GET") return ok({invites: [...invites].filter(([, i]) => i.trip === id && !i.usedBy && !i.revoked).map(([tk, i]) => ({id: "id-" + tk, role: i.role, expires: "2026-12-04T00:00:00.000Z"}))});
+      if(what === "invites" && method === "DELETE"){ const i = invites.get(sub.replace(/^id-/, "")); if(!i) return no(404, "invite: not found"); i.revoked = true; return ok({ok: true}); }
+      if(what === "members" && method === "GET") return ok({members: [{handle: who, role: "owner"}, ...[...(members.get(id) || [])].map(([u, r]) => ({id: "u-" + u, handle: u, role: r}))]});
+      return no(404, "not found");
+    }
     const m = path.match(/^\/v1\/trips(?:\/([^/]+)(?:\/(push|private|versions)(?:\/([^/]+))?)?)?$/);
     if(m && !who) return no(401, "sign in first");
-    if(m && method === "GET" && !m[1]) return ok({trips: [...trips.values()].filter(t => t.owner === who).map(summary)});
+    if(m && method === "GET" && !m[1]) return ok({trips: [...trips.values()].filter(t => t.owner === who || (members.get(t.id) || new Map()).has(who))
+      .map(t => t.owner === who ? summary(t) : {...summary(t), role: members.get(t.id).get(who)})});
     if(m && m[1] && !m[2] && method === "DELETE"){ trips.delete(m[1]); return ok({ok: true}); }
     if(m && method === "POST" && !m[1]){
       const trip = body.trip, had = [...trips.values()].find(t => t.owner === who && t.localId === trip.id);
@@ -1290,7 +1312,7 @@ function fakeService(){
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs, chat, calls, refuse, deleted};
+  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members};
   return handler;
 }
 
@@ -1482,6 +1504,39 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.deepEqual(blocked(), []);
   });
 
+  await step("sharing: the owner sees who has it, makes a link for one person, takes it back; a link received brings a trip shared with you", async () => {
+    await run(`location.hash = "#trips";`);
+    const card = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="demo-lisbon"]'))`;
+    await until("the trip on the account", `${card} && ${card}.querySelector('[data-act="share-trip"]')`, 15000);
+    await run(`${card}.querySelector('[data-act="share-trip"]').click();`);
+    await until("the sheet", `document.querySelector("dialog.sheet[open] [data-person]")`);
+    assert.match(await text("dialog.sheet[open] h2"), /^Share “Lisbon in my pocket \(example\)”$/);
+    assert.equal(await text("dialog.sheet[open] [data-person] small"), "owner · you");
+    await run(`document.querySelector("dialog.sheet[open] [data-role]").value = "edit"; document.querySelector("dialog.sheet[open] [data-make]").click();`);
+    await until("the link", `!document.querySelector("dialog.sheet[open] [data-link]").hidden && document.querySelector("dialog.sheet[open] [data-invite]")`);
+    assert.match(await run(`return document.querySelector("dialog.sheet[open] [data-link-text]").value;`), /#invite=invite-token-\d+-abcdefgh$/);
+    assert.equal(await text("dialog.sheet[open] [data-invite] b"), "can change it");
+    await run(`document.querySelector("dialog.sheet[open] [data-revoke]").click();`);
+    await until("taken back", `!document.querySelector("dialog.sheet[open] [data-invite]")`);
+    assert.ok([...service.invites.values()].every(i => i.revoked));
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    // A trip of someone else's, and an invite to it, received as a link.
+    const {trip: theirs} = await prepare({...splitPrivate(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"))).trip, id: "from-ugo", title: "Ugo's trip"});
+    service.trips.set("t-ugo", {id: "t-ugo", owner: "ugo", localId: "from-ugo", head: theirs.version.id, versions: new Map([[theirs.version.id, theirs]])});
+    service.invites.set("for-fra-from-ugo-0001", {trip: "t-ugo", role: "read"});
+    await run(`location.hash = "#invite=for-fra-from-ugo-0001";`);
+    await until("taken", `/“Ugo's trip” is among your trips, shared with you/.test(document.getElementById("toast").textContent)`, 15000);
+    assert.equal(await run(`return location.hash;`), "#day-1", "opened, the invite gone from the address");
+    await run(`location.hash = "#trips";`);
+    await until("its card", `document.querySelector(".active-trip .t span") && document.querySelector(".active-trip .t span").textContent === "Ugo's trip"`);
+    assert.equal(await text(".active-trip .where"), "Shared with you, read only: your changes stay on this phone");
+    // The same link again, by someone else: refused.
+    service.invites.get("for-fra-from-ugo-0001").usedBy = "eve";
+    await run(`location.hash = "#invite=for-fra-from-ugo-0001";`);
+    await until("said", `/already used by someone else/.test(document.getElementById("toast").textContent)`);
+    assert.deepEqual(blocked(), []);
+  });
+
   await step("the account: a copy of its data; deleted for good with the handle and the passkey, the trips staying on the phone", async () => {
     const openMe = async () => {
       await run(`location.hash = "#trips";`);
@@ -1505,7 +1560,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`document.querySelector('dialog.ask[open] [data-answer="yes"]').click();`);
     await until("deleted", `/Account deleted/.test(document.getElementById("toast").textContent)`, 15000);
     assert.deepEqual(service.deleted, ["fra"]);
-    assert.equal(service.trips.size, 0, "its trips gone from the service");
+    assert.equal([...service.trips.values()].filter(t => t.owner === "fra").length, 0, "its trips gone from the service (someone else's stay)");
     // Signed out; the trips stay on this phone, as this phone's.
     await run(`location.hash = "#trips";`);
     await until("signed out", `document.querySelector(".acct [data-act='signup']")`);

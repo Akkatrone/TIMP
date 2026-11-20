@@ -67,6 +67,11 @@ export const SHAPES = {
     role: text("What they will be able to do.", {values: ["read", "edit"]}),
     expires: text("Until when it can be accepted (ISO date).")
   },
+  pendingInvite: {
+    id: text("The invite's id (not its token: the token only its link has)."),
+    role: text("What the person will be able to do.", {values: ["read", "edit"]}),
+    expires: text("Until when it can be accepted (ISO date).")
+  },
   member: {
     id: {type: "text", doc: "Account id (absent for the owner)."},
     handle: text("Their handle."),
@@ -130,6 +135,8 @@ export const ROUTES = {
   invite: {method: "POST", path: "/v1/trips/:id/invites", auth: true, body: {role: text("read or edit.", {values: ["read", "edit"]})}, answer: "invite", doc: "The owner invites one person."},
   acceptInvite: {method: "POST", path: "/v1/invites/accept", auth: true, body: {token: text("The invite's token.")}, answer: "tripSummary", doc: "The trip joins the user's \"Shared with you\"."},
   members: {method: "GET", path: "/v1/trips/:id/members", auth: true, answer: {members: {type: "list", of: "member", req: true}}, doc: "Who a trip is shared with."},
+  invites: {method: "GET", path: "/v1/trips/:id/invites", auth: true, answer: {invites: {type: "list", of: "pendingInvite", req: true}}, doc: "The owner sees the invites not accepted yet and not expired."},
+  revokeInvite: {method: "DELETE", path: "/v1/trips/:id/invites/:invite", auth: true, answer: "ok", doc: "The owner takes back an invite not accepted yet: its link opens nothing."},
   removeMember: {method: "DELETE", path: "/v1/trips/:id/members/:user", auth: true, answer: "ok", doc: "The owner takes someone off; anyone can leave."},
   oauthRequest: {method: "POST", path: "/v1/oauth/request", auth: true, body: {request: text("The id in the app's address (#authorize=…).")}, answer: "oauthRequest", doc: "A chat app asks to reach the user's trips (MCP): what it is and what it asks, to show before the answer."},
   oauthApprove: {method: "POST", path: "/v1/oauth/approve", auth: true, body: {request: text("The request's id."),
