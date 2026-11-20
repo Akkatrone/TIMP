@@ -92,3 +92,53 @@ export function openPublishSheet({rec, toast, onDone}){
   });
   dlg.showModal();
 }
+
+/**
+ * "Use as a base": the first day of the copy, asked. Needed when the dates were not
+ * published (they are 2001 in the page's copy); offered as published otherwise.
+ * @returns the day ("YYYY-MM-DD"), or null if the sheet was closed
+ */
+export function chooseFirstDay({title, by, hidden, first}){
+  return new Promise(resolve => {
+    const dlg = document.createElement("dialog");
+    dlg.className = "sheet";
+    dlg.setAttribute("aria-labelledby", "base-title");
+    dlg.innerHTML = `
+    <form method="dialog" class="sheet-form" novalidate>
+      <div class="sheet-head">
+        <h2 id="base-title">${esc(t("baseTitle", {t: title}))}</h2>
+        <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
+      </div>
+      <p class="foot">${esc(t("baseText", {h: by}))}</p>
+      <div class="field">
+        <label for="base-first">${esc(t("baseFirst"))}</label>
+        <input id="base-first" type="date" value="${esc(first || "")}" required>
+        <p class="foot">${esc(t(hidden ? "baseFirstHidden" : "baseFirstReal"))}</p>
+      </div>
+      <p class="errbox" data-error role="alert" hidden></p>
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
+        <span class="grow"></span>
+        <button type="submit" class="btn primary">${esc(t("baseMake"))}</button>
+      </div>
+    </form>`;
+    document.body.appendChild(dlg);
+    let chosen = null;
+    dlg.addEventListener("close", () => { dlg.remove(); resolve(chosen); });
+    dlg.addEventListener("click", e => { if(e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+    dlg.querySelector("form").addEventListener("submit", e => {
+      e.preventDefault();
+      const v = dlg.querySelector("#base-first").value;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){
+        const box = dlg.querySelector("[data-error]");
+        box.textContent = t("baseFirstNeeded");
+        box.hidden = false;
+        return;
+      }
+      chosen = v;
+      dlg.close();
+    });
+    dlg.showModal();
+    dlg.querySelector("#base-first").focus();
+  });
+}

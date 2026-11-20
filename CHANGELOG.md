@@ -4,6 +4,24 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.26.0
+
+Published trips, from their page into the app.
+
+- **Open in TIMP**, on a published trip's page: the trip on your phone, read only (with
+  the map, offline), under "From others" on Trips, with who published it. Opened again,
+  it is brought up to date. It is theirs: it never goes to your account, and you can
+  delete it whenever you like.
+- **Use as a base**, on the page or on that trip's card: a copy all yours, from the first
+  day you choose (asked when its dates were not published), that you change as you like
+  and that syncs like your other trips. The original learns nothing of it.
+- The copy says where it came from: "Based on … by @…", with the page's link. In the
+  file: `basedOn` (`url`, `title`, `by`), written by the app.
+- A trip published without its dates shows the day of the week and "Day N", never a
+  made-up date.
+- **Sheets**: a long title wraps beside the ×, which keeps its size; the buttons beside
+  long names (Remove, Unlink, Take off) too.
+
 ## 3.25.1
 
 - **Passkeys and devices, Linked chats, Share** open whole: their lists are loaded

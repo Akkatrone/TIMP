@@ -77,6 +77,7 @@ an `address` and its position (`lat`, `lng`):
 | `expenses` | no | Money spent outside the stops: flights, hotels, passes. See [Costs](#costs). |
 | `private` | no | The traveller's own spending, not shared with the trip. See [Private expenses](#private-expenses). |
 | `googleMapsKey` | no | A Google Maps key for everyone who loads the trip. See [Google Maps key](#google-maps-key). |
+| `basedOn` | written by the app | The published trip this one was copied from, with "Use as a base": `url` (its page), `title`, `by` (who published it). The copy is the traveller's own; nothing links it to the original. |
 | `id` | written by the app | Identifies the trip on the phone. Without it the app makes one from the title and the first date, so a corrected file for the same trip updates it. Keep it when you change a file the app saved. |
 | `version` | written by the app | Keep it exactly as it is.<!-- llms.txt: skip --> See [Versions](#versions).<!-- llms.txt: end --> |
 
@@ -345,6 +346,8 @@ warnings: the file loads, and the command-line checker shows them.
 Only what a trip file, or a list of changes, can say differently. Files written for an
 older version still load.
 
+- **3.26**: `basedOn` on the trip, written by the app on a copy of a published trip
+  (`url`, `title`, `by`). Optional.
 - **3.9**: changes say the version they were written for: `from`, from the outline.
 - **3.8**: a `cost` is what the traveller pays, their share of what is split; in 3.7
   it was the total for everyone. Private expenses: `private`, with its `expenses` (a

@@ -376,6 +376,10 @@ real routes and transport times, tap "Directions" on a stop.
   are found and taken out unless you keep them; the dates show as days of the week
   unless you choose the real ones. Withdraw it whenever you want: the page then says it
   was withdrawn. Copies others made with "Use as a base" stay theirs.
+- A trip someone else published opens in your app read only ("Open in TIMP" on its
+  page): it stays on your phone and never goes to your account. "Use as a base" makes
+  a copy all yours, which says where it came from (`basedOn`); the original's author
+  learns nothing of it.
 - Your data is yours: You → Export my data gives you a copy of everything
   the service keeps about you; Delete account deletes all of it for good (your handle
   written again, then your passkey).

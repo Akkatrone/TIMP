@@ -12,6 +12,7 @@ import { commit, relation, commonBase, commitMerge } from "../js/version.js";
 import { mergeTrips } from "../js/merge.js";
 import { addStop } from "../js/edit.js";
 import { splitPrivate } from "../js/private.js";
+import { publishable } from "../js/publish.js";
 
 let passed = 0;
 async function step(name, fn){
@@ -1243,6 +1244,14 @@ function fakeService(){
     }
     const who = sessions.get(String(headers.authorization || "").replace("Bearer ", ""));
     // Sharing: invites (a token, once), what is pending, members; accepting one.
+    // A published trip, for anyone: the copy made as the service makes it; 410 once withdrawn.
+    const pg = path.match(/^\/v1\/public\/([^/]+)$/);
+    if(pg && method === "GET"){
+      const [id, p] = [...pubs].find(([, x]) => x.page === pg[1]) || [];
+      if(!p) return no(handler.state.withdrawn && handler.state.withdrawn.has(pg[1]) ? 410 : 404, "page: not found");
+      const t = trips.get(id), file = t.versions.get(p.version);
+      return ok({trip: publishable(file, {dates: p.dates}).trip, by: t.owner, dates: p.dates, publishedAt: p.publishedAt, updatedAt: p.updatedAt});
+    }
     // Publishing: owner only; the choices checked as the contract says.
     const pb = path.match(/^\/v1\/trips\/([^/]+)\/publication$/);
     if(pb){
@@ -1610,6 +1619,9 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`${card}.querySelector('[data-act="share-trip"]').click();`);
     await until("the sheet", `document.querySelector("dialog.sheet[open] [data-person]")`);
     assert.match(await text("dialog.sheet[open] h2"), /^Share “Lisbon in my pocket \(example\)”$/);
+    // A long title wraps beside the ×, which keeps its size (every sheet has this head).
+    assert.deepEqual(await run(`const h = document.querySelector("dialog.sheet[open] h2"), was = h.textContent; h.textContent = "Share “" + "A very long trip title ".repeat(6) + "”";
+      const r = document.querySelector("dialog.sheet[open] .sheet-head [data-close]").getBoundingClientRect(); h.textContent = was; return [Math.round(r.width), Math.round(r.height)];`), [36, 36]);
     assert.equal(await text("dialog.sheet[open] [data-person] small"), "owner · you");
     await run(`document.querySelector("dialog.sheet[open] [data-role]").value = "edit"; document.querySelector("dialog.sheet[open] [data-make]").click();`);
     await until("the link", `!document.querySelector("dialog.sheet[open] [data-link]").hidden && document.querySelector("dialog.sheet[open] [data-invite]")`);
@@ -1671,6 +1683,55 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("a way to publish again", `document.querySelector("dialog.sheet[open] [data-pub-make]")`);
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
     await until("no sign on its card", `${card} && !${card}.querySelector("[data-published]")`, 15000);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("a published trip: opened read only from its page, never sent to the account; used as a base, a copy of your own from the day you choose", async () => {
+    // The page of the example, as if someone had sent its link.
+    const [tripId, t] = [...service.trips].find(([, x]) => x.localId === "demo-lisbon");
+    service.pubs.set(tripId, {page: "readonlypagexy", version: t.head, level: "link", dates: "hidden", publishedAt: "2026-11-20T18:00:00.000Z", updatedAt: "2026-11-20T18:00:00.000Z"});
+    const before = service.trips.size;
+    await run(`location.hash = "#public=readonlypagexy";`);
+    await until("opened", `/by @fra: read only on this phone/.test(document.getElementById("toast").textContent)`, 15000);
+    assert.equal(await run(`return location.hash;`), "", "the link leaves the address");
+    // Read only: no +, and the day says whose it is.
+    await run(`location.hash = "#day-1";`);
+    await until("its day", `document.querySelector(".stop")`);
+    assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "nothing to add");
+    assert.match(await text(".lock-note"), /^This trip is @fra's, read only/);
+    // On Trips, apart, with its month only (its dates were not published).
+    await run(`location.hash = "#trips";`);
+    await until("its card", `document.querySelector("[data-public-badge]")`);
+    assert.equal(await text(".active-trip [data-public-badge]"), "by @fra");
+    assert.match(await text(".active-trip .s"), /^May · 4 days$/);
+    assert.equal(await run(`return !!document.querySelector('.active-trip [data-act="lock"]') || !!document.querySelector('.active-trip [data-act="share-trip"]');`), false);
+    // Never sent to the account, however often it syncs.
+    await run(`document.querySelector('[data-act="sync"]').click();`);
+    await until("synced", `document.querySelector('[data-sync="ok"]') && !document.querySelector('[data-sync="busy"]')`, 15000);
+    assert.equal(service.trips.size, before);
+    // Used as a base: the first day asked (its dates were hidden), then a copy of your own.
+    await run(`document.querySelector('.active-trip [data-act="base-copy"]').click();`);
+    await until("the first day asked", `document.querySelector("dialog.sheet[open] #base-first")`);
+    assert.equal(await text("dialog.sheet[open] #base-title"), "Use “Lisbon in my pocket (example)” as a base");
+    await run(`document.querySelector("dialog.sheet[open] form").requestSubmit();`);
+    await until("needed", `!document.querySelector("dialog.sheet[open] [data-error]").hidden`);
+    await run(`const i = document.getElementById("base-first"); i.value = "2028-06-02"; document.querySelector("dialog.sheet[open] form").requestSubmit();`);
+    await until("yours", `/is yours: a copy of @fra's trip/.test(document.getElementById("toast").textContent)`, 15000);
+    await run(`location.hash = "#trips";`);
+    await until("the copy, open", `document.querySelector(".active-trip [data-based-on]")`);
+    assert.equal(await text(".active-trip [data-based-on]"), "Based on “Lisbon in my pocket (example)” by @fra ↗");
+    assert.equal(await run(`return !!document.querySelector(".active-trip [data-public-badge]");`), false, "yours: not read only");
+    // A copy of your own goes to the account, with its new dates and where it came from.
+    for(let i = 0; i < 50 && service.trips.size === before; i++) await new Promise(r => setTimeout(r, 200));
+    const copy = [...service.trips.values()].find(x => x.versions.get(x.head).basedOn);
+    assert.ok(copy, "on the account");
+    const file = copy.versions.get(copy.head);
+    assert.deepEqual([file.days[0].date, file.basedOn.by, file.basedOn.url.endsWith("/t/readonlypagexy")], ["2028-06-02", "fra", true]);
+    // Withdrawn meanwhile: its link says so.
+    service.pubs.delete(tripId);
+    service.withdrawn = new Set(["readonlypagexy"]);
+    await run(`location.hash = "#public=readonlypagexy";`);
+    await until("said", `/withdrawn by whoever published it/.test(document.getElementById("toast").textContent)`, 15000);
     assert.deepEqual(blocked(), []);
   });
 

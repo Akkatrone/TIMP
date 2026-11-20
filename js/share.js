@@ -292,6 +292,15 @@ export const pageUrl = page => SHARE_URL + "/t/" + page;
 /** Publishes the account's version of a trip (or one named), with the choices made: the publication. */
 export const publishTrip = (id, {version, dates, remove}) => call("publishTrip", {params: {id}, body: {...(version ? {version} : {}), dates, remove}});
 
+/** A published trip, for anyone: {trip, by, dates, publishedAt, updatedAt}. */
+export const publicTrip = page => call("publicTrip", {params: {page}});
+
+/** A page's way into the app: "#public=<page>" (open it, read only) or "#base=<page>" (a copy). */
+export function publicLink(hash){
+  const m = /^#(public|base)=([a-z2-9]{14})$/.exec(String(hash || ""));
+  return m ? {kind: m[1], page: m[2]} : null;
+}
+
 /** Withdraws the page: it answers "withdrawn" from now on. */
 export const unpublishTrip = id => call("unpublishTrip", {params: {id}});
 

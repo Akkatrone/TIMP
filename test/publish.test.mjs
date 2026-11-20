@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { publishable, sensitiveIn, dateShift, MASK } from "../js/publish.js";
+import { publishable, sensitiveIn, dateShift, MASK, moveDates, asBase } from "../js/publish.js";
 import { validateTrip } from "../js/trip.js";
 
 const demo = () => JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
@@ -109,4 +109,19 @@ test("the example trip: published as it is, valid, the same twice", () => {
   assert.ok(validateTrip(a.trip).ok, JSON.stringify(validateTrip(a.trip).errors));
   assert.equal(JSON.stringify(a), JSON.stringify(b), "deterministic");
   assert.equal(a.trip.days.length, demo().days.length);
+});
+
+test("use as a base: the traveller's own copy, its dates from the day they choose, where it came from said", () => {
+  const pub = {trip: publishable(trip()).trip, by: "fra"};
+  const copy = asBase(pub, {url: "https://share.example/t/k7qm2hxprw9dtn", first: "2028-06-02"});
+  assert.equal("id" in copy || "version" in copy || "private" in copy, false);
+  assert.deepEqual(copy.basedOn, {url: "https://share.example/t/k7qm2hxprw9dtn", title: "Porto weekend", by: "fra"});
+  assert.deepEqual(copy.days.map(d => d.date), ["2028-06-02", "2028-06-03"]);
+  assert.equal(copy.expenses[0].date, "2028-06-02", "dates inside move with it");
+  assert.ok(validateTrip(copy).ok, JSON.stringify(validateTrip(copy).errors));
+  // Without a day: the dates as published.
+  assert.deepEqual(asBase(pub, {url: "https://share.example/t/x"}).days.map(d => d.date), pub.trip.days.map(d => d.date));
+  // A copy of a copy says only the last.
+  assert.equal(asBase({trip: copy, by: "ugo"}, {url: "https://share.example/t/y"}).basedOn.by, "ugo");
+  assert.deepEqual(moveDates(trip(), "nope").days.map(d => d.date), ["2027-03-12", "2027-03-13"], "an unreadable day changes nothing");
 });

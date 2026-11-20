@@ -253,7 +253,9 @@ test("llms.txt gives a chat assistant the whole format in one page, with valid e
 
 test("the format in short has every field an assistant writes, a valid example, and no key", () => {
   const brief = formatBrief();
-  for(const [kind, fields] of Object.entries(FIELDS)){
+  // Kinds only the app writes (basedOn) are not in it at all.
+  assert.ok(!/^basedOn:$/m.test(brief));
+  for(const [kind, fields] of Object.entries(FIELDS).filter(([k]) => k !== "basedOn")){
     for(const [name, f] of Object.entries(fields)){
       const listed = new RegExp(`^  ${name}( \\(required\\))?:`, "m").test(brief.split(`\n${kind}:\n`)[1] || "");
       assert.equal(listed, !f.byApp && f.inBrief !== false, `${kind}.${name}`);

@@ -25,6 +25,8 @@ export const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const HASH = /^[0-9a-f]{16}$/;
 const HTTPS = /^https:\/\/[^\s<>"]+$/;
+// A page of a sharing service: https, or this machine while developing one.
+const PAGE_URL = /^(https:\/\/[^\s<>"]+|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/[^\s<>"]*)$/;
 // A currency, as its ISO 4217 code.
 const CURRENCY = /^[A-Z]{3}$/;
 const CURRENCY_HINT = "a currency code like \"JPY\"";
@@ -81,6 +83,7 @@ export const FIELDS = {
     expenses: {type: "list", of: "expense", min: 1, doc: "Money spent outside the stops: flights, hotels, passes."},
     private: {type: "private", doc: "The traveller's own spending, not shared."},
     googleMapsKey: {type: "text", inBrief: false, doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
+    basedOn: {type: "basedOn", byApp: true, inBrief: false, doc: "Written by the app: the published trip this one was copied from (\"Use as a base\")."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app. Keep it when you change a file the app saved."},
     version: {type: "any", byApp: true, doc: "Written by the app. Keep it as it is."}
   },
@@ -123,6 +126,11 @@ export const FIELDS = {
     date: {type: "text", test: realDate, hint: "a real date as \"YYYY-MM-DD\"", doc: "When it was paid: the day of its rate. Without it, the trip's first day."},
     stop: {type: "text", pattern: ID, hint: "a stop id", inBrief: false, doc: "Private expenses only: the id of the stop it was paid at, on the day in `date`."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
+  },
+  basedOn: {
+    url: {type: "text", req: true, pattern: PAGE_URL, hint: "an https:// address", doc: "The page of the trip it was copied from."},
+    title: {type: "text", req: true, doc: "That trip's title."},
+    by: {type: "text", req: true, doc: "The handle of whoever published it."}
   },
   private: {
     expenses: {type: "list", of: "expense", min: 1, req: true, doc: "Shopping, a meal alone."},
@@ -304,11 +312,15 @@ export function formatBrief(){
       : f.type === "number" ? (f.max >= 1e9 ? `number, ${f.min} or more` : `number from ${f.min} to ${f.max}`) : f.values ? f.values.join("|") : f.hint || f.type;
     return `  ${name}${f.req ? " (required)" : ""}: ${what}. ${f.doc}`;
   };
-  const block = k => `${k}:\n` + Object.entries(FIELDS[k]).filter(([, f]) => !f.byApp && f.inBrief !== false).map(([n]) => kind(k, n)).join("\n");
+  const shown = ([, f]) => !f.byApp && f.inBrief !== false;
+  const block = k => `${k}:\n` + Object.entries(FIELDS[k]).filter(shown).map(([n]) => kind(k, n)).join("\n");
+  // Only the kinds an assistant writes: those its fields lead to (not basedOn, the app's).
+  const kinds = new Set(["trip"]);
+  for(const k of Object.keys(FIELDS)) for(const e of Object.entries(FIELDS[k]).filter(shown)) for(const x of [e[1].type, e[1].of]) if(FIELDS[x]) kinds.add(x);
   return [
     `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block: double quotes, no comments, no trailing commas. Use only these fields; invent none.`,
     "",
-    ...Object.keys(FIELDS).map(block),
+    ...Object.keys(FIELDS).filter(k => kinds.has(k)).map(block),
     "",
     "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. A cost is what the traveller pays: their share if split. Give lat/lng only for places you are sure about; otherwise an address.",
     "",

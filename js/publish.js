@@ -148,3 +148,31 @@ export function publishable(trip, {remove = {}, dates = "hidden"} = {}){
   }
   return {trip: out, found, dates: dates === "real" ? "real" : "hidden"};
 }
+
+/** A copy of a trip with every date moved so that its first day is `first` ("YYYY-MM-DD"). */
+export function moveDates(trip, first){
+  const out = structuredClone(trip);
+  if(!out.days || !out.days.length || !/^\d{4}-\d{2}-\d{2}$/.test(first || "")) return out;
+  const shift = parse(first) - parse(out.days[0].date);
+  const move = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? iso(parse(d) + shift) : d;
+  for(const d of out.days){
+    d.date = move(d.date);
+    for(const s of [...(d.stops || []), ...(d.plans || []).flatMap(p => p.stops || [])]) if(Array.isArray(s.closed)) s.closed = s.closed.map(move);
+  }
+  for(const e of out.expenses || []) if(e.date) e.date = move(e.date);
+  return out;
+}
+
+/**
+ * "Use as a base": a published trip made the traveller's own. A trip of its own (no id,
+ * no version: the app gives them), its dates from `first` if given, and where it came
+ * from in `basedOn`. Nothing else links it to the original.
+ * @param pub   the published trip, as the service gives it: {trip, by}
+ * @param o     {url: the page's address, first?: the first day}
+ */
+export function asBase(pub, {url, first} = {}){
+  const {id: _id, version: _version, private: _own, basedOn: _was, ...trip} = pub.trip;
+  const out = first ? moveDates(trip, first) : structuredClone(trip);
+  out.basedOn = {url, title: String(trip.title || ""), by: String(pub.by || "")};
+  return out;
+}

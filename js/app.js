@@ -1,7 +1,7 @@
 import { validateTrip, upgrade, citiesOf, stayOf, placeQuery, formatBrief, FORMAT, TRAVEL, TYPES } from "./trip.js";
 import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
-import { esc, rich, mapsUrl, dirUrl, dateParts, todayIn, jsonIn, weekdayName } from "./util.js";
+import { esc, rich, mapsUrl, dirUrl, dateParts as calendarParts, todayIn, jsonIn, weekdayName } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
 import { daylight, partsOfDay } from "./sun.js";
 import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
@@ -22,8 +22,10 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical, contentOf } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl } from "./share.js";
 import { openShareSheet } from "./sharing.js";
+import { chooseFirstDay } from "./publishing.js";
+import { asBase } from "./publish.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
 
@@ -151,6 +153,17 @@ function route(){
   return {name: "day", i: ti >= 0 ? ti : 0};
 }
 
+// A day's date as the app says it. Someone else's trip published without its dates
+// carries them moved to 2001: it says the day of the week and "Day N", never that date.
+function dateParts(iso, lang){
+  const p = calendarParts(iso, lang);
+  const rec = S.rec;
+  if(!(rec && rec.public && rec.public.dates === "hidden")) return p;
+  const i = rec.trip.days.findIndex(d => d.date === iso);
+  const weekday = new Intl.DateTimeFormat(lang, {weekday: "long", timeZone: "UTC"}).format(new Date(iso + "T12:00:00Z"));
+  return {...p, long: weekday.charAt(0).toUpperCase() + weekday.slice(1), short: i >= 0 ? `${t("day")} ${i + 1}` : p.dow};
+}
+
 /* ---------- theme ---------- */
 
 const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
@@ -225,7 +238,7 @@ async function importChanges(data){
   const rec = data.trip ? S.records.find(r => r.id === data.trip) : S.rec;
   const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); scrollToY(0); };
   if(!rec) return fail([data.trip ? t("changesNoTrip", {id: data.trip}) : t("changesNoOpen")]);
-  if(isLocked(rec) && data.changes.some(c => !Object.values(c || {}).some(x => x && x.private))) return fail([t("lockedNoChanges", {t: rec.trip.title})]);
+  if(isLocked(rec) && data.changes.some(c => !Object.values(c || {}).some(x => x && x.private))) return fail([lockedText(rec, "lockedNoChanges", {t: rec.trip.title})]);
   // Written for the version the outline showed: when the trip changed since, applied
   // to that version and joined with what came after. A version this phone does not
   // have: tried on the trip as it is.
@@ -249,7 +262,7 @@ async function importChanges(data){
 }
 
 // demo: the example's private expenses are taken without asking.
-async function importText(text, name, {demo = false} = {}){
+async function importText(text, name, {demo = false, said = ""} = {}){
   let data;
   try{ data = JSON.parse(text); }
   catch(e){
@@ -274,12 +287,12 @@ async function importText(text, name, {demo = false} = {}){
     if(!local){
       await versions.put(incoming);
       rec = {id: incoming.id, trip: incoming, importedAt: Date.now(), fileName: name || "", exported: incoming.version.id};
-      message = t("imported", {t: incoming.title});
+      message = said || t("imported", {t: incoming.title});
     }else{
       const x = await inspect(versions, local.trip, incoming);
       // Locked: nothing of this file goes into it (another trip with the same id may go apart).
       if(isLocked(local) && x.kind !== "same" && !x.unrelated){
-        S.importError = {title: t("importFailed"), items: [t("lockedNoFile", {t: local.trip.title})]};
+        S.importError = {title: t("importFailed"), items: [lockedText(local, "lockedNoFile", {t: local.trip.title})]};
         render(); scrollToY(0);
         return;
       }
@@ -393,12 +406,16 @@ function showHistory(id){
 // version brought back, no deleting, until it is unlocked. Ticks and private expenses
 // are not the trip's version: they stay free. On the account, the lock is the
 // service's (its owner's, for everyone); on this phone only, this phone's.
-const isLocked = rec => !!(rec && (rec.locked || (rec.share && !rec.share.gone && rec.share.locked)));
-const editable = (rec = S.rec) => { if(!isLocked(rec)) return true; toast(t("lockedNoEdit")); return false; };
+// A trip opened from someone's page ("Open in TIMP") is read only, as a locked trip, for
+// good: it is theirs. To change it, "Use as a base" makes a copy.
+const isLocked = rec => !!(rec && (rec.locked || rec.public || (rec.share && !rec.share.gone && rec.share.locked)));
+// What a locked trip says when something would change it: its own words for a trip of someone else's.
+const lockedText = (rec, key, vars) => rec && rec.public ? t("publicNoEdit", {h: rec.public.by}) : t(key, vars);
+const editable = (rec = S.rec) => { if(!isLocked(rec)) return true; toast(lockedText(rec, "lockedNoEdit")); return false; };
 
 async function toggleLock(id){
   const rec = S.records.find(r => r.id === id);
-  if(!rec) return;
+  if(!rec || rec.public) return;
   const locked = isLocked(rec), title = rec.trip.title;
   const yes = await ask({title: t(locked ? "unlockTitle" : "lockTitle"), text: t(locked ? "unlockText" : "lockText", {t: title}),
     actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t(locked ? "unlock" : "lock"), kind: "primary"}]});
@@ -423,7 +440,7 @@ async function toggleLock(id){
 async function applyEdit(change, message, extra = {}, privMessage = "privSaved"){
   const cur = S.rec.trip, had = privOf();
   const out = change(cur);
-  if(isLocked(S.rec) && canonical(contentOf(out.trip)) !== canonical(contentOf(cur))){ toast(t("lockedNoEdit")); return; }
+  if(isLocked(S.rec) && canonical(contentOf(out.trip)) !== canonical(contentOf(cur))){ toast(lockedText(S.rec, "lockedNoEdit")); return; }
   const {trip: next, changed} = await saveEdit(versions, cur, out.trip);
   const priv = out.priv === undefined ? had : out.priv && out.priv.expenses.length ? out.priv : null;
   const privChanged = canonical(priv) !== canonical(had);
@@ -597,7 +614,8 @@ async function loadDemo(){
 async function removeRecord(id){
   const rec = S.records.find(r => r.id === id);
   if(!rec) return;
-  if(isLocked(rec)){ toast(t("lockedNoDelete")); return; }
+  // Someone else's trip, read only, can always go from this phone.
+  if(isLocked(rec) && !rec.public){ toast(t("lockedNoDelete")); return; }
   const onAccount = !!(rec.share && rec.share.id && !rec.share.gone && S.account);
   let message = "removed";
   if(!onAccount){
@@ -971,7 +989,8 @@ function syncNow(){
       // the others: it says why on its card, and is tried again at the next sync.
       const errors = new Map();
       for(const rec of [...S.records]){
-        if(rec.share && rec.share.gone) continue;
+        // Gone from the account, or someone else's published trip: never sent.
+        if((rec.share && rec.share.gone) || rec.public) continue;
         const remoteOf = remote.find(r => rec.share && r.id === rec.share.id) || null;
         // Deleted from the account on another phone, or no longer shared with this
         // account: the copy here stays, on this phone only, and is not sent again.
@@ -1080,6 +1099,46 @@ function accountRecover(){
     onDone: user => { S.account = user; render(); toast(t("recoveredDone", {h: user.handle})); syncNow(); }}));
 }
 
+/* ---------- a published trip, from its page ---------- */
+
+const pageError = e => e && e.status === 410 ? t("publicGone") : e && e.status === 404 ? t("publicMissing") : accountError(e);
+
+// "Open in TIMP" (#public=<page>): someone's published trip on this phone, read only, as
+// its page shows it now (opened again, brought up to date). An id of its own, so it never
+// meets a trip of this phone's; never sent to the account: it is theirs.
+async function openPublic(page){
+  history.replaceState(null, "", location.pathname + location.search);
+  if(!hasService()) return;
+  let pub;
+  try{ pub = await publicTrip(page); }catch(e){ toast(pageError(e)); return; }
+  const id = "pub-" + page, info = {page, by: pub.by, dates: pub.dates, updatedAt: pub.updatedAt};
+  const {trip} = await prepare({...pub.trip, id});
+  const local = S.records.find(r => r.id === id);
+  let rec;
+  if(local && canonical(contentOf(local.trip)) === canonical(contentOf(trip))) rec = {...local, public: info};
+  else{
+    await versions.put(trip);
+    rec = {...(local || {}), id, trip, importedAt: Date.now(), fileName: "", exported: trip.version.id, public: info};
+  }
+  await keepRecord(rec);
+  render();
+  scrollToY(0);
+  toast(t("publicOpened", {t: trip.title, h: pub.by}));
+}
+
+// "Use as a base" (#base=<page>, or from a published trip opened here): the traveller's
+// own copy, from the first day they choose; a trip like any other of theirs.
+async function useAsBase(page, known){
+  history.replaceState(null, "", location.pathname + location.search);
+  if(!hasService()) return;
+  let pub = known;
+  if(!pub){ try{ pub = await publicTrip(page); }catch(e){ toast(pageError(e)); return; } }
+  const first = await chooseFirstDay({title: pub.trip.title, by: pub.by, hidden: pub.dates === "hidden", first: pub.dates === "real" && pub.trip.days[0] ? pub.trip.days[0].date : ""});
+  if(!first) return;
+  const copy = asBase(pub, {url: pageUrl(page), first});
+  await importText(JSON.stringify(copy), "", {said: t("baseDone", {t: copy.title, h: pub.by})});
+}
+
 /* ---------- a trip shared with this person ---------- */
 
 // Someone sent an invite: its link opens the app with #invite=<token>. Signed in (or
@@ -1149,6 +1208,16 @@ function tripWhen(tr){
   return {phase: "now", first, last, day: tr.days.findIndex(d => d.date === today) + 1};
 }
 
+// A trip's dates as a card says them: its range, or only its month for a trip of someone
+// else's published without its dates (they are 2001 in the copy: never the real ones).
+function datesOf(r, lang){
+  if(r.public && r.public.dates === "hidden" && r.trip.days[0]){
+    const m = new Intl.DateTimeFormat(lang, {month: "long", timeZone: "UTC"}).format(new Date(r.trip.days[0].date + "T12:00:00Z"));
+    return m.charAt(0).toUpperCase() + m.slice(1);
+  }
+  return dateRange(r.trip, lang);
+}
+
 // A trip's dates as a short range: "14–17 May 2027".
 function dateRange(tr, lang){
   const w = tripWhen(tr);
@@ -1165,13 +1234,16 @@ function tripDetails(r, cur, lang){
       <div class="s">${esc(t("loadedOn", {d: when}))}</div>
       <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
       ${r.share ? `<div class="s where">${esc(t(r.share.gone ? "goneFromAccount" : r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
+      ${r.public ? `<div class="s" data-public>${esc(t("publicWhere", {h: r.public.by}))}</div>` : ""}
+      ${r.trip.basedOn ? `<div class="s" data-based-on>${esc(t("basedOnLine", {t: r.trip.basedOn.title, h: r.trip.basedOn.by}))} <a href="${esc(r.trip.basedOn.url)}" target="_blank" rel="noopener">↗</a></div>` : ""}
       ${S.syncErrors.has(r.id) ? `<div class="unsaved" role="status" data-sync-error>${esc(t("notSynced", {why: S.syncErrors.get(r.id)}))}</div>` : ""}
       ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small primary" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${r.share && r.share.id && !r.share.gone && r.share.role === "owner" && S.account ? `<button type="button" class="btn small" data-act="share-trip" data-id="${esc(r.id)}">${esc(t("share"))}</button>` : ""}${!r.share || r.share.gone || r.share.role === "owner" ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>`;
+      <div class="actions">${cur ? "" : `<button type="button" class="btn small primary" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${r.share && r.share.id && !r.share.gone && r.share.role === "owner" && S.account ? `<button type="button" class="btn small" data-act="share-trip" data-id="${esc(r.id)}">${esc(t("share"))}</button>` : ""}${r.public ? `<button type="button" class="btn small primary" data-act="base-copy" data-id="${esc(r.id)}">${esc(t("useAsBase"))}</button>` : ""}${!r.public && (!r.share || r.share.gone || r.share.role === "owner") ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>`;
 }
 
 // Small signs on a trip's line: locked, shared, not synced.
-const tripSigns = r => (isLocked(r) ? `<span class="badge-lock" data-locked>${esc(t("locked"))}</span>` : "")
+const tripSigns = r => (r.public ? `<span class="badge-pub" data-public-badge>${esc(t("publicBadge", {h: r.public.by}))}</span>`
+    : isLocked(r) ? `<span class="badge-lock" data-locked>${esc(t("locked"))}</span>` : "")
   + (r.share && !r.share.gone && r.share.role !== "owner" ? `<span class="badge-lock">${esc(t("sharedBadge"))}</span>` : "")
   + (r.share && !r.share.gone && r.share.publication ? `<span class="badge-pub" data-published>${esc(t("withLink"))}</span>` : "")
   + (S.syncErrors.has(r.id) ? `<span class="badge-warn">${esc(t("notSyncedBadge"))}</span>` : "");
@@ -1182,20 +1254,21 @@ const tripSigns = r => (isLocked(r) ? `<span class="badge-lock" data-locked>${es
 function renderTrips(){
   const lang = getLang();
   const active = S.rec ? S.records.find(r => r.id === S.rec.id) || null : null;
-  const w = active && tripWhen(active.trip);
+  // Someone else's published trip is not "in N days": it is theirs, read here.
+  const w = active && !active.public && tripWhen(active.trip);
   const phase = !w ? "" : w.phase === "now" ? t("phaseNow", {d: w.day, n: active.trip.days.length}) : w.phase === "next" ? (w.inDays === 1 ? t("phaseTomorrow") : t("phaseNext", {n: w.inDays})) : t("phasePast");
   const activeCard = !active ? "" : `<section class="active-trip" aria-label="${esc(t("activeTrip"))}">
     <div class="tripcard current">
       <div class="eyebrow">${esc(phase)}</div>
       <div class="t"><span>${esc(active.trip.title)}</span>${tripSigns(active)}</div>
-      <div class="s">${esc(dateRange(active.trip, lang))} · ${esc(t("daysCount", {n: active.trip.days.length}))}</div>
+      <div class="s">${esc(datesOf(active, lang))} · ${esc(t("daysCount", {n: active.trip.days.length}))}</div>
       ${tripDetails(active, true, lang)}
     </div></section>`;
   const others = S.records.filter(r => r !== active);
   const q = (S.tripSearch || "").trim().toLowerCase();
   const found = !q ? others : others.filter(r => [r.trip.title, ...r.trip.days.map(d => d.city || "")].some(x => String(x).toLowerCase().includes(q)));
   const row = r => `<details class="tripcard trip-row" data-keep="trip:${esc(r.id)}"${S.openDetails.has("trip:" + r.id) ? " open" : ""}>
-      <summary><span class="t"><span>${esc(r.trip.title)}</span>${tripSigns(r)}</span><span class="s">${esc(dateRange(r.trip, lang))} · ${esc(t("daysCount", {n: r.trip.days.length}))}</span></summary>
+      <summary><span class="t"><span>${esc(r.trip.title)}</span>${tripSigns(r)}</span><span class="s">${esc(datesOf(r, lang))} · ${esc(t("daysCount", {n: r.trip.days.length}))}</span></summary>
       ${tripDetails(r, false, lang)}
     </details>`;
   const sort = S.ui.tripSort || "date";
@@ -1203,8 +1276,9 @@ function renderTrips(){
   if(sort === "name") list = found.slice().sort((a, b) => a.trip.title.localeCompare(b.trip.title, lang)).map(row).join("");
   else if(sort === "recent") list = found.slice().sort((a, b) => b.importedAt - a.importedAt).map(row).join("");
   else{
-    const by = {now: [], next: [], past: new Map()};
+    const by = {now: [], next: [], past: new Map()}, theirs = [];
     for(const r of found){
+      if(r.public){ theirs.push(r); continue; }
       const x = tripWhen(r.trip);
       if(x.phase === "past"){ const y = (x.last || "").slice(0, 4); by.past.set(y, [...(by.past.get(y) || []), r]); }
       else by[x.phase].push(r);
@@ -1213,7 +1287,8 @@ function renderTrips(){
     const group = (title, rs) => rs.length ? `<h3 class="trip-group">${esc(title)}</h3>${rs.map(row).join("")}` : "";
     list = group(t("groupNow"), by.now.sort((a, b) => start(a).localeCompare(start(b))))
       + group(t("groupNext"), by.next.sort((a, b) => start(a).localeCompare(start(b))))
-      + [...by.past.keys()].sort().reverse().map(y => group(t("groupPast", {y}), by.past.get(y).sort((a, b) => end(b).localeCompare(end(a))))).join("");
+      + [...by.past.keys()].sort().reverse().map(y => group(t("groupPast", {y}), by.past.get(y).sort((a, b) => end(b).localeCompare(end(a))))).join("")
+      + group(t("groupPublic"), theirs.sort((a, b) => b.importedAt - a.importedAt));
   }
   const tools = others.length < 2 ? "" : `<div class="trip-tools">
       ${others.length >= 6 ? `<input type="search" data-trips-search placeholder="${esc(t("searchTrips"))}" aria-label="${esc(t("searchTrips"))}" value="${esc(S.tripSearch || "")}">` : ""}
@@ -1787,7 +1862,7 @@ function renderDay(i){
   </section>
   <div class="headrow">
     ${d.title ? `<h1>${esc(d.title)}</h1>` : ""}
-    ${isLocked(S.rec) ? `<p class="lock-note" data-locked>${esc(t("lockedNote"))}</p>` : ""}
+    ${isLocked(S.rec) ? `<p class="lock-note" data-locked>${esc(S.rec.public ? t("publicNote", {h: S.rec.public.by}) : t("lockedNote"))}</p>` : ""}
     <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}</span></div>
     <div class="tools">${
       (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
@@ -2078,6 +2153,10 @@ $app.addEventListener("click", e => {
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "reup") putBackOnAccount(act.dataset.id);
   else if(a === "lock") toggleLock(act.dataset.id);
+  else if(a === "base-copy"){
+    const rec = S.records.find(r => r.id === act.dataset.id);
+    if(rec && rec.public) useAsBase(rec.public.page, {trip: contentOf(rec.trip), by: rec.public.by, dates: rec.public.dates});
+  }
   else if(a === "share-trip"){
     const rec = S.records.find(r => r.id === act.dataset.id);
     if(rec && rec.share && !act.disabled){
@@ -2233,6 +2312,8 @@ window.addEventListener("hashchange", () => {
   if(chat){ answerChatApp(chat); return; }
   const invite = inviteToken(location.hash);
   if(invite){ takeInvite(invite); return; }
+  const pageLink = publicLink(location.hash);
+  if(pageLink){ (pageLink.kind === "base" ? useAsBase : openPublic)(pageLink.page); return; }
   S.importError = null; S.menuFor = null; render(); scrollToY(0);
 });
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
@@ -2363,13 +2444,14 @@ async function start(){
   syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);
   await readVersion();
-  const chat = chatRequestId(location.hash), invite = inviteToken(location.hash);
-  if(chat || invite) history.replaceState(null, "", location.pathname + location.search);
+  const chat = chatRequestId(location.hash), invite = inviteToken(location.hash), pageLink = publicLink(location.hash);
+  if(chat || invite || pageLink) history.replaceState(null, "", location.pathname + location.search);
   render();
   setupServiceWorker();
   takeSharedPlace();
   if(chat) answerChatApp(chat);
   if(invite) takeInvite(invite);
+  if(pageLink) (pageLink.kind === "base" ? useAsBase : openPublic)(pageLink.page);
   syncNow();
 }
 

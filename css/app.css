@@ -176,7 +176,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .stop.skipped .body h3,.stop.skipped .time,.stop.skipped .desc{opacity:.5}
 .stop.skipped .body h3{text-decoration:line-through;text-decoration-thickness:1px}
 .tools{display:flex;align-items:center;gap:8px}
-.iconbtn{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.iconbtn{flex:none;margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
 .iconbtn svg{width:18px;height:18px}
 .iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 /* the day's ⋯ menu, at the end of the row of tools */
@@ -415,8 +415,9 @@ body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 @media (min-width:600px){ .sheet{margin:auto;border-radius:16px} }
 .sheet::backdrop{background:rgba(10,12,14,.45)}
 .sheet-form{display:grid;gap:14px;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
-.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.sheet-head h2{font:700 1.2rem/1.2 var(--f-display);margin:0}
+/* A long title wraps beside the ×; the × keeps its size, at the top. */
+.sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.sheet-head h2{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;font:700 1.2rem/1.2 var(--f-display);margin:0;padding-top:6px}
 .sheet-head .iconbtn{margin-left:0;font-size:1.4rem;line-height:1}
 .sheet .field{display:grid;gap:6px;min-width:0}
 .sheet .field.two{grid-template-columns:1.4fr 1fr;gap:10px;align-items:start}
@@ -615,6 +616,9 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 .me-actions .btn{justify-content:center}
 .chat{display:flex;align-items:center;gap:12px;background:var(--bg);border-radius:14px;padding:12px 14px}
 .chat .who{display:grid;gap:2px;flex:1 1 auto;min-width:0}
+/* The action of a row (Remove, Unlink, Take off) keeps its size beside a long name. */
+.chat > .btn,.person > .btn,.acct .acts .btn{flex:none}
+.chat .who b,.person .who b{overflow-wrap:anywhere}
 .chat .who b{font:600 1rem var(--f-body)}
 .chat .who small{font:500 .74rem var(--f-mono);color:var(--muted)}
 .sheet .passkey{display:grid;place-items:center;gap:6px;text-align:center;padding:6px 0 2px;color:var(--muted);font:400 .86rem var(--f-body)}

@@ -227,3 +227,12 @@ test("a file in the old format becomes a valid one, losing only map settings", (
   assert.equal(upgrade(t), t, "a file in the new format is left as it is");
   assert.ok(hasError(validateTrip(old()).errors, "old format"));
 });
+
+test("basedOn: where a copy came from, checked; written by the app", () => {
+  const base = JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
+  assert.ok(validateTrip({...base, basedOn: {url: "https://share.example/t/abc", title: "Lisbon", by: "fra"}}).ok);
+  assert.ok(validateTrip({...base, basedOn: {url: "http://localhost:8787/t/abc", title: "Lisbon", by: "fra"}}).ok, "a service on this machine, while developing");
+  const bad = validateTrip({...base, basedOn: {url: "http://share.example/t/abc", title: "Lisbon"}});
+  assert.ok(!bad.ok);
+  assert.ok(bad.errors.some(e => e.startsWith("basedOn.url")) && bad.errors.some(e => e.startsWith("basedOn.by")));
+});

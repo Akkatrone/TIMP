@@ -39,7 +39,7 @@ export const CHANGES = "travel-in-my-pocket/changes";
 
 const KINDS = "add, update, remove, setDay, addDay, removeDay, addPlan, setPlan, removePlan, setTrip, addExpense, setExpense or removeExpense";
 // What setTrip may change: the rest has its own changes, or is the app's.
-const TRIP_SET = Object.keys(FIELDS.trip).filter(k => !["format", "days", "expenses", "id", "version", "googleMapsKey"].includes(k));
+const TRIP_SET = Object.keys(FIELDS.trip).filter(k => !FIELDS.trip[k].byApp && !["format", "days", "expenses", "googleMapsKey"].includes(k));
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const clone = v => JSON.parse(JSON.stringify(v));
 
