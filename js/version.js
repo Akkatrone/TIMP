@@ -23,14 +23,28 @@ export function contentOf(trip){
   return rest;
 }
 
-// JSON with keys in a fixed order, so the same data always gives the same text.
+// JSON with keys in a fixed order, so the same data always gives the same text. Version
+// ids are made from it: its output never changes (test/versions.test.mjs holds it to the
+// first way it was written). One pass, without the arrays of map and join: comparing
+// and hashing a big trip calls it a lot.
 export function canonical(value){
-  if(Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
-  if(value && typeof value === "object"){
-    return "{" + Object.keys(value).filter(k => value[k] !== undefined).sort()
-      .map(k => JSON.stringify(k) + ":" + canonical(value[k])).join(",") + "}";
+  if(value === null || typeof value !== "object") return JSON.stringify(value);
+  if(Array.isArray(value)){
+    let s = "[";
+    for(let i = 0; i < value.length; i++){
+      if(i) s += ",";
+      const c = canonical(value[i]);
+      if(c !== undefined) s += c;   // as join() writes undefined: nothing
+    }
+    return s + "]";
   }
-  return JSON.stringify(value);
+  let s = "{", first = true;
+  for(const k of Object.keys(value).sort()){
+    if(value[k] === undefined) continue;
+    s += (first ? "" : ",") + JSON.stringify(k) + ":" + canonical(value[k]);
+    first = false;
+  }
+  return s + "}";
 }
 
 async function sha256(text){

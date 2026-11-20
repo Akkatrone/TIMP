@@ -4,6 +4,16 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.22.1
+
+Faster with big trips.
+
+- Comparing and hashing a trip (`canonical` in `js/version.js`) in one pass: the same
+  text as before, held to it by a test, so every version id stays the same.
+- Checking a trip asks each time zone once, not once per place.
+- On the sharing service, with these and its own changes, a change to a 60-day trip
+  costs about a fifth of the CPU it did.
+
 ## 3.22.0
 
 Recovery codes, for when every passkey is lost.

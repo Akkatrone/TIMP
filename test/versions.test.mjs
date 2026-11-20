@@ -442,3 +442,34 @@ test("changes written for an earlier version are applied there, and joined with 
   // "from" must look like a version
   assert.match(applyChanges(v1, {...data, from: "abc"}).errors[0], /^from: must be the version named in the outline/);
 });
+
+test("canonical JSON never changes: the same text as the first way it was written, for any value", async () => {
+  // The first version of canonical(), kept here as the reference: version ids depend on it.
+  const reference = value => {
+    if(Array.isArray(value)) return "[" + value.map(reference).join(",") + "]";
+    if(value && typeof value === "object"){
+      return "{" + Object.keys(value).filter(k => value[k] !== undefined).sort()
+        .map(k => JSON.stringify(k) + ":" + reference(value[k])).join(",") + "}";
+    }
+    return JSON.stringify(value);
+  };
+  const demo = JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
+  assert.equal(canonical(demo), reference(demo));
+  // Random values, edge cases included: undefined in arrays and objects, null, nested.
+  let seed = 7;
+  const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  const leaf = () => [null, undefined, true, false, 0, -1.5, 1e21, "", "a\"b\\c\n", "ünï ✈", NaN][rnd(11)];
+  const value = depth => {
+    if(depth > 4 || rnd(3) === 0) return leaf();
+    if(rnd(2)) return Array.from({length: rnd(5)}, () => value(depth + 1));
+    const o = {};
+    for(let i = rnd(6); i > 0; i--) o[["z", "a", "id", "é", "10", "2", "__proto_", ""][rnd(8)] + rnd(3)] = value(depth + 1);
+    return o;
+  };
+  for(let i = 0; i < 3000; i++){
+    const v = value(0);
+    assert.equal(canonical(v), reference(v), JSON.stringify(v));
+  }
+  assert.equal(canonical(undefined), reference(undefined));
+  assert.equal(canonical([undefined, null, () => 1]), reference([undefined, null, () => 1]));
+});

@@ -44,8 +44,15 @@ function closedDay(s){
   return WEEKDAYS.includes(s) || realDate(s);
 }
 
+// A formatter per check was most of the time of checking a big trip: each zone is
+// asked once (a few hundred kept at most, whatever a file brings).
+const ZONES = new Map();
 function realTimezone(s){
-  try{ new Intl.DateTimeFormat("en", {timeZone: s}); return true; }catch(e){ return false; }
+  if(ZONES.has(s)) return ZONES.get(s);
+  let ok = false;
+  try{ new Intl.DateTimeFormat("en", {timeZone: s}); ok = true; }catch(e){}
+  if(ZONES.size < 500) ZONES.set(s, ok);
+  return ok;
 }
 
 /*
