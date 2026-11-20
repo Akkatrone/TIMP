@@ -92,7 +92,7 @@ export function openSignUp(o){
  * since when, when last used, and Unlink: its keys stop working at once.
  * @param toast  says something short over the page
  */
-export function openLinkedApps(toast){
+export async function openLinkedApps(toast){
   const dlg = document.createElement("dialog");
   dlg.className = "sheet";
   dlg.setAttribute("aria-labelledby", "chats-title");
@@ -138,8 +138,9 @@ export function openLinkedApps(toast){
       toast(t("chatUnlinked", {app: app.client}));
     }catch(err){ b.disabled = false; toast(accountError(err)); }
   });
+  // The list first, then the sheet, already whole: it does not grow under the finger.
+  await linkedApps().then(list => { apps = list; draw(); }, failed);
   dlg.showModal();
-  linkedApps().then(list => { apps = list; draw(); }, failed);
 }
 
 /** A browser's User-Agent in a few words, "iPhone · Safari", "" if nothing is recognised. */
@@ -177,7 +178,7 @@ export async function recently(fn, again){
  * @param o.save   save(file, title): gives a file to the person (share sheet or download)
  * @param o.handle the account's handle, for the codes' file
  */
-export function openDevices({toast, save, handle}){
+export async function openDevices({toast, save, handle}){
   const dlg = document.createElement("dialog");
   dlg.className = "sheet";
   dlg.setAttribute("aria-labelledby", "devices-title");
@@ -286,8 +287,8 @@ export function openDevices({toast, save, handle}){
       if(yes === "yes") busy(others, async () => { await endOtherSessions(); toast(t("endOthersDone")); await load(); });
     }
   });
+  await load();
   dlg.showModal();
-  load();
 }
 
 /**

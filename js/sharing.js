@@ -17,7 +17,7 @@ import { shortId } from "./version.js";
  *   toast            says something short over the page
  *   onPublication(p) the trip's page changed: the publication, or null once withdrawn
  */
-export function openShareSheet({rec, toast, onPublication = () => {}}){
+export async function openShareSheet({rec, toast, onPublication = () => {}}){
   const id = rec.share.id;
   const dlg = document.createElement("dialog");
   dlg.className = "sheet";
@@ -125,7 +125,8 @@ export function openShareSheet({rec, toast, onPublication = () => {}}){
     }catch(err){ toast(accountError(err)); }
     finally{ b.disabled = false; }
   });
-  dlg.showModal();
+  // Who sees it first, then the sheet, already whole: it does not grow under the finger.
   drawPub();
-  load();
+  await load();
+  dlg.showModal();
 }

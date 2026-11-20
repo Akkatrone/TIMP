@@ -1017,8 +1017,8 @@ function syncNow(){
 // What the account's buttons on You lead to.
 async function accountActions(what){
   if(!S.account) return;
-  if(what === "devices") openDevices({toast, save: handOver, handle: S.account.handle});
-  else if(what === "chats") openLinkedApps(toast);
+  if(what === "devices") await openDevices({toast, save: handOver, handle: S.account.handle});
+  else if(what === "chats") await openLinkedApps(toast);
   else if(what === "export") exportMyData();
   else if(what === "signout"){ await signOut(); S.account = null; S.sync = ""; render(); toast(t("signedOut")); }
   else if(what === "delete") removeAccount();
@@ -2049,7 +2049,13 @@ $app.addEventListener("click", e => {
     return;
   }
   const meBtn = e.target.closest("#app [data-me]");
-  if(meBtn){ accountActions(meBtn.dataset.me); return; }
+  if(meBtn){
+    // A sheet opens once its data is here: the button waits with it, tapped once.
+    if(meBtn.disabled) return;
+    meBtn.disabled = true;
+    accountActions(meBtn.dataset.me).finally(() => { meBtn.disabled = false; });
+    return;
+  }
   const act = e.target.closest("[data-act]");
   if(!act) return;
   const a = act.dataset.act;
@@ -2074,10 +2080,13 @@ $app.addEventListener("click", e => {
   else if(a === "lock") toggleLock(act.dataset.id);
   else if(a === "share-trip"){
     const rec = S.records.find(r => r.id === act.dataset.id);
-    if(rec && rec.share) openShareSheet({rec, toast, onPublication: async publication => {
-      const now = S.records.find(r => r.id === rec.id);
-      if(now && now.share){ await keepSynced({...now, share: {...now.share, publication}}); render(); }
-    }});
+    if(rec && rec.share && !act.disabled){
+      act.disabled = true;
+      openShareSheet({rec, toast, onPublication: async publication => {
+        const now = S.records.find(r => r.id === rec.id);
+        if(now && now.share){ await keepSynced({...now, share: {...now.share, publication}}); render(); }
+      }}).finally(() => { act.disabled = false; });
+    }
   }
   else if(a === "signin") accountSignIn();
   else if(a === "me") location.hash = "#me";

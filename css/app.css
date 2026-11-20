@@ -590,6 +590,7 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 .me-list button.danger{color:var(--err)}
 .me-list button:focus-visible{outline:2px solid var(--link);outline-offset:-2px}
 .me-list button:active{background:var(--line)}
+.me-list button:disabled{opacity:.55;cursor:progress}
 .acct.me .av{width:64px;height:64px;font-size:1.6rem}
 .acct .av svg{width:24px;height:24px}
 .sync-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}

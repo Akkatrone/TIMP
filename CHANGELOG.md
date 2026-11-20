@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.25.1
+
+- **Passkeys and devices, Linked chats, Share** open whole: their lists are loaded
+  first, so the sheet no longer opens empty and then grows under your finger. The
+  button you tapped waits meanwhile.
+
 ## 3.25.0
 
 Publishing a trip, with the link.

@@ -1541,7 +1541,9 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`location.hash = "#me";`);
     await until("the account", `document.querySelector("#app [data-me='chats']")`);
     await run(`document.querySelector("#app [data-me='chats']").click();`);
-    await until("the list", `document.querySelector("dialog.sheet[open] [data-chat]")`);
+    // The sheet opens whole: never a "…" that grows into the list under the finger.
+    await until("the sheet", `document.querySelector("dialog.sheet[open]")`);
+    assert.equal(await run(`return !!document.querySelector("dialog.sheet[open] [data-chat]") && !document.querySelector("dialog.sheet[open] [aria-busy]");`), true, "whole when it opens");
     assert.equal(await text("dialog.sheet[open] h2"), "Linked chats");
     assert.equal(await text("dialog.sheet[open] [data-chat] b"), "Claude");
     assert.equal(await text("dialog.sheet[open] [data-chat] small"), "reads and changes your trips");
@@ -1676,7 +1678,8 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     const openDevices = async () => {
       await openMe();
       await run(`document.querySelector("#app [data-me='devices']").click();`);
-      await until("the lists", `document.querySelector("dialog.sheet[open] [data-keys] .chat") && document.querySelector("dialog.sheet[open] [data-sessions] .chat")`);
+      await until("the sheet", `document.querySelector("dialog.sheet[open]")`);
+      assert.equal(await run(`return !!document.querySelector("dialog.sheet[open] [data-keys] .chat") && !!document.querySelector("dialog.sheet[open] [data-sessions] .chat") && !document.querySelector("dialog.sheet[open] [aria-busy]");`), true, "whole when it opens");
     };
     const answer = async (title, id = "yes") => {
       await until(`asked: ${title}`, `document.querySelector("dialog.ask[open] #ask-title") && document.querySelector("dialog.ask[open] #ask-title").textContent === ${JSON.stringify(title)}`, 15000);
