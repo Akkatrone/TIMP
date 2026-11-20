@@ -17,7 +17,9 @@ merged, however useful it is otherwise.
    (every currency against the euro: no amount, place or currency of the trip). And
    an optional account, only on a copy with a sharing service: a name and the public
    half of a passkey go to it, and, signed in, the traveller's trips and private
-   expenses.
+   expenses (sealed where they are kept), to be on their other phones and shared with
+   whom they choose. A chat app (Claude, ChatGPT…) the traveller connects to that
+   account reads there only what they allowed in the app (`#authorize=`).
 2. **It works offline.** Everything except the interactive map must work in airplane
    mode, on iPhone and Android, after the app has been opened once.
 3. **Anyone can host it.** The app is static files. No build step is needed to run it
@@ -56,6 +58,10 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/trip.js` | The trip file format: `FIELDS`, one table for every field, from which come the checks and the JSON Schema; the conversion of format 1; what the app works out (trip id, cities). No DOM. |
 | `js/geo.js` | Groups stops into map zones, draws the offline sketch, and gives pins and lines their colours (kind of place, part of the day). No DOM. |
 | `js/sun.js` | Sunrise and sunset from the date and the place (the sunrise equation), and the part of the day of each stop. Nothing about it goes in the trip file. No DOM. |
+| `js/money.js` | Amounts as people type them, in their currency, and what they make in another at the rate of their own day. No DOM, no network. |
+| `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
+| `js/places.js` | What the app works out about a place: its part of the world, its review site, closing days, the language of its local name. No DOM. |
+| `js/private.js` | Private expenses: in the file and on the phone, never in a version or a merge. No DOM. |
 | `js/livemap.js` | The interactive map: Google Maps, or MapLibre with OpenStreetMap from OpenFreeMap. |
 | `js/google.js` | Loads Google's script once per page, shared by the map and the address search. |
 | `js/editor.js` | The form to add or change a stop. |
@@ -70,6 +76,11 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/history.js` | The History sheet: the versions in words, and a way back to any of them. |
 | `js/trips.js` | What happens on an edit or a file received: `inspect` says how a file relates to the trip on the phone, `apply` carries out the traveller's choice. Versions, merges, restores, saved marks. No DOM. |
 | `js/objects.js` | Keeps versions the way Git does: snapshots made of shared pieces, each stored once under its SHA-256. No DOM. |
+| `js/share-api.js` | The contract with the sharing service: every route, what it takes and what it answers, the checks of both, and an OpenAPI page made from it. No DOM. |
+| `js/share.js` | The app's side of the sharing service: the account kept on the phone, passkeys (WebAuthn), every call checked against the contract, the answer to a chat app that asks for the trips. |
+| `js/sync.js` | Trips on the phone and on the account until they agree, with the same rules as two files: taken, joined, sent. No DOM. |
+| `js/account.js`, `js/sharing.js` | The account's sheets (make one, passkeys and devices, recovery codes, linked chats, export, delete) and the sheet to share a trip (who sees it, invites). |
+| `contract/` | `v1.lock.json`: the contract as released. Inside a version it only grows. |
 | `js/store.js` | Storage on the device: IndexedDB, or the same calls in memory when the browser refuses storage. The tests use the memory one. |
 | `js/i18n.js` | Interface texts. |
 | `js/util.js` | Escaping, links, dates. No DOM. |
@@ -158,6 +169,38 @@ where it may send requests. Keep it tight:
 - `npm run e2e` fails if the browser blocks anything while it drives the app, so a
   missing host shows up there. The Google map with a real key cannot run in the e2e:
   check it by hand on a copy with a key.
+
+## The sharing service
+
+A copy of the app can have a sharing service: accounts with passkeys, trips synced
+between phones and shared with other people, chat apps linked to the account. It is
+optional and separate. Its code is not in this repository; the app knows it only
+through the contract in `js/share-api.js`, and nothing of it runs while `SHARE_URL`
+in `js/config.js` is empty, as it is in this repository.
+
+- **The contract is the only link.** Every route, its body and its answer are in
+  `ROUTES` and `SHAPES`; the app checks every answer against them, and treats anything
+  else as an error. Inside a version (`/v1`) the contract only grows: a new route or an
+  optional field is fine, a change that would break a client is not.
+  `node tools/check-contract.mjs` compares it with `contract/v1.lock.json` and fails on
+  such a change; after an addition, `--fix` records it. `npm run check` runs it.
+- **Tested against a fake.** `tools/e2e.mjs` runs the app against a fake service
+  (`fakeService()`), which answers as the contract says and checks what the browser
+  sends, passkeys included (a virtual authenticator). When you add a route the app
+  uses, add it to the fake and a step that uses it.
+- **Privacy, again.** Nothing goes to the service without an account the traveller
+  made, and what goes is listed in the first promise above. A change that would send
+  something else (an analytics call, a trip without an account) breaks that promise.
+
+## Publishing
+
+Every push to `main` is checked (`.github/workflows/ci.yml`) and published to GitHub
+Pages (`deploy.yml`): checks, tests and the browser run again, then `tools/build.mjs`
+fills in `js/config.js` from the repository's variables (`RESOLVER_URL`, `SHARE_URL`;
+empty, the copy works without them), adds their hosts to the Content-Security-Policy,
+and stamps the version of the offline copy. A fork publishes its own copy the same way,
+with its own variables or none. Releases are numbered in `package.json` and described
+in `CHANGELOG.md`.
 
 ## Testing a change on a phone
 
