@@ -81,6 +81,14 @@ export const SHAPES = {
   oauthRedirect: {
     redirect: text("Where the page goes now: the chat app's address, with its code or the refusal.")
   },
+  accountExport: {
+    exportedAt: text("When this copy was made (ISO date)."),
+    user: {type: "user", req: true, doc: "The account."},
+    trips: {type: "list", of: "any", req: true, doc: "Each trip the account owns or that is shared with it: {id, role, file} (file: the trip as it is now)."},
+    privateExpenses: {type: "list", of: "any", req: true, doc: "The account's private expenses: {trip, data}, readable."},
+    linkedApps: {type: "list", of: "linkedApp", req: true, doc: "The chat apps that can reach the trips."},
+    audit: {type: "list", of: "any", req: true, doc: "What the service noted about this account (sign-ins, chats, deletions…), the last 180 days."}
+  },
   linkedApp: {
     id: text("This link's id: one yes given to a chat app."),
     client: text("The chat app's name (Claude, ChatGPT…)."),
@@ -124,7 +132,13 @@ export const ROUTES = {
   oauthApprove: {method: "POST", path: "/v1/oauth/approve", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user allows it: a one-time code for the chat app, bound to this request."},
   oauthDeny: {method: "POST", path: "/v1/oauth/deny", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user refuses: the chat app is told."},
   linkedApps: {method: "GET", path: "/v1/oauth/apps", auth: true, answer: {apps: {type: "list", of: "linkedApp", req: true}}, doc: "The chat apps that can reach the user's trips, newest use first."},
-  unlinkApp: {method: "DELETE", path: "/v1/oauth/apps/:id", auth: true, answer: "ok", doc: "Ends a link: the chat app's tokens stop working at once."}
+  unlinkApp: {method: "DELETE", path: "/v1/oauth/apps/:id", auth: true, answer: "ok", doc: "Ends a link: the chat app's tokens stop working at once."},
+  exportAccount: {method: "GET", path: "/v1/account/export", auth: true, answer: "accountExport", doc: "Everything the service keeps about the account, readable: a copy to take away."},
+  deleteAccount: {method: "POST", path: "/v1/account/delete", auth: true, body: {
+    handle: text("The account's handle, written again by the person."),
+    challengeId: text("From loginOptions: a passkey asked again, now."),
+    credential: {type: "any", req: true, doc: "The passkey's answer (WebAuthn, as JSON): only a passkey of this account will do."}
+  }, answer: "ok", doc: "Deletes the account and everything it has, for good: its trips (for everyone), sharing, private expenses, sessions, passkeys, linked chats."}
 };
 
 /* ---------- checks ---------- */

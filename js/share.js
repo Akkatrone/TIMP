@@ -184,3 +184,23 @@ export const linkedApps = async () => (await call("linkedApps")).apps;
 
 /** Ends a chat app's link: its keys stop working at once. */
 export const unlinkApp = id => call("unlinkApp", {params: {id}});
+
+/* ---------- the person's data ---------- */
+
+/** Everything the service keeps about the account, readable. */
+export const exportAccount = () => call("exportAccount");
+
+/**
+ * Deletes the account for good: the handle written again by the person, and a passkey
+ * of the account used now (the phone asks for the fingerprint, face or PIN). true when
+ * done (this phone is signed out), null if the person closed the passkey prompt.
+ */
+export async function deleteAccount(handle){
+  const opt = await call("loginOptions", {body: {}});
+  let cred;
+  try{ cred = await navigator.credentials.get({publicKey: requestOptions(opt.publicKey)}); }
+  catch(e){ if(cancelled(e)) return null; throw e; }
+  await call("deleteAccount", {body: {handle, challengeId: opt.challengeId, credential: credentialJSON(cred)}});
+  await delKV(SESSION).catch(() => {});
+  return true;
+}

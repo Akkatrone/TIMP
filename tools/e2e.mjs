@@ -1093,6 +1093,7 @@ function fakeService(){
     firstDay: h.days[0].date, lastDay: h.days[h.days.length - 1].date, days: h.days.length, updatedAt: "2026-11-19T00:00:00.000Z"}; };
   const client = cred => JSON.parse(Buffer.from(cred.response.clientDataJSON, "base64url").toString());
   const calls = [], refuse = new Set();         // what the phone asked; local ids the service fails on
+  const deleted = [];                           // accounts deleted
   const handler = async (method, path, body, headers) => {
     calls.push(method + " " + path);
     if(method === "POST" && path === "/v1/trips" && body.trip && refuse.has(body.trip.id)) return {status: 500, body: {error: "server: something went wrong"}};
@@ -1159,6 +1160,24 @@ function fakeService(){
       privs.set(k, {data: body.data, rev: cur.rev + 1});
       return ok(privs.get(k));
     }
+    // The account's data: a copy, and deleting it (the handle, and a passkey of it used now).
+    if(path === "/v1/account/export" && method === "GET"){
+      if(!who) return no(401, "sign in first");
+      return ok({exportedAt: "2026-11-20T00:00:00.000Z", user: user(who), trips: [...trips.values()].filter(t => t.owner === who).map(t => ({id: t.id, role: "owner", file: t.versions.get(t.head)})),
+        privateExpenses: [], linkedApps: [], audit: [{at: "2026-11-19T00:00:00.000Z", kind: "signup", route: null, detail: ""}]});
+    }
+    if(path === "/v1/account/delete" && method === "POST"){
+      if(!who) return no(401, "sign in first");
+      if(body.handle !== who) return no(400, "handle: write the account's handle to delete it");
+      const c = challenges.get(body.challengeId), cred = body.credential, cd = client(cred);
+      if(!c || cd.type !== "webauthn.get" || cd.challenge !== c.challenge || keys.get(cred.id) !== who) return no(403, "passkey: not one of this account");
+      for(const [id, t] of trips) if(t.owner === who) trips.delete(id);
+      for(const [k, h] of keys) if(h === who) keys.delete(k);
+      for(const [tk, h] of sessions) if(h === who) sessions.delete(tk);
+      users.delete(who);
+      deleted.push(who);
+      return ok({ok: true});
+    }
     // The chats linked: Claude once the person said yes, until unlinked.
     if(path === "/v1/oauth/apps" && method === "GET"){
       if(!who) return no(401, "sign in first");
@@ -1184,7 +1203,7 @@ function fakeService(){
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs, chat, calls, refuse};
+  handler.state = {trips, privs, chat, calls, refuse, deleted};
   return handler;
 }
 
@@ -1211,7 +1230,10 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`location.hash = "#trips";`);
     await until("still signed in", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`);
     // Out, then in again with the same passkey (the phone lists it; one here).
-    await run(`document.querySelector(".acct [data-act='signout']").click();`);
+    await run(`document.querySelector(".acct [data-act='me']").click();`);
+    await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me='signout']")`);
+    assert.equal(await text("dialog.sheet[open] h2"), "@fra");
+    await run(`document.querySelector("dialog.sheet[open] [data-me='signout']").click();`);
     await until("signed out", `document.querySelector(".acct [data-act='signin']")`);
     await run(`document.querySelector(".acct [data-act='signin']").click();`);
     await until("signed in again", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`, 15000);
@@ -1306,8 +1328,10 @@ async function accountSteps({run, until, reload, page, blocked, service}){
 
   await step("linked chats: what each can do and since when; unlinking asks first, then stops it", async () => {
     await run(`location.hash = "#trips";`);
-    await until("the account", `document.querySelector('.acct [data-act="chats"]')`);
-    await run(`document.querySelector('.acct [data-act="chats"]').click();`);
+    await until("the account", `document.querySelector('.acct [data-act="me"]')`);
+    await run(`document.querySelector('.acct [data-act="me"]').click();`);
+    await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me='chats']")`);
+    await run(`document.querySelector("dialog.sheet[open] [data-me='chats']").click();`);
     await until("the list", `document.querySelector("dialog.sheet[open] [data-chat]")`);
     assert.equal(await text("dialog.sheet[open] h2"), "Linked chats");
     assert.equal(await text("dialog.sheet[open] [data-chat] b"), "Claude");
@@ -1364,6 +1388,38 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("back", `/Back on your account\./.test(document.getElementById("toast").textContent)`, 15000);
     assert.equal(await run(`return ${demoCard}.querySelector(".where").textContent;`), "On your account");
     assert.ok([...service.trips.values()].some(t => t.localId === "demo-lisbon"), "on the account again, as a new trip");
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("the account: a copy of its data; deleted for good with the handle and the passkey, the trips staying on the phone", async () => {
+    const openMe = async () => {
+      await run(`location.hash = "#trips";`);
+      await until("the account", `document.querySelector('.acct [data-act="me"]')`);
+      await run(`document.querySelector('.acct [data-act="me"]').click();`);
+      await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me]")`);
+    };
+    await openMe();
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.sheet[open] [data-me]")].map(b => b.textContent);`), ["Linked chats", "Export my data", "Sign out", "Delete account"]);
+    service.calls.length = 0;
+    await run(`document.querySelector("dialog.sheet[open] [data-me='export']").click();`);
+    await until("the copy made", `/Your data is in the file/.test(document.getElementById("toast").textContent)`, 15000);
+    assert.ok(service.calls.includes("GET /v1/account/export"));
+    // Deleting: the handle first (nothing happens without it), then the passkey.
+    await openMe();
+    await run(`document.querySelector("dialog.sheet[open] [data-me='delete']").click();`);
+    await until("the handle asked", `document.querySelector("dialog.ask[open] .ask-type input")`);
+    assert.equal(await text("dialog.ask[open] #ask-title"), "Delete your account?");
+    assert.equal(await run(`return document.querySelector('dialog.ask[open] [data-answer="yes"]').disabled;`), true);
+    await run(`const i = document.querySelector("dialog.ask[open] .ask-type input"); i.value = "fra"; i.dispatchEvent(new Event("input"));`);
+    await run(`document.querySelector('dialog.ask[open] [data-answer="yes"]').click();`);
+    await until("deleted", `/Account deleted/.test(document.getElementById("toast").textContent)`, 15000);
+    assert.deepEqual(service.deleted, ["fra"]);
+    assert.equal(service.trips.size, 0, "its trips gone from the service");
+    // Signed out; the trips stay on this phone, as this phone's.
+    await run(`location.hash = "#trips";`);
+    await until("signed out", `document.querySelector(".acct [data-act='signup']")`);
+    assert.ok(await run(`return document.querySelectorAll(".tripcard").length > 0;`), "the trips stay");
+    assert.equal(await run(`return [...document.querySelectorAll(".tripcard .where")].length;`), 0, "none says it is on an account");
     assert.deepEqual(blocked(), []);
   });
 }

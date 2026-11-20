@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.16.0
+
+Your data, yours.
+
+- **Trips → Account**: one place for what you can do with your account: the linked
+  chats, a copy of your data, signing out, deleting it.
+- **Export my data**: a file with everything the service keeps about you, readable:
+  your trips and those shared with you, your private expenses, the linked chats, and
+  what the service noted (sign-ins, chats, deletions).
+- **Delete account**: for good, asked twice: write your handle, then your passkey is
+  asked. Your trips and private expenses go from the service, also for the people you
+  share them with; what you wrote on other people's trips stays in their history,
+  without your name. The trips on this phone stay, on this phone only.
+
 ## 3.15.0
 
 Chats that change your trips; deleting for good asks for the trip's name.

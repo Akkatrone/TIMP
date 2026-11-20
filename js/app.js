@@ -22,9 +22,9 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount } from "./share.js";
 import { syncTrip, syncPrivate } from "./sync.js";
-import { openSignUp, openLinkedApps, accountError } from "./account.js";
+import { openSignUp, openLinkedApps, openAccountSheet, accountError } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -491,10 +491,32 @@ function download(file){
 // (NotAllowedError: the type is not on its list). Once refused, download directly.
 let shareRefused = false;
 
-// Hands the file over: the share sheet where the phone has one and takes the file
-// (WhatsApp, Drive, Files…), a download otherwise. Marks the version as saved.
-// With private expenses, the traveller says first whether they go in the file: kept
-// for themselves, left out for someone else.
+// Hands a file over: the share sheet where the phone has one and takes the file
+// (WhatsApp, Drive, Files…), a download otherwise. false if the traveller closed the
+// sheet or it could not be done (said already).
+async function handOver(file, title){
+  try{
+    if(!shareRefused && navigator.canShare && navigator.canShare({files: [file]})){
+      try{
+        await navigator.share({files: [file], title});
+      }catch(e){
+        if(e && e.name === "AbortError") return false;   // the traveller closed the share sheet
+        shareRefused = true;
+        download(file);
+      }
+    }else{
+      download(file);
+    }
+    return true;
+  }catch(e){
+    toast(t("fileFailed"));
+    return false;
+  }
+}
+
+// A trip as a file, handed over; the version marked as saved. With private expenses,
+// the traveller says first whether they go in the file: kept for themselves, left out
+// for someone else.
 async function saveFile(rec){
   let priv = null;
   if(rec.priv && rec.priv.expenses.length){
@@ -504,22 +526,7 @@ async function saveFile(rec){
     if(answer === "with") priv = rec.priv;
   }
   const file = new File([fileText(rec.trip, priv)], fileName(rec.trip), {type: "application/json"});
-  try{
-    if(!shareRefused && navigator.canShare && navigator.canShare({files: [file]})){
-      try{
-        await navigator.share({files: [file], title: rec.trip.title});
-      }catch(e){
-        if(e && e.name === "AbortError") return;   // the traveller closed the share sheet
-        shareRefused = true;
-        download(file);
-      }
-    }else{
-      download(file);
-    }
-  }catch(e){
-    toast(t("fileFailed"));
-    return;
-  }
+  if(!(await handOver(file, rec.trip.title))) return;
   const done = {...rec, exported: rec.trip.version.id, ...(priv ? {privUnsaved: false} : {})};
   await keepRecord(done);
   render();
@@ -822,8 +829,7 @@ function accountSection(){
     `<span class="who"><b>@${esc(u.handle)}</b><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", partial: "syncPartial", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn", {n: S.syncErrors.size}))}</small></span>` +
     `<span class="acts"><button type="button" class="btn small" data-act="sync"${S.sync === "busy" ? " disabled" : ""}>${esc(t("syncNow"))}</button>` +
     (S.hidden.size ? `<button type="button" class="btn small" data-act="unhide">${esc(t("hiddenBack", {n: S.hidden.size}))}</button>` : "") +
-    `<button type="button" class="btn small" data-act="chats">${esc(t("chatsTitle"))}</button>` +
-    `<button type="button" class="btn small" data-act="signout">${esc(t("signOut"))}</button></span></section>`;
+    `<button type="button" class="btn small" data-act="me">${esc(t("accountBtn"))}</button></span></section>`;
 }
 
 /* ---------- sync with the sharing service ---------- */
@@ -893,6 +899,42 @@ function syncNow(){
     }
   })();
   return syncing;
+}
+
+// The account's sheet, and what it leads to.
+async function accountActions(){
+  if(!S.account) return;
+  const what = await openAccountSheet(S.account);
+  if(what === "chats") openLinkedApps(toast);
+  else if(what === "export") exportMyData();
+  else if(what === "signout"){ await signOut(); S.account = null; S.sync = ""; render(); toast(t("signedOut")); }
+  else if(what === "delete") removeAccount();
+}
+
+// A copy of everything the service keeps about the account, as a file to keep.
+async function exportMyData(){
+  try{
+    const data = await exportAccount();
+    const day = new Date().toISOString().slice(0, 10);
+    const file = new File([JSON.stringify(data, null, 2)], `timp-account-${S.account.handle}-${day}.json`, {type: "application/json"});
+    if(await handOver(file, t("exportData"))) toast(t("exportDone"));
+  }catch(e){ toast(accountError(e)); }
+}
+
+// The account deleted for good: the handle written again, then a passkey of it used now.
+// The trips on this phone stay, as this phone's only.
+async function removeAccount(){
+  const handle = S.account.handle;
+  const sure = await ask({title: t("deleteAccountTitle"), text: t("deleteAccountText"), type: {label: t("deleteAccountLabel"), expected: handle},
+    actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("deleteAccount"), kind: "danger", needsType: true}]});
+  if(sure !== "yes") return;
+  try{ if(!(await deleteAccount(handle))) return; }
+  catch(e){ toast(accountError(e)); return; }
+  for(const rec of S.records.filter(r => r.share)){ const {share, ...rest} = rec; await keepSynced(rest); }
+  S.account = null; S.sync = ""; S.syncErrors = new Map(); S.hidden.clear();
+  await store.delKV("share:hidden").catch(() => {});
+  render();
+  toast(t("accountDeleted"));
 }
 
 // A trip no longer on the account (deleted on another phone, no longer shared): on
@@ -1807,8 +1849,7 @@ $app.addEventListener("click", e => {
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "reup") putBackOnAccount(act.dataset.id);
   else if(a === "signin") accountSignIn();
-  else if(a === "chats") openLinkedApps(toast);
-  else if(a === "signout") signOut().then(() => { S.account = null; S.sync = ""; render(); toast(t("signedOut")); });
+  else if(a === "me") accountActions();
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
   else if(a === "history") showHistory(act.dataset.id);

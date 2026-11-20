@@ -355,8 +355,11 @@ real routes and transport times, tap "Directions" on a stop.
 - A chat app (Claude, ChatGPT…) reaches your trips only if you connect it to your
   account: the app shows who asks, what it will be able to do and where the answer
   goes, and you allow or deny it there, with your passkey. The chat app gets a key of
-  its own for that, never your passkey or your session. Trips → Linked chats shows
-  which chats can reach your trips, and unlinks one at once.
+  its own for that, never your passkey or your session. Trips → Account → Linked chats
+  shows which chats can reach your trips, and unlinks one at once.
+- Your data is yours: Trips → Account → Export my data gives you a copy of everything
+  the service keeps about you; Delete account deletes all of it for good (your handle
+  written again, then your passkey).
 - A saved trip file goes only where you send it. When the trip has private expenses,
   the app asks each time whether they go in the file.
 - A Content-Security-Policy in `index.html` lets the page load code only from the app

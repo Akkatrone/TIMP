@@ -215,6 +215,36 @@
     "req": true
    }
   },
+  "accountExport": {
+   "exportedAt": {
+    "type": "text",
+    "req": true
+   },
+   "user": {
+    "type": "user",
+    "req": true
+   },
+   "trips": {
+    "type": "list",
+    "of": "any",
+    "req": true
+   },
+   "privateExpenses": {
+    "type": "list",
+    "of": "any",
+    "req": true
+   },
+   "linkedApps": {
+    "type": "list",
+    "of": "linkedApp",
+    "req": true
+   },
+   "audit": {
+    "type": "list",
+    "of": "any",
+    "req": true
+   }
+  },
   "linkedApp": {
    "id": {
     "type": "text",
@@ -520,6 +550,32 @@
    "method": "DELETE",
    "path": "/v1/oauth/apps/:id",
    "auth": true,
+   "answer": "ok"
+  },
+  "exportAccount": {
+   "method": "GET",
+   "path": "/v1/account/export",
+   "auth": true,
+   "answer": "accountExport"
+  },
+  "deleteAccount": {
+   "method": "POST",
+   "path": "/v1/account/delete",
+   "auth": true,
+   "body": {
+    "handle": {
+     "type": "text",
+     "req": true
+    },
+    "challengeId": {
+     "type": "text",
+     "req": true
+    },
+    "credential": {
+     "type": "any",
+     "req": true
+    }
+   },
    "answer": "ok"
   }
  }
