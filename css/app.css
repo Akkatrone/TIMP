@@ -620,6 +620,13 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 .sheet .passkey svg{width:44px;height:44px;color:var(--ink)}
 .btn svg{width:20px;height:20px;flex:none}
 .devices section{display:grid;gap:10px}
+.publish section,.pub{display:grid;gap:10px}
+.found{display:grid;gap:8px}
+.found-row{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer}
+.found-row input{width:20px;height:20px;margin:2px 0 0;flex:none;accent-color:var(--ink)}
+.found-row span{display:grid;gap:2px;min-width:0}
+.found-row small{font:500 .74rem var(--f-mono);color:var(--muted);overflow-wrap:anywhere}
+.badge-pub{display:inline-block;font:700 .62rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;border:1.5px solid var(--ok);color:var(--ok);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
 .codes{display:grid;gap:8px}
 .codes textarea{font:500 .95rem/1.6 var(--f-mono);letter-spacing:.04em;resize:none;text-align:center}
 .devices .sheet-h{margin:6px 0 0}

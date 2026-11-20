@@ -4,6 +4,23 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.25.0
+
+Publishing a trip, with the link.
+
+- **Share → With the link → Publish**: a page anyone with its address can read, even
+  without the app; it never shows up in searches.
+- **What goes out is shown first**: booking codes, phone numbers, emails and where you
+  sleep are found in the trip and taken out (ticked) unless you keep them. Your private
+  expenses, a Google key and the trip's history never go. The service makes the page
+  from the version on your account, with the same rules: no phone can publish more.
+- **Dates**: as "Day 1, 2…" with the day of the week and the month (a trip not done
+  yet), or the real ones.
+- **Then**: the page's address to send or copy, **Publish again** after changes (the
+  same address), **Withdraw** (the page then says it was withdrawn). The card says
+  "With the link".
+- Published under CC BY 4.0: whoever copies it says it is yours.
+
 ## 3.24.1
 
 - **Trips** stays in view at the top right, next to the circle: on a phone the days

@@ -1,19 +1,23 @@
 // The sheet to share a trip on the account: who sees it and what they may do, the
-// invites not accepted yet (taken back with one tap), and a new invite for one person,
-// as a link sent however the owner likes. Only the trip's owner opens it.
+// invites not accepted yet (taken back with one tap), a new invite for one person, as a
+// link sent however the owner likes, and the trip's page "with the link" (published,
+// published again, withdrawn: js/publishing.js). Only the trip's owner opens it.
 
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
 import { ask } from "./ask.js";
-import { createInvite, pendingInvites, revokeInvite, tripMembers, leaveTrip, inviteLink } from "./share.js";
+import { createInvite, pendingInvites, revokeInvite, tripMembers, leaveTrip, inviteLink, pageUrl, unpublishTrip } from "./share.js";
 import { accountError } from "./account.js";
+import { openPublishSheet } from "./publishing.js";
+import { shortId } from "./version.js";
 
 /**
  * @param {object} o
- *   rec     the trip's record (on the account, owned)
- *   toast   says something short over the page
+ *   rec              the trip's record (on the account, owned)
+ *   toast            says something short over the page
+ *   onPublication(p) the trip's page changed: the publication, or null once withdrawn
  */
-export function openShareSheet({rec, toast}){
+export function openShareSheet({rec, toast, onPublication = () => {}}){
   const id = rec.share.id;
   const dlg = document.createElement("dialog");
   dlg.className = "sheet";
@@ -37,12 +41,25 @@ export function openShareSheet({rec, toast}){
       </div>
       <p class="foot">${esc(t("linkHelp"))}</p>
     </section>
+    <section><h3 class="sheet-h">${esc(t("withLink"))}</h3><div class="pub" data-pub></div></section>
   </div>`;
   document.body.appendChild(dlg);
   const $ = sel => dlg.querySelector(sel);
   const role = r => t(r === "owner" ? "roleOwner" : r === "edit" ? "roleEdit" : "roleRead");
   const until = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short"}).format(new Date(d));
-  let people = [], pending = [];
+  let people = [], pending = [], pub = rec.share.publication || null;
+  const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", year: "numeric"}).format(new Date(d));
+  // The page: its address, what it shows, again or withdrawn; or a way to make it.
+  const drawPub = () => {
+    $("[data-pub]").innerHTML = !pub ? `<p class="foot">${esc(t("publishHelp"))}</p>
+      <div class="actions"><button type="button" class="btn" data-pub-make>${esc(t("publishLink"))}</button></div>` : `
+      <p class="foot">${esc(t("publishedOn", {v: shortId(pub.version), d: when(pub.updatedAt)}))}${pub.dates === "hidden" ? " " + esc(t("publishedHidden")) : ""}</p>
+      ${pub.version !== rec.trip.version.id ? `<p class="warnline" data-pub-changed>${esc(t("publishChanged"))}</p>` : ""}
+      <div class="invite-link"><input type="text" readonly data-pub-link value="${esc(pageUrl(pub.page))}" aria-label="${esc(t("withLink"))}">
+        <div class="actions"><button type="button" class="btn small primary" data-pub-send>${esc(t("shareLink"))}</button><button type="button" class="btn small" data-pub-copy>${esc(t("copyLink"))}</button></div></div>
+      <div class="actions"><button type="button" class="btn small" data-pub-make>${esc(t("publishAgain"))}</button><button type="button" class="btn small danger" data-pub-off>${esc(t("unpublish"))}</button></div>`;
+  };
+  const published = p => { pub = p; drawPub(); onPublication(p); };
   const draw = () => {
     $("[data-people]").removeAttribute("aria-busy");
     $("[data-people]").innerHTML = people.map(m => `<div class="person" data-person="${esc(m.id || "")}">
@@ -76,6 +93,22 @@ export function openShareSheet({rec, toast}){
       }else if(b.matches("[data-copy]")){
         await navigator.clipboard.writeText($("[data-link-text]").value).catch(() => $("[data-link-text]").select());
         toast(t("linkCopied"));
+      }else if(b.matches("[data-pub-make]")){
+        openPublishSheet({rec: {...rec, share: {...rec.share, publication: pub}}, toast, onDone: p => { published(p); toast(t("publishedDone")); }});
+      }else if(b.matches("[data-pub-send]")){
+        const url = $("[data-pub-link]").value;
+        if(navigator.share) await navigator.share({title: rec.trip.title, url}).catch(() => {});
+        else{ await navigator.clipboard.writeText(url); toast(t("linkCopied")); }
+      }else if(b.matches("[data-pub-copy]")){
+        await navigator.clipboard.writeText($("[data-pub-link]").value).catch(() => $("[data-pub-link]").select());
+        toast(t("linkCopied"));
+      }else if(b.matches("[data-pub-off]")){
+        const yes = await ask({title: t("unpublishQ"), text: t("unpublishText"),
+          actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("unpublish"), kind: "danger"}]});
+        if(yes !== "yes") return;
+        await unpublishTrip(id);
+        published(null);
+        toast(t("unpublished"));
       }else if(b.dataset.revoke){
         await revokeInvite(id, b.dataset.revoke);
         toast(t("inviteRevoked"));
@@ -93,5 +126,6 @@ export function openShareSheet({rec, toast}){
     finally{ b.disabled = false; }
   });
   dlg.showModal();
+  drawPub();
   load();
 }

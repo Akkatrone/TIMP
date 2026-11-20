@@ -1177,8 +1177,9 @@ function fakeService(){
   const chat = {answered: "", unlinked: false}; // a chat app's request, then its link
   let n = 0;
   const clone = v => JSON.parse(JSON.stringify(v));
-  const summary = t => { const h = t.versions.get(t.head); return {id: t.id, localId: t.localId, title: h.title, head: t.head, role: "owner", visibility: "private",
-    firstDay: h.days[0].date, lastDay: h.days[h.days.length - 1].date, days: h.days.length, updatedAt: "2026-11-19T00:00:00.000Z"}; };
+  const pubs = new Map();                       // trip → its page, once published
+  const summary = t => { const h = t.versions.get(t.head); return {id: t.id, localId: t.localId, title: h.title, head: t.head, role: "owner", visibility: pubs.has(t.id) ? "link" : "private",
+    firstDay: h.days[0].date, lastDay: h.days[h.days.length - 1].date, days: h.days.length, updatedAt: "2026-11-19T00:00:00.000Z", ...(pubs.has(t.id) ? {publication: pubs.get(t.id)} : {})}; };
   const client = cred => JSON.parse(Buffer.from(cred.response.clientDataJSON, "base64url").toString());
   const calls = [], refuse = new Set();         // what the phone asked; local ids the service fails on
   const deleted = [];                           // accounts deleted
@@ -1242,6 +1243,20 @@ function fakeService(){
     }
     const who = sessions.get(String(headers.authorization || "").replace("Bearer ", ""));
     // Sharing: invites (a token, once), what is pending, members; accepting one.
+    // Publishing: owner only; the choices checked as the contract says.
+    const pb = path.match(/^\/v1\/trips\/([^/]+)\/publication$/);
+    if(pb){
+      if(!who) return no(401, "sign in first");
+      const t = trips.get(pb[1]);
+      if(!t || t.owner !== who) return no(404, "trip: not found");
+      if(method === "DELETE"){ if(!pubs.has(t.id)) return no(404, "page: this trip is not published"); pubs.delete(t.id); return ok({ok: true}); }
+      if(!["hidden", "real"].includes(body.dates) || !body.remove || typeof body.remove !== "object") return no(400, "publication: dates and remove");
+      const before = pubs.get(t.id), at = "2026-11-20T18:00:00.000Z";
+      pubs.set(t.id, {page: before ? before.page : "pagefortest" + String(++n).padStart(3, "0"), version: body.version || t.head, level: "link", dates: body.dates,
+        publishedAt: before ? before.publishedAt : at, updatedAt: at});
+      handler.state.lastPublish = body;
+      return ok(pubs.get(t.id));
+    }
     const sh = path.match(/^\/v1\/trips\/([^/]+)\/(invites|members)(?:\/([^/]+))?$/);
     if(sh || path === "/v1/invites/accept"){
       if(!who) return no(401, "sign in first");
@@ -1383,7 +1398,7 @@ function fakeService(){
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members, flags, sessions, recovery};
+  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members, flags, sessions, recovery, pubs};
   return handler;
 }
 
@@ -1616,6 +1631,44 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     service.invites.get("for-fra-from-ugo-0001").usedBy = "eve";
     await run(`location.hash = "#invite=for-fra-from-ugo-0001";`);
     await until("said", `/already used by someone else/.test(document.getElementById("toast").textContent)`);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("publishing with the link: what was found shown first, choices sent, the page's address, a sign on the card; withdrawn", async () => {
+    await run(`location.hash = "#trips";`);
+    const card = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="demo-lisbon"]'))`;
+    await until("the trip on the account", `${card} && ${card}.querySelector('[data-act="share-trip"]')`, 15000);
+    await run(`${card}.querySelector('[data-act="share-trip"]').click();`);
+    await until("the sheet", `document.querySelector("dialog.sheet[open] [data-pub-make]")`);
+    assert.match(await text("dialog.sheet[open] [data-pub] .foot"), /never shows up in searches/);
+    await run(`document.querySelector("dialog.sheet[open] [data-pub-make]").click();`);
+    await until("the review", `document.querySelector("dialog.sheet[open] #publish-title")`);
+    assert.equal(await text("dialog.sheet[open] #publish-title"), "Publish “Lisbon in my pocket (example)”");
+    // Found in the example: where you sleep, three nights; ticked (taken out).
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.sheet[open] .found-row b")].map(b => b.textContent);`), ["Where you sleep: address and notes (3)"]);
+    assert.equal(await run(`return document.querySelector('dialog.sheet[open] [data-take="stays"]').checked;`), true);
+    // A trip not over yet: its dates hidden unless chosen.
+    assert.equal(await run(`return document.querySelector('dialog.sheet[open] [data-dates="hidden"]').getAttribute("aria-pressed");`), "true");
+    assert.match(await text("dialog.sheet[open] .publish .foot:last-of-type"), /./);
+    await run(`document.querySelector('dialog.sheet[open] [data-take="stays"]').click(); document.querySelector("dialog.sheet[open] #publish-title").closest("form").requestSubmit();`);
+    await until("published", `/Published: send the link/.test(document.getElementById("toast").textContent)`, 15000);
+    assert.deepEqual(service.lastPublish, {dates: "hidden", remove: {codes: true, phones: true, emails: true, stays: false}}, "the stays kept, as unticked");
+    await until("its address", `document.querySelector("dialog.sheet[open] [data-pub-link]")`);
+    assert.match(await run(`return document.querySelector("dialog.sheet[open] [data-pub-link]").value;`), /\/t\/pagefortest\d{3}$/);
+    assert.match(await text("dialog.sheet[open] [data-pub] .foot"), /^Version \w+ published on .+\. Dates shown as days of the week\.$/);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    await until("the sign on its card", `${card} && ${card}.querySelector("[data-published]")`, 15000);
+    // Withdrawn, asked first.
+    await run(`${card}.querySelector('[data-act="share-trip"]').click();`);
+    await until("the sheet", `document.querySelector("dialog.sheet[open] [data-pub-off]")`);
+    await run(`document.querySelector("dialog.sheet[open] [data-pub-off]").click();`);
+    await until("asked", `document.querySelector("dialog.ask[open] #ask-title") && document.querySelector("dialog.ask[open] #ask-title").textContent === "Withdraw the page?"`);
+    await run(`document.querySelector('dialog.ask[open] [data-answer="yes"]').click();`);
+    await until("withdrawn", `/Withdrawn: the page no longer opens/.test(document.getElementById("toast").textContent)`, 15000);
+    assert.equal(service.pubs.size, 0);
+    await until("a way to publish again", `document.querySelector("dialog.sheet[open] [data-pub-make]")`);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    await until("no sign on its card", `${card} && !${card}.querySelector("[data-published]")`, 15000);
     assert.deepEqual(blocked(), []);
   });
 

@@ -284,6 +284,17 @@ export async function signInAgain(){
   return true;
 }
 
+/* ---------- publishing a trip ---------- */
+
+/** The page of a published trip: on the service, readable with or without the app. */
+export const pageUrl = page => SHARE_URL + "/t/" + page;
+
+/** Publishes the account's version of a trip (or one named), with the choices made: the publication. */
+export const publishTrip = (id, {version, dates, remove}) => call("publishTrip", {params: {id}, body: {...(version ? {version} : {}), dates, remove}});
+
+/** Withdraws the page: it answers "withdrawn" from now on. */
+export const unpublishTrip = id => call("unpublishTrip", {params: {id}});
+
 /* ---------- sharing a trip ---------- */
 
 // The owner invites one person: a link with a token, for one person, for 14 days. The

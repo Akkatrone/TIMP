@@ -369,6 +369,13 @@ real routes and transport times, tap "Directions" on a stop.
   works once, and using one replaces your passkeys with a new one on that phone, signs
   every other device out and unlinks your chats. Whoever has a code can get in: keep
   them away from your phone. Removing a passkey signs out the devices it opened.
+- A trip you publish (Share → With the link) is a page anyone with its address can
+  read, even without the app; it never shows up in searches. Only the version you
+  publish, and only what you reviewed first: your private expenses, a Google key and
+  the trip's history never go; booking codes, phone numbers, emails and where you sleep
+  are found and taken out unless you keep them; the dates show as days of the week
+  unless you choose the real ones. Withdraw it whenever you want: the page then says it
+  was withdrawn. Copies others made with "Use as a base" stay theirs.
 - Your data is yours: You → Export my data gives you a copy of everything
   the service keeps about you; Delete account deletes all of it for good (your handle
   written again, then your passkey).

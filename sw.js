@@ -39,6 +39,7 @@ const FILES = [
   "js/places.js",
   "js/private.js",
   "js/publish.js",
+  "js/publishing.js",
   "js/rates.js",
   "js/share-api.js",
   "js/share.js",

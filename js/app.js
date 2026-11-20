@@ -989,6 +989,8 @@ function syncNow(){
           }else next = await syncTrip(versions, rec, remoteOf, api);
           next = await syncPrivate(next, api);
           if(remoteOf && !!remoteOf.locked !== !!(next.share && next.share.locked)) next = {...next, share: {...next.share, locked: !!remoteOf.locked}};
+          // Its page, if its owner published it: said on the card, kept for the Share sheet.
+          if(remoteOf && canonical(remoteOf.publication || null) !== canonical((next.share && next.share.publication) || null)) next = {...next, share: {...next.share, publication: remoteOf.publication || null}};
           if(next !== rec) await keepSynced(next);
         }catch(e){
           if(!e || e.status === 0 || e.status === 401) throw e;   // offline, or signed out: all of it waits
@@ -1171,6 +1173,7 @@ function tripDetails(r, cur, lang){
 // Small signs on a trip's line: locked, shared, not synced.
 const tripSigns = r => (isLocked(r) ? `<span class="badge-lock" data-locked>${esc(t("locked"))}</span>` : "")
   + (r.share && !r.share.gone && r.share.role !== "owner" ? `<span class="badge-lock">${esc(t("sharedBadge"))}</span>` : "")
+  + (r.share && !r.share.gone && r.share.publication ? `<span class="badge-pub" data-published>${esc(t("withLink"))}</span>` : "")
   + (S.syncErrors.has(r.id) ? `<span class="badge-warn">${esc(t("notSyncedBadge"))}</span>` : "");
 
 // The Trips page: the active trip on top, in full; the others below, a line each,
@@ -2069,7 +2072,13 @@ $app.addEventListener("click", e => {
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "reup") putBackOnAccount(act.dataset.id);
   else if(a === "lock") toggleLock(act.dataset.id);
-  else if(a === "share-trip"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec && rec.share) openShareSheet({rec, toast}); }
+  else if(a === "share-trip"){
+    const rec = S.records.find(r => r.id === act.dataset.id);
+    if(rec && rec.share) openShareSheet({rec, toast, onPublication: async publication => {
+      const now = S.records.find(r => r.id === rec.id);
+      if(now && now.share){ await keepSynced({...now, share: {...now.share, publication}}); render(); }
+    }});
+  }
   else if(a === "signin") accountSignIn();
   else if(a === "me") location.hash = "#me";
   else if(a === "remove") removeRecord(act.dataset.id);

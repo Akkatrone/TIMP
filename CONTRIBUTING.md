@@ -19,7 +19,9 @@ merged, however useful it is otherwise.
    half of a passkey go to it, and, signed in, the traveller's trips and private
    expenses (sealed where they are kept), to be on their other phones and shared with
    whom they choose. A chat app (Claude, ChatGPT…) the traveller connects to that
-   account reads there only what they allowed in the app (`#authorize=`).
+   account reads there only what they allowed in the app (`#authorize=`). A trip its
+   owner publishes "with the link" is readable by anyone with the page's address: only
+   the version chosen and only what they reviewed, until they withdraw it.
 2. **It works offline.** Everything except the interactive map must work in airplane
    mode, on iPhone and Android, after the app has been opened once.
 3. **Anyone can host it.** The app is static files. No build step is needed to run it
@@ -80,6 +82,7 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/share-api.js` | The contract with the sharing service: every route, what it takes and what it answers, the checks of both, and an OpenAPI page made from it. No DOM. |
 | `js/share.js` | The app's side of the sharing service: the account kept on the phone, passkeys (WebAuthn), every call checked against the contract, the answer to a chat app that asks for the trips. |
 | `js/sync.js` | Trips on the phone and on the account until they agree, with the same rules as two files: taken, joined, sent. No DOM. |
+| `js/publishing.js` | The sheet to publish a trip "with the link", with what was found in it to review first. |
 | `js/account.js`, `js/sharing.js` | The account's sheets (make one, passkeys and devices, recovery codes, linked chats, export, delete) and the sheet to share a trip (who sees it, invites). |
 | `contract/` | `v1.lock.json`: the contract as released. Inside a version it only grows. |
 | `js/store.js` | Storage on the device: IndexedDB, or the same calls in memory when the browser refuses storage. The tests use the memory one. |

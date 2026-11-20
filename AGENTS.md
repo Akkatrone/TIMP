@@ -74,6 +74,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
 | `js/share.js` | The app's side of the sharing service: the account kept on the phone, passkeys (WebAuthn), calls checked against `js/share-api.js`, the answer to a chat app asking for the trips (`#authorize=`). Nothing runs without `SHARE_URL` in `js/config.js`. |
 | `js/sync.js` | Trips and the sharing service until they agree, with the rules of two files (inspect, apply): taken, joined, sent; read-only trips never sent. Private expenses joined three ways (`mergePrivate` in `js/private.js`). No DOM. |
+| `js/publishing.js` | The sheet to publish a trip "with the link": what `publishable` found, ticked to take out; the dates hidden or real; then the page. |
 | `js/sharing.js` | The sheet to share a trip on the account: who sees it, invites not accepted yet (taken back), a new invite as a link. |
 | `js/account.js` | The account's sheets: the form to make one (invitation code, name, passkey), passkeys and devices (add one here, take one off, recovery codes, sign out the others; the passkey asked again when the sign-in is not recent), back in with a recovery code, the linked chats (what each can do, unlink). |
 | `js/share-api.js` | The contract with the sharing service (accounts, sync, sharing): every route, what it takes and answers; checks and an OpenAPI page made from it. Inside a version only additions: `contract/v1.lock.json` is the released contract and `node tools/check-contract.mjs` fails on a change that would break it (`--fix` records additions). No DOM. |
@@ -123,6 +124,9 @@ seems to need it: say so instead.
    on their other phones and shared with whom they choose (sealed at rest). And a chat
    app (Claude, ChatGPT…) the traveller connects to that account reads there what they
    allowed in the app (`#authorize=`, which shows who asks, what for, where it goes).
+   And a trip its owner publishes "with the link": only the version chosen, only what
+   they reviewed (`js/publish.js`, run again by the service on the version it holds),
+   readable by anyone with the page's address until they withdraw it.
 2. **It works offline.** Everything except the interactive map, after one online visit.
 3. **Anyone can host it.** Static files only; running it needs no build and no
    installed dependency. The link resolver is optional: without it the app loses only
