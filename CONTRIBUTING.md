@@ -62,6 +62,7 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
 | `js/places.js` | What the app works out about a place: its part of the world, its review site, closing days, the language of its local name. No DOM. |
 | `js/private.js` | Private expenses: in the file and on the phone, never in a version or a merge. No DOM. |
+| `js/publish.js` | What of a trip may be published, and what was found in it for the traveller to review: one function, `publishable`, for every way a trip leaves for a page. No DOM. |
 | `js/livemap.js` | The interactive map: Google Maps, or MapLibre with OpenStreetMap from OpenFreeMap. |
 | `js/google.js` | Loads Google's script once per page, shared by the map and the address search. |
 | `js/editor.js` | The form to add or change a stop. |
