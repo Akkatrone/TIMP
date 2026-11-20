@@ -1086,6 +1086,7 @@ function fakeService(){
   const b64 = s => Buffer.from(s).toString("base64url");
   const users = new Map(), keys = new Map(), codes = new Set(["TEST-CODE-0000-0001"]), sessions = new Map(), challenges = new Map();
   const trips = new Map(), privs = new Map();   // the service's trips and private expenses
+  const chat = {answered: ""};                  // a chat app's request
   let n = 0;
   const clone = v => JSON.parse(JSON.stringify(v));
   const summary = t => { const h = t.versions.get(t.head); return {id: t.id, localId: t.localId, title: h.title, head: t.head, role: "owner", visibility: "private",
@@ -1155,13 +1156,22 @@ function fakeService(){
       privs.set(k, {data: body.data, rev: cur.rev + 1});
       return ok(privs.get(k));
     }
+    // A chat app's request (Claude), answered by the person: the page goes back to it,
+    // here the app's own address with the code, so the test can see where it went.
+    if(method === "POST" && path.startsWith("/v1/oauth/")){
+      if(!who) return no(401, "sign in first");
+      if(body.request !== "req-0123456789abcdef" || chat.answered) return no(404, "request: expired or unknown, start again from the chat app");
+      if(path === "/v1/oauth/request") return ok({client: "Claude", redirectHost: "claude.ai", scopes: ["trips:read", "trips:write"], expires: "2026-11-19T00:10:00.000Z"});
+      chat.answered = path.endsWith("/approve") ? "yes" : "no";
+      return ok({redirect: `${headers.origin}/?chat=${chat.answered}#back`});
+    }
     if(method === "POST" && path === "/v1/auth/logout"){
       sessions.delete(String(headers.authorization || "").replace("Bearer ", ""));
       return ok({ok: true});
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs};
+  handler.state = {trips, privs, chat};
   return handler;
 }
 
@@ -1249,5 +1259,24 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.match(await text("#toast"), /Deleted from your account and every phone\./);
     assert.equal(service.trips.size, 0);
     assert.equal(await run(`return !!${card};`), false);
+  });
+
+  await step("a chat app asks for the trips: the person sees who, what for and where the answer goes, and answers", async () => {
+    // An unknown or late request: said, nothing else.
+    await run(`location.hash = "#authorize=req-unknown-0000000000";`);
+    await until("said", `/expired or was already answered/.test(document.getElementById("toast").textContent)`);
+    assert.equal(await run(`return location.hash;`), "", "the request leaves the address");
+    await run(`location.hash = "#authorize=req-0123456789abcdef";`);
+    await until("the question", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await text("dialog.ask #ask-title"), "Connect Claude to TIMP?");
+    assert.equal(await text("dialog.ask h3"), "Claude will be able to, as @fra:");
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask li")].map(li => li.textContent);`), ["read your trips and those shared with you", "change your trips and those you can edit"]);
+    assert.equal(await text("dialog.ask p"), "Then you go back to claude.ai.");
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask [data-answer]")].map(b => b.textContent);`), ["Deny", "Allow"]);
+    assert.equal(await run(`return document.activeElement.dataset.answer;`), "no", "the safe answer first");
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
+    await until("back to the chat app", `location.search === "?chat=yes"`, 15000);
+    assert.equal(service.chat.answered, "yes");
+    assert.deepEqual(blocked(), []);
   });
 }

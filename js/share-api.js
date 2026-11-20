@@ -72,6 +72,15 @@ export const SHAPES = {
     role: text("Their role.", {values: ["owner", "edit", "read"]})
   },
   ok: {ok: {type: "bool", req: true, doc: "Done."}},
+  oauthRequest: {
+    client: text("The name the chat app gave itself (Claude, ChatGPT…), as it registered."),
+    redirectHost: text("Where the answer goes: the host of its redirect address."),
+    scopes: {type: "list", of: "text", req: true, doc: "What it asks to do: trips:read, trips:write."},
+    expires: text("Until when it can be answered (ISO date).")
+  },
+  oauthRedirect: {
+    redirect: text("Where the page goes now: the chat app's address, with its code or the refusal.")
+  },
   error: {
     error: text("A short sentence, safe to show."),
     current: {type: "any", doc: "With 409 on private expenses: what is there now, to join and send again."}
@@ -103,7 +112,10 @@ export const ROUTES = {
   invite: {method: "POST", path: "/v1/trips/:id/invites", auth: true, body: {role: text("read or edit.", {values: ["read", "edit"]})}, answer: "invite", doc: "The owner invites one person."},
   acceptInvite: {method: "POST", path: "/v1/invites/accept", auth: true, body: {token: text("The invite's token.")}, answer: "tripSummary", doc: "The trip joins the user's \"Shared with you\"."},
   members: {method: "GET", path: "/v1/trips/:id/members", auth: true, answer: {members: {type: "list", of: "member", req: true}}, doc: "Who a trip is shared with."},
-  removeMember: {method: "DELETE", path: "/v1/trips/:id/members/:user", auth: true, answer: "ok", doc: "The owner takes someone off; anyone can leave."}
+  removeMember: {method: "DELETE", path: "/v1/trips/:id/members/:user", auth: true, answer: "ok", doc: "The owner takes someone off; anyone can leave."},
+  oauthRequest: {method: "POST", path: "/v1/oauth/request", auth: true, body: {request: text("The id in the app's address (#authorize=…).")}, answer: "oauthRequest", doc: "A chat app asks to reach the user's trips (MCP): what it is and what it asks, to show before the answer."},
+  oauthApprove: {method: "POST", path: "/v1/oauth/approve", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user allows it: a one-time code for the chat app, bound to this request."},
+  oauthDeny: {method: "POST", path: "/v1/oauth/deny", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user refuses: the chat app is told."}
 };
 
 /* ---------- checks ---------- */

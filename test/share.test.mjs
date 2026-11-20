@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { creationOptions, requestOptions, credentialJSON, hasService } from "../js/share.js";
+import { creationOptions, requestOptions, credentialJSON, hasService, chatRequestId, chatAddress, onThisComputer } from "../js/share.js";
 
 const b64 = s => Buffer.from(s).toString("base64url");
 
@@ -27,4 +27,13 @@ test("passkey options from the service become what the browser takes, and back",
 
 test("without a service address, the account part is not there", () => {
   assert.equal(hasService(), false, "js/config.js is empty while developing");
+});
+
+test("a chat app's request: its id from the address, and only its own kinds of address back", () => {
+  assert.equal(chatRequestId("#authorize=Abc_def-1234567890XYZ"), "Abc_def-1234567890XYZ");
+  for(const h of ["", "#trips", "#authorize=", "#authorize=short", "#authorize=a b c d e f g h i j", "#authorize=<script>alert(1)</script>xxxxxx"]) assert.equal(chatRequestId(h), "", h);
+  assert.equal(chatAddress("https://claude.ai/api/mcp/auth_callback?code=x&state=y"), "https://claude.ai/api/mcp/auth_callback?code=x&state=y");
+  assert.equal(chatAddress("http://localhost:53122/callback?code=x"), "http://localhost:53122/callback?code=x");
+  for(const bad of ["javascript:alert(1)", "http://evil.example/cb", "data:text/html,x", "nonsense"]) assert.equal(chatAddress(bad), "", bad);
+  assert.deepEqual(["localhost", "127.0.0.1", "claude.ai"].map(onThisComputer), [true, true, false]);
 });

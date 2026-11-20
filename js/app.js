@@ -22,7 +22,7 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer } from "./share.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, accountError } from "./account.js";
 
@@ -886,6 +886,31 @@ async function accountSignIn(){
     toast(t("welcomeBack", {h: user.handle}));
     syncNow();
   }catch(e){ toast(accountError(e)); }
+}
+
+/* ---------- chat apps ---------- */
+
+// A chat app (Claude, ChatGPT…) asks to reach the trips: it sent the person here with
+// #authorize=<id>. They answer signed in, after seeing who asks, what for, and where the
+// answer goes; the page then goes back to the chat app. Closing the question is a no.
+// Never inside another site's frame: it could cover the question with its own page.
+async function answerChatApp(id){
+  history.replaceState(null, "", location.pathname + location.search);
+  if(!hasService() || window.top !== window) return;
+  if(!S.account){
+    const go = await ask({title: t("chatAsk"), text: t("chatSignIn"), actions: [{id: "no", label: t("cancel")}, {id: "in", label: t("signIn"), kind: "primary"}]});
+    if(go !== "in") return;
+    await accountSignIn();
+    if(!S.account) return;
+  }
+  const failed = e => toast(e && e.status === 404 ? t("chatGone") : accountError(e));
+  let req;
+  try{ req = await chatRequest(id); }catch(e){ failed(e); return; }
+  const can = req.scopes.map(s => ({"trips:read": t("chatRead"), "trips:write": t("chatWrite")})[s]).filter(Boolean);
+  const yes = await ask({title: t("chatTitle", {app: req.client}),
+    text: [{title: t("chatCan", {app: req.client, h: S.account.handle}), items: can}, onThisComputer(req.redirectHost) ? t("chatLocal") : t("chatBack", {host: req.redirectHost})],
+    actions: [{id: "no", label: t("chatDeny")}, {id: "yes", label: t("chatAllow"), kind: "primary"}]}) === "yes";
+  try{ location.replace(await answerChat(id, yes)); }catch(e){ failed(e); }
 }
 
 function renderTrips(){
@@ -1888,7 +1913,11 @@ $file.addEventListener("change", async () => {
   }
 });
 
-window.addEventListener("hashchange", () => { S.importError = null; S.menuFor = null; render(); scrollToY(0); });
+window.addEventListener("hashchange", () => {
+  const chat = chatRequestId(location.hash);
+  if(chat){ answerChatApp(chat); return; }
+  S.importError = null; S.menuFor = null; render(); scrollToY(0);
+});
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
 // The path is the one at the time of the tap: the page may have been redrawn since.
 document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().includes($app)) closeMenu(); });
@@ -2017,9 +2046,12 @@ async function start(){
   syncThemeColor();
   await openRecord(S.records.find(r => r.id === activeId) || S.records[S.records.length - 1] || null);
   await readVersion();
+  const chat = chatRequestId(location.hash);
+  if(chat) history.replaceState(null, "", location.pathname + location.search);
   render();
   setupServiceWorker();
   takeSharedPlace();
+  if(chat) answerChatApp(chat);
   syncNow();
 }
 

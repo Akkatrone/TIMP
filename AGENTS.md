@@ -72,7 +72,7 @@ Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` a
 | `js/sun.js` | Sunrise and sunset from date and place, and each stop's part of the day. No DOM. |
 | `js/money.js` | Amounts as people type them, in their currency, and what they make in another at the rate of their own day. No DOM, no network. |
 | `js/rates.js` | The exchange rates of a month, from Frankfurter, kept on the phone. No DOM. |
-| `js/share.js` | The app's side of the sharing service: the account kept on the phone, passkeys (WebAuthn), calls checked against `js/share-api.js`. Nothing runs without `SHARE_URL` in `js/config.js`. |
+| `js/share.js` | The app's side of the sharing service: the account kept on the phone, passkeys (WebAuthn), calls checked against `js/share-api.js`, the answer to a chat app asking for the trips (`#authorize=`). Nothing runs without `SHARE_URL` in `js/config.js`. |
 | `js/sync.js` | Trips and the sharing service until they agree, with the rules of two files (inspect, apply): taken, joined, sent; read-only trips never sent. Private expenses joined three ways (`mergePrivate` in `js/private.js`). No DOM. |
 | `js/account.js` | The form to make an account: invitation code, name, passkey. |
 | `js/share-api.js` | The contract with the sharing service (accounts, sync, sharing): every route, what it takes and answers; checks and an OpenAPI page made from it. Inside a version only additions: `contract/v1.lock.json` is the released contract and `node tools/check-contract.mjs` fails on a change that would break it (`--fix` records additions). No DOM. |
@@ -118,7 +118,9 @@ seems to need it: say so instead.
    an account, only on a copy built with a sharing service (`--share`) and only if the
    traveller makes one: its name and the public half of its passkey go to that
    service; signed in, the traveller's trips and private expenses go there too, to be
-   on their other phones and shared with whom they choose (sealed at rest).
+   on their other phones and shared with whom they choose (sealed at rest). And a chat
+   app (Claude, ChatGPT…) the traveller connects to that account reads there what they
+   allowed in the app (`#authorize=`, which shows who asks, what for, where it goes).
 2. **It works offline.** Everything except the interactive map, after one online visit.
 3. **Anyone can host it.** Static files only; running it needs no build and no
    installed dependency. The link resolver is optional: without it the app loses only

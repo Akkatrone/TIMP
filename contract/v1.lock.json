@@ -190,6 +190,31 @@
     "req": true
    }
   },
+  "oauthRequest": {
+   "client": {
+    "type": "text",
+    "req": true
+   },
+   "redirectHost": {
+    "type": "text",
+    "req": true
+   },
+   "scopes": {
+    "type": "list",
+    "of": "text",
+    "req": true
+   },
+   "expires": {
+    "type": "text",
+    "req": true
+   }
+  },
+  "oauthRedirect": {
+   "redirect": {
+    "type": "text",
+    "req": true
+   }
+  },
   "error": {
    "error": {
     "type": "text",
@@ -419,6 +444,42 @@
    "path": "/v1/trips/:id/members/:user",
    "auth": true,
    "answer": "ok"
+  },
+  "oauthRequest": {
+   "method": "POST",
+   "path": "/v1/oauth/request",
+   "auth": true,
+   "body": {
+    "request": {
+     "type": "text",
+     "req": true
+    }
+   },
+   "answer": "oauthRequest"
+  },
+  "oauthApprove": {
+   "method": "POST",
+   "path": "/v1/oauth/approve",
+   "auth": true,
+   "body": {
+    "request": {
+     "type": "text",
+     "req": true
+    }
+   },
+   "answer": "oauthRedirect"
+  },
+  "oauthDeny": {
+   "method": "POST",
+   "path": "/v1/oauth/deny",
+   "auth": true,
+   "body": {
+    "request": {
+     "type": "text",
+     "req": true
+    }
+   },
+   "answer": "oauthRedirect"
   }
  }
 }

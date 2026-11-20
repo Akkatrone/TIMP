@@ -144,3 +144,37 @@ export const deleteFromAccount = id => call("deleteTrip", {params: {id}});
 
 /** Leaves a trip someone shared with this account. */
 export const leaveTrip = (id, userId) => call("removeMember", {params: {id, user: userId}});
+
+/* ---------- chat apps (Claude, ChatGPT…) ---------- */
+
+// A chat app sends the person to the app with #authorize=<id>: they answer here, signed
+// in with their passkey, and the page goes back to the chat app with the answer.
+
+const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
+
+/** The id of a chat app's request in the app's address, or "". */
+export function chatRequestId(hash){
+  const m = /^#authorize=([A-Za-z0-9_-]{16,128})$/.exec(hash || "");
+  return m ? m[1] : "";
+}
+
+/** Whether an answer goes to a program on this computer (Claude Code…), not to a site. */
+export const onThisComputer = host => LOOPBACK.includes(host);
+
+/** Where the page may go with the answer: a site over https, or this computer. "" otherwise. */
+export function chatAddress(redirect){
+  let u;
+  try{ u = new URL(redirect); }catch(e){ return ""; }
+  return u.protocol === "https:" || (u.protocol === "http:" && onThisComputer(u.hostname)) ? u.href : "";
+}
+
+/** What a chat app asks: {client, redirectHost, scopes, expires}. */
+export const chatRequest = id => call("oauthRequest", {body: {request: id}});
+
+/** The person's answer, yes or no: the chat app's address to go to now. */
+export async function answerChat(id, yes){
+  const {redirect} = await call(yes ? "oauthApprove" : "oauthDeny", {body: {request: id}});
+  const to = chatAddress(redirect);
+  if(!to) throw new ShareError(502, "redirect: not a chat app's address");
+  return to;
+}

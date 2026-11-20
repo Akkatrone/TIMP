@@ -352,6 +352,10 @@ real routes and transport times, tap "Directions" on a stop.
   your private expenses go to it too, encrypted where they are kept, so that they are
   on your other phones and shared only with the people you invite. Without an account
   nothing changes.
+- A chat app (Claude, ChatGPT…) reaches your trips only if you connect it to your
+  account: the app shows who asks, what it will be able to do and where the answer
+  goes, and you allow or deny it there, with your passkey. The chat app gets a key of
+  its own for that, never your passkey or your session.
 - A saved trip file goes only where you send it. When the trip has private expenses,
   the app asks each time whether they go in the file.
 - A Content-Security-Policy in `index.html` lets the page load code only from the app

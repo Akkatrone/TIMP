@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.13.0
+
+Your trips in Claude and ChatGPT: the first step.
+
+- **A chat app can ask for your trips**: connecting TIMP in Claude, ChatGPT or Claude
+  Code opens the app, which shows who asks, what it will be able to do (read your trips,
+  change them) and where the answer goes. You allow or deny, signed in with your
+  passkey; the chat app gets a key of its own, never your passkey or your session. Only
+  on a copy of the app with a sharing service, and only with an account.
+- For now the chat lists your trips. Reading their days and stops, and changing them,
+  come next.
+
 ## 3.12.2
 
 Asking an AI assistant, from the phone.
