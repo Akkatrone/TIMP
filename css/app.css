@@ -597,6 +597,8 @@ button.crow{cursor:pointer}
 .sheet .passkey svg{width:44px;height:44px;color:var(--ink)}
 .btn svg{width:20px;height:20px;flex:none}
 .devices section{display:grid;gap:10px}
+.codes{display:grid;gap:8px}
+.codes textarea{font:500 .95rem/1.6 var(--f-mono);letter-spacing:.04em;resize:none;text-align:center}
 .devices .sheet-h{margin:6px 0 0}
 .chat[data-current] .who small{color:var(--ok)}
 

@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.22.0
+
+Recovery codes, for when every passkey is lost.
+
+- **Passkeys and devices → Recovery codes**: ten codes, shown once, to copy or save as a
+  file and keep away from the phone. How many are left, and when they were made. New
+  ones replace the old (asked first); making them asks for your passkey again when you
+  did not just sign in.
+- **Lost your passkey?** In the form to make an account: your handle and one code, and
+  the phone makes a new passkey. Every other device is signed out (a lost phone too);
+  the code works once.
+
 ## 3.21.0
 
 Passkeys and devices.

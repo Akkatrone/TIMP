@@ -240,6 +240,25 @@ export async function addPasskey(){
   return true;
 }
 
+/** The recovery codes: {made, left}, never the codes. */
+export const recoveryState = () => call("recovery");
+
+/** Ten new recovery codes, shown this once; the old ones stop working. Needs a recent sign-in. */
+export const makeRecoveryCodes = async () => (await call("makeRecovery", {body: {}})).codes;
+
+/**
+ * Every passkey lost: the handle and a recovery code, then a new passkey made on this
+ * phone, which signs in (every other device signed out). The user, or null if the
+ * person closed the prompt (the code is then not used).
+ */
+export async function recoverAccount(handle, code){
+  const opt = await call("recoverOptions", {body: {handle, code}});
+  let cred;
+  try{ cred = await navigator.credentials.create({publicKey: creationOptions(opt.publicKey)}); }
+  catch(e){ if(cancelled(e)) return null; throw e; }
+  return keep(await call("recover", {body: {challengeId: opt.challengeId, credential: credentialJSON(cred)}}));
+}
+
 /** The service wants a sign-in of the last minutes for this (a passkey added or taken off). */
 export const needsSignIn = e => e instanceof ShareError && e.status === 403 && /^sign in again/.test(e.message);
 

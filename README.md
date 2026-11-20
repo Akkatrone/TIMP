@@ -362,7 +362,9 @@ real routes and transport times, tap "Directions" on a stop.
   (never the last), sign out every other device at once. Adding or taking off a passkey
   asks for your passkey again if you did not just sign in, so a phone left open is not
   enough to change who can get in. The service keeps the name each browser gives
-  itself, to tell your devices apart.
+  itself, to tell your devices apart. Recovery codes, made there and shown once, let
+  you back in if you lose every passkey: the service keeps only their hashes, each
+  works once, and using one signs every other device out.
 - Your data is yours: Trips → Account → Export my data gives you a copy of everything
   the service keeps about you; Delete account deletes all of it for good (your handle
   written again, then your passkey).

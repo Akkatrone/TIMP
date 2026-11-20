@@ -73,6 +73,13 @@ export const SHAPES = {
     added: text("When it was added (ISO date)."),
     lastUsed: {type: "text", req: true, null: true, doc: "When it last signed in (ISO date), or null."}
   },
+  recoveryState: {
+    made: {type: "text", req: true, null: true, doc: "When the account's recovery codes were made (ISO date), or null: none."},
+    left: {type: "number", req: true, doc: "How many of them can still be used."}
+  },
+  recoveryCodes: {
+    codes: {type: "list", of: "text", req: true, doc: "The new codes, shown this once: the service keeps only their hashes."}
+  },
   openSession: {
     id: text("The session's id (not its token)."),
     device: {type: "text", doc: "What the device said it was, when it signed in (its browser)."},
@@ -107,6 +114,7 @@ export const SHAPES = {
     linkedApps: {type: "list", of: "linkedApp", req: true, doc: "The chat apps that can reach the trips."},
     passkeys: {type: "list", of: "passkey", doc: "The account's passkeys (their public half stays on the service)."},
     sessions: {type: "list", of: "any", doc: "The devices signed in: {device, since}."},
+    recovery: {type: "recoveryState", doc: "The recovery codes: when made, how many left (never the codes)."},
     audit: {type: "list", of: "any", req: true, doc: "What the service noted about this account (sign-ins, chats, deletions…), the last 180 days."}
   },
   linkedApp: {
@@ -132,6 +140,8 @@ export const ROUTES = {
     version: {type: "text", doc: "The service's own release (SemVer), apart from the API version."},
     commit: {type: "text", doc: "The commit that release was built from, where it says."}}, doc: "Whether the service is up, which API versions it has, which release runs."},
   registerOptions: {method: "POST", path: "/v1/auth/register/options", auth: false, body: {code: text("A sign-up code."), handle: text("The handle wanted.")}, answer: "ceremony", doc: "Sign-up, step one: the code and the handle are checked; the phone gets what its passkey signs."},
+  recoverOptions: {method: "POST", path: "/v1/auth/recover/options", auth: false, body: {handle: text("The account's handle."), code: text("One of its recovery codes.")}, answer: "ceremony", doc: "Every passkey lost, step one: the handle and a recovery code are checked (one answer for any mistake); the phone gets what a new passkey signs. The code is not used yet."},
+  recover: {method: "POST", path: "/v1/auth/recover", auth: false, body: {challengeId: text("From step one."), credential: {type: "any", req: true, doc: "The new passkey, as PublicKeyCredential.toJSON()."}}, answer: "session", doc: "Step two: the code used (once, for good), the new passkey on the account, every other device signed out, a session here."},
   register: {method: "POST", path: "/v1/auth/register", auth: false, body: {challengeId: text("From step one."), credential: {type: "any", req: true, doc: "The new passkey, as PublicKeyCredential.toJSON()."}}, answer: "session", doc: "Sign-up, step two: the account, its passkey, a session."},
   loginOptions: {method: "POST", path: "/v1/auth/login/options", auth: false, body: {}, answer: "ceremony", doc: "Sign-in, step one."},
   login: {method: "POST", path: "/v1/auth/login", auth: false, body: {challengeId: text("From step one."), credential: {type: "any", req: true, doc: "The passkey's answer, as PublicKeyCredential.toJSON()."}}, answer: "session", doc: "Sign-in, step two: a session."},
@@ -167,6 +177,8 @@ export const ROUTES = {
   addPasskey: {method: "POST", path: "/v1/account/passkeys", auth: true, body: {challengeId: text("From step one."), credential: {type: "any", req: true, doc: "The new passkey, as PublicKeyCredential.toJSON()."}}, answer: "ok",
     doc: "Step two: the passkey made on this device joins the account."},
   removePasskey: {method: "DELETE", path: "/v1/account/passkeys/:id", auth: true, answer: "ok", doc: "Takes a passkey off the account: never the last one; only with a recent sign-in."},
+  recovery: {method: "GET", path: "/v1/account/recovery", auth: true, answer: "recoveryState", doc: "Whether the account has recovery codes, and how many are left."},
+  makeRecovery: {method: "POST", path: "/v1/account/recovery", auth: true, body: {}, answer: "recoveryCodes", doc: "Ten new recovery codes; those made before stop working. Only with a sign-in of the last 10 minutes (403 \"sign in again\")."},
   sessions: {method: "GET", path: "/v1/account/sessions", auth: true, answer: {sessions: {type: "list", of: "openSession", req: true}}, doc: "The devices signed in to the account."},
   endOtherSessions: {method: "POST", path: "/v1/account/sessions/end", auth: true, body: {}, answer: "ok", doc: "Signs out every other device: their sessions end now."},
   exportAccount: {method: "GET", path: "/v1/account/export", auth: true, answer: "accountExport", doc: "Everything the service keeps about the account, readable: a copy to take away."},

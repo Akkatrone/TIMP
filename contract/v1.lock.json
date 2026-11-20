@@ -187,6 +187,24 @@
     "null": true
    }
   },
+  "recoveryState": {
+   "made": {
+    "type": "text",
+    "req": true,
+    "null": true
+   },
+   "left": {
+    "type": "number",
+    "req": true
+   }
+  },
+  "recoveryCodes": {
+   "codes": {
+    "type": "list",
+    "of": "text",
+    "req": true
+   }
+  },
   "openSession": {
    "id": {
     "type": "text",
@@ -303,6 +321,9 @@
     "type": "list",
     "of": "any"
    },
+   "recovery": {
+    "type": "recoveryState"
+   },
    "audit": {
     "type": "list",
     "of": "any",
@@ -380,6 +401,38 @@
     }
    },
    "answer": "ceremony"
+  },
+  "recoverOptions": {
+   "method": "POST",
+   "path": "/v1/auth/recover/options",
+   "auth": false,
+   "body": {
+    "handle": {
+     "type": "text",
+     "req": true
+    },
+    "code": {
+     "type": "text",
+     "req": true
+    }
+   },
+   "answer": "ceremony"
+  },
+  "recover": {
+   "method": "POST",
+   "path": "/v1/auth/recover",
+   "auth": false,
+   "body": {
+    "challengeId": {
+     "type": "text",
+     "req": true
+    },
+    "credential": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "session"
   },
   "register": {
    "method": "POST",
@@ -696,6 +749,19 @@
    "path": "/v1/account/passkeys/:id",
    "auth": true,
    "answer": "ok"
+  },
+  "recovery": {
+   "method": "GET",
+   "path": "/v1/account/recovery",
+   "auth": true,
+   "answer": "recoveryState"
+  },
+  "makeRecovery": {
+   "method": "POST",
+   "path": "/v1/account/recovery",
+   "auth": true,
+   "body": {},
+   "answer": "recoveryCodes"
   },
   "sessions": {
    "method": "GET",

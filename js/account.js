@@ -5,7 +5,8 @@
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
 import { ask } from "./ask.js";
-import { signUp, ShareError, linkedApps, unlinkApp, passkeys, openSessions, endOtherSessions, removePasskey, addPasskey, needsSignIn, signInAgain } from "./share.js";
+import { signUp, ShareError, linkedApps, unlinkApp, passkeys, openSessions, endOtherSessions, removePasskey, addPasskey, needsSignIn, signInAgain,
+  recoveryState, makeRecoveryCodes, recoverAccount } from "./share.js";
 
 /**
  * The account's sheet: who, and what can be done with it. Resolves with the action
@@ -55,6 +56,7 @@ export function accountError(e){
   if(/^handle:/.test(e.message)) return t("handleBad");
   if(/^passkey: already on this device/.test(e.message)) return t("passkeyHere");
   if(/^passkey: another account/.test(e.message)) return t("passkeyOther");
+  if(/^recovery:/.test(e.message)) return t("recoverBad");
   if(e.status === 429 || e.status === 503) return t("accountBusy");
   return t("accountFailed");
 }
@@ -64,6 +66,7 @@ export function accountError(e){
  * @param {object} o
  *   onDone(user)   the account was made and this phone is signed in
  *   onSignIn()     the person has an account already
+ *   onRecover()    the person lost every passkey and has a recovery code
  */
 export function openSignUp(o){
   const dlg = document.createElement("dialog");
@@ -87,6 +90,7 @@ export function openSignUp(o){
     </div>
     <div class="passkey">${FINGER}<span>${esc(t("passkeyHelp"))}</span></div>
     <p class="errbox" data-error role="alert" hidden></p>
+    <p class="foot"><button type="button" class="linkbtn" data-recover>${esc(t("lostPasskey"))}</button></p>
     <div class="sheet-actions">
       <button type="button" class="btn" data-signin>${esc(t("haveAccount"))}</button>
       <span class="grow"></span>
@@ -100,6 +104,7 @@ export function openSignUp(o){
   dlg.addEventListener("click", e => {
     if(e.target === dlg || e.target.closest("[data-close]")) dlg.close();
     else if(e.target.closest("[data-signin]")){ dlg.close(); o.onSignIn(); }
+    else if(e.target.closest("[data-recover]")){ dlg.close(); o.onRecover(); }
   });
   $("form").addEventListener("submit", async e => {
     e.preventDefault();
@@ -202,10 +207,13 @@ async function recently(fn, again){
 
 /**
  * Who can get in: the account's passkeys (one more on this device, one taken off, never
- * the last) and the devices signed in (all the others signed out in one go).
- * @param toast  says something short over the page
+ * the last), the recovery codes (made, shown once) and the devices signed in (all the
+ * others signed out in one go).
+ * @param o.toast  says something short over the page
+ * @param o.save   save(file, title): gives a file to the person (share sheet or download)
+ * @param o.handle the account's handle, for the codes' file
  */
-export function openDevices(toast){
+export function openDevices({toast, save, handle}){
   const dlg = document.createElement("dialog");
   dlg.className = "sheet";
   dlg.setAttribute("aria-labelledby", "devices-title");
@@ -222,6 +230,16 @@ export function openDevices(toast){
       <button type="button" class="btn" data-add-key>${FINGER}${esc(t("addPasskey"))}</button>
     </section>
     <section>
+      <h3 class="sheet-h">${esc(t("recoveryTitle"))}</h3>
+      <p class="foot" data-recovery>…</p>
+      <button type="button" class="btn" data-make-codes hidden></button>
+      <div class="codes" data-codes hidden>
+        <textarea readonly rows="10" spellcheck="false" aria-label="${esc(t("recoveryTitle"))}"></textarea>
+        <p class="foot">${esc(t("recoveryKeep"))}</p>
+        <div class="sheet-actions"><button type="button" class="btn" data-copy-codes>${esc(t("copyLink"))}</button><button type="button" class="btn primary" data-save-codes>${esc(t("recoverySave"))}</button></div>
+      </div>
+    </section>
+    <section>
       <h3 class="sheet-h">${esc(t("sessionsTitle"))}</h3>
       <div class="chats" data-sessions aria-busy="true"><p class="foot">…</p></div>
       <button type="button" class="btn danger" data-end-others hidden>${esc(t("endOthers"))}</button>
@@ -232,7 +250,7 @@ export function openDevices(toast){
   // The year only when it is not this one.
   const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
     ...(new Date(d).getFullYear() !== new Date().getFullYear() ? {year: "numeric"} : {})}).format(new Date(d));
-  let keys = [], devices = [];
+  let keys = [], devices = [], recovery = null;
   const draw = () => {
     for(const box of [$("[data-keys]"), $("[data-sessions]")]) box.removeAttribute("aria-busy");
     $("[data-keys]").innerHTML = keys.map((k, i) => `
@@ -245,9 +263,15 @@ export function openDevices(toast){
         <span class="who"><b>${esc(deviceName(d.device) || t("deviceUnknown"))}</b><small>${esc(d.current ? t("deviceThis") : t("deviceSince", {d: when(d.since)}))}</small></span>
       </div>`).join("");
     $("[data-end-others]").hidden = devices.length < 2;
+    if(recovery){
+      $("[data-recovery]").textContent = recovery.made ? t("recoveryLeft", {n: recovery.left, d: when(recovery.made)}) : t("recoveryNone");
+      $("[data-make-codes]").textContent = t(recovery.made ? "recoveryAgain" : "recoveryMake");
+      $("[data-make-codes]").hidden = false;
+    }
   };
   const failed = e => { for(const box of [$("[data-keys]"), $("[data-sessions]")]){ box.removeAttribute("aria-busy"); box.innerHTML = `<p class="errbox" role="alert">${esc(accountError(e))}</p>`; } };
-  const load = () => Promise.all([passkeys(), openSessions()]).then(([k, d]) => { keys = k; devices = d; draw(); }, failed);
+  const load = () => Promise.all([passkeys(), openSessions(), recoveryState()]).then(([k, d, r]) => { keys = k; devices = d; recovery = r; draw(); }, failed);
+  const codesText = () => t("recoveryFile", {h: handle}) + "\n\n" + $("[data-codes] textarea").value + "\n";
   // One thing at a time: the buttons wait while the service answers.
   const busy = async (b, fn) => {
     b.disabled = true;
@@ -258,6 +282,30 @@ export function openDevices(toast){
   dlg.addEventListener("click", async e => {
     if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
     const add = e.target.closest("[data-add-key]"), off = e.target.closest("[data-remove-key]"), others = e.target.closest("[data-end-others]");
+    const make = e.target.closest("[data-make-codes]"), copy = e.target.closest("[data-copy-codes]"), keep = e.target.closest("[data-save-codes]");
+    if(make){
+      // New codes void the old ones: asked first when there are some.
+      if(recovery && recovery.made && await ask({title: t("recoveryAgainQ"), text: t("recoveryAgainText"),
+        actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("recoveryAgain"), kind: "primary"}]}) !== "yes") return;
+      busy(make, async () => {
+        const codes = await recently(makeRecoveryCodes);
+        if(!codes) return;
+        $("[data-codes] textarea").value = codes.join("\n");
+        $("[data-codes]").hidden = false;
+        await load();
+        $("[data-codes]").scrollIntoView({block: "nearest"});
+      });
+      return;
+    }
+    if(copy){
+      await navigator.clipboard.writeText(codesText()).then(() => toast(t("recoveryCopied")), () => $("[data-codes] textarea").select());
+      return;
+    }
+    if(keep){
+      const day = new Date().toISOString().slice(0, 10);
+      await save(new File([codesText()], `timp-recovery-codes-${handle}-${day}.txt`, {type: "text/plain"}), t("recoveryTitle"));
+      return;
+    }
     if(add) busy(add, async () => {
       if(await recently(addPasskey, t("addPasskey"))){ toast(t("passkeyAddedDone")); await load(); }
     });
@@ -276,4 +324,57 @@ export function openDevices(toast){
   });
   dlg.showModal();
   load();
+}
+
+/**
+ * Every passkey lost: the handle and one recovery code, then a new passkey made on this
+ * phone. Every other device is signed out.
+ * @param onDone(user)  signed in on this phone
+ * @param onClose()     the form is closed, done or not
+ */
+export function openRecover({onDone, onClose = () => {}}){
+  const dlg = document.createElement("dialog");
+  dlg.className = "sheet";
+  dlg.setAttribute("aria-labelledby", "recover-title");
+  dlg.innerHTML = `
+  <form method="dialog" class="sheet-form" novalidate>
+    <div class="sheet-head">
+      <h2 id="recover-title">${esc(t("recoverTitle"))}</h2>
+      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
+    </div>
+    <p class="foot">${esc(t("recoverHelp"))}</p>
+    <div class="field">
+      <label for="rec-handle">${esc(t("fHandle"))}</label>
+      <input id="rec-handle" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="31">
+    </div>
+    <div class="field">
+      <label for="rec-code">${esc(t("fRecoveryCode"))}</label>
+      <input id="rec-code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-…">
+    </div>
+    <div class="passkey">${FINGER}<span>${esc(t("recoverPasskey"))}</span></div>
+    <p class="errbox" data-error role="alert" hidden></p>
+    <div class="sheet-actions">
+      <span class="grow"></span>
+      <button type="submit" class="btn primary">${esc(t("createPasskey"))}</button>
+    </div>
+  </form>`;
+  document.body.appendChild(dlg);
+  const $ = sel => dlg.querySelector(sel);
+  const fail = text => { const box = $("[data-error]"); box.textContent = text; box.hidden = false; };
+  dlg.addEventListener("close", () => { dlg.remove(); onClose(); });
+  dlg.addEventListener("click", e => { if(e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+  $("form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const handle = $("#rec-handle").value.trim(), code = $("#rec-code").value.trim();
+    if(!handle || !code) return fail(t("recoverBad"));
+    const go = $("[type=submit]");
+    go.disabled = true;
+    try{
+      const user = await recoverAccount(handle, code);
+      if(user){ dlg.close(); onDone(user); }
+    }catch(err){ fail(accountError(err)); }
+    finally{ go.disabled = false; }
+  });
+  dlg.showModal();
+  $("#rec-handle").focus();
 }

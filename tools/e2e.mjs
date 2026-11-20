@@ -1182,6 +1182,7 @@ function fakeService(){
   const deleted = [];                           // accounts deleted
   const invites = new Map(), members = new Map(); // token → {trip, role, usedBy, revoked}; trip → user → role
   const flags = {stale: false};                 // the sign-in no longer recent (more than ten minutes ago)
+  const recovery = new Map();                   // recovery code → {who, used}
   const handler = async (method, path, body, headers) => {
     calls.push(method + " " + path);
     if(method === "POST" && path === "/v1/trips" && body.trip && refuse.has(body.trip.id)) return {status: 500, body: {error: "server: something went wrong"}};
@@ -1202,6 +1203,25 @@ function fakeService(){
       if(!cred.response.publicKey || !cred.response.authenticatorData || cred.response.publicKeyAlgorithm !== -7) return no(400, "passkey: could not be checked");
       codes.clear();
       users.set(c.handle, true);
+      keys.set(cred.id, c.handle);
+      return session(c.handle);
+    }
+    // Every passkey lost: a recovery code, then a new passkey; every other device out.
+    if(method === "POST" && path === "/v1/auth/recover/options"){
+      const h = String(body.handle || "").trim().replace(/^@/, "").toLowerCase(), code = String(body.code || "").trim().toUpperCase(), r = recovery.get(code);
+      if(!r || r.used || r.who !== h) return no(401, "recovery: handle or code not valid");
+      const id = "c" + ++n, challenge = b64("challenge-" + id);
+      challenges.set(id, {challenge, handle: h, recover: code});
+      return ok({challengeId: id, publicKey: {challenge, rp: {id: "localhost", name: "TIMP"}, user: {id: b64("u-" + h), name: h, displayName: h},
+        pubKeyCredParams: [{type: "public-key", alg: -7}], authenticatorSelection: {residentKey: "required", userVerification: "required"}, attestation: "none"}});
+    }
+    if(method === "POST" && path === "/v1/auth/recover"){
+      const c = challenges.get(body.challengeId), cred = body.credential, cd = client(cred);
+      if(!c || !c.recover || cd.type !== "webauthn.create" || cd.challenge !== c.challenge) return no(400, "passkey: could not be checked");
+      const r = recovery.get(c.recover);
+      if(r.used) return no(401, "recovery: handle or code not valid");
+      r.used = true;
+      for(const [tk, h] of sessions) if(h === c.handle) sessions.delete(tk);
       keys.set(cred.id, c.handle);
       return session(c.handle);
     }
@@ -1269,6 +1289,16 @@ function fakeService(){
       if(body.rev !== cur.rev) return {status: 409, body: {error: "private: changed on another phone", current: cur}};
       privs.set(k, {data: body.data, rev: cur.rev + 1});
       return ok(privs.get(k));
+    }
+    if(path === "/v1/account/recovery"){
+      if(!who) return no(401, "sign in first");
+      const mine = [...recovery.values()].filter(r => r.who === who);
+      if(method === "GET") return ok({made: mine.length ? "2026-11-20T10:00:00.000Z" : null, left: mine.filter(r => !r.used).length});
+      if(flags.stale) return no(403, "sign in again: this needs a sign-in from the last 10 minutes");
+      for(const [code, r] of recovery) if(r.who === who) recovery.delete(code);
+      const codes = Array.from({length: 10}, (_, i) => `RECO-${String(++n).padStart(4, "0")}-ABCD-EFG${i}`);
+      for(const code of codes) recovery.set(code, {who, used: false});
+      return ok({codes});
     }
     // Who can get in: the passkeys (one more, one taken off, never the last) and the
     // devices signed in. Adding or taking off a passkey needs a recent sign-in.
@@ -1347,7 +1377,7 @@ function fakeService(){
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members, flags, sessions};
+  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members, flags, sessions, recovery};
   return handler;
 }
 
@@ -1626,6 +1656,48 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.equal(service.sessions.has("tok-tablet"), false);
     await until("only this device", `document.querySelectorAll("dialog.sheet[open] [data-sessions] .chat").length === 1`);
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("recovery codes: made, shown once, made again only when asked; every passkey lost, one lets you in with a new passkey, once", async () => {
+    await openMe();
+    await run(`document.querySelector("dialog.sheet[open] [data-me='devices']").click();`);
+    await until("the codes' state", `!document.querySelector("dialog.sheet[open] [data-make-codes]").hidden`);
+    assert.match(await text("dialog.sheet[open] [data-recovery]"), /^None yet/);
+    await run(`document.querySelector("dialog.sheet[open] [data-make-codes]").click();`);
+    await until("the codes", `!document.querySelector("dialog.sheet[open] [data-codes]").hidden`);
+    const first = (await run(`return document.querySelector("dialog.sheet[open] [data-codes] textarea").value;`)).split("\n");
+    assert.equal(first.length, 10);
+    await until("counted", `/^10 of 10 still usable/.test(document.querySelector("dialog.sheet[open] [data-recovery]").textContent)`);
+    assert.equal(await text("dialog.sheet[open] [data-make-codes]"), "Make new codes");
+    // Again: asked first, the old ones void.
+    await run(`document.querySelector("dialog.sheet[open] [data-make-codes]").click();`);
+    await until("asked", `document.querySelector("dialog.ask[open] #ask-title") && document.querySelector("dialog.ask[open] #ask-title").textContent === "Make new recovery codes?"`);
+    await run(`document.querySelector('dialog.ask[open] [data-answer="yes"]').click();`);
+    await until("new codes", `document.querySelector("dialog.sheet[open] [data-codes] textarea").value.split("\\n")[0] !== ${JSON.stringify(first[0])}`);
+    const codes = (await run(`return document.querySelector("dialog.sheet[open] [data-codes] textarea").value;`)).split("\n");
+    assert.equal(service.recovery.has(first[0]), false);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    // Signed out, and the phone's passkeys lost.
+    service.sessions.set("tok-old-tablet", "fra");
+    await openMe();
+    await run(`document.querySelector("dialog.sheet[open] [data-me='signout']").click();`);
+    await until("signed out", `document.querySelector(".acct [data-act='signup']")`, 15000);
+    await page("WebAuthn.clearCredentials", {authenticatorId});
+    await run(`document.querySelector(".acct [data-act='signup']").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] [data-recover]")`);
+    await run(`document.querySelector("dialog.sheet[open] [data-recover]").click();`);
+    await until("the recovery form", `document.querySelector("dialog.sheet[open] #rec-code")`);
+    // A wrong code: said, nothing else.
+    await run(`document.getElementById("rec-handle").value = "@fra"; document.getElementById("rec-code").value = "AAAA-BBBB-CCCC-DDDD"; document.querySelector("dialog.sheet[open] form").requestSubmit();`);
+    await until("refused", `!document.querySelector("dialog.sheet[open] [data-error]").hidden`);
+    assert.equal(await text("dialog.sheet[open] [data-error]"), "That handle or recovery code is not valid.");
+    // The right one, typed loosely: a new passkey, signed in, every other device out.
+    await run(`document.getElementById("rec-code").value = ${JSON.stringify(" " + codes[3].toLowerCase() + " ")}; document.querySelector("dialog.sheet[open] form").requestSubmit();`);
+    await until("signed in", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`, 20000);
+    assert.match(await run(`return document.getElementById("toast").textContent;`), /^Signed in as @fra\. In Passkeys and devices/);
+    assert.deepEqual([...service.sessions.values()].filter(h => h === "fra").length, 1, "the old tablet signed out");
+    assert.equal(service.recovery.get(codes[3]).used, true);
     assert.deepEqual(blocked(), []);
   });
 

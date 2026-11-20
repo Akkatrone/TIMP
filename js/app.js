@@ -25,7 +25,7 @@ import { shortId, canonical, contentOf } from "./version.js";
 import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { syncTrip, syncPrivate } from "./sync.js";
-import { openSignUp, openLinkedApps, openAccountSheet, openDevices, accountError } from "./account.js";
+import { openSignUp, openLinkedApps, openAccountSheet, openDevices, openRecover, accountError } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -960,7 +960,7 @@ function syncNow(){
 async function accountActions(){
   if(!S.account) return;
   const what = await openAccountSheet(S.account);
-  if(what === "devices") openDevices(toast);
+  if(what === "devices") openDevices({toast, save: handOver, handle: S.account.handle});
   else if(what === "chats") openLinkedApps(toast);
   else if(what === "export") exportMyData();
   else if(what === "signout"){ await signOut(); S.account = null; S.sync = ""; render(); toast(t("signedOut")); }
@@ -1016,6 +1016,13 @@ async function accountSignIn(){
   }catch(e){ toast(accountError(e)); }
 }
 
+// Every passkey lost: a recovery code and a new passkey on this phone. Resolves when the
+// form is closed, signed in or not.
+function accountRecover(){
+  return new Promise(done => openRecover({onClose: done,
+    onDone: user => { S.account = user; render(); toast(t("recoveredDone", {h: user.handle})); syncNow(); }}));
+}
+
 /* ---------- a trip shared with this person ---------- */
 
 // Someone sent an invite: its link opens the app with #invite=<token>. Signed in (or
@@ -1027,7 +1034,7 @@ async function takeInvite(token){
     const go = await ask({title: t("inviteTitle"), text: t("inviteSignIn"),
       actions: [{id: "no", label: t("cancel")}, {id: "up", label: t("signUp")}, {id: "in", label: t("signIn"), kind: "primary"}]});
     if(go === "in") await accountSignIn();
-    else if(go === "up") await new Promise(done => openSignUp({onDone: user => { S.account = user; render(); done(); }, onSignIn: () => accountSignIn().then(done)}));
+    else if(go === "up") await new Promise(done => openSignUp({onDone: user => { S.account = user; render(); done(); }, onSignIn: () => accountSignIn().then(done), onRecover: () => accountRecover().then(done)}));
     if(!S.account) return;
   }
   let summary;
@@ -1998,7 +2005,7 @@ $app.addEventListener("click", e => {
     if(prompt && act.dataset.key === "new") prompt.textContent = aiMessage();
   }
   else if(a === "demo") loadDemo();
-  else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn});
+  else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn, onRecover: accountRecover});
   else if(a === "sync") syncNow();
   else if(a === "unhide"){ S.hidden.clear(); store.delKV("share:hidden").catch(() => {}); render(); syncNow(); }
   else if(a === "reup") putBackOnAccount(act.dataset.id);
