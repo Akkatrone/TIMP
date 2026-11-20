@@ -4,6 +4,16 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.17.0
+
+Private expenses for chats, only if you tick them.
+
+- **Connecting a chat app**: when it asks for your private expenses too, the question
+  shows "Also my private expenses: read them and change them", not ticked. Left so,
+  the chat reaches your trips only. Ticked, it can read your private expenses with the
+  trip, add and change them; taking one away still needs your yes, as for stops.
+- **Linked chats** says which chats can reach your private expenses.
+
 ## 3.16.0
 
 Your data, yours.

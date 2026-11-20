@@ -518,6 +518,10 @@
     "request": {
      "type": "text",
      "req": true
+    },
+    "scopes": {
+     "type": "list",
+     "of": "text"
     }
    },
    "answer": "oauthRedirect"

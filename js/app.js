@@ -979,10 +979,15 @@ async function answerChatApp(id){
   let req;
   try{ req = await chatRequest(id); }catch(e){ failed(e); return; }
   const can = req.scopes.map(s => ({"trips:read": t("chatRead"), "trips:write": t("chatWrite")})[s]).filter(Boolean);
-  const yes = await ask({title: t("chatTitle", {app: req.client}),
+  // The private expenses, if asked, only when ticked: left out unless the person says so.
+  const privAsked = req.scopes.some(s => s.startsWith("private:"));
+  const check = privAsked ? {label: t("chatPrivateToo"), checked: false} : undefined;
+  let yes = await ask({title: t("chatTitle", {app: req.client}),
     text: [{title: t("chatCan", {app: req.client, h: S.account.handle}), items: can}, onThisComputer(req.redirectHost) ? t("chatLocal") : t("chatBack", {host: req.redirectHost})],
-    actions: [{id: "no", label: t("chatDeny")}, {id: "yes", label: t("chatAllow"), kind: "primary"}]}) === "yes";
-  try{ location.replace(await answerChat(id, yes)); }catch(e){ failed(e); }
+    check, actions: [{id: "no", label: t("chatDeny")}, {id: "yes", label: t("chatAllow"), kind: "primary"}]}) === "yes";
+  const scopes = req.scopes.filter(s => !s.startsWith("private:") || (check && check.checked));
+  if(!scopes.length) yes = false;
+  try{ location.replace(await answerChat(id, yes, scopes)); }catch(e){ failed(e); }
 }
 
 function renderTrips(){

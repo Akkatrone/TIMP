@@ -75,7 +75,7 @@ export const SHAPES = {
   oauthRequest: {
     client: text("The name the chat app gave itself (Claude, ChatGPT…), as it registered."),
     redirectHost: text("Where the answer goes: the host of its redirect address."),
-    scopes: {type: "list", of: "text", req: true, doc: "What it asks to do: trips:read, trips:write."},
+    scopes: {type: "list", of: "text", req: true, doc: "What it asks to do: trips:read, trips:write, private:read, private:write (the traveller's private expenses)."},
     expires: text("Until when it can be answered (ISO date).")
   },
   oauthRedirect: {
@@ -92,7 +92,7 @@ export const SHAPES = {
   linkedApp: {
     id: text("This link's id: one yes given to a chat app."),
     client: text("The chat app's name (Claude, ChatGPT…)."),
-    scopes: {type: "list", of: "text", req: true, doc: "What it can do: trips:read, trips:write."},
+    scopes: {type: "list", of: "text", req: true, doc: "What it can do: trips:read, trips:write, private:read, private:write."},
     since: text("When the user said yes (ISO date)."),
     lastUsed: text("When it last renewed its access, about once an hour while used (ISO date).")
   },
@@ -129,7 +129,9 @@ export const ROUTES = {
   members: {method: "GET", path: "/v1/trips/:id/members", auth: true, answer: {members: {type: "list", of: "member", req: true}}, doc: "Who a trip is shared with."},
   removeMember: {method: "DELETE", path: "/v1/trips/:id/members/:user", auth: true, answer: "ok", doc: "The owner takes someone off; anyone can leave."},
   oauthRequest: {method: "POST", path: "/v1/oauth/request", auth: true, body: {request: text("The id in the app's address (#authorize=…).")}, answer: "oauthRequest", doc: "A chat app asks to reach the user's trips (MCP): what it is and what it asks, to show before the answer."},
-  oauthApprove: {method: "POST", path: "/v1/oauth/approve", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user allows it: a one-time code for the chat app, bound to this request."},
+  oauthApprove: {method: "POST", path: "/v1/oauth/approve", auth: true, body: {request: text("The request's id."),
+    scopes: {type: "list", of: "text", doc: "What the user allows, among what was asked (the private expenses only if they ticked it); all of it if left out."}},
+    answer: "oauthRedirect", doc: "The user allows it: a one-time code for the chat app, bound to this request."},
   oauthDeny: {method: "POST", path: "/v1/oauth/deny", auth: true, body: {request: text("The request's id.")}, answer: "oauthRedirect", doc: "The user refuses: the chat app is told."},
   linkedApps: {method: "GET", path: "/v1/oauth/apps", auth: true, answer: {apps: {type: "list", of: "linkedApp", req: true}}, doc: "The chat apps that can reach the user's trips, newest use first."},
   unlinkApp: {method: "DELETE", path: "/v1/oauth/apps/:id", auth: true, answer: "ok", doc: "Ends a link: the chat app's tokens stop working at once."},

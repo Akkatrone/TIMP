@@ -171,9 +171,9 @@ export function chatAddress(redirect){
 /** What a chat app asks: {client, redirectHost, scopes, expires}. */
 export const chatRequest = id => call("oauthRequest", {body: {request: id}});
 
-/** The person's answer, yes or no: the chat app's address to go to now. */
-export async function answerChat(id, yes){
-  const {redirect} = await call(yes ? "oauthApprove" : "oauthDeny", {body: {request: id}});
+/** The person's answer, yes (with what they allow, all asked if not said) or no: the chat app's address to go to now. */
+export async function answerChat(id, yes, scopes){
+  const {redirect} = await call(yes ? "oauthApprove" : "oauthDeny", {body: {request: id, ...(yes && scopes ? {scopes} : {})}});
   const to = chatAddress(redirect);
   if(!to) throw new ShareError(502, "redirect: not a chat app's address");
   return to;

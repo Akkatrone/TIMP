@@ -1193,8 +1193,9 @@ function fakeService(){
     if(method === "POST" && path.startsWith("/v1/oauth/")){
       if(!who) return no(401, "sign in first");
       if(body.request !== "req-0123456789abcdef" || chat.answered) return no(404, "request: expired or unknown, start again from the chat app");
-      if(path === "/v1/oauth/request") return ok({client: "Claude", redirectHost: "claude.ai", scopes: ["trips:read", "trips:write"], expires: "2026-11-19T00:10:00.000Z"});
+      if(path === "/v1/oauth/request") return ok({client: "Claude", redirectHost: "claude.ai", scopes: ["trips:read", "trips:write", "private:read", "private:write"], expires: "2026-11-19T00:10:00.000Z"});
       chat.answered = path.endsWith("/approve") ? "yes" : "no";
+      chat.scopes = body.scopes;
       return ok({redirect: `${headers.origin}/?chat=${chat.answered}#back`});
     }
     if(method === "POST" && path === "/v1/auth/logout"){
@@ -1320,9 +1321,13 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.equal(await text("dialog.ask p"), "Then you go back to claude.ai.");
     assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask [data-answer]")].map(b => b.textContent);`), ["Deny", "Allow"]);
     assert.equal(await run(`return document.activeElement.dataset.answer;`), "no", "the safe answer first");
+    // The private expenses: asked by the chat app, left out unless ticked.
+    assert.equal(await text("dialog.ask .ask-check span"), "Also my private expenses: read them and change them");
+    assert.equal(await run(`return document.querySelector("dialog.ask .ask-check input").checked;`), false);
     await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
     await until("back to the chat app", `location.search === "?chat=yes"`, 15000);
     assert.equal(service.chat.answered, "yes");
+    assert.deepEqual(service.chat.scopes, ["trips:read", "trips:write"], "allowed: the trips, not the private expenses");
     assert.deepEqual(blocked(), []);
   });
 

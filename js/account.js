@@ -137,7 +137,8 @@ export function openLinkedApps(toast){
   document.body.appendChild(dlg);
   const $list = dlg.querySelector("[data-chats]");
   const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(d));
-  const can = scopes => t(scopes.includes("trips:write") ? (scopes.includes("trips:read") ? "chatsReadWrite" : "chatsWrite") : "chatsRead");
+  const can = scopes => t(scopes.includes("trips:write") ? (scopes.includes("trips:read") ? "chatsReadWrite" : "chatsWrite") : "chatsRead")
+    + (scopes.some(s => s.startsWith("private:")) ? t("chatsPrivate") : "");
   let apps = [];
   const draw = () => {
     $list.removeAttribute("aria-busy");
