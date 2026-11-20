@@ -8,43 +8,6 @@ import { ask } from "./ask.js";
 import { signUp, ShareError, linkedApps, unlinkApp, passkeys, openSessions, endOtherSessions, removePasskey, addPasskey, needsSignIn, signInAgain,
   recoveryState, makeRecoveryCodes, recoverAccount } from "./share.js";
 
-/**
- * The account's sheet: who, and what can be done with it. Resolves with the action
- * chosen ("devices", "chats", "export", "signout", "delete"), or null when closed.
- */
-export function openAccountSheet(user){
-  return new Promise(resolve => {
-    const dlg = document.createElement("dialog");
-    dlg.className = "sheet";
-    dlg.setAttribute("aria-labelledby", "me-title");
-    const since = new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "long", year: "numeric"}).format(new Date(user.since));
-    dlg.innerHTML = `
-    <div class="sheet-form">
-      <div class="sheet-head">
-        <h2 id="me-title">@${esc(user.handle)}</h2>
-        <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
-      </div>
-      <p class="foot">${esc(t("accountSince", {d: since}))}</p>
-      <div class="me-actions">
-        <button type="button" class="btn" data-me="devices">${esc(t("devicesTitle"))}</button>
-        <button type="button" class="btn" data-me="chats">${esc(t("chatsTitle"))}</button>
-        <button type="button" class="btn" data-me="export">${esc(t("exportData"))}</button>
-        <button type="button" class="btn" data-me="signout">${esc(t("signOut"))}</button>
-        <button type="button" class="btn danger" data-me="delete">${esc(t("deleteAccount"))}</button>
-      </div>
-    </div>`;
-    document.body.appendChild(dlg);
-    let chosen = null;
-    dlg.addEventListener("close", () => { dlg.remove(); resolve(chosen); });
-    dlg.addEventListener("click", e => {
-      const b = e.target.closest("[data-me]");
-      if(b){ chosen = b.dataset.me; dlg.close(); }
-      else if(e.target === dlg || e.target.closest("[data-close]")) dlg.close();
-    });
-    dlg.showModal();
-  });
-}
-
 const FINGER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 8.5a6.5 6.5 0 0111.6-2.4M18.9 9.2c.4 1.6.4 3.3.1 4.8M5.6 11.5v2.2c0 2.6 1 5 2.7 6.8"/><path d="M8.6 12v1.7a8.6 8.6 0 002.2 5.8M12 9.8a2.3 2.3 0 012.3 2.3v1.6c0 1.6.4 3.1 1.2 4.4"/><path d="M12 13v.8a11 11 0 001.7 5.9"/></svg>';
 
 /** What the service said, for people: its known sentences in the app's language. */

@@ -234,7 +234,7 @@ Google Maps, for everyone who loads the file. Restrict the key to the address of
 app and to the Maps JavaScript API, set a daily quota, and never put a file with a key
 in a public repository. How to create one is in the
 [README](../README.md#google-maps-optional). Each phone can also save its own key, or
-turn Google Maps off, on the Trips page.
+turn Google Maps off, on the You page (the circle at the top right).
 
 <!-- llms.txt: end -->
 <!-- llms.txt: skip -->

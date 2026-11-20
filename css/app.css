@@ -571,6 +571,28 @@ button.crow{cursor:pointer}
 #toast .x{border:0;background:none;color:var(--bg);opacity:.7;font:400 1.3rem/1 var(--f-body);width:32px;height:32px;border-radius:50%;cursor:pointer;flex:0 0 auto;padding:0}
 
 /* The account with the sharing service, at the top of Trips */
+/* The circle at the top right: You (the account, the settings). */
+.strip .gutter{display:flex;align-items:flex-start;gap:10px}
+#days{flex:1 1 auto;min-width:0}
+.me-btn{flex:none;width:40px;height:40px;margin-top:2px;border-radius:50%;display:grid;place-items:center;background:var(--card);color:var(--ink);border:1px solid var(--line);text-decoration:none;font:700 1rem var(--f-display)}
+.me-btn svg{width:22px;height:22px}
+.me-btn.signed{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.me-btn[aria-current="page"]{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--ink)}
+.me-btn.float{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(16px,env(safe-area-inset-right,0px))}
+.me-head{min-height:40px;display:flex;align-items:center}
+.me-head .back{color:var(--link);text-decoration:none;font:600 .95rem var(--f-body)}
+h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
+.me-list{display:grid;background:var(--card);border-radius:18px;overflow:hidden}
+.me-list button{appearance:none;border:0;border-top:1px solid var(--line);background:none;display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:52px;padding:12px 16px;font:600 1rem var(--f-body);color:var(--ink);text-align:left;cursor:pointer}
+.me-list button:first-child{border-top:0}
+.me-list button::after{content:"›";color:var(--muted);font-size:1.4rem;line-height:1}
+.me-list button.danger{color:var(--err)}
+.me-list button:focus-visible{outline:2px solid var(--link);outline-offset:-2px}
+.me-list button:active{background:var(--line)}
+.acct.me .av{width:64px;height:64px;font-size:1.6rem}
+.acct .av svg{width:24px;height:24px}
+.sync-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.sync-line small{font:500 .78rem var(--f-mono);color:var(--muted)}
 .acct{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:18px;padding:14px 16px;margin:0 0 14px;flex-wrap:wrap}
 .acct .av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--bg);font:700 1rem var(--f-display);flex:none}
 .acct .who{display:grid;gap:2px;flex:1 1 140px;min-width:0}

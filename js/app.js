@@ -25,7 +25,7 @@ import { shortId, canonical, contentOf } from "./version.js";
 import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { syncTrip, syncPrivate } from "./sync.js";
-import { openSignUp, openLinkedApps, openAccountSheet, openDevices, openRecover, accountError, recently } from "./account.js";
+import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
 
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -140,6 +140,8 @@ function todayIndex(){
 
 function route(){
   const h = location.hash.slice(1);
+  // You: the account and the settings, with or without a trip.
+  if(h === "me") return {name: "me"};
   if(!trip()) return {name: "welcome"};
   if(h === "trips") return {name: "trips"};
   if(h === "info") return {name: "info"};
@@ -639,6 +641,7 @@ async function removeRecord(id){
 /* ---------- rendering ---------- */
 
 function renderStrip(r){
+  drawMeButton(r);
   if(!trip()){ $strip.hidden = true; return; }
   $strip.hidden = false;
   const lang = getLang(), ti = todayIndex();
@@ -652,6 +655,25 @@ function renderStrip(r){
   const active = $days.querySelector('[aria-current="page"]');
   if(active) $days.scrollLeft = active.offsetLeft - ($days.clientWidth - active.offsetWidth) / 2;
   markStrip();
+}
+
+// The circle at the top right: who you are (your initial; a photo, one day), and the
+// way to the account and the settings. On a page without the bar of days (welcome, You
+// without a trip) it floats in the same place.
+const PERSON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 19.5c1.3-3.3 4-5 7.2-5s5.9 1.7 7.2 5"/></svg>';
+function drawMeButton(r){
+  const b = document.getElementById("me-btn");
+  const u = hasService() && S.account;
+  b.innerHTML = u ? `<span>${esc(u.handle.slice(0, 1).toUpperCase())}</span>` : PERSON;
+  b.classList.toggle("signed", !!u);
+  b.setAttribute("aria-label", t("meTitle") + (u ? " · @" + u.handle : ""));
+  b.title = t("meTitle");
+  if(r.name === "me") b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  // Without the bar it goes on the page itself, top right.
+  const float = !trip();
+  b.classList.toggle("float", float);
+  if(float && b.parentElement !== document.body) document.body.appendChild(b);
+  if(!float && b.parentElement === document.body) document.querySelector(".strip .gutter").appendChild(b);
 }
 
 // The bar of days: an edge once the page has scrolled under it, and a fade on each side
@@ -852,29 +874,60 @@ function renderWelcome(){
     <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
     <button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>
   </div>
-  ${accountSection()}
+  ${S.account ? syncLine() : accountSection()}
   ${aiSection(false)}
   ${installSteps()}
-  ${langPicker()}
-  ${themePicker()}
   ${REPO_URL ? `<p class="foot"><a href="${esc(REPO_URL)}#create-your-own-trip" target="_blank" rel="noopener">${esc(t("makeYourOwn"))} ↗</a></p>` : ""}
   ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}`;
 }
 
-// The account with the sharing service, at the top of Trips (and on the welcome screen,
-// for a new phone), only when this copy of the app has one (js/config.js). Without an
+// The account with the sharing service, on You (and on the welcome screen, for a new
+// phone, to sign in), only when this copy of the app has one (js/config.js). Without an
 // account the app is exactly as before.
 function accountSection(){
   if(!hasService()) return "";
   const u = S.account;
-  if(!u) return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">?</span>` +
+  if(!u) return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${PERSON}</span>` +
     `<span class="who"><b>${esc(t("account"))}</b><small>${esc(t("accountShort"))}</small></span>` +
     `<span class="acts"><button type="button" class="btn small" data-act="signin">${esc(t("signIn"))}</button><button type="button" class="btn small primary" data-act="signup">${esc(t("signUp"))}</button></span></section>`;
-  return `<section class="acct" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${esc(u.handle.slice(0, 1).toUpperCase())}</span>` +
-    `<span class="who"><b>@${esc(u.handle)}</b><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", partial: "syncPartial", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn", {n: S.syncErrors.size}))}</small></span>` +
+  const since = new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "long", year: "numeric"}).format(new Date(u.since));
+  return `<section class="acct me" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${esc(u.handle.slice(0, 1).toUpperCase())}</span>` +
+    `<span class="who"><b>@${esc(u.handle)}</b><small>${esc(t("accountSince", {d: since}))}</small></span></section>` +
+    `<nav class="me-list" aria-label="${esc(t("account"))}">
+      <button type="button" data-me="devices">${esc(t("devicesTitle"))}</button>
+      <button type="button" data-me="chats">${esc(t("chatsTitle"))}</button>
+      <button type="button" data-me="export">${esc(t("exportData"))}</button>
+      <button type="button" data-me="signout">${esc(t("signOut"))}</button>
+      <button type="button" class="danger" data-me="delete">${esc(t("deleteAccount"))}</button>
+    </nav>`;
+}
+
+// On Trips, signed in: whether the trips agree with the account, and Sync now.
+function syncLine(){
+  if(!hasService() || !S.account) return "";
+  return `<section class="sync-line"><small data-sync="${esc(S.sync)}">${esc(t({busy: "syncBusy", ok: "syncOk", partial: "syncPartial", offline: "syncOffline", error: "syncError"}[S.sync] || "signedIn", {n: S.syncErrors.size}))}</small>` +
     `<span class="acts"><button type="button" class="btn small" data-act="sync"${S.sync === "busy" ? " disabled" : ""}>${esc(t("syncNow"))}</button>` +
-    (S.hidden.size ? `<button type="button" class="btn small" data-act="unhide">${esc(t("hiddenBack", {n: S.hidden.size}))}</button>` : "") +
-    `<button type="button" class="btn small" data-act="me">${esc(t("accountBtn"))}</button></span></section>`;
+    (S.hidden.size ? `<button type="button" class="btn small" data-act="unhide">${esc(t("hiddenBack", {n: S.hidden.size}))}</button>` : "") + `</span></section>`;
+}
+
+// You: the account, then the settings of this device, then the app.
+function renderMe(){
+  const back = trip() ? "#trips" : "#";
+  return `
+  <div class="me-head"><a class="back" href="${back}">${esc(t("back"))}</a></div>
+  <h1>${esc(t("meTitle"))}</h1>
+  ${errorBox()}
+  ${accountSection()}
+  <h2 class="part">${esc(t("settings"))}</h2>
+  ${mapSettings()}
+  ${langPicker()}
+  ${themePicker()}
+  ${homePicker()}
+  ${installSteps()}
+  <section class="sec"><h2>${esc(t("about"))}</h2>
+    <p class="foot">TIMP · Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
+    ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}
+  </section>`;
 }
 
 /* ---------- sync with the sharing service ---------- */
@@ -956,10 +1009,9 @@ function syncNow(){
   return syncing;
 }
 
-// The account's sheet, and what it leads to.
-async function accountActions(){
+// What the account's buttons on You lead to.
+async function accountActions(what){
   if(!S.account) return;
-  const what = await openAccountSheet(S.account);
   if(what === "devices") openDevices({toast, save: handOver, handle: S.account.handle});
   else if(what === "chats") openLinkedApps(toast);
   else if(what === "export") exportMyData();
@@ -1163,16 +1215,11 @@ function renderTrips(){
     </div>`;
   const cards = activeCard + (others.length ? `<section class="sec my-trips"><div class="list-head"><h2>${esc(t("myTrips", {n: others.length}))}</h2></div>${tools}
     ${list || `<p class="foot">${esc(t("noTripsFound"))}</p>`}</section>` : "");
-  const key = googleKey();
-  const status = !S.useGoogle ? "statusOsmChosen"
-    : !key ? "statusNoKey"
-    : googleRefusedKey(key) ? "statusRefused"
-    : S.deviceKey ? "statusGoogleDevice" : "statusGoogleTrip";
   return `
   <h1>${esc(t("yourTrips"))}</h1>
   ${errorBox()}
+  ${syncLine()}
   ${cards}
-  ${accountSection()}
   <section class="sec">
     <div class="actions">
       <button type="button" class="btn primary" data-act="pick">${esc(t("updateTrip"))}</button>
@@ -1180,7 +1227,20 @@ function renderTrips(){
       ${S.records.some(r => r.fileName === "demo-trip.json") ? "" : `<button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>`}
     </div>
   </section>
-  <section class="sec"><h2>${esc(t("mapProvider"))}</h2>
+  <section class="sec"><h2>${esc(t("aiTitleShort"))}</h2>
+    ${aiSection(true)}
+    ${S.rec ? aiEditSection() : ""}
+  </section>`;
+}
+
+// The map: Google (with a key: this device's or the trip's) or OpenStreetMap.
+function mapSettings(){
+  const key = googleKey();
+  const status = !S.useGoogle ? "statusOsmChosen"
+    : !key ? "statusNoKey"
+    : googleRefusedKey(key) ? "statusRefused"
+    : S.deviceKey ? "statusGoogleDevice" : "statusGoogleTrip";
+  return `<section class="sec"><h2>${esc(t("mapProvider"))}</h2>
     <div class="seg" role="group" aria-label="${esc(t("mapProvider"))}">
       <button type="button" data-provider="google" aria-pressed="${S.useGoogle}">Google Maps</button>
       <button type="button" data-provider="osm" aria-pressed="${!S.useGoogle}">OpenStreetMap</button>
@@ -1192,18 +1252,6 @@ function renderTrips(){
       <input id="gkey" name="gkey" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(S.deviceKey)}" placeholder="AIza…">
       <div class="actions"><button type="submit" class="btn small">${esc(t("save"))}</button></div>
     </form>
-  </section>
-  ${langPicker()}
-  ${themePicker()}
-  ${homePicker()}
-  ${installSteps()}
-  <section class="sec"><h2>${esc(t("aiTitleShort"))}</h2>
-    ${aiSection(true)}
-    ${S.rec ? aiEditSection() : ""}
-  </section>
-  <section class="sec"><h2>${esc(t("about"))}</h2>
-    <p class="foot">TIMP · Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
-    ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}
   </section>`;
 }
 
@@ -1794,7 +1842,7 @@ $fabPaste.addEventListener("click", () => pasteAnything());
 function render(){
   const r = route();
   renderStrip(r);
-  $fabs.hidden = r.name === "welcome";
+  $fabs.hidden = r.name === "welcome" || r.name === "me";
   $fab.hidden = r.name !== "day" || isLocked(S.rec);
   $fab.setAttribute("aria-label", t("addStop"));
   $fab.title = t("addStop");
@@ -1811,6 +1859,7 @@ function render(){
   if(live) live.handle.el.remove(); // keep the map alive while the page is rebuilt
   let wanted = null;
   if(r.name === "welcome") $app.innerHTML = renderWelcome();
+  else if(r.name === "me") $app.innerHTML = renderMe();
   else if(r.name === "trips") $app.innerHTML = renderTrips();
   else if(r.name === "info") $app.innerHTML = renderInfo();
   else { const out = renderDay(r.i); $app.innerHTML = out.html; wanted = out.wanted; }
@@ -1993,6 +2042,8 @@ $app.addEventListener("click", e => {
     refocus(`[data-plan="${CSS.escape(plan.dataset.plan)}"]`);
     return;
   }
+  const meBtn = e.target.closest("#app [data-me]");
+  if(meBtn){ accountActions(meBtn.dataset.me); return; }
   const act = e.target.closest("[data-act]");
   if(!act) return;
   const a = act.dataset.act;
@@ -2017,7 +2068,7 @@ $app.addEventListener("click", e => {
   else if(a === "lock") toggleLock(act.dataset.id);
   else if(a === "share-trip"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec && rec.share) openShareSheet({rec, toast}); }
   else if(a === "signin") accountSignIn();
-  else if(a === "me") accountActions();
+  else if(a === "me") location.hash = "#me";
   else if(a === "remove") removeRecord(act.dataset.id);
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
   else if(a === "history") showHistory(act.dataset.id);

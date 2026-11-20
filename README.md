@@ -314,7 +314,8 @@ If Google refuses the key (wrong site, quota reached), the app says so and shows
 OpenStreetMap instead. Without the Geocoding API, positions are looked up on
 OpenStreetMap.
 
-On each device, the Trips page shows which map is in use and lets you:
+On each device, the You page (the circle at the top right) shows which map is in use
+and lets you:
 
 - save a key that applies to every trip on that device, in place of the trip's key;
 - turn Google Maps off and use OpenStreetMap even when a key is present, to save
@@ -356,9 +357,9 @@ real routes and transport times, tap "Directions" on a stop.
   account: the app shows who asks, what it will be able to do and where the answer
   goes, and you allow or deny it there, with your passkey (asked again if you did not
   just sign in). The chat app gets a key of
-  its own for that, never your passkey or your session. Trips → Account → Linked chats
+  its own for that, never your passkey or your session. You (the circle at the top right) → Linked chats
   shows which chats can reach your trips, and unlinks one at once.
-- Who can get in is up to you: Trips → Account → Passkeys and devices lists your
+- Who can get in is up to you: You → Passkeys and devices lists your
   passkeys and the devices signed in. Add a passkey on each phone you use, take one off
   (never the last), sign out every other device at once. Adding or taking off a passkey
   asks for your passkey again if you did not just sign in, so a phone left open is not
@@ -368,7 +369,7 @@ real routes and transport times, tap "Directions" on a stop.
   works once, and using one replaces your passkeys with a new one on that phone, signs
   every other device out and unlinks your chats. Whoever has a code can get in: keep
   them away from your phone. Removing a passkey signs out the devices it opened.
-- Your data is yours: Trips → Account → Export my data gives you a copy of everything
+- Your data is yours: You → Export my data gives you a copy of everything
   the service keeps about you; Delete account deletes all of it for good (your handle
   written again, then your passkey).
 - A saved trip file goes only where you send it. When the trip has private expenses,

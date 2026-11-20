@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.24.0
+
+You: the account and the settings in a place of their own.
+
+- **The circle at the top right**, on every page: your initial when you are signed in
+  (a photo, one day), a person when not. It opens **You**.
+- **You** has the account (who you are, since when; passkeys and devices, linked chats,
+  export, sign out, delete; or sign in and make an account), then the **settings of
+  this device** (map and Google key, language, theme, your currency, install), then
+  the app's version.
+- **Trips** has only the trips: the open one, the others, loading and pasting, the AI
+  assistant. When you are signed in, one line says whether they are synced, with Sync
+  now (and the trips taken off this phone, to bring back).
+
 ## 3.23.0
 
 Safer account, after a security review.

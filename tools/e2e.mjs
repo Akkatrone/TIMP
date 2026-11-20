@@ -153,7 +153,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   });
 
   await step("the interface language can be chosen on the device", async () => {
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector('[data-lang="it"]')`);
     await click('[data-lang="it"]');
     assert.equal(await run(`return document.documentElement.lang;`), "it");
@@ -162,7 +162,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await text(".stop:not(.skipped):not(.done) [data-skip]"), "Salta");
     await reload();
     assert.equal(await run(`return document.documentElement.lang;`), "it");
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector('[data-lang="auto"]')`);
     await click('[data-lang="auto"]');
     assert.equal(await run(`return document.documentElement.lang;`), "en");
@@ -274,7 +274,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   await step("the dark theme can be chosen, survives a reload, and darkens the map", async () => {
     const bg = () => run(`return getComputedStyle(document.body).backgroundColor;`);
     const light = await bg();
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector('[data-theme-choice="dark"]')`);
     await click('[data-theme-choice="dark"]');
     assert.equal(await run(`return document.documentElement.dataset.theme;`), "dark");
@@ -288,7 +288,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     await until("a dark map", `document.querySelector(".live.dark .maplibregl-map")`);
     await click("[data-map]");
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector('[data-theme-choice="auto"]')`);
     await click('[data-theme-choice="auto"]');
     assert.equal(await run(`return document.documentElement.dataset.theme === undefined;`), true);
@@ -517,7 +517,7 @@ await withApp(async ({run, until, reload, blocked}) => {
       await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     };
 
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.getElementById("gkey")`);
     assert.equal(await status(), "statusNoKey");
     await saveKey(KEY_A);
@@ -526,7 +526,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await openLiveMap();
     await until("Google to refuse key A and the map to fall back", `document.querySelector(".live .maplibregl-map")`, 30000);
     assert.deepEqual(await run(`return ${googleScripts};`), [KEY_A]);
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector("[data-map-status]")`);
     assert.equal(await status(), "statusRefused");
 
@@ -540,7 +540,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.deepEqual(await run(`return ${googleScripts};`), [KEY_B]);
 
     // Turned off: no request to Google at all, even with a key.
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector('[data-provider="osm"]')`);
     await click('[data-provider="osm"]');
     await until("the status", `document.querySelector('[data-map-status="statusOsmChosen"]')`);
@@ -550,7 +550,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.deepEqual(await run(`return ${googleScripts};`), []);
 
     // Leave the device as it was.
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector('[data-provider="google"]')`);
     await click('[data-provider="google"]');
     await saveKey("");
@@ -728,7 +728,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#trips";`);
     await until("the Paste button", `document.querySelector(".fab-paste") && !document.querySelector(".fabs").hidden`);
     assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "no + outside a day");
-    // In the middle of the page only its icon, scrolling up too; its word at the top.
+    // In the middle of a long page only its icon, scrolling up too; its word at the top.
+    await run(`location.hash = "#info";`);
+    await until("the Info page", `document.querySelector("#app .sec") && !document.querySelector(".fabs").hidden`);
     const scrollBy = y => run(`const el = document.documentElement.classList.contains("own-scroll") ? document.body : document.scrollingElement; el.scrollTop = ${y}; await new Promise(r => setTimeout(r, 120));`);
     await scrollBy(0); await scrollBy(300);
     assert.equal(await run(`return document.querySelector(".fabs").classList.contains("compact");`), true, "compact while scrolling down");
@@ -910,9 +912,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("the question", `document.querySelector("dialog.ask[open]")`);
     await answer("yes");
     assert.equal(await run(`return document.querySelector('[data-expense="${added}"]');`), null);
-    // The traveller's currency, on Trips: euro, and euro costs have nothing to convert.
-    await run(`location.hash = "#trips";`);
-    await until("trips", `document.querySelector("#home-cur")`);
+    // The traveller's currency, on You: euro, and euro costs have nothing to convert.
+    await run(`location.hash = "#me";`);
+    await until("You", `document.querySelector("#home-cur")`);
     await run(`const s = document.querySelector("#home-cur"); s.value = "EUR"; s.dispatchEvent(new Event("change", {bubbles: true}));`);
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelector('[data-edit="se"]')`);
@@ -1389,16 +1391,14 @@ async function accountSteps({run, until, reload, page, blocked, service}){
   const text = sel => run(`const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent : null;`);
   let authenticatorId = "";
   const openMe = async () => {
-    await run(`location.hash = "#trips";`);
-    await until("the account", `document.querySelector('.acct [data-act="me"]')`);
-    await run(`document.querySelector('.acct [data-act="me"]').click();`);
-    await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me]")`);
+    await run(`location.hash = "#me";`);
+    await until("the account", `document.querySelector("#app [data-me]")`);
   };
   await step("an account: made with an invitation code and a passkey, kept on the phone, signed out and in again", async () => {
     // A passkey as a phone makes it: kept on the device, opened with the fingerprint.
     await page("WebAuthn.enable", {enableUI: false});
     ({authenticatorId} = await page("WebAuthn.addVirtualAuthenticator", {options: {protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true}}));
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("the account section", `document.querySelector(".acct [data-act='signup']")`);
     assert.equal(await text(".acct .who b"), "Account");
     await run(`document.querySelector(".acct [data-act='signup']").click();`);
@@ -1412,13 +1412,13 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.equal(await run(`return !!document.querySelector("dialog.sheet[open]");`), false);
     // Kept on the phone: still signed in after a reload.
     await reload();
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("still signed in", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`);
     // Out, then in again with the same passkey (the phone lists it; one here).
-    await run(`document.querySelector(".acct [data-act='me']").click();`);
-    await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me='signout']")`);
-    assert.equal(await text("dialog.sheet[open] h2"), "@fra");
-    await run(`document.querySelector("dialog.sheet[open] [data-me='signout']").click();`);
+    // On You: the account, its actions, the circle at the top right with its initial.
+    assert.equal(await text("#me-btn span"), "F");
+    assert.equal(await run(`return document.getElementById("me-btn").getAttribute("aria-current");`), "page");
+    await run(`document.querySelector("#app [data-me='signout']").click();`);
     await until("signed out", `document.querySelector(".acct [data-act='signin']")`);
     await run(`document.querySelector(".acct [data-act='signin']").click();`);
     await until("signed in again", `document.querySelector(".acct .who b") && document.querySelector(".acct .who b").textContent === "@fra"`, 15000);
@@ -1427,6 +1427,8 @@ async function accountSteps({run, until, reload, page, blocked, service}){
 
   await step("signed in, trips go to the account and come back: a change made on another phone arrives here", async () => {
     // A trip on this phone (the example, with its private expenses): it goes up by itself.
+    await run(`location.hash = "#trips";`);
+    await until("the welcome screen", `document.querySelector('[data-act="demo"]')`);
     await run(`document.querySelector('[data-act="demo"]').click();`);
     await until("the trip", `document.querySelectorAll(".stop").length > 0`);
     for(let i = 0; i < 50 && !service.trips.size; i++) await new Promise(r => setTimeout(r, 200));
@@ -1521,11 +1523,9 @@ async function accountSteps({run, until, reload, page, blocked, service}){
   });
 
   await step("linked chats: what each can do and since when; unlinking asks first, then stops it", async () => {
-    await run(`location.hash = "#trips";`);
-    await until("the account", `document.querySelector('.acct [data-act="me"]')`);
-    await run(`document.querySelector('.acct [data-act="me"]').click();`);
-    await until("the account's sheet", `document.querySelector("dialog.sheet[open] [data-me='chats']")`);
-    await run(`document.querySelector("dialog.sheet[open] [data-me='chats']").click();`);
+    await run(`location.hash = "#me";`);
+    await until("the account", `document.querySelector("#app [data-me='chats']")`);
+    await run(`document.querySelector("#app [data-me='chats']").click();`);
     await until("the list", `document.querySelector("dialog.sheet[open] [data-chat]")`);
     assert.equal(await text("dialog.sheet[open] h2"), "Linked chats");
     assert.equal(await text("dialog.sheet[open] [data-chat] b"), "Claude");
@@ -1564,7 +1564,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     const demoCard = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="demo-lisbon"]'))`;
     await until("said on its card", `${demoCard} && ${demoCard}.querySelector("[data-sync-error]")`, 15000);
     assert.equal(await run(`return ${demoCard}.querySelector("[data-sync-error]").textContent;`), "Not synced: server: something went wrong. It will try again.");
-    assert.equal(await text(".acct small[data-sync]"), "1 trip(s) not synced: see the cards below");
+    assert.equal(await text(".sync-line small[data-sync]"), "1 trip(s) not synced: see the cards below");
     const failedAt = service.calls.indexOf("POST /v1/trips");
     assert.ok(failedAt >= 0 && service.calls.indexOf("GET /v1/trips/t-other/private") > failedAt, "the other trip was still synced after it: " + service.calls.join(", "));
     // The service works again: the next sync takes it, the card says nothing more.
@@ -1621,7 +1621,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
   await step("passkeys and devices: one more after the passkey asked again, one taken off but never the last, the other devices signed out", async () => {
     const openDevices = async () => {
       await openMe();
-      await run(`document.querySelector("dialog.sheet[open] [data-me='devices']").click();`);
+      await run(`document.querySelector("#app [data-me='devices']").click();`);
       await until("the lists", `document.querySelector("dialog.sheet[open] [data-keys] .chat") && document.querySelector("dialog.sheet[open] [data-sessions] .chat")`);
     };
     const answer = async (title, id = "yes") => {
@@ -1670,7 +1670,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
 
   await step("recovery codes: made, shown once, made again only when asked; every passkey lost, one lets you in with a new passkey, once", async () => {
     await openMe();
-    await run(`document.querySelector("dialog.sheet[open] [data-me='devices']").click();`);
+    await run(`document.querySelector("#app [data-me='devices']").click();`);
     await until("the codes' state", `!document.querySelector("dialog.sheet[open] [data-make-codes]").hidden`);
     assert.match(await text("dialog.sheet[open] [data-recovery]"), /^None yet/);
     await run(`document.querySelector("dialog.sheet[open] [data-make-codes]").click();`);
@@ -1690,7 +1690,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     // Signed out, and the phone's passkeys lost.
     service.sessions.set("tok-old-tablet", "fra");
     await openMe();
-    await run(`document.querySelector("dialog.sheet[open] [data-me='signout']").click();`);
+    await run(`document.querySelector("#app [data-me='signout']").click();`);
     await until("signed out", `document.querySelector(".acct [data-act='signup']")`, 15000);
     await page("WebAuthn.clearCredentials", {authenticatorId});
     await run(`document.querySelector(".acct [data-act='signup']").click();`);
@@ -1712,14 +1712,14 @@ async function accountSteps({run, until, reload, page, blocked, service}){
 
   await step("the account: a copy of its data; deleted for good with the handle and the passkey, the trips staying on the phone", async () => {
     await openMe();
-    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.sheet[open] [data-me]")].map(b => b.textContent);`), ["Passkeys and devices", "Linked chats", "Export my data", "Sign out", "Delete account"]);
+    assert.deepEqual(await run(`return [...document.querySelectorAll("#app [data-me]")].map(b => b.textContent);`), ["Passkeys and devices", "Linked chats", "Export my data", "Sign out", "Delete account"]);
     service.calls.length = 0;
-    await run(`document.querySelector("dialog.sheet[open] [data-me='export']").click();`);
+    await run(`document.querySelector("#app [data-me='export']").click();`);
     await until("the copy made", `/Your data is in the file/.test(document.getElementById("toast").textContent)`, 15000);
     assert.ok(service.calls.includes("GET /v1/account/export"));
     // Deleting: the handle first (nothing happens without it), then the passkey.
     await openMe();
-    await run(`document.querySelector("dialog.sheet[open] [data-me='delete']").click();`);
+    await run(`document.querySelector("#app [data-me='delete']").click();`);
     await until("the handle asked", `document.querySelector("dialog.ask[open] .ask-type input")`);
     assert.equal(await text("dialog.ask[open] #ask-title"), "Delete your account?");
     assert.equal(await run(`return document.querySelector('dialog.ask[open] [data-answer="yes"]').disabled;`), true);
@@ -1729,8 +1729,10 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.deepEqual(service.deleted, ["fra"]);
     assert.equal([...service.trips.values()].filter(t => t.owner === "fra").length, 0, "its trips gone from the service (someone else's stay)");
     // Signed out; the trips stay on this phone, as this phone's.
-    await run(`location.hash = "#trips";`);
+    await run(`location.hash = "#me";`);
     await until("signed out", `document.querySelector(".acct [data-act='signup']")`);
+    await run(`location.hash = "#trips";`);
+    await until("the trips", `document.querySelector(".tripcard")`);
     assert.ok(await run(`return document.querySelectorAll(".tripcard").length > 0;`), "the trips stay");
     assert.equal(await run(`return [...document.querySelectorAll(".tripcard .where")].length;`), 0, "none says it is on an account");
     assert.deepEqual(blocked(), []);
