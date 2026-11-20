@@ -1546,7 +1546,8 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.match(await text("dialog.sheet[open] [data-chats]"), /No chat app is linked/);
     await until("said", `/Unlinked: Claude\./.test(document.getElementById("toast").textContent)`);
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
-    assert.equal(await run(`return !!document.querySelector("dialog.sheet");`), false);
+    // The sheet goes on its "close" event, a moment after the tap (later on a slow machine).
+    await until("the sheet gone", `!document.querySelector("dialog.sheet")`);
     assert.deepEqual(blocked(), []);
   });
 
