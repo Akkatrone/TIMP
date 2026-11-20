@@ -592,21 +592,44 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector('[data-act="paste"]')`);
     // The message to start from is there, with the page of the format on this site.
-    assert.match(await run(`return document.querySelector("details.aihow [data-prompt]").textContent;`), /^Read http:\/\/\S+\/llms\.txt and follow it exactly\./);
+    assert.match(await run(`return document.querySelector("details.aihow [data-prompt]").textContent;`), /^Read http:\/\/\S+\/llms\.txt and follow it exactly:/);
     await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; };`);
     await run(`document.querySelector("[data-act='copy-prompt']").click(); await new Promise(r => setTimeout(r, 100));`);
     const message = await run(`return window.__copied;`);
     assert.match(message, /\[where, dates or number of days/);
+    // The line to fill in comes last: pasted in a chat, the cursor is already there.
+    const last = text => text.trim().split("\n").pop();
+    assert.match(last(message), /^My trip: \[where/);
     assert.ok(message.length < 400, "short enough to use on a phone");
     // For an assistant that opens no link: the same, with the format itself.
     await run(`document.querySelector("[data-act='copy-prompt-full']").click(); await new Promise(r => setTimeout(r, 100));`);
     const full = await run(`return window.__copied;`);
     assert.match(full, /TIMP trip file, format "travel-in-my-pocket\/2"/);
     assert.ok(!full.includes("llms.txt"));
+    assert.match(last(full), /^My trip: \[where/);
     // Changing the open trip: the message carries the trip itself.
     await run(`document.querySelector("[data-act='copy-edit']").click(); await new Promise(r => setTimeout(r, 100));`);
     const edit = await run(`return window.__copied;`);
     assert.match(edit, /\[what to change\]/);
+    assert.equal(last(edit), "Change my trip like this: [what to change].");
+    // Written in the app: the request becomes the last line, and stays on the phone.
+    const type = (sel, value) => run(`const b = document.querySelector(${JSON.stringify(sel)}); b.value = ${JSON.stringify(value)}; b.dispatchEvent(new Event("input", {bubbles: true}));`);
+    await type("#ai-new", "Kyoto, 5 days in April, two of us, temples and food");
+    assert.equal(last(await run(`return document.querySelector("[data-prompt]").textContent;`)), "My trip: Kyoto, 5 days in April, two of us, temples and food", "the preview follows");
+    await run(`document.querySelector("[data-act='copy-prompt']").click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(last(await run(`return window.__copied;`)), "My trip: Kyoto, 5 days in April, two of us, temples and food");
+    await type("#ai-edit", "Move the castle to the morning");
+    await run(`document.querySelector("[data-act='copy-edit']").click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(last(await run(`return window.__copied;`)), "Change my trip like this: Move the castle to the morning");
+    await new Promise(r => setTimeout(r, 600));   // drafts are kept after a short pause
+    await reload();
+    await run(`location.hash = "#trips";`);
+    await until("the drafts kept", `document.querySelector("#ai-new") && document.querySelector("#ai-new").value.startsWith("Kyoto") && document.querySelector("#ai-edit").value === "Move the castle to the morning"`);
+    await run(`document.querySelector("[data-act='clear-draft'][data-key='new']").click();`);
+    assert.equal(await run(`return document.querySelector("#ai-new").value;`), "");
+    assert.equal(last(await run(`return document.querySelector("[data-prompt]").textContent;`)), "My trip: [where, dates or number of days, who travels, what you like, how you get around].");
+    await run(`document.querySelector("[data-act='clear-draft'][data-key^='edit:']").click(); await new Promise(r => setTimeout(r, 600));`);
+    await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; };`);
     assert.match(edit, /travel-in-my-pocket\/changes/, "how to write changes");
     assert.match(edit, /\nTrip ".*", id [a-z0-9-]+, version [0-9a-f]{16}, \d+ days?\./, "the outline of the open trip");
     assert.ok(!edit.includes('"text":'), "not the whole file");

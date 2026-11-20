@@ -56,6 +56,8 @@ const S = {
   account: null,          // the sharing service's account on this phone ({id, handle, …}), or null
   sync: "",               // "", "busy", "ok", "offline", "error": the last sync with the service
   hidden: new Set(),      // trips of the account taken off this phone only: not downloaded again
+  drafts: {},             // what the traveller wrote for an assistant: {new: "…", "edit:<trip id>": "…"}
+  openDetails: new Set(), // folded sections opened (data-keep), kept open when the page is drawn again
   openCosts: new Set()    // stops whose cost shows what it makes at home, until the page is closed
 };
 
@@ -628,16 +630,21 @@ function errorBox(){
 // date). For an assistant that opens no link at all, the second button copies the
 // format itself (formatBrief), about forty lines.
 const llmsUrl = () => REPO_URL ? `${REPO_URL}/blob/main/llms.txt` : new URL("llms.txt", document.baseURI).href;
-const aiMessage = () => t("aiPrompt", {url: llmsUrl()});
-const aiMessageFull = () => t("aiPromptFull") + "\n\n" + formatBrief();
+// The request the traveller wrote in the app, as the last line; without one, the part in
+// brackets to fill in, in the chat.
+const tripLine = () => t("aiTripLine", {x: (S.drafts.new || "").trim() || t("aiTripPh")});
+const aiMessage = () => t("aiPrompt", {url: llmsUrl()}) + "\n" + tripLine();
+// The long part first, the line to fill in last: pasted in a chat, the cursor is already there.
+const aiMessageFull = () => formatBrief() + "\n\n" + t("aiPromptFull") + "\n" + tripLine();
 
 function aiSection(folded){
   const body = `<ol class="steps"><li>${esc(t("aiStep1"))}</li><li>${esc(t("aiStep2"))}</li></ol>
+    ${requestBox("ai-new", "new", t("aiTripLabel"), t("aiTripHint"))}
+    <div class="actions"><button type="button" class="btn small primary" data-act="copy-prompt">${esc(t("copyPrompt"))}</button><button type="button" class="btn small" data-act="clear-draft" data-key="new">${esc(t("clearDraft"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
     <pre class="prompt" data-prompt>${esc(aiMessage())}</pre>
-    <div class="actions"><button type="button" class="btn small" data-act="copy-prompt">${esc(t("copyPrompt"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
     <p class="foot">${esc(t("aiNoLinks"))} <button type="button" class="linkbtn" data-act="copy-prompt-full">${esc(t("copyPromptFull"))}</button></p>`;
   return folded
-    ? `<details class="aihow"><summary>${esc(t("aiTitle"))}</summary>${body}</details>`
+    ? `<details class="aihow" data-keep="ai-new"${S.openDetails.has("ai-new") ? " open" : ""}><summary>${esc(t("aiTitle"))}</summary>${body}</details>`
     : `<section class="sec aihow"><h2>${esc(t("aiTitle"))}</h2>${body}</section>`;
 }
 
@@ -649,13 +656,28 @@ function aiSection(folded){
 // in the chat: a newer one tells it to read the guide again. Only on a published copy.
 const appVersion = () => (/^\d+\.\d+\.\d+/.exec(S.version) || [""])[0];
 const versionLine = () => appVersion() ? "\n\n" + t("aiVersion", {v: appVersion(), url: llmsUrl()}) : "";
-const aiEditMessage = () => t("aiEditPrompt") + versionLine() + "\n\n" + changesBrief() + "\n\n" + outline(S.rec.trip, privOf());
+const aiEditMessage = () => changesBrief() + "\n\n" + outline(S.rec.trip, privOf()) + versionLine() + "\n\n" + t("aiEditPrompt") +
+  "\n" + t("aiEditLine", {x: (S.drafts["edit:" + S.rec.id] || "").trim() || t("aiEditPh")});
+
+// What the traveller writes for an assistant stays on the phone (a draft per new trip,
+// one per trip to change), until they clear it.
+let draftTimer = 0;
+function setDraft(key, value){
+  if(value) S.drafts[key] = value; else delete S.drafts[key];
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => store.setKV("drafts", S.drafts).catch(() => {}), 400);
+}
+// The box where the request is written: the hint shows while it is empty.
+const requestBox = (id, key, label, hint) => `<div class="field ask-box"><label for="${id}">${esc(label)}</label>` +
+  `<textarea id="${id}" rows="3" data-draft="${esc(key)}" placeholder="${esc(hint)}">${esc(S.drafts[key] || "")}</textarea></div>`;
 
 function aiEditSection(){
-  return `<details class="aihow"><summary>${esc(t("aiEditTitle"))}</summary>
+  const key = "edit:" + S.rec.id;
+  return `<details class="aihow" data-keep="ai-edit"${S.openDetails.has("ai-edit") ? " open" : ""}><summary>${esc(t("aiEditTitle"))}</summary>
     <ol class="steps"><li>${esc(t("aiEdit1"))}</li><li>${esc(t("aiEdit2"))}</li><li>${esc(t("aiEdit3"))}</li></ol>
-    <pre class="prompt">${esc(t("aiEditPrompt"))}\n${esc(t("aiEditMore", {t: S.rec.trip.title}))}</pre>
-    <div class="actions"><button type="button" class="btn small" data-act="copy-edit">${esc(t("copyEdit"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
+    ${requestBox("ai-edit", key, t("aiEditLabel"), t("aiEditHint"))}
+    <div class="actions"><button type="button" class="btn small primary" data-act="copy-edit">${esc(t("copyEdit"))}</button><button type="button" class="btn small" data-act="clear-draft" data-key="${esc(key)}">${esc(t("clearDraft"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
+    <p class="foot">${esc(t("aiEditMore", {t: S.rec.trip.title}))}</p>
   </details>`;
 }
 
@@ -1548,8 +1570,12 @@ function renderKeepingFocus(){
       if(attr) sel = `[${attr}="${CSS.escape(a.getAttribute(attr))}"]`;
     }
   }
+  // Typing in a box: the caret stays where it was.
+  const caret = a && typeof a.selectionStart === "number" ? [a.selectionStart, a.selectionEnd] : null;
   render();
   if(sel) refocus(sel);
+  const b = sel && document.querySelector(sel);
+  if(b && caret && typeof b.setSelectionRange === "function") try{ b.setSelectionRange(caret[0], caret[1]); }catch(e){}
 }
 
 /* ---------- events ---------- */
@@ -1558,6 +1584,20 @@ function refocus(selector){
   const el = document.querySelector(selector);
   if(el) el.focus({preventScroll: true});
 }
+
+$app.addEventListener("input", e => {
+  const box = e.target.closest && e.target.closest("[data-draft]");
+  if(!box) return;
+  setDraft(box.dataset.draft, box.value);
+  const prompt = document.querySelector("[data-prompt]");
+  if(prompt && box.dataset.draft === "new") prompt.textContent = aiMessage();
+});
+// Folded sections the traveller opened stay open when the page is drawn again.
+$app.addEventListener("toggle", e => {
+  const d = e.target;
+  if(!d.dataset || !d.dataset.keep) return;
+  if(d.open) S.openDetails.add(d.dataset.keep); else S.openDetails.delete(d.dataset.keep);
+}, true);
 
 $app.addEventListener("click", e => {
   // Any tap outside the open ⋯ menu closes it first (its own button toggles it below).
@@ -1695,9 +1735,16 @@ $app.addEventListener("click", e => {
   if(a === "pick"){ $file.value = ""; $file.click(); }
   else if(a === "paste") pasteTrip();
   else if(a === "copy-errors") copyErrors();
-  else if(a === "copy-prompt") copyText(aiMessage(), t("copiedPrompt"));
-  else if(a === "copy-prompt-full") copyText(aiMessageFull(), t("copiedPrompt"));
-  else if(a === "copy-edit" && S.rec) copyText(aiEditMessage(), t("copiedEdit"));
+  else if(a === "copy-prompt") copyText(aiMessage(), t((S.drafts.new || "").trim() ? "copiedReady" : "copiedPrompt"));
+  else if(a === "copy-prompt-full") copyText(aiMessageFull(), t((S.drafts.new || "").trim() ? "copiedReady" : "copiedPrompt"));
+  else if(a === "copy-edit" && S.rec) copyText(aiEditMessage(), t((S.drafts["edit:" + S.rec.id] || "").trim() ? "copiedReady" : "copiedEdit"));
+  else if(a === "clear-draft"){
+    setDraft(act.dataset.key, "");
+    const box = document.querySelector(`[data-draft="${CSS.escape(act.dataset.key)}"]`);
+    if(box){ box.value = ""; box.focus(); }
+    const prompt = document.querySelector("[data-prompt]");
+    if(prompt && act.dataset.key === "new") prompt.textContent = aiMessage();
+  }
   else if(a === "demo") loadDemo();
   else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn});
   else if(a === "sync") syncNow();
@@ -1946,6 +1993,10 @@ async function start(){
     S.account = ((await shareSession()) || {}).user || null;
     const hidden = await store.getKV("share:hidden");
     if(Array.isArray(hidden)) S.hidden = new Set(hidden);
+  }
+  {
+    const drafts = await store.getKV("drafts");
+    if(drafts && typeof drafts === "object") S.drafts = drafts;
   }
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;

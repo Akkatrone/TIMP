@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.12.2
+
+Asking an AI assistant, from the phone.
+
+- **Write your request in the app**: a box for the trip to write ("Your trip") and one
+  for the changes to the open trip ("What to change"). Copy makes the whole message,
+  with your words as its last line: in the chat you only paste and send. What you wrote
+  stays on the phone until you clear it, one draft per trip.
+- **The messages end with the line to fill in**: the format and the trip come first.
+  With an empty box, the part in brackets is there to complete in the chat, right
+  where the cursor is.
+
 ## 3.12.1
 
 Deleting a trip that is on your account.

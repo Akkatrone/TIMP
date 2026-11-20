@@ -366,6 +366,10 @@ span.costbtn{cursor:auto}
 .aihow + .aihow{border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
 .aihow .foot{margin-top:10px}
 .aihow .steps{margin-top:8px}
+.aihow .ask-box{display:grid;gap:6px;margin:10px 0}
+.aihow .ask-box label{font-weight:600;font-size:.9rem}
+.aihow .ask-box textarea{width:100%;box-sizing:border-box;min-height:84px;resize:vertical;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:400 1rem/1.45 var(--f-body)}
+.aihow .ask-box textarea::placeholder{color:var(--muted)}
 .errbox b{font-weight:600}
 
 /* bottom right: Paste (what was copied: a place, a trip, changes) and + (a stop on the

@@ -227,11 +227,15 @@ Any assistant can write a trip file, because the instructions are two plain docu
   write the trip**:
 
   ```text
-  Read https://github.com/Frafal/TIMP/blob/main/llms.txt and follow it exactly.
-  Then write a TIMP trip file for: [where, dates or number of days, who travels,
-  what you like, how you get around].
-  Give me the whole JSON in one block.
+  Read https://github.com/Frafal/TIMP/blob/main/llms.txt and follow it exactly: write a
+  TIMP trip file, and give me the whole JSON in one block.
+  My trip: [where, dates or number of days, who travels, what you like, how you get around].
   ```
+
+  Write your trip in the app's box and the message is copied with it as its last
+  line; or leave the box empty and fill in the part in brackets in the chat: it is
+  always the last line, also in the longer messages (with the whole format, or with
+  the trip to change).
 
   Then copy the whole answer and tap **Trips → Paste a trip**. If something is wrong,
   the app lists each problem with its position in the file; **Copy for the assistant**
