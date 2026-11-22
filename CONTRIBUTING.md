@@ -8,20 +8,12 @@ project is put together and what a change needs before it can be merged.
 Three promises shape every decision. A change that breaks one of them will not be
 merged, however useful it is otherwise.
 
-1. **The trip never leaves the device.** No accounts, no server, no analytics, no
-   request that carries trip data. Trip files are read locally and stored in IndexedDB.
-   Two exceptions, only when a stop is added or changed: its name and address go to
-   Google or OpenStreetMap to look up its position, and a Google Maps link pasted or
-   shared goes to the link resolver (`worker/`), which keeps nothing. And one for costs
-   in another currency: the month whose exchange rates are needed goes to Frankfurter
-   (every currency against the euro: no amount, place or currency of the trip). And
-   an optional account, only on a copy with a sharing service: a name and the public
-   half of a passkey go to it, and, signed in, the traveller's trips and private
-   expenses (sealed where they are kept), to be on their other phones and shared with
-   whom they choose. A chat app (Claude, ChatGPT…) the traveller connects to that
-   account reads there only what they allowed in the app (`#authorize=`). A trip its
-   owner publishes "with the link" is readable by anyone with the page's address: only
-   the version chosen and only what they reviewed, until they withdraw it.
+1. **The trip never leaves the device**, except where [docs/privacy.md](docs/privacy.md)
+   says, and that page lists all of it: a stop's name and address to find its
+   position, a Maps short link to the resolver, the month of an exchange rate; with an
+   account the traveller made, their trips on its service, the chats they linked, the
+   pages they publish. No analytics, no request that carries trip data otherwise. A
+   change to what leaves the phone, or to whom, goes in that page in the same change.
 2. **It works offline.** Everything except the interactive map must work in airplane
    mode, on iPhone and Android, after the app has been opened once.
 3. **Anyone can host it.** The app is static files. No build step is needed to run it
@@ -93,10 +85,12 @@ taps, add a check to `tools/e2e.mjs`.
 | `icons/` | `icon.svg` and `icon-maskable.svg` are the sources; the PNGs are made from them with `rsvg-convert` (192, 512, the maskable 512, and 180 for the iPhone, on a square without rounded corners). |
 | `sw.js` | Service worker: keeps the app available offline. |
 | `worker/` | The link resolver, a separate and optional service on Cloudflare Workers: a Google Maps link in, name, address, position and kind of place out. It keeps nothing. How to put it online: `worker/README.md`. |
-| `tools/` | Command-line checks, the build used for publishing, the browser check and the screenshots. |
-| `test/` | Unit tests (`node:test`, no dependencies). |
+| `tools/` | Command-line checks, the build used for publishing, the browser check and the screenshots; `tools/lib/llms.mjs` builds `llms.txt`. |
+| `test/` | Unit tests and the joins' property tests (`node:test`, no dependencies). |
+| `vendor/` | Third-party code, unmodified (MapLibre, with its licence). |
 | `docs/trip-format.md` | The trip file format, for people who write trips. |
 | `docs/creating-a-trip.md` | How to write a good trip file, for people and AI assistants. |
+| `docs/using-the-app.md`, `docs/privacy.md`, `docs/google-maps.md` | The details the README leaves out: using the app, everything that leaves the phone, a Google Maps key. |
 | `AGENTS.md` | Instructions for AI coding agents. `CLAUDE.md` only points to it. |
 | `.claude/skills/create-trip-file/` | A short skill that sends the agent to the two documents above. |
 
@@ -115,6 +109,14 @@ rule in the validator and escaping where it is shown.
 versions must end with the same trip and the same version id: the merge picks the
 winner of a conflict by version id, never by which phone runs it. `test/versions.test.mjs`
 checks it; keep it passing when you touch `js/version.js`, `js/merge.js` or `js/edit.js`.
+
+**A join never makes a trip invalid, doubles a stop or loses what one side did.**
+`test/merge-properties.test.mjs` holds the rules of `js/merge.js` (written at its top)
+on random edits made on two sides, and on three phones that edit, restore and sync in
+any order: 400 cases in every test run, 20,000 more each week (`merge-fuzz.yml`). A new
+kind of edit, or a new list in the format, gets its step in that generator in the same
+change. A failure names its seed (`MERGE_SEEDS=1 MERGE_FIRST=<seed>` runs it alone):
+fix the join, never the seed.
 
 **The trip format is a contract, and it is content only.** A trip file says what the
 trip is; how it looks (colours, map zones, labels, icons) is worked out by the app and
@@ -138,8 +140,10 @@ into tool-specific files.
 
 Chat assistants (Gemini, ChatGPT…) do not clone the repository: they read one page,
 if they can open it at all. That page is `llms.txt`, made by `tools/lib/llms.mjs`: the
-format in short (`formatBrief()` in `js/trip.js`, about forty lines made from `FIELDS`),
-then the two documents and the example. It is published with the site and kept at the
+format in short (`formatBrief()` in `js/trip.js`, about sixty lines made from `FIELDS`:
+every field), how to write changes, the guide and the example. The field reference
+(`docs/trip-format.md`) stays for people: every line of `llms.txt` is read, and paid for,
+by every assistant that writes a trip. It is published with the site and kept at the
 root of the repository, because assistants open github.com pages more readily than a
 small site; the app's message for an assistant points there. Never edit it by hand: run
 `node tools/check-llms.mjs --fix` after changing `docs/`, `js/trip.js` or the example

@@ -3,11 +3,13 @@
 //
 // Chat assistants (Gemini, ChatGPT…) read one page when given a link; they do not
 // clone the repository and open docs/. This page is made by the build: the version and
-// what changed in the format, the format in short (formatBrief in js/trip.js, made from
-// FIELDS, the same text the app copies for an assistant), then the documents agents
-// read, without what only matters inside the repository (between the markers
-// <!-- llms.txt: skip --> and <!-- llms.txt: end -->), then the example, compact.
-// Nothing here is written twice.
+// the latest changes to the format, the format in short (formatBrief in js/trip.js, made
+// from FIELDS, the same text the app copies for an assistant: every field), how to write
+// changes, the guide (docs/creating-a-trip.md) without what only matters inside the
+// repository (between <!-- llms.txt: skip --> and <!-- llms.txt: end -->), the example,
+// compact. The field reference (docs/trip-format.md) stays for people: the format in
+// short says the same in a fifth of the length. Nothing here is written twice: every
+// line is read, and paid for, by every assistant that writes a trip.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -58,7 +60,9 @@ function forOnePage(md){
 export function llmsText({root = ROOT, site = "https://frafal.github.io/TIMP/", resolver = ""} = {}){
   const version = JSON.parse(read(root, "package.json")).version;
   const reference = read(root, "docs/trip-format.md");
-  const news = (NEWS.exec(reference) || ["", ""])[1].trim();
+  // The latest three: what an assistant that read an older page needs. All of them are
+  // in docs/trip-format.md.
+  const news = (NEWS.exec(reference) || ["", ""])[1].trim().split(/\n(?=- )/).slice(0, 4).join("\n");
   const links = resolver ? `
 ## Google Maps links
 
@@ -125,10 +129,6 @@ ${links}
 ---
 
 ${forOnePage(read(root, "docs/creating-a-trip.md"))}
-
----
-
-${forOnePage(reference)}
 
 ---
 

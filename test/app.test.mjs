@@ -223,10 +223,10 @@ test("the build publishes only the app, stamped with a version", () => {
 
 test("llms.txt gives a chat assistant the whole format in one page, with valid examples", () => {
   const text = llmsText();
-  for(const doc of ["docs/creating-a-trip.md", "docs/trip-format.md"]){
-    const title = readFileSync(join(ROOT, doc), "utf8").split("\n")[0];
-    assert.ok(text.includes(title), doc);
-  }
+  // The guide, whole; the field reference stays for people: the format in short already
+  // has every field, and every line here is paid for by every assistant that reads it.
+  assert.ok(text.includes(readFileSync(join(ROOT, "docs/creating-a-trip.md"), "utf8").split("\n")[0]), "the guide");
+  assert.ok(!text.includes(readFileSync(join(ROOT, "docs/trip-format.md"), "utf8").split("\n")[0]), "the reference is not pasted again");
   assert.ok(!/\]\((?!https?:)[^)]+\)/.test(text), "no links to files of the repository");
   // It is one complete page: nothing sends the assistant to look for another file.
   assert.ok(!/trip-format\.md|creating-a-trip\.md|demo-trip\.json|ask for it/.test(text), "no pointer to a file the page already contains");
