@@ -6,7 +6,7 @@ import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
 import { ask } from "./ask.js";
 import { signUp, ShareError, linkedApps, unlinkApp, passkeys, openSessions, endOtherSessions, removePasskey, addPasskey, needsSignIn, signInAgain,
-  recoveryState, makeRecoveryCodes, recoverAccount } from "./share.js";
+  recoveryState, makeRecoveryCodes, recoverAccount, connectorAddress } from "./share.js";
 
 const FINGER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 8.5a6.5 6.5 0 0111.6-2.4M18.9 9.2c.4 1.6.4 3.3.1 4.8M5.6 11.5v2.2c0 2.6 1 5 2.7 6.8"/><path d="M8.6 12v1.7a8.6 8.6 0 002.2 5.8M12 9.8a2.3 2.3 0 012.3 2.3v1.6c0 1.6.4 3.1 1.2 4.4"/><path d="M12 13v.8a11 11 0 001.7 5.9"/></svg>';
 
@@ -104,6 +104,16 @@ export async function openLinkedApps(toast){
     </div>
     <p class="foot">${esc(t("chatsHelp"))}</p>
     <div class="chats" data-chats aria-busy="true"><p class="foot">…</p></div>
+    <section class="connect" aria-labelledby="connect-title">
+      <h3 id="connect-title">${esc(t("connectTitle"))}</h3>
+      <p class="foot">${esc(t("connectHelp"))}</p>
+      <div class="invite-link">
+        <code class="addr" data-connector aria-label="${esc(t("connectAddress"))}">${esc(connectorAddress())}</code>
+        <div class="actions"><button type="button" class="btn small" data-copy-connector>${esc(t("copyLink"))}</button></div>
+      </div>
+      <ul class="foot steps"><li>${esc(t("connectClaude"))}</li><li>${esc(t("connectChatgpt"))}</li></ul>
+      <p class="foot">${esc(t("connectAfter"))}</p>
+    </section>
   </div>`;
   document.body.appendChild(dlg);
   const $list = dlg.querySelector("[data-chats]");
@@ -123,6 +133,11 @@ export async function openLinkedApps(toast){
   dlg.addEventListener("close", () => dlg.remove());
   dlg.addEventListener("click", async e => {
     if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-copy-connector]")){
+      const field = dlg.querySelector("[data-connector]");
+      await navigator.clipboard.writeText(field.textContent).then(() => toast(t("connectCopied")), () => getSelection().selectAllChildren(field));
+      return;
+    }
     const b = e.target.closest("[data-unlink]");
     if(!b) return;
     const app = apps.find(a => a.id === b.dataset.unlink);

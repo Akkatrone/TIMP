@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.28.0
+
+Linking a chat app, said where it is needed.
+
+- **You → Linked chats → Link a chat**: the connector's address, with Copy, and the
+  steps for Claude and ChatGPT. Before, the app said to add a connector without saying
+  which address.
+- **README**: "With an account" (sync, sharing, publishing, lock, history) and "Link a
+  chat app (Claude, ChatGPT)": how, and what a linked chat can and cannot do.
+- **llms.txt**: a chat with TIMP's tools uses them, not files; one without them can be
+  linked.
+
 ## 3.27.2
 
 - History: an open version lists every change, however many (no more "and N more"),

@@ -15,6 +15,9 @@ const SESSION = "share:session";
 /** Whether this copy of the app has a sharing service. */
 export const hasService = () => !!SHARE_URL;
 
+/** The address a chat app (Claude, ChatGPT…) is given to add TIMP as a connector. */
+export const connectorAddress = () => SHARE_URL + "/mcp";
+
 /** An error of the service: its status and its sentence (js/share-api.js, shape `error`). */
 export class ShareError extends Error {
   constructor(status, message, current){

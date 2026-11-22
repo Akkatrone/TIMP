@@ -88,6 +88,13 @@ is newer, read "What's new" and use it. If you cannot open it, ask the traveller
 the message the app copies (Trips → Have an AI assistant change this trip): it always
 carries the current format.
 
+## When TIMP is linked to this chat
+
+If you have TIMP's tools (\`list_trips\`, \`get_trip\`, \`change_trip\`…), the traveller
+linked their TIMP account to this chat: use the tools, not files. They read and change
+the trips on the account directly, and say how. Without them, a traveller with a TIMP
+account can link you: in TIMP, You → Linked chats → Link a chat.
+
 ## What's new
 
 ${news}

@@ -36,6 +36,11 @@ Retake them with <code>npm run screenshots</code>.</sub></p>
 - Add and change stops on the phone: paste what Google Maps shares, or an address.
 - Every change is a version, like a commit in Git. Share the file, and when a friend
   changed it too, the app joins the two.
+- With an account (optional; by invitation for now): your trips on all your phones,
+  shared with the people you choose, published as a page anyone with the link can
+  read, locked when they are final. See [With an account](#with-an-account).
+- Link Claude or ChatGPT to your account, and the chat reads and changes your trips
+  for you, without copying anything: see [Link a chat app](#link-a-chat-app-claude-chatgpt).
 - Tick the stops you have done, or skip the ones you leave out. The app remembers both.
 - Each stop at a glance: time, pin number and how you get there on the left, a label
   like "Booking needed" above the title, Map and Directions always one tap away.
@@ -188,6 +193,59 @@ version with the old content, the way `git revert` does, so it can itself be und
 
 Ticked and skipped stops are never part of the file: they stay on each phone.
 
+## With an account
+
+An account is optional: without one the app works as it always has, with files. Making
+one needs an invitation code, for now. In the app, tap the circle at the top right
+(**You**) → **Create account**: a name and a passkey, no password, no email.
+
+Signed in:
+
+- **Your trips on every phone.** They sync by themselves; changes made on two phones
+  are joined, as with files.
+- **Share** a trip with a person: they get a link, and see it (or also change it) on
+  their own phone. Take them off whenever you want.
+- **Publish** a trip **with the link**: a page anyone with its address can read, even
+  without the app, after you review what goes on it. Others can open it in TIMP, or
+  **Use as a base** for a trip of their own. Withdraw it whenever you want.
+- **Lock** a trip when it is final: no change, from you, the people you share it with
+  or a chat, until you unlock it.
+- **History** says who made each version and how: in the app, or with a linked chat.
+- **You** → Passkeys and devices, recovery codes, Export my data, Delete account.
+
+What the service keeps and who sees it: [Privacy](#privacy).
+
+### Link a chat app (Claude, ChatGPT)
+
+A chat linked to your account works on your trips directly: no file to paste, no
+outline to copy. Ask *"add a dinner near the hotel on day 2"* or *"plan a day in Porto
+for me"*, and the change is on your phones at their next sync.
+
+1. In TIMP: **You** → **Linked chats**. Under **Link a chat** you find the connector's
+   address, with **Copy**.
+2. In the chat app, add a connector with that address:
+   - **Claude**: Settings → Connectors → Add custom connector.
+   - **ChatGPT**: Settings → Apps & Connectors, with developer mode on → Create.
+3. The chat app sends you to TIMP: it shows who asks, what it will be able to do (read
+   your trips; change them; your private expenses only if you tick them) and where
+   the answer goes. Allow it with your passkey.
+
+What a linked chat can do:
+
+- **Read** your trips and those shared with you: a day, a stop, the practical info,
+  the history. It reads a short outline first, so a long trip costs few tokens.
+- **Change** them where you may: add and change stops, days, plans, expenses. Each
+  change is a version, joined with what you changed on your phones meanwhile, as
+  between two phones.
+- **Take away** a stop, a day, a note… only after asking you: the chat app asks you to
+  confirm, and nothing goes without your yes.
+- **Create** a new trip on your account. It never overwrites one you have.
+- Never: a locked trip, a trip you can only read, your private expenses unless you
+  allowed them, your account or your passkeys.
+
+The History marks what a chat did ("with Claude"); **You** → **Linked chats** shows
+what each chat can do and when it last did it, and **Unlink** stops it at once.
+
 ## Create your own trip
 
 > **AI assistant reading this page:** before you write a trip file, read
@@ -216,6 +274,8 @@ Any assistant can write a trip file, because the instructions are two plain docu
 [docs/creating-a-trip.md](docs/creating-a-trip.md) (how to write a good one) and
 [docs/trip-format.md](docs/trip-format.md) (every field).
 
+- **A chat linked to your account** (Claude, ChatGPT): ask, and it writes the trip
+  straight onto your account. See [Link a chat app](#link-a-chat-app-claude-chatgpt).
 - **A coding agent** (Claude Code, Codex, Cursor, Copilot and others): clone the
   repository, open the folder, and describe your trip or hand over your notes:
   *"Create a trip file for my week in Portugal, here is the plan…"*. The agent finds

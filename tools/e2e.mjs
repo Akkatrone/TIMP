@@ -1564,6 +1564,9 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.equal(await text("dialog.sheet[open] [data-chat] small"), "reads and changes your trips");
     assert.match(await run(`return document.querySelectorAll("dialog.sheet[open] [data-chat] small")[1].textContent;`), /^linked .+$/);
     assert.match(await run(`return document.querySelectorAll("dialog.sheet[open] [data-chat] small")[2].textContent;`), /^last used .+$/);
+    // How to link one: the connector's address, ready to copy, and the steps.
+    assert.match(await run(`return document.querySelector("dialog.sheet[open] [data-connector]").textContent;`), /^https?:\/\/.+\/mcp$/);
+    assert.match(await text("dialog.sheet[open] .connect"), /Claude: Settings → Connectors/);
     // Cancel keeps it.
     await run(`document.querySelector("dialog.sheet[open] [data-unlink]").click();`);
     await until("the question", `document.querySelector("dialog.ask[open]")`);
@@ -1575,7 +1578,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
     await until("gone from the list", `!document.querySelector("dialog.sheet[open] [data-chat]")`);
     assert.equal(service.chat.unlinked, true);
-    assert.match(await text("dialog.sheet[open] [data-chats]"), /No chat app is linked/);
+    assert.match(await text("dialog.sheet[open] [data-chats]"), /No chat app is linked yet/);
     await until("said", `/Unlinked: Claude\./.test(document.getElementById("toast").textContent)`);
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
     // The sheet goes on its "close" event, a moment after the tap (later on a slow machine).
