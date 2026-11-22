@@ -99,6 +99,46 @@ function makeMerger(aWins){
   return {fields, list};
 }
 
+// A stop id is unique within its list. Only infer a move across lists when
+// that id names exactly one stop throughout each of the three versions.
+function positions(trip){
+  const byId = new Map();
+  for(const day of trip.days){
+    for(const plan of day.plans || [day]){
+      const place = JSON.stringify([day.date, day.plans ? plan.id : null]);
+      for(const stop of plan.stops || []){
+        if(stop.id) byId.set(stop.id, byId.has(stop.id) ? null : {place, stop});
+      }
+    }
+  }
+  return byId;
+}
+
+function mergeMovedStops(days, base, ours, theirs, merger, aWins){
+  const a = positions(ours), b = positions(theirs), moves = new Map();
+  for(const [id, original] of positions(base)){
+    const left = a.get(id), right = b.get(id);
+    if(!original || !left || !right) continue;
+    if(left.place === original.place && right.place === original.place) continue;
+    let dest = aWins ? left : right;
+    if(left.place === original.place) dest = right;
+    if(right.place === original.place) dest = left;
+    moves.set(id, {place: dest.place, stop: merger.fields(original.stop, left.stop, right.stop)});
+  }
+  if(!moves.size) return days;
+  const update = (stops, date, plan) => {
+    const place = JSON.stringify([date, plan]);
+    return stops.flatMap(stop => {
+      const move = moves.get(stop.id);
+      if(!move) return [stop];
+      return move.place === place ? [move.stop] : [];
+    });
+  };
+  return days.map(day => day.plans
+    ? {...day, plans: day.plans.map(p => ({...p, stops: update(p.stops, day.date, p.id)}))}
+    : {...day, stops: update(day.stops, day.date, null)});
+}
+
 /**
  * @param {object|null} base   the common version, or null if unknown
  * @param {object} ours        the trip on this device
@@ -107,7 +147,8 @@ function makeMerger(aWins){
  *   diffTrips(ours, result) (js/diff.js).
  */
 export function mergeTrips(base, ours, theirs){
-  const m = makeMerger(String(ours.version.id) > String(theirs.version.id));
+  const aWins = String(ours.version.id) > String(theirs.version.id);
+  const m = makeMerger(aWins);
   const strip = t => { const {version, ...rest} = t; return rest; };
 
   const stops = m.list(s => s.id, (z, a, b) => m.fields(z, a, b));
@@ -116,6 +157,8 @@ export function mergeTrips(base, ours, theirs){
   const expenses = m.list(x => x.id, (z, a, b) => m.fields(z, a, b));
 
   const trip = m.fields(base ? strip(base) : undefined, strip(ours), strip(theirs), {days, expenses});
+  if(base) trip.days = mergeMovedStops(trip.days, base, ours, theirs, m, aWins);
+  trip.days = [...trip.days];
   trip.days.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
   return trip;
 }

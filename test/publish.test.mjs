@@ -125,3 +125,15 @@ test("use as a base: the traveller's own copy, its dates from the day they choos
   assert.equal(asBase({trip: copy, by: "ugo"}, {url: "https://share.example/t/y"}).basedOn.by, "ugo");
   assert.deepEqual(moveDates(trip(), "nope").days.map(d => d.date), ["2027-03-12", "2027-03-13"], "an unreadable day changes nothing");
 });
+
+test("reuse keeps real venue dates and discards anonymised exceptions", () => {
+  const original = trip();
+  original.days[1].plans[0].stops[0].closed = ["2027-03-13"];
+  const options = {first: "2028-06-02", url: "https://share.example/t/x"};
+  const real = asBase({...publishable(original, {dates: "real"}), by: "fra"}, options);
+  assert.deepEqual(real.days[0].stops[0].closed, ["2027-03-13", "sun"]);
+  const hidden = asBase({...publishable(original), by: "fra"}, options);
+  assert.deepEqual(hidden.days[0].stops[0].closed, ["sun"]);
+  assert.equal("closed" in hidden.days[1].plans[0].stops[0], false);
+  assert.ok(validateTrip(hidden).ok);
+});
