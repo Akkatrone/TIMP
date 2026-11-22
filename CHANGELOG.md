@@ -4,6 +4,11 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.27.1
+
+- History: versions made before the service kept how they were made no longer say
+  "in the app" (some were made by a chat): only who made them, on a shared trip.
+
 ## 3.27.0
 
 The history of a trip, easier to read.

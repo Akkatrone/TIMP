@@ -36,6 +36,8 @@ let dialog = null;
 // chat app (Claude, ChatGPT…) the traveller linked; another person's name on a shared trip.
 export function madeBy(info, me){
   if(!info) return "";
+  // Made before the service kept how: only who, when it was someone else.
+  if(info.via === undefined) return info.by && info.by !== me ? info.by : "";
   const how = info.via ? t("historyViaChat", {app: info.via}) : t("historyViaApp");
   return info.by && info.by !== me ? t("historyWho", {who: info.by, how}) : how;
 }
