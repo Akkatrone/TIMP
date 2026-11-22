@@ -11,6 +11,7 @@
 import { loadGoogle } from "./google.js";
 import { typeFrom, TYPES } from "./trip.js";
 import { RESOLVER_URL } from "./config.js";
+import { queryOf } from "./gmaps.js";
 
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 
@@ -29,7 +30,7 @@ function readNominatim(results){
   if(!r) return null;
   const lat = +r.lat, lng = +r.lon;
   if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return {lat: round(lat), lng: round(lng), source: "osm", type: typeFrom([r.category, r.type])};
+  return {lat: round(lat), lng: round(lng), source: "osm", type: typeFrom([r.category, r.type]), ...(r.display_name ? {label: String(r.display_name).slice(0, 200)} : {})};
 }
 
 const round = v => Math.round(v * 1e5) / 1e5;
@@ -44,7 +45,8 @@ async function viaGoogle(address, key, near){
   const gm = await loadGoogle(key);
   const {Geocoder} = await gm.importLibrary("geocoding");
   const {results} = await new Geocoder().geocode(near ? {address, bounds: near} : {address});
-  const hit = (results || []).map(r => ({lat: round(r.geometry.location.lat()), lng: round(r.geometry.location.lng()), source: "google", type: typeFrom(r.types || [])})).find(h => inside(h, near));
+  const hit = (results || []).map(r => ({lat: round(r.geometry.location.lat()), lng: round(r.geometry.location.lng()), source: "google", type: typeFrom(r.types || []),
+    ...(r.formatted_address ? {label: String(r.formatted_address).slice(0, 200)} : {})})).find(h => inside(h, near));
   return hit || null;
 }
 
@@ -78,8 +80,9 @@ export function areaAround(points, km = 15){
  * @param {string} address
  * @param {{googleKey?: string, lang?: string, near?: {south, west, north, east}|null}} o
  *   near: the area of the trip (areaAround); the search tries there first, then anywhere.
- * @returns {Promise<{lat: number, lng: number, source: "google"|"osm", type: string|null}|null>}
+ * @returns {Promise<{lat: number, lng: number, source: "google"|"osm", type: string|null, label?: string}|null>}
  *   type: the kind of place (TYPES in js/trip.js) when the service says what it is.
+ *   label: the place found, in the service's words ("Sé de Lisboa, Largo da Sé…"), to check it.
  *   null when no service found the address, or the device is offline.
  */
 export async function geocode(address, {googleKey = "", lang = "en", near = null} = {}){
@@ -101,6 +104,18 @@ export async function geocode(address, {googleKey = "", lang = "en", near = null
     }catch(e){ return null; }
   }
   return null;
+}
+
+/**
+ * A stop's position, searched the way the stop form searches it: with an address, the
+ * address alone first (the more reliable), then name and address; without one, its
+ * name and the day's city.
+ * @param stop {title, address?}
+ * @returns the same as geocode
+ */
+export async function findStop({title, address}, city, o = {}){
+  const text = address ? queryOf({title, address}) : [title, city].filter(Boolean).join(", ");
+  return (address && await geocode(address, o)) || await geocode(text, o);
 }
 
 // A signal that aborts after `ms`. AbortSignal.timeout is missing before Safari 16.

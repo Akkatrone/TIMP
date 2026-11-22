@@ -34,7 +34,18 @@ from the stop before it straight to the one after.
 
 The day has its own **⋯**, next to Map of the day: **Edit day** changes its city, title,
 where you sleep and its notes, or deletes it; **Add a day** opens the stop form on a new
-day after the last. Alternative plans for a day, like one for when it rains, are a job
+day after the last. The day's notes are one line at the top ("3 notes · …"): a tap opens
+them all, another closes them; the app remembers which, for each trip.
+
+**Stops without a position** (an AI assistant often leaves them out) have no pin and no
+route. A line above the stops says how many, with **Find**: the app looks for all of
+them, one after the other, the way the stop form does, and shows what it found before
+saving anything: the place in the search's own words, what kind of place it is, how far
+it is from the other stops, and **Verify**, which opens Google Maps on the point found. A
+result more than 30 km away comes unticked ("probably another place"): a common name
+can be in another town. **Save** keeps the ticked ones as one new version. If some are
+left, the line moves below the stops, to come back to later; one not found opens in the
+stop form, to search by hand. Alternative plans for a day, like one for when it rains, are a job
 for an AI assistant: "add a plan for day 3 if it rains" is all it takes.
 
 ### Places to eat

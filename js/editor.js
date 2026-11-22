@@ -5,8 +5,8 @@
 
 import { t, getLang } from "./i18n.js";
 import { esc, dateParts, weekdayName } from "./util.js";
-import { parseMapsInput, queryOf } from "./gmaps.js";
-import { geocode, areaAround, resolveLink } from "./geocode.js";
+import { parseMapsInput } from "./gmaps.js";
+import { findStop, areaAround, resolveLink } from "./geocode.js";
 import { newMap } from "./livemap.js";
 import { icon } from "./icons.js";
 import { TRAVEL, TYPES } from "./trip.js";
@@ -329,13 +329,10 @@ export function openStopEditor(o){
   async function findPosition(){
     const day = days[+$("#stop-day").value];
     const title = $("#stop-title").value.trim();
-    const text = st.address ? queryOf({title, address: st.address}) : [title, day.city].filter(Boolean).join(", ");
-    if(!text) return;
+    if(!title && !st.address) return;
     if(navigator.onLine === false){ note(t("posOffline")); return; }
     st.searching = true; showPos();
-    // With a name and an address, the address alone is the more reliable search.
-    const near = area();
-    const hit = (st.address && await geocode(st.address, {googleKey: o.googleKey, lang, near})) || await geocode(text, {googleKey: o.googleKey, lang, near});
+    const hit = await findStop({title, address: st.address}, day.city, {googleKey: o.googleKey, lang, near: area()});
     st.searching = false;
     if(hit){
       st.lat = hit.lat; st.lng = hit.lng; st.source = hit.source; movePick();

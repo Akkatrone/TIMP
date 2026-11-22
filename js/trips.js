@@ -125,7 +125,7 @@ export async function joinChanges(versions, current, from, changed){
  * moves: [{date, plan, from, to, toDate?, toPlan?}]
  */
 export function moveMarks(state, moves){
-  const out = {done: {...state.done}, skipped: {...state.skipped}, plans: {...state.plans}};
+  const out = {...state, done: {...state.done}, skipped: {...state.skipped}, plans: {...state.plans}};
   for(const m of moves){
     const from = `${m.date}|${m.plan || ""}|${m.from}`;
     const to = `${m.toDate || m.date}|${(m.toDate ? m.toPlan : m.plan) || ""}|${m.to}`;

@@ -317,6 +317,16 @@ export const STRINGS = {
     save: "Save", saved: "Saved.",
     about: "About", version: "Version {v}",
     updateReady: "New version available.", reload: "Update", close: "Close",
+    notesClosed: "{n} notes", notesOpen: "{n} notes for the day", notesOpenOne: "1 note for the day",
+    posMissing: "{n} stops without a position", posMissingOne: "1 stop without a position",
+    posStill: "{n} stops still without a position", posStillOne: "1 stop still without a position",
+    posFind: "Find", posFindOffline: "Finding positions needs the internet: try again when you are online.",
+    posFinding: "Finding positions… {a} of {b}", posFound: "Positions found", noPosTag: "no position",
+    posFindHelp: "Check the ones you do not know with Verify: Google Maps opens on the point found. Untick the wrong ones.",
+    posNoneFound: "Not found: open it to search by hand.", posOpen: "Open", posVerify: "Verify", notNow: "Not now",
+    posNear: "{d} km from the other stops", posFar: "{d} km from the other stops: probably another place",
+    posSave: "Save", posSaveOne: "Save 1 position", posSaveN: "Save {n} positions",
+    posSaved: "{n} positions saved · version {v}", posSavedOne: "1 position saved · version {v}",
     offlineReady: "Ready to work offline."
   },
   it: {
@@ -631,6 +641,16 @@ export const STRINGS = {
     save: "Salva", saved: "Salvato.",
     about: "Informazioni", version: "Versione {v}",
     updateReady: "Nuova versione disponibile.", reload: "Aggiorna", close: "Chiudi",
+    notesClosed: "{n} avvisi", notesOpen: "{n} avvisi per la giornata", notesOpenOne: "1 avviso per la giornata",
+    posMissing: "{n} tappe senza posizione", posMissingOne: "1 tappa senza posizione",
+    posStill: "{n} tappe ancora senza posizione", posStillOne: "1 tappa ancora senza posizione",
+    posFind: "Cerca", posFindOffline: "Per cercare le posizioni serve la rete: riprova quando sei online.",
+    posFinding: "Cerco le posizioni… {a} di {b}", posFound: "Posizioni trovate", noPosTag: "senza posizione",
+    posFindHelp: "Controlla quelle che non conosci con Verifica: si apre Google Maps sul punto trovato. Togli la spunta a quelle sbagliate.",
+    posNoneFound: "Non trovata: aprila per cercarla a mano.", posOpen: "Apri", posVerify: "Verifica", notNow: "Non ora",
+    posNear: "a {d} km dalle altre tappe", posFar: "a {d} km dalle altre tappe: probabilmente un'altra",
+    posSave: "Salva", posSaveOne: "Salva 1 posizione", posSaveN: "Salva {n} posizioni",
+    posSaved: "{n} posizioni salvate · versione {v}", posSavedOne: "1 posizione salvata · versione {v}",
     offlineReady: "Pronta per funzionare offline."
   }
 };

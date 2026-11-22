@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.31.0
+
+- **Positions for the stops that lack one, all at once.** Stops an AI assistant wrote
+  often come without a position: no pin, no route. A line above the day's stops says how
+  many, with **Find**: each one is searched as the stop form searches it, then shown to
+  be checked before anything is saved (the place found, its kind, how far it is from the
+  other stops, **Verify** on Google Maps). A result more than 30 km away comes unticked.
+  The ticked ones are saved as one new version; what is left moves below the stops. Not
+  on a trip that cannot be changed (locked, someone else's page, shared to read).
+- **The day's notes in one line**: how many, and the start of the first. A tap opens
+  them all, numbered; open or closed is remembered for the trip on this phone. Before,
+  each note was a box of its own, and with four of them the stops started halfway down
+  the screen.
+
 ## 3.30.0
 
 **Every stop has an id of its own, unique in the trip.** Before, a stop's id came from

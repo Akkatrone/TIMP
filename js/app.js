@@ -19,6 +19,8 @@ import { keptRates, fetchMonth } from "./rates.js";
 import { prepare, saveEdit, inspect, apply, restore, moveMarks, followIds, fileName, fileText, separate, joinChanges } from "./trips.js";
 import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop, followIds as followIdsPrivate } from "./private.js";
 import { needsStopIds } from "./ids.js";
+import { openFindPositions } from "./positions.js";
+import { areaAround } from "./geocode.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
@@ -200,7 +202,8 @@ async function openRecord(rec){
   S.state = {done: {}, skipped: {}, plans: {}};
   if(rec){
     const saved = await store.getKV("state:" + rec.id);
-    if(saved && typeof saved === "object") S.state = {done: saved.done || {}, skipped: saved.skipped || {}, plans: saved.plans || {}};
+    if(saved && typeof saved === "object") S.state = {done: saved.done || {}, skipped: saved.skipped || {}, plans: saved.plans || {},
+      ...(saved.notesOpen ? {notesOpen: true} : {}), ...(saved.found ? {found: saved.found} : {})};
     followNewIds();
     await store.setKV("active", rec.id);
   }else{
@@ -504,6 +507,37 @@ function editDay(){
     onDelete: () => applyEdit(tr => ({trip: removeDay(tr, d.date)}), "dayDeleted")
       .then(() => { location.hash = "#day-" + Math.max(1, Math.min(i + 1, trip().days.length)); })
       .catch(err => toast(String(err.message || err)))});
+}
+
+// The stops of the open day without a position, found all at once (js/positions.js),
+// checked, and the ticked ones saved as one version. Once some are saved, the line
+// that says what is left goes below the stops.
+async function findPositions(){
+  if(!editable()) return;
+  const here = currentPlace(), d = trip().days[here.dayIndex];
+  const listIn = t => { const x = t.days.find(y => y.date === d.date); return !x ? [] : here.planId ? ((x.plans || []).find(p => p.id === here.planId) || {stops: []}).stops : x.stops || []; };
+  const list = listIn(trip()), missing = list.filter(s => s.lat === undefined && s.id);
+  if(!missing.length) return;
+  if(navigator.onLine === false){ toast(t("posFindOffline")); return; }
+  const around = list.filter(s => s.lat !== undefined);
+  const all = trip().days.flatMap(x => x.plans ? x.plans.flatMap(p => p.stops) : x.stops);
+  const res = await openFindPositions({stops: missing.map(s => ({id: s.id, title: s.title, address: s.address})), city: d.city,
+    near: areaAround(around) || areaAround(all), around, googleKey: googleKey()});
+  if(!res) return;
+  if(res.open){ editStop(res.open); return; }
+  if(!res.found.length) return;
+  await applyEdit(tr => {
+    let out = tr;
+    // The trip as it is now (a sync may have come meanwhile): only stops still without one.
+    for(const f of res.found){
+      const s = listIn(out).find(x => x.id === f.id);
+      if(s && s.lat === undefined) out = updateStop(out, {date: d.date, plan: here.planId, id: f.id}, {...s, lat: f.lat, lng: f.lng}).trip;
+    }
+    return {trip: out};
+  }, res.found.length === 1 ? "posSavedOne" : "posSaved", {n: res.found.length});
+  S.state.found = {...(S.state.found || {}), [d.date]: true};
+  saveState();
+  render();
 }
 
 function editStop(stopId){
@@ -1765,6 +1799,23 @@ function dayTotal(items){
   return homeText ? ` · <span class="daycost"><b>${esc(homeText)}</b></span>` : "";
 }
 
+// The day's notes in one line, closed: how many and the start of the first (one alone:
+// its start). A tap opens them all, numbered; open or closed is kept for the trip on
+// this phone.
+function notesHTML(notes){
+  const open = !!S.state.notesOpen, n = notes.length;
+  const plain = x => String(x).replace(/\*\*/g, "");
+  const head = open ? `<b>${esc(t(n === 1 ? "notesOpenOne" : "notesOpen", {n}))}</b>`
+    : n === 1 ? `<span class="first">${esc(plain(notes[0]))}</span>` : `<b>${esc(t("notesClosed", {n}))}</b><span class="first"> · ${esc(plain(notes[0]))}</span>`;
+  return `<div class="reminds${open ? " open" : ""}"><button type="button" class="remind-row" data-notes aria-expanded="${open}" aria-controls="day-notes">` +
+    `<span class="ic" aria-hidden="true">!</span><span class="rt">${head}</span><span class="chev">${CHEVRON}</span></button>` +
+    `<ol class="remind-list" id="day-notes"${open ? "" : " hidden"}>${notes.map(r => `<li class="remind"><div>${rich(r)}</div></li>`).join("")}</ol></div>`;
+}
+
+// Whether the open trip can be changed here: not locked, not someone else's page, not
+// shared with this account to read only.
+const canChange = () => !isLocked(S.rec) && !(S.rec.share && !S.rec.share.gone && S.rec.share.role === "read");
+
 function stopsHTML(day, planId, list, parts, paint){
   const dayIndex = trip().days.indexOf(day);
   const skippedAt = j => { const k = stopKey(day, planId, list[j], j); return !S.state.done[k] && !!S.state.skipped[k]; };
@@ -1799,7 +1850,8 @@ function stopsHTML(day, planId, list, parts, paint){
       (q ? `<a class="maplink" href="${esc(dirUrl(q, comingFrom(dayIndex, list, i, skippedAt)))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
       (review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)}</a>` : "");
     const booked = s.booking === "booked" ? `<span class="tag ok">${esc(t("booked"))}</span>` : "";
-    const meta = isSkipped || links || booked ? `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}</div>` : "";
+    const nopos = s.lat === undefined && canChange() ? `<span class="tag nopos-tag">${esc(t("noPosTag"))}</span>` : "";
+    const meta = isSkipped || links || booked || nopos ? `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}${nopos}</div>` : "";
     const eyebrow = s.tag ? `<span class="eyebrow">${esc(s.tag)}</span>` : "";
     // Right: the tick, and the ⋯ menu with the actions used less often.
     const menuOpen = S.menuFor === id;
@@ -1901,12 +1953,17 @@ function renderDay(i){
     // The lines are not in the key: hiding them keeps the map, its zoom and its place.
     if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, dark, skippedNow].join("|"), zones: zs, color: cityColor(d.city), dark, gone, paint};
   }
-  if(d.notes) html += d.notes.map(r => `<div class="remind"><span class="ic" aria-hidden="true">!</span><div>${rich(r)}</div></div>`).join("");
+  if(d.notes) html += notesHTML(d.notes);
   if(d.plans){
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
   }
-  html += stopsHTML(d, pid, list, light ? parts : null, paint);
+  // Stops without a position: a line with Find, above them until some were chosen from
+  // a search on this day (remembered on this phone), then below, to come back to.
+  const missing = canChange() ? list.filter(s => s.lat === undefined && s.id).length : 0;
+  const later = !!(S.state.found && S.state.found[d.date]);
+  const nopos = missing ? `<div class="nopos${later ? " later" : ""}"><span>${esc(t(later ? (missing === 1 ? "posStillOne" : "posStill") : (missing === 1 ? "posMissingOne" : "posMissing"), {n: missing}))}</span><button type="button" class="btn small" data-find-pos>${esc(t("posFind"))}</button></div>` : "";
+  html += (later ? "" : nopos) + stopsHTML(d, pid, list, light ? parts : null, paint) + (later ? nopos : "");
   html += `<p class="foot dayfoot">${esc(t("footDay"))}</p>`;
   return {html, wanted};
 }
@@ -2107,6 +2164,15 @@ $app.addEventListener("click", e => {
     refocus(`[data-lang="${CSS.escape(S.langPref)}"]`);
     return;
   }
+  if(e.target.closest("[data-notes]")){
+    S.state.notesOpen = !S.state.notesOpen;
+    if(!S.state.notesOpen) delete S.state.notesOpen;
+    saveState();
+    render();
+    refocus("[data-notes]");
+    return;
+  }
+  if(e.target.closest("[data-find-pos]")){ findPositions(); return; }
   if(e.target.closest("[data-map]")){
     S.ui.mapOpen = !S.ui.mapOpen;
     saveUi();

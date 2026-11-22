@@ -1898,4 +1898,40 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.deepEqual(now.version.parents, [kept.version.id], "a version made from the one it had");
     assert.equal(now.version.id, (await prepare(kept)).trip.version.id, "the same version any phone makes");
   });
+
+  await step("a day's notes in one line, opened with a tap and kept so; its stops without a position found at once, checked, saved as one version", async () => {
+    await run(`location.hash = "#day-1";`);
+    await until("the notes", `document.querySelector("[data-notes]")`);
+    assert.equal(await run(`return document.querySelector("[data-notes] .rt").textContent;`), "2 notes · This is an invented trip, here to show what the app does. Times and descriptions are examples: check everything before a real visit.");
+    assert.equal(await run(`return document.getElementById("day-notes").hidden;`), true, "closed at first");
+    await run(`document.querySelector("[data-notes]").click();`);
+    assert.equal(await run(`return document.getElementById("day-notes").hidden;`), false);
+    assert.equal(await run(`return document.querySelector("[data-notes] .rt").textContent;`), "2 notes for the day");
+    await reload();
+    await run(`location.hash = "#day-1";`);
+    await until("the notes", `document.querySelector("[data-notes]")`);
+    assert.equal(await run(`return document.querySelector("[data-notes]").getAttribute("aria-expanded");`), "true", "kept open for this trip");
+    await run(`document.querySelector("[data-notes]").click();`);
+    assert.equal(await run(`return document.getElementById("day-notes").hidden;`), true);
+    // One stop without a position: a line above the stops, and the stop says so.
+    assert.equal(await run(`return document.querySelector(".nopos span").textContent;`), "1 stop without a position");
+    assert.equal(await run(`return !!document.querySelector(".nopos + .stops");`), true, "above the stops");
+    assert.equal(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nopos-tag")).map(li => li.querySelector("h3").textContent).join();`), "Lunch in Alfama");
+    const before = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip.version.id); }; });`);
+    await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.7115","lon":"-9.1305","category":"amenity","type":"restaurant","display_name":"Taberna Exemplo, Rua dos Remédios, Lisboa"}]'))) : real(u, o);`);
+    await run(`document.querySelector("[data-find-pos]").click();`);
+    await until("the result", `document.querySelector("dialog.sheet[open] [data-found]")`, 15000);
+    assert.equal(await run(`return document.querySelector("#pos-title").textContent;`), "Positions found");
+    assert.match(await run(`return document.querySelector("dialog.sheet[open] .found").textContent;`), /Lunch in AlfamaTaberna Exemplo, Rua dos Remédios, LisboaFood · 0\.\d km from the other stops/);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] .found .maplink").href;`), "https://www.google.com/maps/search/?api=1&query=38.7115%2C-9.1305");
+    assert.equal(await run(`return document.querySelector("[data-found]").checked;`), true, "near: ticked");
+    assert.match(await run(`return window.__geo[0];`), /q=Lunch\+in\+Alfama%2C\+Lisboa/, "its name and the day's city");
+    await run(`document.querySelector("dialog.sheet[open] [data-save]").click();`);
+    await until("saved", `/1 position saved · version/.test(document.getElementById("toast").textContent)`);
+    const now = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip); }; });`);
+    const lunch = now.days[0].stops.find(s => s.title === "Lunch in Alfama");
+    assert.deepEqual([lunch.lat, lunch.lng], [38.7115, -9.1305]);
+    assert.deepEqual(now.version.parents, [before], "one new version");
+    assert.equal(await run(`return document.querySelector(".nopos");`), null, "every stop has its position: the line is gone");
+  });
 }
