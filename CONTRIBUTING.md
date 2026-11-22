@@ -39,7 +39,7 @@ python3 -m http.server 4173
 
 Open `http://localhost:4173/` and tap "Try the example trip". Any static server works.
 
-There is nothing to install. Node 20 or later is needed only for the checks:
+There is nothing to install. Node 22 or later is needed only for the checks:
 
 ```bash
 npm run check   # example trip, offline file list, no private data in the repository

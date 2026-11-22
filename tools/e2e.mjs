@@ -1171,7 +1171,9 @@ await withApp(async ({run, until, reload, blocked}) => {
 }).then(() => { const api = fakeService(); return withApp(ctx => accountSteps({...ctx, service: api.state}), {api, host: "localhost"}); }).then(() => {
   console.log(`e2e: OK (${passed} checks)`);
 }).catch(e => {
+  // Why, even when it failed before the first step (a step says its own failure).
   console.error("e2e: FAILED");
+  console.error(e);
   process.exit(1);
 });
 

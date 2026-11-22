@@ -485,7 +485,7 @@ python3 -m http.server 4173
 Then open `http://localhost:4173/`. Opening `index.html` as a file does not work:
 browsers refuse modules and service workers there.
 
-Node 20 or later is needed only for the checks:
+Node 22 or later is needed only for the checks:
 
 ```bash
 npm run check

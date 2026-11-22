@@ -59,7 +59,7 @@ node tools/check-precache.mjs --fix   # after adding or removing a file of the a
 npm run screenshots              # retake the README pictures
 ```
 
-Nothing needs installing. Node 20+ is used only by the checks and tools; `e2e` and
+Nothing needs installing. Node 22+ is used only by the checks and tools; `e2e` and
 `screenshots` also need Chrome or Chromium (`CHROME=/path/to/chrome` if not found).
 
 ### Where things are
