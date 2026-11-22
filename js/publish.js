@@ -155,10 +155,7 @@ export function moveDates(trip, first){
   if(!out.days || !out.days.length || !/^\d{4}-\d{2}-\d{2}$/.test(first || "")) return out;
   const shift = parse(first) - parse(out.days[0].date);
   const move = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? iso(parse(d) + shift) : d;
-  for(const d of out.days){
-    d.date = move(d.date);
-    for(const s of [...(d.stops || []), ...(d.plans || []).flatMap(p => p.stops || [])]) if(Array.isArray(s.closed)) s.closed = s.closed.map(move);
-  }
+  for(const d of out.days) d.date = move(d.date);
   for(const e of out.expenses || []) if(e.date) e.date = move(e.date);
   return out;
 }
@@ -173,6 +170,19 @@ export function moveDates(trip, first){
 export function asBase(pub, {url, first} = {}){
   const {id: _id, version: _version, private: _own, basedOn: _was, ...trip} = pub.trip;
   const out = first ? moveDates(trip, first) : structuredClone(trip);
+  // Hidden publications contain display dates. Their original calendar
+  // exceptions cannot be recovered when planning another visit.
+  if(pub.dates === "hidden"){
+    for(const day of out.days){
+      for(const plan of day.plans || [day]){
+        for(const stop of plan.stops || []){
+          if(!stop.closed) continue;
+          stop.closed = stop.closed.filter(value => !/^\d{4}-/.test(value));
+          if(!stop.closed.length) delete stop.closed;
+        }
+      }
+    }
+  }
   out.basedOn = {url, title: String(trip.title || ""), by: String(pub.by || "")};
   return out;
 }
