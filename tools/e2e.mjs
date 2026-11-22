@@ -490,6 +490,8 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelectorAll("dialog.history .versions details[open]").length;`), 0, "versions start closed");
     await run(`[...document.querySelectorAll("dialog.history .versions > li")].find(li => li.textContent.includes("+ Sunset on the river")).querySelector("summary").click();`);
     assert.ok(await run(`const d = document.querySelector("dialog.history .versions details[open]"); return !!d && d.querySelector("[data-restore]").offsetParent !== null;`), "a tap opens the version");
+    await run(`document.querySelector("dialog.history .versions details[open] .what li").click();`);
+    assert.equal(await run(`return document.querySelectorAll("dialog.history .versions details[open]").length;`), 0, "a tap on its changes closes it");
     // Back to the version that had "Sunset on the river".
     const before = await versionOnPhone();
     await run(`[...document.querySelectorAll("dialog.history .versions > li")].find(li => li.textContent.includes("+ Sunset on the river")).querySelector("[data-restore]").click();`);

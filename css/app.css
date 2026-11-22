@@ -564,7 +564,7 @@ button.crow{cursor:pointer}
 .versions details[open] .sum{visibility:hidden}
 .versions summary .chev{display:block;align-self:center}
 .versions details[open] .chev{transform:rotate(180deg)}
-.versions .body{display:grid;gap:10px;justify-items:start;padding:0 0 14px}
+.versions .body{display:grid;gap:10px;justify-items:start;padding:0 0 14px;cursor:pointer}
 .what{list-style:none;margin:0;padding:0;font-size:.88rem;color:var(--ink);display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
 .tripcard .actions{flex-wrap:wrap}
 

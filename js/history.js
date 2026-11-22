@@ -73,6 +73,10 @@ export async function openHistory({trip, versions, onRestore, who}){
   dialog.showModal();
   dialog.onclick = async e => {
     if(e.target.closest("[data-close]")){ dialog.close(); return; }
+    // An open version closes with a tap anywhere on it, Restore excepted: a long one
+    // need not be scrolled back to its top.
+    const body = e.target.closest("details[open] > .body");
+    if(body && !e.target.closest("[data-restore]")){ body.parentElement.open = false; return; }
     const b = e.target.closest("[data-restore]");
     if(!b) return;
     const answer = await ask({title: t("restoreTitle", {v: shortId(b.dataset.restore)}), text: t("restoreText"),
@@ -94,7 +98,7 @@ export async function openHistory({trip, versions, onRestore, who}){
     flush();
     const parent = v.version.parents[0] && here.has(v.version.parents[0]) ? await versions.get(trip.id, v.version.parents[0]) : null;
     const what = !v.version.parents.length ? [t("historyFirst")]
-      : parent ? describe(diffTrips(parent, v), 40) : [t("historyUnknown")];
+      : parent ? describe(diffTrips(parent, v), Infinity) : [t("historyUnknown")];
     if(v.version.parents.length > 1) what.unshift(t("historyMerge", {v: shortId(v.version.parents[1])}));
     const when = v.version.date ? fmt.format(new Date(v.version.date)) : "";
     const current = id === trip.version.id;
