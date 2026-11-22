@@ -36,10 +36,11 @@ const placed = trip => trip.days.flatMap(d => d.plans
 const at = (trip, id) => placed(trip).filter(x => x.stop.id === id);
 const where = x => `${x.date}/${x.plan || "-"}`;
 // The plan of a day that holds most of these stops: the plan plain stops became (adding
-// a plan), or the one whose stops became plain (removing the others).
+// a plan), or the one whose stops became plain (removing the others). None when no stop
+// is in one: a day of new stops (the day removed and added again) comes from no plan.
 function planOf(day, stops){
   const ids = new Set(stops.map(s => s.id));
-  let pick = null, score = -1;
+  let pick = null, score = 0;
   for(const p of day.plans || []){ const n = p.stops.filter(s => ids.has(s.id)).length; if(n > score){ pick = p; score = n; } }
   return pick && pick.id;
 }
