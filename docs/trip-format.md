@@ -111,7 +111,7 @@ an `address` and its position (`lat`, `lng`):
 | `address` | no | Where it is, as you would search it in Google Maps: a street address, or name and town (`"Pantheon, Rome"`). Used by the Map and Directions links. |
 | `lat`, `lng` | no | The position, both or neither. Gives the stop its pin on the map. |
 | `link` | no | A Google Maps link (`https://…`) to the exact place. The Map link opens it. |
-| `id` | written by the app | Lets ticks, edits and merges follow the stop. |
+| `id` | written by the app | Lets ticks, edits and merges follow the stop. Twelve characters, `0-9` and `a-z`, unique in the trip; a new stop has none (the app gives it one). An id made from a title by an older app (`"lunch"`) becomes one of these by a fixed rule, the same on every device. A stop copied with its id gets its own. |
 
 A stop without a position is still shown, without a pin. A journey can be a stop of its
 own ("Train to Naples", `"travel": "train"`, no position): it marks the leg from the

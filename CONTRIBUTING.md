@@ -67,6 +67,7 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/geocode.js` | Finds the coordinates of an address: Google, then OpenStreetMap. |
 | `js/version.js` | Version ids, like Git's, and how two versions relate. No DOM. |
 | `js/merge.js` | Three-way merge of two versions of a trip. No DOM. |
+| `js/ids.js` | Stop ids: new ones, the fixed rule that converts the ids of before, copies told apart. No DOM. |
 | `js/diff.js` | What changed between two versions, stop by stop: the only comparison, used by the history and by the choice when a file is loaded. No DOM. |
 | `js/history.js` | The History sheet: the versions in words, and a way back to any of them. |
 | `js/trips.js` | What happens on an edit or a file received: `inspect` says how a file relates to the trip on the phone, `apply` carries out the traveller's choice. Versions, merges, restores, saved marks. No DOM. |

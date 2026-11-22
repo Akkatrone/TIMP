@@ -7,10 +7,12 @@ import { diffTrips, counts } from "../js/diff.js";
 const merge = (base, ours, theirs) => { const trip = mergeTrips(base, ours, theirs); return {trip, report: counts(diffTrips(ours, trip))}; };
 import { ensureIds, addStop, updateStop, removeStop, insertIndex, clockMinutes, newId, dayAfter, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense } from "../js/edit.js";
 import { validateTrip } from "../js/trip.js";
+import { isStopId, oldStopId } from "../js/ids.js";
+import { demo, ID } from "./demo.mjs";
 
-const demo = () => JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
 const stopsOf = (trip, date) => trip.days.find(d => d.date === date).stops;
 const ids = (trip, date) => stopsOf(trip, date).map(s => s.id);
+const titles = (trip, date) => stopsOf(trip, date).map(s => s.title);
 const DAY1 = "2027-05-14", DAY2 = "2027-05-15";
 
 /* ---------- versions ---------- */
@@ -36,12 +38,12 @@ test("a file without a version gets the same root version on every device, and t
 
 test("an edit makes a child version; no change makes none", async () => {
   const root = await ensureVersion(demo());
-  const {trip: edited} = addStop(root, {date: DAY1}, {time: "12:00", title: "Coffee"});
+  const {trip: edited, ref: coffee} = addStop(root, {date: DAY1}, {time: "12:00", title: "Coffee"});
   const v2 = await commit(edited, root);
   assert.deepEqual(v2.version.parents, [root.version.id]);
   assert.deepEqual(v2.version.history, [root.version.id]);
   assert.equal(await commit(root, root), root);
-  const v3 = await commit(removeStop(v2, {date: DAY1, id: "coffee"}), v2);
+  const v3 = await commit(removeStop(v2, coffee), v2);
   assert.deepEqual(v3.version.history, [v2.version.id, root.version.id]);
   assert.deepEqual(validateTrip(v3).errors, []);
 });
@@ -64,7 +66,7 @@ async function fork(){
   const root = await ensureVersion(demo());
   const a = await commit(addStop(root, {date: DAY1}, {time: "12:15", title: "Gelato", travel: "metro"}).trip, root);
   let bt = addStop(root, {date: DAY2}, {time: "13:00", title: "Lunch by the river"}).trip;
-  bt = updateStop(bt, {date: DAY1, id: "se"}, {...stopsOf(bt, DAY1).find(s => s.id === "se"), text: "Changed on the other phone."}).trip;
+  bt = updateStop(bt, {date: DAY1, id: ID("se")}, {...stopsOf(bt, DAY1).find(s => s.id === ID("se")), text: "Changed on the other phone."}).trip;
   const b = await commit(bt, root);
   return {root, a, b};
 }
@@ -72,9 +74,9 @@ async function fork(){
 test("a merge keeps what both sides added and what only one side changed", async () => {
   const {root, a, b} = await fork();
   const {trip, report} = merge(root, a, b);
-  assert.ok(ids(trip, DAY1).includes("gelato"));
-  assert.ok(ids(trip, DAY2).includes("lunch-by-the-river"));
-  assert.equal(stopsOf(trip, DAY1).find(s => s.id === "se").text, "Changed on the other phone.");
+  assert.ok(titles(trip, DAY1).includes("Gelato"));
+  assert.ok(titles(trip, DAY2).includes("Lunch by the river"));
+  assert.equal(stopsOf(trip, DAY1).find(s => s.id === ID("se")).text, "Changed on the other phone.");
   assert.deepEqual(report, {added: 1, changed: 1, removed: 0});
   assert.deepEqual(validateTrip(trip).errors, []);
 });
@@ -91,45 +93,45 @@ test("a merge gives the same trip and the same version on both phones", async ()
 
 test("a stop removed on one side goes, unless the other side changed it", async () => {
   const root = await ensureVersion(demo());
-  const a = await commit(removeStop(root, {date: DAY1, id: "castelo"}), root);
+  const a = await commit(removeStop(root, {date: DAY1, id: ID("castelo")}), root);
   const b = await commit(addStop(root, {date: DAY2}, {time: "08:00", title: "Early coffee"}).trip, root);
   let merged = merge(root, a, b);
-  assert.ok(!ids(merged.trip, DAY1).includes("castelo"));
+  assert.ok(!ids(merged.trip, DAY1).includes(ID("castelo")));
   assert.equal(merged.report.removed, 0, "already gone on this phone");
   assert.equal(merge(root, b, a).report.removed, 1, "seen from the phone that still had it");
 
-  const castelo = stopsOf(root, DAY1).find(s => s.id === "castelo");
-  const c = await commit(updateStop(root, {date: DAY1, id: "castelo"}, {...castelo, time: "13:00"}).trip, root);
+  const castelo = stopsOf(root, DAY1).find(s => s.id === ID("castelo"));
+  const c = await commit(updateStop(root, {date: DAY1, id: ID("castelo")}, {...castelo, time: "13:00"}).trip, root);
   merged = merge(root, a, c);
-  assert.ok(ids(merged.trip, DAY1).includes("castelo"), "changed on one side wins over removed");
+  assert.ok(ids(merged.trip, DAY1).includes(ID("castelo")), "changed on one side wins over removed");
 });
 
 test("both sides changed the same field: the same side wins on both phones", async () => {
   const root = await ensureVersion(demo());
-  const se = stopsOf(root, DAY1).find(s => s.id === "se");
-  const a = await commit(updateStop(root, {date: DAY1, id: "se"}, {...se, time: "11:05"}).trip, root);
-  const b = await commit(updateStop(root, {date: DAY1, id: "se"}, {...se, time: "11:10"}).trip, root);
+  const se = stopsOf(root, DAY1).find(s => s.id === ID("se"));
+  const a = await commit(updateStop(root, {date: DAY1, id: ID("se")}, {...se, time: "11:05"}).trip, root);
+  const b = await commit(updateStop(root, {date: DAY1, id: ID("se")}, {...se, time: "11:10"}).trip, root);
   const winner = a.version.id > b.version.id ? "11:05" : "11:10";
-  assert.equal(stopsOf(merge(root, a, b).trip, DAY1).find(s => s.id === "se").time, winner);
-  assert.equal(stopsOf(merge(root, b, a).trip, DAY1).find(s => s.id === "se").time, winner);
+  assert.equal(stopsOf(merge(root, a, b).trip, DAY1).find(s => s.id === ID("se")).time, winner);
+  assert.equal(stopsOf(merge(root, b, a).trip, DAY1).find(s => s.id === ID("se")).time, winner);
 });
 
 test("without a base nothing is removed, and a stop added at the same place by both is kept once", async () => {
   const {a, b} = await fork();
   const {trip} = merge(null, a, b);
   for(const id of ids(a, DAY1)) assert.ok(ids(trip, DAY1).includes(id), id);
-  assert.ok(ids(trip, DAY2).includes("lunch-by-the-river"));
+  assert.ok(titles(trip, DAY2).includes("Lunch by the river"));
   assert.equal(new Set(ids(trip, DAY1)).size, ids(trip, DAY1).length);
 });
 
 test("a stop moved to another day on one side moves", async () => {
   const root = await ensureVersion(demo());
-  const lunch = stopsOf(root, DAY1).find(s => s.id === "lunch");
-  const a = await commit(updateStop(root, {date: DAY1, id: "lunch"}, lunch, {date: DAY2}).trip, root);
+  const lunch = stopsOf(root, DAY1).find(s => s.id === ID("lunch"));
+  const a = await commit(updateStop(root, {date: DAY1, id: ID("lunch")}, lunch, {date: DAY2}).trip, root);
   const b = await commit(addStop(root, {date: DAY2}, {time: "17:00", title: "Shopping"}).trip, root);
   const {trip} = merge(root, a, b);
-  assert.ok(!ids(trip, DAY1).includes("lunch"));
-  assert.ok(ids(trip, DAY2).includes("lunch"));
+  assert.ok(!ids(trip, DAY1).includes(ID("lunch")));
+  assert.ok(ids(trip, DAY2).includes(ID("lunch")));
 });
 
 test("a day's city, stay and plans merge field by field", async () => {
@@ -160,11 +162,12 @@ test("times order the stops; words for times keep their place", () => {
   assert.equal(insertIndex([], "10:00"), 0);
 });
 
-test("a new stop gets a unique id from its title and goes in time order", () => {
+test("a new stop gets an id of its own and goes in time order", () => {
   const trip = demo();
   const {trip: t2, ref} = addStop(trip, {date: DAY1}, {time: "11:15", title: "Sé", text: "", lat: 1, lng: 2});
-  assert.equal(ref.id, "se-2");
-  assert.deepEqual(ids(t2, DAY1).slice(0, 4), ["comercio", "se", "se-2", "santa-luzia"]);
+  assert.ok(isStopId(ref.id));
+  assert.notEqual(addStop(trip, {date: DAY1}, {title: "Sé"}).ref.id, ref.id, "random: the same title twice is two stops");
+  assert.deepEqual(ids(t2, DAY1).slice(0, 4), [ID("comercio"), ID("se"), ref.id, ID("santa-luzia")]);
   assert.equal("text" in stopsOf(t2, DAY1)[2], false, "empty fields are left out");
   assert.equal(ids(trip, DAY1).length, 6, "the original is untouched");
   assert.equal(newId("Café São Jorge!", new Set()), "cafe-sao-jorge");
@@ -173,13 +176,13 @@ test("a new stop gets a unique id from its title and goes in time order", () => 
 test("an edit keeps the id and the field order; a new time or day moves the stop", () => {
   const trip = demo();
   const se = stopsOf(trip, DAY1)[1];
-  const same = updateStop(trip, {date: DAY1, id: "se"}, {...se, text: "New"}).trip;
+  const same = updateStop(trip, {date: DAY1, id: ID("se")}, {...se, text: "New"}).trip;
   assert.deepEqual(Object.keys(stopsOf(same, DAY1)[1]), Object.keys(se));
-  const later = updateStop(trip, {date: DAY1, id: "se"}, {...se, time: "12:45"}).trip;
-  assert.deepEqual(ids(later, DAY1).slice(0, 4), ["comercio", "santa-luzia", "castelo", "se"]);
-  const moved = updateStop(trip, {date: DAY1, id: "se"}, se, {date: DAY2});
-  assert.deepEqual(moved.ref, {date: DAY2, plan: null, id: "se"});
-  assert.ok(ids(moved.trip, DAY2).includes("se"));
+  const later = updateStop(trip, {date: DAY1, id: ID("se")}, {...se, time: "12:45"}).trip;
+  assert.deepEqual(ids(later, DAY1).slice(0, 4), [ID("comercio"), ID("santa-luzia"), ID("castelo"), ID("se")]);
+  const moved = updateStop(trip, {date: DAY1, id: ID("se")}, se, {date: DAY2});
+  assert.deepEqual(moved.ref, {date: DAY2, plan: null, id: ID("se")});
+  assert.ok(ids(moved.trip, DAY2).includes(ID("se")));
 });
 
 test("a day is added after the last, its own fields changed, and removed; days merge by date", async () => {
@@ -205,11 +208,11 @@ test("a day is added after the last, its own fields changed, and removed; days m
   assert.throws(() => removeDay({...base, days: [base.days[0]]}, DAY1), /at least one day/);
   // One phone adds the day, the other changes a stop: the merge has both, on both phones.
   const ours = await commit(added, base);
-  const theirs = await commit(updateStop(base, {date: DAY1, plan: null, id: "se"}, {...stopsOf(base, DAY1)[1], time: "11:30"}).trip, base);
+  const theirs = await commit(updateStop(base, {date: DAY1, plan: null, id: ID("se")}, {...stopsOf(base, DAY1)[1], time: "11:30"}).trip, base);
   const a = await commitMerge(mergeTrips(base, ours, theirs), ours, theirs), b = await commitMerge(mergeTrips(base, theirs, ours), theirs, ours);
   assert.equal(a.version.id, b.version.id);
   assert.equal(a.days.at(-1).date, "2027-05-18");
-  assert.equal(stopsOf(a, DAY1).find(s => s.id === "se").time, "11:30");
+  assert.equal(stopsOf(a, DAY1).find(s => s.id === ID("se")).time, "11:30");
 });
 
 test("expenses get ids, stay in date order, and merge by id on both phones alike", async () => {
@@ -231,7 +234,7 @@ test("expenses get ids, stay in date order, and merge by id on both phones alike
   assert.deepEqual(a.expenses.map(x => x.cost).sort((x, y) => x - y), [35, 250, 390]);
   assert.deepEqual(validateTrip(a).errors, []);
   // the comparison sees a stop's cost as a change of its cost
-  const priced = updateStop(base, {date: DAY1, plan: null, id: "se"}, {...stopsOf(base, DAY1)[1], cost: 12}).trip;
+  const priced = updateStop(base, {date: DAY1, plan: null, id: ID("se")}, {...stopsOf(base, DAY1)[1], cost: 12}).trip;
   assert.deepEqual(diffTrips(base, priced).changed[0].fields, ["cost"]);
 });
 
@@ -239,8 +242,10 @@ test("stops without an id get one, and the old keys are reported so ticks can fo
   const trip = demo();
   delete stopsOf(trip, DAY1)[4].id;
   const {trip: fixed, renamed} = ensureIds(trip);
-  assert.equal(stopsOf(fixed, DAY1)[4].id, "lunch-in-alfama");
-  assert.deepEqual(renamed, [{date: DAY1, plan: null, from: "#4", to: "lunch-in-alfama"}]);
+  // From its title, the way ids were made before, then the id that one becomes.
+  const id = oldStopId("demo-lisbon", DAY1, "lunch-in-alfama");
+  assert.equal(stopsOf(fixed, DAY1)[4].id, id);
+  assert.deepEqual(renamed, [{date: DAY1, plan: null, from: "#4", to: id}, {date: DAY1, plan: null, from: "lunch-in-alfama", to: id}]);
 });
 
 /* ---------- receiving files and editing, as the app does ---------- */
@@ -285,12 +290,12 @@ test("a newer file replaces, an older one changes nothing", async () => {
 
 test("a merge without the base keeps both sides' stops", async () => {
   const {trip: root} = await prepare(demo());
-  const a = await commit(removeStop(root, {date: DAY1, id: "castelo"}), root);
+  const a = await commit(removeStop(root, {date: DAY1, id: ID("castelo")}), root);
   const b = await commit(addStop(root, {date: DAY2}, {time: "13:00", title: "Lunch"}).trip, root);
   const r = await receive(memoryStore(), a, b);   // a phone that never saw the base
   assert.equal(r.base, false);
-  assert.ok(ids(r.trip, DAY1).includes("castelo"), "without the base the removal cannot be told from an addition");
-  assert.ok(ids(r.trip, DAY2).includes("lunch"));
+  assert.ok(ids(r.trip, DAY1).includes(ID("castelo")), "without the base the removal cannot be told from an addition");
+  assert.ok(titles(r.trip, DAY2).includes("Lunch"));
 });
 
 test("a file edited by hand, with its old version left in, becomes a new version made from it", async () => {
@@ -343,8 +348,8 @@ test("using only the file drops this phone's changes, and an old copy cannot bri
   assert.deepEqual(x.mine.added.map(a => a.stop.title), ["Wrong stop"]);
   assert.deepEqual(x.theirs.added.map(a => a.stop.title), ["Lunch"]);
   const kept = await apply(store, x, "theirs");
-  assert.ok(!ids(kept, DAY1).includes("wrong-stop"));
-  assert.ok(ids(kept, DAY2).includes("lunch"));
+  assert.ok(!titles(kept, DAY1).includes("Wrong stop"));
+  assert.ok(titles(kept, DAY2).includes("Lunch"));
   assert.deepEqual([...kept.version.parents].sort(), [mine.version.id, theirs.version.id].sort());
   assert.equal((await inspect(store, kept, mine)).kind, "older", "the dropped version is already in the history");
   assert.equal((await apply(store, await inspect(store, mine, theirs), "cancel")).version.id, mine.version.id, "cancel keeps this phone's version");
@@ -357,7 +362,7 @@ test("back to an older file makes a new version with its content, newer for ever
   const x = await inspect(store, v2, root);
   assert.equal(x.kind, "older");
   const back = await apply(store, x, "back");
-  assert.ok(!ids(back, DAY1).includes("wrong-stop"));
+  assert.ok(!titles(back, DAY1).includes("Wrong stop"));
   assert.deepEqual(back.version.parents, [v2.version.id]);
   assert.equal((await inspect(memoryStore(), v2, back)).kind, "newer", "a phone that has v2 takes it");
 });
@@ -366,7 +371,7 @@ test("restoring an earlier version undoes what came after, as a new version", as
   const store = memoryStore();
   const {trip: v1} = await prepare(demo());
   const v2 = (await saveEdit(store, v1, addStop(v1, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip)).trip;
-  const v3 = (await saveEdit(store, v2, removeStop(v2, {date: DAY1, id: "castelo"}))).trip;
+  const v3 = (await saveEdit(store, v2, removeStop(v2, {date: DAY1, id: ID("castelo")}))).trip;
   const {trip: back} = await restore(store, v3, v1.version.id);
   assert.equal(canonical(diffTrips(v1, back)), canonical(diffTrips(v1, v1)), "same stops as v1");
   assert.deepEqual(back.version.history.slice(0, 3), [v3.version.id, v2.version.id, v1.version.id]);
@@ -376,15 +381,15 @@ test("restoring an earlier version undoes what came after, as a new version", as
 test("the comparison names what changed: added, removed, changed fields, moved", () => {
   const trip = demo();
   let next = addStop(trip, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip;
-  next = removeStop(next, {date: DAY1, id: "castelo"});
-  const se = stopsOf(next, DAY1).find(s => s.id === "se");
-  next = updateStop(next, {date: DAY1, id: "se"}, {...se, time: "11:30", lat: 1, lng: 2}).trip;
-  next = updateStop(next, {date: DAY1, id: "lunch"}, stopsOf(next, DAY1).find(s => s.id === "lunch"), {date: DAY2}).trip;
+  next = removeStop(next, {date: DAY1, id: ID("castelo")});
+  const se = stopsOf(next, DAY1).find(s => s.id === ID("se"));
+  next = updateStop(next, {date: DAY1, id: ID("se")}, {...se, time: "11:30", lat: 1, lng: 2}).trip;
+  next = updateStop(next, {date: DAY1, id: ID("lunch")}, stopsOf(next, DAY1).find(s => s.id === ID("lunch")), {date: DAY2}).trip;
   const d = diffTrips(trip, next);
-  assert.deepEqual(d.added.map(x => x.stop.id), ["gelato"]);
-  assert.deepEqual(d.removed.map(x => x.stop.id), ["castelo"]);
-  assert.deepEqual(d.changed.map(x => [x.stop.id, x.fields]), [["se", ["time", "place"]]]);
-  assert.deepEqual(d.moved.map(x => [x.stop.id, x.from.date, x.date]), [["lunch", DAY1, DAY2]]);
+  assert.deepEqual(d.added.map(x => x.stop.title), ["Gelato"]);
+  assert.deepEqual(d.removed.map(x => x.stop.id), [ID("castelo")]);
+  assert.deepEqual(d.changed.map(x => [x.stop.id, x.fields]), [[ID("se"), ["time", "place"]]]);
+  assert.deepEqual(d.moved.map(x => [x.stop.id, x.from.date, x.date]), [[ID("lunch"), DAY1, DAY2]]);
   assert.equal(d.other, false);
   assert.deepEqual(counts(d), {added: 1, changed: 2, removed: 1});
   const renamed = JSON.parse(JSON.stringify(trip)); renamed.title = "Other";
@@ -443,15 +448,15 @@ test("changes written for an earlier version are applied there, and joined with 
   assert.match(outline(v1), new RegExp(`^Trip "[^"]+", id demo-lisbon, version ${v1.version.id}, 4 days`));
   const v2 = (await saveEdit(store, v1, addStop(v1, {date: DAY1}, {time: "12:15", title: "Gelato"}).trip)).trip;
   const data = {format: CHANGES, trip: "demo-lisbon", from: v1.version.id, changes: [
-    {update: {day: DAY1, stop: "castelo", set: {tag: "Tickets online"}}},
+    {update: {day: DAY1, stop: "castelo", set: {tag: "Tickets online"}}},   // an outline from before: the id of before
     {add: {day: DAY2, stop: {time: "21:00", title: "Fado evening"}}}
   ]};
   const res = applyChanges(v1, data);
   assert.equal(res.ok, true, JSON.stringify(res.errors));
   const joined = await joinChanges(store, v2, v1, res.trip);
-  assert.ok(ids(joined, DAY1).includes("gelato"), "what the phone added stays");
-  assert.ok(ids(joined, DAY2).includes("fado-evening"), "what the assistant added comes");
-  assert.equal(stopsOf(joined, DAY1).find(s => s.id === "castelo").tag, "Tickets online");
+  assert.ok(titles(joined, DAY1).includes("Gelato"), "what the phone added stays");
+  assert.ok(titles(joined, DAY2).includes("Fado evening"), "what the assistant added comes");
+  assert.equal(stopsOf(joined, DAY1).find(s => s.id === ID("castelo")).tag, "Tickets online");
   assert.equal(joined.version.parents.length, 2, "a merge, in the history");
   assert.ok(joined.version.history.includes(v2.version.id));
   // Changes that change nothing: the phone's trip as it is.
@@ -493,7 +498,7 @@ test("canonical JSON never changes: the same text as the first way it was writte
 
 test("a move and a concurrent edit keep one edited stop on its new day", async () => {
   const root = await ensureVersion(demo());
-  const ref = {date: DAY1, id: "se"}, stop = stopsOf(root, DAY1).find(s => s.id === ref.id);
+  const ref = {date: DAY1, id: ID("se")}, stop = stopsOf(root, DAY1).find(s => s.id === ref.id);
   const moved = await commit(updateStop(root, ref, stop, {date: DAY2}).trip, root);
   const edited = await commit(updateStop(root, ref, {...stop, cost: 20}).trip, root);
   for(const [a, b] of [[moved, edited], [edited, moved]]){

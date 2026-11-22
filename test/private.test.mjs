@@ -6,6 +6,7 @@ import { ensureVersion, isIntact } from "../js/version.js";
 import { fileText } from "../js/trips.js";
 import { applyChanges, outline, CHANGES } from "../js/changes.js";
 import { ensureIds } from "../js/edit.js";
+import { oldStopId } from "../js/ids.js";
 import { validateTrip } from "../js/trip.js";
 
 const demo = () => JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
@@ -86,9 +87,11 @@ test("an assistant changes private expenses too, with \"private\": true; the out
   ]), priv, ME);
   assert.equal(r.ok, true, JSON.stringify(r.errors));
   assert.deepEqual(r.trip.expenses, trip.expenses, "the trip's expenses are untouched");
-  assert.deepEqual(r.priv.expenses.map(x => [x.title, x.cost, x.date, x.stop]), [["Castle souvenir", 8, D2, "castelo"], ["Port wine, a bottle for home (invented)", 22, "2027-05-17", undefined]]);
+  // "castelo", the id of before in an outline from before: the stop it became.
+  const castelo = oldStopId("demo-lisbon", D1, "castelo");
+  assert.deepEqual(r.priv.expenses.map(x => [x.title, x.cost, x.date, x.stop]), [["Castle souvenir", 8, D2, castelo], ["Port wine, a bottle for home (invented)", 22, "2027-05-17", undefined]]);
   assert.deepEqual(r.counts, {added: 1, changed: 2, removed: 1});
-  assert.match(outline(r.trip, r.priv), /Castle souvenir: 8 \(at \[castelo\]\)/);
+  assert.ok(outline(r.trip, r.priv).includes(`Castle souvenir: 8 (at [${castelo}])`));
   // the first private expense makes the section, with this phone's code
   assert.equal(applyChanges(trip, changes([{addExpense: {private: true, expense: {title: "Hat", cost: 20}}}]), null, ME).priv.owner, ME);
   // a stop that is not there; a private expense that is not there; a trip expense cannot have a stop
@@ -96,7 +99,7 @@ test("an assistant changes private expenses too, with \"private\": true; the out
   assert.match(applyChanges(trip, changes([{removeExpense: {private: true, expense: "nope"}}]), priv, ME).errors[0], /no private expense "nope"/);
   assert.match(applyChanges(trip, changes([{addExpense: {expense: {title: "X", cost: 1, date: D1, stop: "castelo"}}}]), priv, ME).errors[0], /only private expenses have a stop/);
   // a stop removed: what was paid there stays, without the link
-  const gone = applyChanges(r.trip, changes([{remove: {day: D2, stop: "castelo"}}]), r.priv, ME);
+  const gone = applyChanges(r.trip, changes([{remove: {day: D2, stop: castelo}}]), r.priv, ME);
   assert.deepEqual(gone.priv.expenses[0].stop, undefined);
   assert.equal(gone.priv.expenses[0].title, "Castle souvenir");
 });

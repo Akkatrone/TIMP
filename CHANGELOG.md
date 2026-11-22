@@ -4,6 +4,35 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.30.0
+
+**Every stop has an id of its own, unique in the trip.** Before, a stop's id came from
+its title (`lunch`, `lunch-2`) and was unique only in its day or plan: the same id could
+be in two places of a trip, and a join had to guess which stop was which. Now:
+
+- **A new stop gets a random id**: twelve characters, `0-9` and `a-z`, the last one a
+  check. Two stops with the same title are two stops, also when two phones add them.
+- **The ids of before become ids of their own by a fixed rule** (the SHA-256 of the
+  trip, the day and the old id): every phone, the sharing service and a join make the
+  same id from the same old one, without asking each other. The app converts the trips
+  only on the phone when it starts, as a new version made from the one it had: the same
+  version on every phone. Trips on an account are converted by the sharing service, once
+  for everyone. Ticks, skips and the private expenses paid at a stop follow; History says
+  "Stops given ids of their own".
+- **A stop copied with its id** (an AI assistant that copied a stop in the file, a file
+  edited by hand) is two stops: the original keeps the id (the one where the version the
+  file was made from has it), the copy gets its own. On loading a file, on changes from
+  an assistant, in every join.
+- Changes from an assistant that still name a stop by its id of before (an outline read
+  before) find the stop it became. Bringing back a version from before (History →
+  Restore) gives its stops the ids they have now.
+- Joins of a version from before with one converted join stop by stop, as if both were
+  converted: checked on random edits, with phones of before and copies among them.
+
+The format does not change (`travel-in-my-pocket/2`): the new ids follow its rule, so an
+older app opens the trips. For contributors: `js/ids.js`; `addStop` takes the id as a
+fourth argument in the tests.
+
 ## 3.29.0
 
 Joining two versions, made robust. After #1 we stopped trusting hand-picked cases: the

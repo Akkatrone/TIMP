@@ -32,6 +32,7 @@ const FILES = [
   "js/history.js",
   "js/i18n.js",
   "js/icons.js",
+  "js/ids.js",
   "js/livemap.js",
   "js/merge.js",
   "js/money.js",

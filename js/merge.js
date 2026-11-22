@@ -12,6 +12,9 @@
 // counts as removed and every difference is settled by the same winner.
 //
 // Days are matched by date, plans, stops and expenses by id; anything else field by field.
+// Stop ids of before (made from titles, unique in their list only) are first converted
+// the one way every device converts them (js/ids.js), and copies told apart, on the
+// three versions: a phone that converted and one that did not still join stop by stop.
 // Also:
 //   - a list one side left as it was is the other side's, order included;
 //   - a stop moved to another day or plan on one side, and changed on the other, is
@@ -29,6 +32,7 @@
 // No DOM here.
 
 import { clockMinutes, insertIndex } from "./edit.js";
+import { uniqueStopIds } from "./ids.js";
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 // Lists that may be absent: absent is empty, and left empty they go.
@@ -345,7 +349,8 @@ function plainWhenOne(days){
  */
 export function mergeTrips(base0, ours0, theirs0){
   const aWins = String(ours0.version.id) > String(theirs0.version.id);
-  const [base, ours, theirs] = alignShapes([base0, ours0, theirs0]);
+  const base1 = base0 && uniqueStopIds(base0).trip;
+  const [base, ours, theirs] = alignShapes([base1, uniqueStopIds(ours0, base1).trip, uniqueStopIds(theirs0, base1).trip]);
   const m = makeMerger(aWins);
   const strip = t => { const {version, ...rest} = t; return rest; };
 

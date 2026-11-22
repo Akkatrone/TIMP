@@ -204,7 +204,8 @@ again. Put the version named at the top of the outline in `from`.
 - Keep the trip `id` and the `version` block exactly as they are, if the file has
   them: the app then updates the trip, keeps what was ticked, and makes a new version.
   Never write or change `version` yourself.
-- Keep the `id` of every stop that still exists, even if it is renamed or moved.
+- Keep the `id` of every stop that still exists, even if it is renamed or moved. A new
+  stop has no `id`; one copied from another stop leaves the copy's out.
 - Keep `private` and its `owner` as they are, unless the traveller asked to change
   their private expenses.
 - Change only what was asked. Do not rewrite texts nobody mentioned.

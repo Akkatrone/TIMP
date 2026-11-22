@@ -13,11 +13,12 @@ import { versionStore } from "./objects.js";
 import { REPO_URL } from "./config.js";
 import { openStopEditor, openDayEditor, openExpenseEditor } from "./editor.js";
 import { ask } from "./ask.js";
-import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense } from "./edit.js";
+import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense, ensureIds } from "./edit.js";
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
 import { keptRates, fetchMonth } from "./rates.js";
-import { prepare, saveEdit, inspect, apply, restore, moveMarks, fileName, fileText, separate, joinChanges } from "./trips.js";
-import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop } from "./private.js";
+import { prepare, saveEdit, inspect, apply, restore, moveMarks, followIds, fileName, fileText, separate, joinChanges } from "./trips.js";
+import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop, followIds as followIdsPrivate } from "./private.js";
+import { needsStopIds } from "./ids.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
@@ -200,6 +201,7 @@ async function openRecord(rec){
   if(rec){
     const saved = await store.getKV("state:" + rec.id);
     if(saved && typeof saved === "object") S.state = {done: saved.done || {}, skipped: saved.skipped || {}, plans: saved.plans || {}};
+    followNewIds();
     await store.setKV("active", rec.id);
   }else{
     await store.delKV("active");
@@ -272,13 +274,20 @@ async function importText(text, name, {demo = false, said = ""} = {}){
   }
   if(isChanges(data)){ await importChanges(data); return; }
   data = upgrade(data);   // a file in the old format is converted, then checked
+  // Its stops get ids of their own, and one copied with its id (an assistant that copied
+  // a stop) another: the original is the one where the version it was made from has it.
+  if(data && typeof data === "object" && !Array.isArray(data)){
+    const v = data.version && typeof data.version.id === "string" && typeof data.id === "string" ? await versions.get(data.id, data.version.id).catch(() => null) : null;
+    data = ensureIds(data, v).trip;
+  }
   const res = validateTrip(data);
   if(!res.ok){ S.importError = {title: t("importFailed"), items: res.errors.slice(0, 12), all: res.errors}; render(); scrollToY(0); return; }
   S.importError = null;
   try{
     // The private expenses travel apart: they never enter a version (js/private.js).
-    const {trip: shared, priv: theirs} = splitPrivate(data);
+    const {trip: shared, priv: file} = splitPrivate(data);
     const {trip: incoming} = await prepare(shared);
+    const theirs = followIdsPrivate(file, incoming);
     const local = S.records.find(r => r.id === incoming.id);
     let pv = demo && theirs ? {action: "mine"} : privateOnLoad(local ? local.priv || null : null, theirs, S.owner);
     const check = pv.action === "ask" ? {label: t("privCheck", {n: theirs.expenses.length}), checked: pv.yes} : null;
@@ -965,7 +974,14 @@ const syncSoon = (ms = 1500) => { clearTimeout(syncTimer); syncTimer = setTimeou
 async function keepSynced(next){
   await store.putTrip(next);
   S.records = S.records.map(r => r.id === next.id ? next : r);
-  if(S.rec && S.rec.id === next.id) S.rec = next;
+  if(S.rec && S.rec.id === next.id){ S.rec = next; followNewIds(); }
+}
+
+// The open trip came with its stops' ids of their own (converted on another phone, or on
+// the service): ticks and skips saved under the ids of before follow (js/ids.js).
+function followNewIds(){
+  const next = followIds(S.state, S.rec.trip);
+  if(next !== S.state){ S.state = next; saveState(); }
 }
 
 function syncNow(){
@@ -2431,13 +2447,24 @@ async function start(){
   if(useGoogle === false) S.useGoogle = false;
   if(typeof lang === "string" && LANGS[lang]) S.langPref = lang;
   S.records = (records || []).sort((a, b) => a.importedAt - b.importedAt);
-  // Trips saved before versions existed, or in format 1: ids, a version, format 2.
-  // A converted trip is a new version made from the old one; ticks follow.
-  for(const rec of S.records.filter(r => !r.trip.version || r.trip.format !== FORMAT)){
-    const {trip: ready, renamed} = await prepare(rec.trip);
+  // Trips saved before versions existed, in format 1, or with stop ids of before: ids
+  // of their own, a version, format 2. A converted trip is a new version made from the
+  // old one, the same one every phone makes; ticks and the private expenses paid at a
+  // stop follow. A trip on the account is converted by the sharing service, once for
+  // everyone, and comes back newer: they follow then (followNewIds).
+  for(const rec of S.records){
+    if(rec.public) continue;
+    const onAccount = !!(rec.share && rec.share.id && !rec.share.gone);
+    const old = !rec.trip.version || rec.trip.format !== FORMAT || (needsStopIds(rec.trip) && !onAccount);
+    const {trip: ready, renamed} = old ? await prepare(rec.trip) : {trip: rec.trip, renamed: []};
     const saved = await store.getKV("state:" + rec.id);
-    if(saved && renamed.length) await store.setKV("state:" + rec.id, moveMarks({done: {}, skipped: {}, plans: {}, ...saved}, renamed));
-    Object.assign(rec, {trip: ready, exported: ready.version.id});
+    if(saved && typeof saved === "object"){
+      const state = followIds(moveMarks({done: {}, skipped: {}, plans: {}, ...saved}, renamed), ready);
+      if(canonical(state) !== canonical({done: {}, skipped: {}, plans: {}, ...saved})) await store.setKV("state:" + rec.id, state);
+    }
+    const priv = rec.priv ? followIdsPrivate(followStops(rec.priv, renamed), ready) : rec.priv;
+    if(!old && priv === rec.priv) continue;
+    Object.assign(rec, {trip: ready, priv, ...(old ? {exported: ready.version.id} : {})});
     await store.putTrip(rec);
     await versions.put(ready);
   }

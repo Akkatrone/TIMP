@@ -3,6 +3,7 @@
 // No DOM here.
 
 import { canonical } from "./version.js";
+import { uniqueStopIds, needsStopIds } from "./ids.js";
 
 // Same content, whatever the order of the fields.
 const same = (a, b) => canonical(a) === canonical(b);
@@ -55,11 +56,18 @@ function others(from, to){
  *   other: something besides stops changed (days, hotels, info…), told by `days` and `trip`:
  *   days: {date, fields: ["notes", "stay", "title", "plans", "other"], or ["added"], or ["removed"]}
  *   trip: the trip's own fields that changed: "info", "expenses", "other"
+ *   ids: the stop ids of before became ids of their own (js/ids.js); stops are compared
+ *     by what they became, so that alone changes no stop
  */
-export function diffTrips(from, to){
+export function diffTrips(from0, to0){
+  // Two versions from before compare as they are (the history has many): converted only
+  // when one is from before and the other not.
+  const before = needsStopIds(from0), after = needsStopIds(to0);
+  const from = before !== after ? uniqueStopIds(from0).trip : from0, to = before !== after ? uniqueStopIds(to0, from).trip : to0;
   const a = stopsOf(from), b = stopsOf(to);
   const other = !same(rest(from), rest(to));
-  const out = {added: [], removed: [], changed: [], moved: [], other, ...(other ? others(from, to) : {days: [], trip: []})};
+  const out = {added: [], removed: [], changed: [], moved: [], other, ...(other ? others(from, to) : {days: [], trip: []}),
+    ids: before && !after};
   for(const [k, x] of b){
     const y = a.get(k);
     if(!y){ out.added.push(x); continue; }

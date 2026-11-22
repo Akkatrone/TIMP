@@ -15,6 +15,7 @@ const fields = fs => fs.map(f => t("field_" + f)).join(", ");
 export function describe(d, max = 6){
   // The days and the trip first: few lines, easily lost after many stops.
   const lines = [
+    ...(d.ids ? [t("changedIds")] : []),
     ...(d.days || []).map(x => `~ ${day(x.date)} · ${x.fields.map(f => t("dayField_" + f)).join(", ")}`),
     ...(d.trip && d.trip.length ? [`~ ${t("tripFields")} · ${d.trip.map(f => t("tripField_" + f)).join(", ")}`] : []),
     ...(d.other && !(d.days || []).length && !(d.trip || []).length ? [t("changedOther")] : []),

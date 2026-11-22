@@ -6,8 +6,10 @@
 // ref: {date, plan, id}
 
 import { FIELDS, slug, tripId } from "./trip.js";
+import { newStopId, uniqueStopIds } from "./ids.js";
 
-// An id made from the title, unique among `taken`.
+// An id made from the title, unique among `taken`: for plans and expenses, unique in
+// their list. Stops have ids of their own kind (js/ids.js).
 export function newId(title, taken){
   const base = slug(title);
   let id = base, n = 2;
@@ -50,47 +52,58 @@ function listIn(trip, date, plan){
 }
 
 /**
- * Gives an id to the trip, and to every plan and stop, that has none. Files written by
- * hand or by an assistant usually lack them; edits, merges and ticks need them.
- * Returns the new trip and, for each stop, the old key the app used for it ("#3") and
- * the new id, so ticks can follow.
+ * Gives an id to the trip, and to every plan and stop, that has none; and makes every
+ * stop id one of its own, once in the trip (uniqueStopIds in js/ids.js: ids of before
+ * converted, copies told apart; `base`, the version the trip was made from, says which
+ * is the original). Files written by hand or by an assistant usually lack them; edits,
+ * merges and ticks need them. The same file gives the same ids on every device.
+ * Returns the new trip and, for each stop, the old key the app used for it ("#3", or its
+ * id of before) and the new id, so ticks can follow.
  */
-export function ensureIds(trip){
-  const out = clone(trip), renamed = [];
-  if(!out.id) out.id = tripId(out);
-  out.days.forEach(d => {
-    if(!d.plans) return;
-    const taken = new Set(d.plans.filter(p => p.id).map(p => p.id));
-    d.plans.forEach(p => { if(!p.id){ p.id = newId(p.name, taken); taken.add(p.id); } });
+export function ensureIds(trip, base = null){
+  const out = clone(trip), named = [];
+  const days = Array.isArray(out.days) ? out.days.filter(d => d && typeof d === "object") : [];
+  if(!out.id && days.length && typeof days[0].date === "string") out.id = tripId(out);
+  days.forEach(d => {
+    if(!Array.isArray(d.plans)) return;
+    const taken = new Set(d.plans.filter(p => p && p.id).map(p => p.id));
+    d.plans.forEach(p => { if(p && typeof p === "object" && !p.id){ p.id = newId(p.name, taken); taken.add(p.id); } });
   });
+  // A stop without an id gets one from its title first, the way ids were made before:
+  // then the same as any id of before.
   const fix = (stops, date, plan) => {
-    const taken = new Set(stops.filter(s => s.id).map(s => s.id));
+    if(!Array.isArray(stops)) return;
+    const taken = new Set(stops.filter(s => s && s.id).map(s => s.id));
     stops.forEach((s, i) => {
-      if(s.id) return;
+      if(!s || typeof s !== "object" || s.id) return;
       s.id = newId(s.title, taken);
       taken.add(s.id);
-      renamed.push({date, plan, from: "#" + i, to: s.id});
+      named.push({date, plan, from: "#" + i, to: s.id});
     });
   };
-  out.days.forEach(d => d.plans ? d.plans.forEach(p => fix(p.stops, d.date, p.id)) : fix(d.stops, d.date, null));
+  days.forEach(d => Array.isArray(d.plans) ? d.plans.forEach(p => p && fix(p.stops, d.date, p.id)) : fix(d.stops, d.date, null));
   if(Array.isArray(out.expenses)){
-    const taken = new Set(out.expenses.filter(x => x.id).map(x => x.id));
-    out.expenses.forEach(x => { if(!x.id){ x.id = newId(x.title, taken); taken.add(x.id); } });
+    const taken = new Set(out.expenses.filter(x => x && x.id).map(x => x.id));
+    out.expenses.forEach(x => { if(x && typeof x === "object" && !x.id){ x.id = newId(x.title, taken); taken.add(x.id); } });
   }
-  return {trip: out, renamed};
+  const {trip: ready, moves} = uniqueStopIds(out, base);
+  const final = (date, plan, id) => (moves.find(m => m.date === date && m.plan === plan && m.from === id) || {to: id}).to;
+  const renamed = [...named.map(m => ({...m, to: final(m.date, m.plan, m.to)})), ...moves];
+  return {trip: ready, renamed};
 }
 
-// Adds `stop` (without an id) to a day and plan, in time order. Returns {trip, ref}.
-export function addStop(trip, {date, plan}, stop){
+// Adds `stop` (without an id) to a day and plan, in time order, with a new id (`id`:
+// one made elsewhere, by the tests). Returns {trip, ref}.
+export function addStop(trip, {date, plan}, stop, id = newStopId()){
   const out = clone(trip);
   const list = listIn(out, date, plan);
-  const s = {id: newId(stop.title, new Set(list.map(x => x.id))), ...clean(stop)};
+  const s = {id, ...clean(stop)};
   list.splice(insertIndex(list, s.time), 0, s);
   return {trip: out, ref: {date, plan: plan || null, id: s.id}};
 }
 
-// Replaces a stop with `stop`, possibly on another day or plan (`to`). The id stays,
-// unless it is already taken where the stop goes. Returns {trip, ref}.
+// Replaces a stop with `stop`, possibly on another day or plan (`to`). The id stays
+// (unless a trip from before has it where the stop goes: then a new one). Returns {trip, ref}.
 export function updateStop(trip, ref, stop, to = ref){
   const out = clone(trip);
   const from = listIn(out, ref.date, ref.plan);
@@ -105,7 +118,7 @@ export function updateStop(trip, ref, stop, to = ref){
   }
   from.splice(i, 1);
   const dest = listIn(out, to.date, to.plan);
-  if(moved && dest.some(s => s.id === next.id)) next.id = newId(next.title, new Set(dest.map(s => s.id)));
+  if(moved && dest.some(s => s.id === next.id)) next.id = newStopId();
   dest.splice(insertIndex(dest, next.time), 0, orderLike(old, next));
   return {trip: out, ref: {date: to.date, plan: to.plan || null, id: next.id}};
 }

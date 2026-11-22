@@ -12,6 +12,7 @@
 //   deleted, the expense stays, with its own title and date.
 
 import { addExpense, updateExpense, removeExpense, newId } from "./edit.js";
+import { findStopId } from "./ids.js";
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 
@@ -122,6 +123,27 @@ export function followStops(priv, moves){
     if(!m || (m.to === x.stop && (m.toDate || m.date) === x.date)) return x;
     changed = true;
     return {...x, stop: m.to, date: m.toDate || m.date};
+  });
+  return changed ? {...priv, expenses} : priv;
+}
+
+/**
+ * Links to a stop's id of before, when the trip came with the ids it became (js/ids.js):
+ * to the id it became, on that day. The same set when nothing changed.
+ */
+export function followIds(priv, trip){
+  if(!priv) return priv;
+  let changed = false;
+  const expenses = priv.expenses.map(x => {
+    const d = x.stop && trip.days.find(y => y.date === x.date);
+    if(!d) return x;
+    const lists = d.plans ? d.plans.map(p => [p.id, p.stops]) : [[null, d.stops]];
+    if(lists.some(([, l]) => l.some(s => s.id === x.stop))) return x;
+    for(const [plan, l] of lists){
+      const to = findStopId(trip, x.date, plan, l, x.stop);
+      if(to){ changed = true; return {...x, stop: to}; }
+    }
+    return x;
   });
   return changed ? {...priv, expenses} : priv;
 }

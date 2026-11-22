@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { applyChanges, outline, changesBrief, isChanges, CHANGES } from "../js/changes.js";
 import { validateTrip } from "../js/trip.js";
-
-const demo = () => JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
+import { isStopId, oldStopId } from "../js/ids.js";
+import { demoFile as demo, demo as loaded, ID } from "./demo.mjs";
 const changes = list => ({format: CHANGES, trip: "demo-lisbon", changes: list});
 const D1 = "2027-05-14", D2 = "2027-05-15", D3 = "2027-05-16";
 const ids = (t, date, plan) => { const d = t.days.find(x => x.date === date); return (plan ? d.plans.find(p => p.id === plan) : d).stops.map(s => s.id); };
+const titles = (t, date, plan) => { const d = t.days.find(x => x.date === date); return (plan ? d.plans.find(p => p.id === plan) : d).stops.map(s => s.title); };
 
 test("the outline is a few lines per day with every stop's id, far shorter than the file", () => {
   const trip = demo(), text = outline(trip);
@@ -20,7 +21,8 @@ test("the outline is a few lines per day with every stop's id, far shorter than 
   assert.ok(text.length * 3 < JSON.stringify(trip).length, `${text.length} vs ${JSON.stringify(trip).length}`);
 });
 
-test("add, update, move and remove apply in order, as one new trip", () => {
+test("add, update, move and remove apply in order, as one new trip; ids of before still name their stops", () => {
+  // A trip from before, and an outline from before: "se" is the stop's id of before.
   const res = applyChanges(demo(), changes([
     {add: {day: D1, stop: {time: "12:30", title: "Café A Brasileira", type: "food", lat: 38.7107, lng: -9.1423}}},
     {update: {day: D1, stop: "se", set: {time: "11:15", tag: "Free entry", text: null}}},
@@ -29,17 +31,20 @@ test("add, update, move and remove apply in order, as one new trip", () => {
   ]));
   assert.equal(res.ok, true, String(res.errors));
   assert.deepEqual(res.counts, {added: 1, changed: 2, removed: 1});
-  assert.ok(ids(res.trip, D1).includes("cafe-a-brasileira"));
-  const se = res.trip.days[0].stops.find(s => s.id === "se");
+  assert.ok(titles(res.trip, D1).includes("Café A Brasileira"));
+  assert.ok(res.trip.days.every(d => (d.plans || [d]).every(l => l.stops.every(s => isStopId(s.id)))), "every stop with an id of its own");
+  const se = res.trip.days[0].stops.find(s => s.id === ID("se"));
   assert.deepEqual([se.time, se.tag, se.text], ["11:15", "Free entry", undefined]);
-  assert.ok(!ids(res.trip, D1).includes("sunset") && ids(res.trip, D2).includes("sunset"));
-  assert.ok(!ids(res.trip, D2).includes("maat"));
-  assert.deepEqual(res.moves, [{date: D1, plan: null, from: "sunset", to: "sunset", toDate: D2, toPlan: null}]);
+  assert.ok(!ids(res.trip, D1).includes(ID("sunset")) && ids(res.trip, D2).includes(ID("sunset")));
+  assert.ok(!ids(res.trip, D2).includes(ID("maat")));
+  // Ticks follow: to the ids the stops got, then where the stop went.
+  assert.deepEqual(res.moves.find(m => m.from === "se"), {date: D1, plan: null, from: "se", to: ID("se")});
+  assert.deepEqual(res.moves.at(-1), {date: D1, plan: null, from: ID("sunset"), to: ID("sunset"), toDate: D2, toPlan: null});
   assert.deepEqual(validateTrip(res.trip).errors, []);
 });
 
 test("days can be changed, added and removed; plans are named by id", () => {
-  const res = applyChanges(demo(), changes([
+  const res = applyChanges(loaded(), changes([
     {setDay: {day: D2, set: {title: "Belém slowly", notes: null}}},
     {add: {day: D3, plan: "cascais", stop: {time: "18:00", title: "Sunset at the bay", type: "view"}}},
     {addDay: {date: "2027-05-18", city: "Lisboa", stops: [{time: "10:00", title: "Last coffee"}]}},
@@ -47,13 +52,13 @@ test("days can be changed, added and removed; plans are named by id", () => {
   ]));
   assert.equal(res.ok, true, String(res.errors));
   assert.equal(res.trip.days[0].title, "Belém slowly");
-  assert.ok(ids(res.trip, D3, "cascais").includes("sunset-at-the-bay"));
+  assert.ok(titles(res.trip, D3, "cascais").includes("Sunset at the bay"));
   assert.deepEqual(res.trip.days.map(d => d.date), [D2, D3, "2027-05-17", "2027-05-18"]);
-  assert.equal(res.trip.days[3].stops[0].id, "last-coffee", "new stops get their ids");
+  assert.equal(res.trip.days[3].stops[0].id, oldStopId("demo-lisbon", "2027-05-18", "last-coffee"), "new stops get their ids, the same on every phone");
 });
 
 test("a rainy-day plan: a day without plans gets two, the stops it had become the first, ticks follow", () => {
-  const res = applyChanges(demo(), changes([
+  const res = applyChanges(loaded(), changes([
     {addPlan: {day: D1, first: "Sunny", plan: {name: "If it rains", stops: [
       {time: "10:00", title: "Tile Museum", type: "museum"},
       {time: "13:00", title: "Lunch in Alfama", type: "food"}
@@ -64,16 +69,16 @@ test("a rainy-day plan: a day without plans gets two, the stops it had become th
   const d = res.trip.days[0];
   assert.equal(d.stops, undefined);
   assert.deepEqual(d.plans.map(p => [p.id, p.name]), [["sunny", "Sunny"], ["if-it-rains", "If it rains"]]);
-  assert.deepEqual(ids(res.trip, D1, "sunny"), ["comercio", "se", "santa-luzia", "castelo", "lunch", "sunset"]);
-  assert.deepEqual(ids(res.trip, D1, "if-it-rains"), ["tile-museum", "lunch-in-alfama", "coffee-at-the-castle"]);
-  assert.deepEqual(res.moves[0], {date: D1, plan: null, from: "comercio", to: "comercio", toDate: D1, toPlan: "sunny"});
+  assert.deepEqual(ids(res.trip, D1, "sunny"), ["comercio", "se", "santa-luzia", "castelo", "lunch", "sunset"].map(x => ID(x)));
+  assert.deepEqual(titles(res.trip, D1, "if-it-rains"), ["Tile Museum", "Lunch in Alfama", "Coffee at the castle"]);
+  assert.deepEqual(res.moves[0], {date: D1, plan: null, from: ID("comercio"), to: ID("comercio"), toDate: D1, toPlan: "sunny"});
   assert.equal(res.moves.length, 6);
   assert.deepEqual(res.counts, {added: 2, changed: 0, removed: 0});
   assert.deepEqual(validateTrip(res.trip).errors, []);
 });
 
 test("plans can be added to a day that has them, renamed and removed; one left is plain stops again", () => {
-  const res = applyChanges(demo(), changes([
+  const res = applyChanges(loaded(), changes([
     {addPlan: {day: D3, plan: {name: "Lazy morning", stops: [{time: "11:00", title: "Breakfast"}]}}},
     {setPlan: {day: D3, plan: "cascais", set: {name: "Coast"}}},
     {removePlan: {day: D3, plan: "sintra"}}
@@ -83,8 +88,8 @@ test("plans can be added to a day that has them, renamed and removed; one left i
   const back = applyChanges(res.trip, changes([{removePlan: {day: D3, plan: "lazy-morning"}}]));
   assert.equal(back.ok, true, String(back.errors));
   assert.equal(back.trip.days[2].plans, undefined);
-  assert.deepEqual(ids(back.trip, D3), ["coast-train", "station", "beach", "boca"]);
-  assert.deepEqual(back.moves[0], {date: D3, plan: "cascais", from: "coast-train", to: "coast-train", toDate: D3, toPlan: null});
+  assert.deepEqual(ids(back.trip, D3), [ID("coast-train"), ID("station", D3, "cascais"), ID("beach"), ID("boca")]);
+  assert.deepEqual(back.moves[0], {date: D3, plan: "cascais", from: ID("coast-train"), to: ID("coast-train"), toDate: D3, toPlan: null});
   // Wrong ones: no name for the stops already there, a plan without stops, more than a name.
   const bad = applyChanges(demo(), changes([
     {addPlan: {day: D1, plan: {name: "Rain", stops: [{title: "Museum"}]}}},
@@ -145,9 +150,9 @@ test("changes can set what things cost: a stop's cost, the trip's currency, expe
   ]));
   assert.equal(r.ok, true, JSON.stringify(r.errors));
   assert.equal(r.trip.currency, "GBP");
-  const se = r.trip.days[0].stops.find(s => s.id === "se");
+  const se = r.trip.days[0].stops.find(s => s.id === ID("se"));
   assert.deepEqual([se.cost, se.currency], [12, "USD"]);
-  assert.equal(r.trip.days[0].stops.find(s => s.id === "comercio").cost, 0);
+  assert.equal(r.trip.days[0].stops.find(s => s.id === ID("comercio")).cost, 0);
   // in date order, each with an id
   assert.deepEqual(r.trip.expenses.map(x => [x.title, x.cost]), [["Travel insurance", 35], ["Flights to Lisbon and back (invented)", 260]]);
   assert.ok(r.trip.expenses.every(x => /^[a-z0-9-]+$/.test(x.id)));

@@ -12,6 +12,9 @@
 //               in the result as that side left it;
 //   removal     what one side removed, and the other did not touch, is gone;
 //   converges   joining the result with either side again changes nothing more;
+//   own ids     every stop of the result has an id of its own kind, once in the trip;
+//               a side from a phone of before (ids made from titles) or with a stop an
+//               assistant copied with its id joins as it would once converted (js/ids.js);
 //   restores    phones that edit, bring back old versions (History → Restore) and sync
 //               in any order end on the same version, valid, with no stop multiplied.
 import { test } from "node:test";
@@ -19,8 +22,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ensureVersion, commit, commitMerge, canonical, contentOf, relation, commonBase } from "../js/version.js";
 import { mergeTrips } from "../js/merge.js";
-import { ensureIds, addStop, updateStop, removeStop, addDay, updateDay, removeDay, dayAfter, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense } from "../js/edit.js";
+import { ensureIds, newId, addStop, updateStop, removeStop, addDay, updateDay, removeDay, dayAfter, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense } from "../js/edit.js";
 import { validateTrip } from "../js/trip.js";
+import { oldStopId, uniqueStopIds, isStopId } from "../js/ids.js";
 
 const demo = () => ensureIds(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"))).trip;
 const same = (a, b) => canonical(contentOf(a)) === canonical(contentOf(b));
@@ -63,8 +67,13 @@ const single = (trip, id) => { const xs = at(trip, id); return xs.length === 1 ?
 // A failure names its seed: MERGE_SEEDS=1 MERGE_FIRST=<seed> runs it again, alone.
 const SEEDS = Number(process.env.MERGE_SEEDS || 400), FIRST = Number(process.env.MERGE_FIRST || 1);
 
-// A small fixed generator: the same edits on every run.
+// A small fixed generator: the same edits on every run. New stops get ids from it too
+// (the app's are random): ids of their own kind, the same on every run.
 const random = seed => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+const idFor = n => oldStopId("test", "new", String(n));
+// Every stop id of the trip, once each and of its own kind; `before`: or one a phone of
+// before made ("old-…"), which a version taken as it is keeps until it is joined.
+const ownIds = (trip, before = false) => { const xs = placed(trip).map(x => x.stop.id); return xs.every(id => isStopId(id) || (before && id.startsWith("old-"))) && new Set(xs).size === xs.length; };
 
 // One random edit, as the app makes them (js/edit.js); one the app would refuse (a day
 // left without stops) is not made. Returns the new trip.
@@ -75,43 +84,56 @@ function edit(trip, r, history){
 function anyEdit(trip, r, history){
   const pick = list => list[Math.floor(r() * list.length)];
   const lists = trip.days.flatMap(d => d.plans ? d.plans.map(p => ({date: d.date, plan: p.id})) : [{date: d.date, plan: null}]);
+  const listOf = (t, l) => { const d = t.days.find(x => x.date === l.date); return l.plan ? d.plans.find(p => p.id === l.plan).stops : d.stops; };
   const stops = placed(trip);
   const n = Math.floor(r() * 1e6);
   const k = r();
+  const time = () => `${10 + Math.floor(r() * 12)}:${String(Math.floor(r() * 6) * 10).padStart(2, "0")}`;
   try{
-    if(k < .14 || !stops.length){ const l = pick(lists); return addStop(trip, {date: l.date, plan: l.plan}, {time: `${10 + Math.floor(r() * 12)}:${String(Math.floor(r() * 6) * 10).padStart(2, "0")}`, title: "Stop " + n}).trip; }
+    if(k < .12 || !stops.length){ const l = pick(lists); return addStop(trip, {date: l.date, plan: l.plan}, {time: time(), title: "Stop " + n}, idFor(n)).trip; }
     const x = pick(stops), ref = {date: x.date, plan: x.plan, id: x.stop.id};
-    if(k < .34){ const f = pick(["cost", "time", "text", "title"]);
-      const v = f === "cost" ? Math.floor(r() * 90) : f === "time" ? `${10 + Math.floor(r() * 12)}:${String(Math.floor(r() * 6) * 10).padStart(2, "0")}` : `${f} ${n}`;
+    if(k < .30){ const f = pick(["cost", "time", "text", "title"]);
+      const v = f === "cost" ? Math.floor(r() * 90) : f === "time" ? time() : `${f} ${n}`;
       return updateStop(trip, ref, {...x.stop, [f]: v}).trip; }
-    if(k < .52){ const l = pick(lists); return updateStop(trip, ref, r() < .5 ? x.stop : {...x.stop, cost: Math.floor(r() * 90)}, {date: l.date, plan: l.plan}).trip; }
-    if(k < .62) return removeStop(trip, ref);
+    if(k < .46){ const l = pick(lists); return updateStop(trip, ref, r() < .5 ? x.stop : {...x.stop, cost: Math.floor(r() * 90)}, {date: l.date, plan: l.plan}).trip; }
+    if(k < .55) return removeStop(trip, ref);
     const d = pick(trip.days);
-    if(k < .72) return updateDay(trip, d.date, pick([{notes: [...(d.notes || []), "Note " + n]}, {notes: (d.notes || []).slice(1)}, {title: "Day " + n}, {stay: "Hotel " + n}]));
-    if(k < .76) return addDay(trip, {date: dayAfter(trip.days[trip.days.length - 1].date), city: "Lisboa", stops: [{id: "s" + n, time: "10:00", title: "Stop " + n}]});
-    if(k < .79 && trip.days.length > 2) return removeDay(trip, d.date);
-    if(k < .76){
-      const y = pick(stops), yref = {date: y.date, plan: y.plan, id: y.stop.id};
-      const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], closed = y.stop.closed || [];
+    if(k < .63) return updateDay(trip, d.date, pick([{notes: [...(d.notes || []), "Note " + n]}, {notes: (d.notes || []).slice(1)}, {title: "Day " + n}, {stay: "Hotel " + n}]));
+    if(k < .66) return addDay(trip, {date: dayAfter(trip.days[trip.days.length - 1].date), city: "Lisboa", stops: [{id: idFor(n), time: "10:00", title: "Stop " + n}]});
+    if(k < .69 && trip.days.length > 2) return removeDay(trip, d.date);
+    if(k < .73){
+      const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], closed = x.stop.closed || [];
       const next = r() < .5 || !closed.length ? [...new Set([...closed, pick(days)])] : closed.slice(1);
-      return updateStop(trip, yref, {...y.stop, closed: next.length ? next : undefined}).trip;
+      return updateStop(trip, ref, {...x.stop, closed: next.length ? next : undefined}).trip;
     }
-    if(k < .79){
+    if(k < .76){
       const info = JSON.parse(JSON.stringify(trip.info || []));
       if(info.length && r() < .5){ const sec = pick(info); if(r() < .5 && sec.items.length > 1) sec.items.splice(Math.floor(r() * sec.items.length), 1); else sec.items.push({label: "Line " + n, text: "Text " + n}); }
       else info.push({title: "Section " + n, items: [{label: "Line " + n, text: "Text " + n}]});
       return {...trip, info};
     }
-    if(k < .84){
+    if(k < .82){
       if(d.plans && r() < .4) return removePlan(trip, d.date, pick(d.plans).id).trip;
       if(d.plans && r() < .3) return renamePlan(trip, d.date, pick(d.plans).id, "Plan " + n);
-      return addPlan(trip, d.date, {name: "Plan " + n, stops: [{id: "p" + n, time: "11:00", title: "Plan stop " + n}]}, "First " + n).trip;
+      return addPlan(trip, d.date, {name: "Plan " + n, stops: [{id: idFor(n), time: "11:00", title: "Plan stop " + n}]}, "First " + n).trip;
     }
-    if(k < .92){
+    if(k < .88){
       const xs = trip.expenses || [];
       if(xs.length && r() < .4) return removeExpense(trip, pick(xs).id);
       if(xs.length && r() < .5){ const e = pick(xs); return updateExpense(trip, e.id, {...e, cost: Math.floor(r() * 500)}); }
       return addExpense(trip, {title: "Expense " + n, cost: Math.floor(r() * 500)}).trip;
+    }
+    if(k < .93){
+      // An assistant's file: a stop copied with its id, here or elsewhere, as it is or
+      // changed. Loading it (js/edit.js, ensureIds) gives the copy an id of its own.
+      const copy = JSON.parse(JSON.stringify(trip)), l = pick(lists), list = listOf(copy, l);
+      list.splice(Math.floor(r() * (list.length + 1)), 0, r() < .5 ? {...x.stop} : {...x.stop, time: time()});
+      return ensureIds(copy, trip).trip;
+    }
+    if(k < .96){
+      // A phone with the app of before: a new stop's id made from its title.
+      const l = pick(lists);
+      return addStop(trip, {date: l.date, plan: l.plan}, {time: time(), title: "Old " + n}, newId("Old " + n, new Set(listOf(trip, l).map(s => s.id)))).trip;
     }
     // Changing one's mind: back to how the trip was a few edits ago.
     if(history.length) return JSON.parse(JSON.stringify(contentOf(pick(history))));
@@ -167,10 +189,15 @@ function emptied(root, a, b, before){
 async function check(seed){
   const r = random(seed);
   const root = await ensureVersion(demo());
-  const a = await side(root, r), b = await side(root, r);
-  const m = mergeTrips(root, a, b);
+  const a0 = await side(root, r), b0 = await side(root, r);
+  const m = mergeTrips(root, a0, b0);
   const say = what => `seed ${seed}: ${what}`;
-  assert.ok(validateTrip(a).ok && validateTrip(b).ok, say("a side is not a valid trip: the generator's fault"));
+  assert.ok(validateTrip(a0).ok && validateTrip(b0).ok, say("a side is not a valid trip: the generator's fault"));
+  // Own ids: the join has them; and it is the join of the two sides once converted, which
+  // the rules below are about.
+  assert.ok(ownIds(m), say("a stop of the join without an id of its own, or one used twice"));
+  const a = uniqueStopIds(a0, root).trip, b = uniqueStopIds(b0, root).trip;
+  assert.equal(canonical(mergeTrips(root, a, b)), canonical(m), say("joined, a side of before and the same side converted differ"));
 
   assert.ok(validateTrip(m).ok, say("invalid: " + validateTrip(m).errors.slice(0, 3).join("; ")));
   assert.equal(canonical(mergeTrips(root, b, a)), canonical(m), say("not symmetric"));
@@ -287,8 +314,9 @@ async function replicas(seed){
   assert.equal(new Set(head.map(h => h.version.id)).size, 1, say("the phones did not end on the same version"));
   const end = head[0];
   assert.ok(validateTrip(end).ok, say("invalid: " + validateTrip(end).errors.slice(0, 3).join("; ")));
+  assert.ok(ownIds(end, true), say("a stop id used twice, or of before: " + placed(end).map(x => x.stop.id).filter((id, i, all) => !isStopId(id) || all.indexOf(id) !== i).join(", ")));
   for(const id of new Set(placed(end).map(x => x.stop.id))){
-    const most = Math.max(...made.map(v => at(v, id).length));
+    const most = Math.max(...made.map(v => Math.max(at(v, id).length, at(uniqueStopIds(v).trip, id).length)));
     assert.ok(at(end, id).length <= most, say(`"${id}" in ${at(end, id).length} places, never more than ${most} in any version made`));
   }
 }

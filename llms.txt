@@ -9,7 +9,7 @@
 > look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
-**Version 3.29.0.** TIMP is under active development and this page changes with it.
+**Version 3.30.0.** TIMP is under active development and this page changes with it.
 Remember this version. Before you change a trip later in the conversation, or when a
 message from the app names a newer TIMP version, open this page again: if its version
 is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
@@ -131,7 +131,7 @@ Each change is one of:
   {"setExpense": {"expense": "<id>", "set": {…}}}  /  {"removeExpense": {"expense": "<id>"}}
   "private": true next to "expense", in these three: the traveller's private expenses (shopping, a meal alone), not shared with the trip. A private one paid at a stop has "stop": "<stop id>" and that day as "date"
 
-On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline. Give lat and lng for new places when you know them. A cost is what the traveller pays (their share of what is split), in the trip's currency unless the stop says another; write only prices you know.
+On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline, copied exactly; new stops have none. Give lat and lng for new places when you know them. A cost is what the traveller pays (their share of what is split), in the trip's currency unless the stop says another; write only prices you know.
 ```
 
 ## How the traveller loads it
@@ -321,7 +321,8 @@ again. Put the version named at the top of the outline in `from`.
 - Keep the trip `id` and the `version` block exactly as they are, if the file has
   them: the app then updates the trip, keeps what was ticked, and makes a new version.
   Never write or change `version` yourself.
-- Keep the `id` of every stop that still exists, even if it is renamed or moved.
+- Keep the `id` of every stop that still exists, even if it is renamed or moved. A new
+  stop has no `id`; one copied from another stop leaves the copy's out.
 - Keep `private` and its `owner` as they are, unless the traveller asked to change
   their private expenses.
 - Change only what was asked. Do not rewrite texts nobody mentioned.

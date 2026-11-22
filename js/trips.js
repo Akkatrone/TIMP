@@ -6,6 +6,7 @@
 
 import { validateTrip, upgrade } from "./trip.js";
 import { ensureIds } from "./edit.js";
+import { findStopId } from "./ids.js";
 import { ensureVersion, childOf, commit, commitMerge, relation, commonBase, isIntact, unrelated, canonical, contentOf } from "./version.js";
 import { mergeTrips } from "./merge.js";
 import { diffTrips } from "./diff.js";
@@ -50,7 +51,8 @@ export async function saveEdit(versions, current, content){
 export async function restore(versions, current, id){
   const old = await versions.get(current.id, id);
   if(!old) throw new Error("version not on this device: " + id);
-  return saveEdit(versions, current, old);
+  // A version from before the stops had ids of their own comes back with them.
+  return saveEdit(versions, current, ensureIds(old, current).trip);
 }
 
 /**
@@ -133,6 +135,23 @@ export function moveMarks(state, moves){
     }
   }
   return out;
+}
+
+/**
+ * Ticks and skips saved under a stop's id of before, when the trip came with the ids it
+ * became (converted on another phone, or on the service): moved to them.
+ * @returns the state, the same object when nothing moved
+ */
+export function followIds(state, trip){
+  const moves = [];
+  for(const set of [state.done || {}, state.skipped || {}]) for(const key of Object.keys(set)){
+    const [date, plan, id] = key.split("|");
+    const d = trip.days.find(x => x.date === date);
+    const list = !d ? null : d.plans ? (d.plans.find(p => p.id === plan) || {}).stops : plan ? null : d.stops;
+    const to = list && !list.some(s => s.id === id) ? findStopId(trip, date, plan || null, list, id) : undefined;
+    if(to) moves.push({date, plan: plan || null, from: id, to});
+  }
+  return moves.length ? moveMarks(state, moves) : state;
 }
 
 /** The name of the file to save: the trip's id and the version's short id. */

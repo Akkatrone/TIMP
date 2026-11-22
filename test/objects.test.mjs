@@ -65,9 +65,10 @@ test("a long history costs little: fifty edits of one stop each", async () => {
   await versions.put(trip);
   const first = await bytes(db);
   for(let i = 0; i < 25; i++){
-    const added = await commit(addStop(trip, {date: "2027-05-15"}, {time: "20:" + String(i).padStart(2, "0"), title: "Stop " + i}).trip, trip);
+    const {trip: next, ref} = addStop(trip, {date: "2027-05-15"}, {time: "20:" + String(i).padStart(2, "0"), title: "Stop " + i});
+    const added = await commit(next, trip);
     await versions.put(added);
-    trip = await commit(removeStop(added, {date: "2027-05-15", id: "stop-" + i}), added);
+    trip = await commit(removeStop(added, ref), added);
     await versions.put(trip);
   }
   const total = await bytes(db), perEdit = (total - first) / 50;
