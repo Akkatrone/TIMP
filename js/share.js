@@ -140,6 +140,9 @@ export function serviceApi(){
 }
 
 /** The owner deletes a trip from the account: gone for every phone and every person. */
+/** A trip's versions as the service has them: who sent each, and with which chat app. */
+export const tripHistory = async id => (await call("history", {params: {id}})).versions;
+
 export const deleteFromAccount = id => call("deleteTrip", {params: {id}});
 
 /** The owner locks a trip on the account at its version, or unlocks it: its summary. */

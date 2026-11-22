@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.27.0
+
+The history of a trip, easier to read.
+
+- **One line per version**: what it changed first, with how many more changes; a tap
+  opens it, with every change and "Restore".
+- **Who made it, and how**: for a trip on the account, "in the app" or "with Claude"
+  (the chat app that made it), and the name of whoever made it on a shared trip.
+  The service says so (`via` in a trip's history, new in the contract).
+- **What changed besides the stops**, in words: the day and what of it (notes, night,
+  name or city, plans; a day added or taken away), and the trip's own (practical info,
+  expenses), instead of "Other changes".
+- For chat apps: to change a day's notes, the whole list as it should be.
+
 ## 3.26.0
 
 Published trips, from their page into the app.

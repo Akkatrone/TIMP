@@ -13,23 +13,47 @@ const fields = fs => fs.map(f => t("field_" + f)).join(", ");
 
 /** Short lines saying what changed, at most `max` of them. */
 export function describe(d, max = 6){
+  // The days and the trip first: few lines, easily lost after many stops.
   const lines = [
+    ...(d.days || []).map(x => `~ ${day(x.date)} · ${x.fields.map(f => t("dayField_" + f)).join(", ")}`),
+    ...(d.trip && d.trip.length ? [`~ ${t("tripFields")} · ${d.trip.map(f => t("tripField_" + f)).join(", ")}`] : []),
+    ...(d.other && !(d.days || []).length && !(d.trip || []).length ? [t("changedOther")] : []),
     ...d.added.map(x => "+ " + x.stop.title),
     ...d.removed.map(x => "− " + x.stop.title),
     ...d.changed.map(x => `~ ${x.stop.title} · ${fields(x.fields)}`),
-    ...d.moved.map(x => `→ ${x.stop.title} · ${day(x.date)}`),
-    ...(d.other ? [t("changedOther")] : [])
+    ...d.moved.map(x => `→ ${x.stop.title} · ${day(x.date)}`)
   ];
   if(!lines.length) return [t("changedNothing")];
   return lines.length > max ? [...lines.slice(0, max - 1), t("changedMore", {n: lines.length - max + 1})] : lines;
 }
 
+// The same arrow as the other things that open (js/app.js).
+const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 let dialog = null;
 
+// Who made a version and how, from what the service says of it: in the app, or with a
+// chat app (Claude, ChatGPT…) the traveller linked; another person's name on a shared trip.
+export function madeBy(info, me){
+  if(!info) return "";
+  const how = info.via ? t("historyViaChat", {app: info.via}) : t("historyViaApp");
+  return info.by && info.by !== me ? t("historyWho", {who: info.by, how}) : how;
+}
+
+// What the service says of the versions, or nothing: offline, slow or not on the account.
+async function authors(who){
+  if(!who) return null;
+  try{ return await Promise.race([who(), new Promise(ok => setTimeout(() => ok(null), 5000))]); }
+  catch(e){ return null; }
+}
+
 /**
- * @param {{trip: object, versions: object, onRestore: (id: string) => Promise<void>}} o
+ * @param {{trip: object, versions: object, onRestore: (id: string) => Promise<void>,
+ *   who?: () => Promise<{me: string, versions: Map<string, {by: string, via: string|null}>}>}} o
+ *   who: the trip's versions as the service has them, when it is on the account
  */
-export async function openHistory({trip, versions, onRestore}){
+export async function openHistory({trip, versions, onRestore, who}){
+  const asked = authors(who);
   if(!dialog){
     dialog = document.createElement("dialog");
     dialog.className = "sheet history";
@@ -60,6 +84,7 @@ export async function openHistory({trip, versions, onRestore}){
   // takes a few milliseconds; the 60 most recent are enough to find one's way back.
   const rows = [];
   let away = 0;
+  const known = await asked;
   const flush = () => { if(away){ rows.push(`<li class="away">${esc(t("historyAway", {n: away}))}</li>`); away = 0; } };
   for(const id of ids.slice(0, 60)){
     const v = here.has(id) ? await versions.get(trip.id, id) : null;
@@ -67,13 +92,20 @@ export async function openHistory({trip, versions, onRestore}){
     flush();
     const parent = v.version.parents[0] && here.has(v.version.parents[0]) ? await versions.get(trip.id, v.version.parents[0]) : null;
     const what = !v.version.parents.length ? [t("historyFirst")]
-      : parent ? describe(diffTrips(parent, v)) : [t("historyUnknown")];
+      : parent ? describe(diffTrips(parent, v), 40) : [t("historyUnknown")];
     if(v.version.parents.length > 1) what.unshift(t("historyMerge", {v: shortId(v.version.parents[1])}));
     const when = v.version.date ? fmt.format(new Date(v.version.date)) : "";
     const current = id === trip.version.id;
-    rows.push(`<li class="${current ? "current" : ""}"><div class="vid"><code>${esc(shortId(id))}</code><span>${esc(when)}</span></div>` +
-      `<ul class="what">${what.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` +
-      (current ? `<span class="badge-on">${esc(t("historyCurrent"))}</span>` : `<button type="button" class="btn small" data-restore="${esc(id)}">${esc(t("restore"))}</button>`) + `</li>`);
+    const info = known && known.versions.get(id);
+    const by = madeBy(info, known && known.me);
+    // One line each; a tap opens it: every change, and the way back to it.
+    rows.push(`<li class="${current ? "current" : ""}"><details><summary>` +
+      `<code class="vid">${esc(shortId(id))}</code>` +
+      `<span class="sum"><span class="l">${esc(what[0])}</span>${what.length > 1 ? `<span class="n">${esc(t("historyMore", {n: what.length - 1}))}</span>` : ""}</span>` +
+      (current ? `<span class="badge-on">${esc(t("historyCurrent"))}</span>` : `<span class="chev">${CHEVRON}</span>`) +
+      `<span class="meta">${[when && esc(when), by && `<span class="by${info.via ? " via" : ""}">${esc(by)}</span>`].filter(Boolean).join(" · ")}</span></summary>` +
+      `<div class="body"><ul class="what">${what.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` +
+      (current ? "" : `<button type="button" class="btn small" data-restore="${esc(id)}">${esc(t("restore"))}</button>`) + `</div></details></li>`);
   }
   flush();
   if(ids.length > 60) rows.push(`<li class="away">${esc(t("historyOlder", {n: ids.length - 60}))}</li>`);

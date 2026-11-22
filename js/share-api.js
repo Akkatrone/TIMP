@@ -72,7 +72,8 @@ export const SHAPES = {
     id: text("Version id."),
     parents: {type: "list", of: "text", req: true, doc: "The versions it was made from."},
     date: {type: "text", req: true, null: true, doc: "When it was made."},
-    by: text("Handle of who sent it.")
+    by: text("Handle of who sent it."),
+    via: {type: "text", null: true, doc: "The chat app that made it for them (as it registered, \"Claude\"), or null when made in the app."}
   },
   privateSet: {
     data: {type: "any", req: true, null: true, doc: "The private expenses, as the trip file's `private` section, or null."},

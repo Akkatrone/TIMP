@@ -27,16 +27,39 @@ function rest(trip){
 const GROUPS = {time: "time", title: "title", local: "title", text: "text", travel: "travel", tag: "tag", type: "type",
   booking: "booking", closed: "closed", cost: "cost", currency: "cost", lat: "place", lng: "place", address: "place", link: "place"};
 
+// A day's fields and the trip's, grouped the same way.
+const DAY_GROUPS = {notes: "notes", stay: "stay", city: "title", title: "title", plans: "plans"};
+const TRIP_GROUPS = {info: "info", expenses: "expenses"};
+const changedKeys = (x, y, groups) => [...new Set(Object.keys({...x, ...y}).filter(k => !same(x[k], y[k])).map(k => groups[k] || "other"))];
+
+// What changed besides the stops: each day's (notes, night, name…) and the trip's own.
+function others(from, to){
+  const {days: da, ...ta} = rest(from), {days: db, ...tb} = rest(to);
+  const a = new Map(da.map(d => [d.date, d])), b = new Map(db.map(d => [d.date, d]));
+  const days = [];
+  for(const [date, y] of b){
+    const x = a.get(date);
+    const fields = x ? changedKeys(x, y, DAY_GROUPS) : ["added"];
+    if(fields.length) days.push({date, fields});
+  }
+  for(const date of a.keys()) if(!b.has(date)) days.push({date, fields: ["removed"]});
+  days.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
+  return {days, trip: changedKeys(ta, tb, TRIP_GROUPS)};
+}
+
 /**
- * @returns {{added: object[], removed: object[], changed: object[], moved: object[], other: boolean}}
+ * @returns {{added: object[], removed: object[], changed: object[], moved: object[], other: boolean, days: object[], trip: string[]}}
  *   added, removed: {date, plan, stop}
  *   changed: {date, plan, stop, fields: ["time", "place", …]}  (the stop as it is in `to`)
  *   moved: {from: {date, plan}, date, plan, stop, fields}      (same stop id, another day or plan)
- *   other: something besides stops changed (days, hotels, info…)
+ *   other: something besides stops changed (days, hotels, info…), told by `days` and `trip`:
+ *   days: {date, fields: ["notes", "stay", "title", "plans", "other"], or ["added"], or ["removed"]}
+ *   trip: the trip's own fields that changed: "info", "expenses", "other"
  */
 export function diffTrips(from, to){
   const a = stopsOf(from), b = stopsOf(to);
-  const out = {added: [], removed: [], changed: [], moved: [], other: !same(rest(from), rest(to))};
+  const other = !same(rest(from), rest(to));
+  const out = {added: [], removed: [], changed: [], moved: [], other, ...(other ? others(from, to) : {days: [], trip: []})};
   for(const [k, x] of b){
     const y = a.get(k);
     if(!y){ out.added.push(x); continue; }

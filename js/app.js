@@ -22,7 +22,7 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical, contentOf } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl, tripHistory } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { chooseFirstDay } from "./publishing.js";
 import { asBase } from "./publish.js";
@@ -390,7 +390,10 @@ async function backToFile(x){
 function showHistory(id){
   const rec = S.records.find(r => r.id === id);
   if(!rec) return;
-  openHistory({trip: rec.trip, versions, onRestore: async vid => {
+  // On the account, the service says who made each version, and whether a chat did.
+  const onAccount = S.account && rec.share && rec.share.id && !rec.share.gone && !rec.public;
+  const who = onAccount ? async () => ({me: S.account.handle, versions: new Map((await tripHistory(rec.share.id)).map(v => [v.id, v]))}) : null;
+  openHistory({trip: rec.trip, versions, who, onRestore: async vid => {
     if(!editable(rec)) return;
     const {trip} = await restore(versions, rec.trip, vid);
     const next = {...rec, trip};

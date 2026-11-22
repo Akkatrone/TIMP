@@ -486,6 +486,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.ok(rows.some(r => r.includes("+ Sunset on the river")));
     assert.ok(rows.some(r => r.includes("Joined with ") && r.includes("which brought:")));
     assert.ok(rows.some(r => r.includes("First version")));
+    // One line each, closed; a tap opens it with every change and "Restore".
+    assert.equal(await run(`return document.querySelectorAll("dialog.history .versions details[open]").length;`), 0, "versions start closed");
+    await run(`[...document.querySelectorAll("dialog.history .versions > li")].find(li => li.textContent.includes("+ Sunset on the river")).querySelector("summary").click();`);
+    assert.ok(await run(`const d = document.querySelector("dialog.history .versions details[open]"); return !!d && d.querySelector("[data-restore]").offsetParent !== null;`), "a tap opens the version");
     // Back to the version that had "Sunset on the river".
     const before = await versionOnPhone();
     await run(`[...document.querySelectorAll("dialog.history .versions > li")].find(li => li.textContent.includes("+ Sunset on the river")).querySelector("[data-restore]").click();`);

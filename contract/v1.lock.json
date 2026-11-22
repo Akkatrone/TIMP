@@ -201,6 +201,10 @@
    "by": {
     "type": "text",
     "req": true
+   },
+   "via": {
+    "type": "text",
+    "null": true
    }
   },
   "privateSet": {

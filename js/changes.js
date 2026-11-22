@@ -93,7 +93,7 @@ export function changesBrief(){
     `  {"update": {"day": "YYYY-MM-DD", "stop": "<id>", "set": {…}}}  changed fields of a stop; null removes a field`,
     `  {"update": {"day": …, "stop": "<id>", "to": {"day": "YYYY-MM-DD"}}}  moves the stop to another day (set may go with it)`,
     `  {"remove": {"day": "YYYY-MM-DD", "stop": "<id>"}}`,
-    `  {"setDay": {"day": "YYYY-MM-DD", "set": {…}}}             a day's city, title, stay or notes`,
+    `  {"setDay": {"day": "YYYY-MM-DD", "set": {…}}}             a day's city, title, stay or notes ("notes": the whole list, as it should be)`,
     `  {"addDay": {…a whole day, as in a trip file…}}`,
     `  {"removeDay": {"day": "YYYY-MM-DD"}}`,
     `  {"addPlan": {"day": "YYYY-MM-DD", "plan": {"name": "…", "stops": [{…}, …]}, "first": "…"}}  an alternative plan for the day (a rainy day, a lazy morning); the traveller picks one. On a day without plans, "first" names the plan made of the stops it has now`,

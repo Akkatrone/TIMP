@@ -394,6 +394,23 @@ test("the comparison names what changed: added, removed, changed fields, moved",
   assert.equal(diffTrips(trip, reordered).changed.length, 0, "the order of fields is not a change");
 });
 
+test("the comparison names what changed besides the stops: which day, which of its parts, the trip's own", () => {
+  const trip = demo();
+  const next = JSON.parse(JSON.stringify(trip));
+  next.days[0].notes = [...(next.days[0].notes || []), "Bring a jacket"];
+  next.days[1].stay = "Another hotel";
+  next.days[1].city = "Sintra";
+  next.info = [...(next.info || []), {title: "Taxis", items: [{label: "Number", text: "123"}]}];
+  next.title = "Lisbon, again";
+  const d = diffTrips(trip, next);
+  assert.equal(d.other, true);
+  assert.deepEqual(d.days, [{date: trip.days[0].date, fields: ["notes"]}, {date: trip.days[1].date, fields: ["title", "stay"]}]);
+  assert.deepEqual([...d.trip].sort(), ["info", "other"]);
+  const fewer = JSON.parse(JSON.stringify(trip)); fewer.days.pop();
+  assert.deepEqual(diffTrips(trip, fewer).days, [{date: trip.days.at(-1).date, fields: ["removed"]}]);
+  assert.deepEqual(diffTrips(trip, trip).days, []);
+});
+
 import { separate, joinChanges } from "../js/trips.js";
 import { unrelated } from "../js/version.js";
 import { applyChanges, outline, CHANGES } from "../js/changes.js";
