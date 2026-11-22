@@ -4,6 +4,25 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.28.1
+
+Two fixes from the first outside contribution: thank you,
+[@Akkatrone](https://github.com/Akkatrone) ([#1](https://github.com/Frafal/TIMP/pull/1)).
+
+- **A stop moved to another day on one phone, and changed on another** (or by a linked
+  chat), no longer comes back twice after the two are joined: it is on its new day, with
+  the change. When both move it, the same side wins on every phone.
+- **Use as a base** keeps a place's closing dates as they are, instead of moving them
+  with the trip to days when the place is open. From a page with hidden dates, whose
+  dates are not real, they are left out; closing days of the week stay.
+- Tests: every stop moved on one side and changed, or moved elsewhere, on the other; 200
+  random pairs of edits, joined in both orders.
+- **README** much shorter: what the app does, how to start, how to make a trip, the
+  account and linked chats, privacy in short. The details moved to
+  [Using the app](docs/using-the-app.md), [Privacy](docs/privacy.md) and
+  [Google Maps](docs/google-maps.md).
+- The checks need Node 22 or later (CI on 22 and 24); the e2e says why when it fails.
+
 ## 3.28.0
 
 Linking a chat app, said where it is needed.

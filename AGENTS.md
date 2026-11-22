@@ -134,6 +134,9 @@ seems to need it: say so instead.
 
 And these rules:
 
+- **What leaves the phone is written down.** A change to what the app sends, or to whom,
+  goes in [docs/privacy.md](docs/privacy.md), and in the README's short Privacy section
+  if it changes the gist. The README stays short: details go in `docs/`.
 - **Text from a trip file is untrusted.** It reaches the page only through `esc()` or
   `rich()` from `js/util.js`. Values used in styles or URLs are validated in `js/trip.js`.
 - **The Content-Security-Policy stays tight.** It is the `<meta>` in `index.html`. No

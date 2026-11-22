@@ -502,3 +502,61 @@ test("a move and a concurrent edit keep one edited stop on its new day", async (
     assert.deepEqual(stopsOf(merged, DAY2).filter(s => s.id === ref.id), [{...stop, cost: 20}]);
   }
 });
+
+// Every stop of a trip with where it is, plans included: an id is unique in its list only.
+const placed = trip => trip.days.flatMap(d => d.plans ? d.plans.flatMap(p => p.stops.map(s => ({date: d.date, plan: p.id, stop: s}))) : d.stops.map(s => ({date: d.date, plan: null, stop: s})));
+const copies = (trip, id) => placed(trip).filter(x => x.stop.id === id);
+
+test("a stop moved on one side, and changed or moved elsewhere on the other: one copy, the same on both phones", async () => {
+  const root = await ensureVersion(ensureIds(demo()).trip);
+  const plain = root.days.filter(d => !d.plans).map(d => d.date);
+  let n = 0;
+  for(const x of placed(root).filter(y => !y.plan)) for(const to of plain.filter(d => d !== x.date)) for(const other of ["cost", "time", "elsewhere"]){
+    const ref = {date: x.date, id: x.stop.id};
+    const moved = await commit(updateStop(root, ref, x.stop, {date: to}).trip, root);
+    const away = plain.find(d => d !== x.date && d !== to);
+    if(other === "elsewhere" && !away) continue;
+    const changed = await commit(other === "elsewhere" ? updateStop(root, ref, x.stop, {date: away}).trip
+      : updateStop(root, ref, {...x.stop, ...(other === "cost" ? {cost: 99} : {time: "23:59"})}).trip, root);
+    const a = mergeTrips(root, moved, changed), b = mergeTrips(root, changed, moved);
+    assert.equal(canonical(a), canonical(b), "the same whichever phone joins");
+    const got = copies(a, x.stop.id);
+    assert.equal(got.length, 1, `${x.stop.id} to ${to}, ${other}: on ${got.map(g => g.date).join(", ")}`);
+    if(other === "cost") assert.equal(got[0].stop.cost, 99);
+    if(other === "time") assert.equal(got[0].stop.time, "23:59");
+    if(other !== "elsewhere") assert.equal(got[0].date, to);
+    assert.ok(validateTrip(a).ok);
+    n++;
+  }
+  assert.ok(n > 20);
+});
+
+test("random pairs of edits: the join is the same on both phones, valid, and never makes a stop twice", async () => {
+  // A small fixed generator: the same pairs on every run.
+  const rnd = seed => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const edit = (trip, r) => {
+    const plain = trip.days.filter(d => !d.plans), stops = placed(trip).filter(x => !x.plan);
+    const pick = list => list[Math.floor(r() * list.length)];
+    const k = r();
+    if(!stops.length || k < .15) return addStop(trip, {date: pick(plain).date}, {time: "23:" + String(Math.floor(r() * 59)).padStart(2, "0"), title: "New " + Math.floor(r() * 1e6)}).trip;
+    const x = pick(stops), ref = {date: x.date, id: x.stop.id};
+    if(k < .5) return updateStop(trip, ref, x.stop, {date: pick(plain).date}).trip;
+    if(k < .8) return updateStop(trip, ref, {...x.stop, cost: Math.floor(r() * 100)}).trip;
+    return removeStop(trip, ref);
+  };
+  let n = 0;
+  for(let seed = 1; seed <= 200; seed++){
+    const r = rnd(seed), root = await ensureVersion(ensureIds(demo()).trip);
+    let a = root, b = root;
+    for(let i = 0; i < 1 + Math.floor(r() * 4); i++) a = await commit(edit(a, r), a);
+    for(let i = 0; i < 1 + Math.floor(r() * 4); i++) b = await commit(edit(b, r), b);
+    if(a.version.id === b.version.id) continue;
+    const m = mergeTrips(root, a, b);
+    assert.equal(canonical(m), canonical(mergeTrips(root, b, a)), "seed " + seed);
+    assert.ok(validateTrip(m).ok, "seed " + seed);
+    for(const id of new Set(placed(m).map(x => x.stop.id)))
+      assert.ok(copies(m, id).length <= Math.max(copies(a, id).length, copies(b, id).length), `seed ${seed}: ${id} made twice`);
+    n++;
+  }
+  assert.ok(n > 150);
+});

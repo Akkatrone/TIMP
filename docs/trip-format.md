@@ -233,8 +233,8 @@ The file gives positions; the app does the rest.
 Without a key, the interactive map uses OpenStreetMap. With `googleMapsKey`, it uses
 Google Maps, for everyone who loads the file. Restrict the key to the address of the
 app and to the Maps JavaScript API, set a daily quota, and never put a file with a key
-in a public repository. How to create one is in the
-[README](../README.md#google-maps-optional). Each phone can also save its own key, or
+in a public repository. How to create one:
+[Google Maps](google-maps.md). Each phone can also save its own key, or
 turn Google Maps off, on the You page (the circle at the top right).
 
 <!-- llms.txt: end -->

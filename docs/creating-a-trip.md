@@ -218,7 +218,7 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 - Only use a key the traveller gives you. Never invent one, never reuse one from
   another file.
 - The key must be restricted to the app's address and to the Maps JavaScript API, with
-  a daily quota. The [README](../README.md#google-maps-optional) explains how.
+  a daily quota. [Google Maps](google-maps.md) explains how.
 - A file with a key must not be published.
 
 ## Mistakes to avoid

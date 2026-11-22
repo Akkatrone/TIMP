@@ -82,7 +82,7 @@ export const FIELDS = {
     currency: {type: "text", pattern: CURRENCY, hint: CURRENCY_HINT, doc: "The currency of every cost without its own."},
     expenses: {type: "list", of: "expense", min: 1, doc: "Money spent outside the stops: flights, hotels, passes."},
     private: {type: "private", doc: "The traveller's own spending, not shared."},
-    googleMapsKey: {type: "text", inBrief: false, doc: "A Google Maps key for everyone who loads the trip (see the README). Without it, OpenStreetMap."},
+    googleMapsKey: {type: "text", inBrief: false, doc: "A Google Maps key for everyone who loads the trip (see docs/google-maps.md). Without it, OpenStreetMap."},
     basedOn: {type: "basedOn", byApp: true, inBrief: false, doc: "Written by the app: the published trip this one was copied from (\"Use as a base\")."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app. Keep it when you change a file the app saved."},
     version: {type: "any", byApp: true, doc: "Written by the app. Keep it as it is."}
