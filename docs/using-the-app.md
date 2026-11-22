@@ -105,11 +105,12 @@ When someone loads a file of a trip they already have (same trip `id`):
   then comes back as a new version, and nothing is lost;
 - **a version that changed separately** shows what is new in the file and what is new
   on the phone, and asks:
-  - **Join both** merges the two: stops added on either side are kept, a stop changed on
-    one side takes that change, a stop removed on one side and untouched on the other
-    goes, a stop moved to another day on one side and changed on the other is moved and
-    changed. When both changed the same detail, the same side wins on every phone, so
-    two friends who swap files end on the same version;
+  - **Join both** merges the two: what was added on either side is kept (stops, notes,
+    expenses, lines of the Info page), a stop changed on one side takes that change, a
+    stop removed on one side and untouched on the other goes, a stop moved to another day
+    on one side and changed on the other is moved and changed. A stop is never doubled,
+    and the stops stay in time order. When both changed the same detail, the same side
+    wins on every phone, so two friends who swap files end on the same version;
   - **Use only the file** keeps the file as it is, as a new version that still remembers
     the phone's changes;
   - **Cancel** loads nothing.

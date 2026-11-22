@@ -4,6 +4,30 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.29.0
+
+Joining two versions, made robust. After #1 we stopped trusting hand-picked cases: the
+joins are now held to their rules on thousands of random edits made on two phones, and
+on three phones that edit, bring back old versions and sync in any order. That found,
+and this release fixes:
+
+- **A join that made an invalid trip**, which then could not be synced: a plan added to
+  a day on one phone (or by a linked chat) while a stop of that day changed on another;
+  a plan removed on one side while one of its stops changed on the other; each side
+  removing one of the last two stops, plans, days or expenses.
+- **Notes, closing days and lines of the Info page** added on two phones: both are kept.
+  Before, one of the two was lost.
+- **An expense added on one phone** while the other removed the last one: kept.
+- **A stop doubled** after it was moved on one phone and changed on another, also when
+  its id is used in another plan of the trip; or brought back on two phones with
+  History → Restore and moved on one.
+- **Stops out of time order** after a join, when one side changed a time.
+- Joining a version with a copy that changed nothing gives that version, exactly: no
+  extra versions.
+
+For contributors: `test/merge-properties.test.mjs` (400 random cases in every test run),
+and a weekly workflow that tries 20,000 more. A new kind of edit gets its step there.
+
 ## 3.28.1
 
 Two fixes from the first outside contribution: thank you,

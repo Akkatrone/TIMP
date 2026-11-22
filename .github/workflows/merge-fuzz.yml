@@ -1,0 +1,24 @@
+name: Merge fuzz
+
+# The joins of two versions (js/merge.js) on many more random edits than the tests run:
+# 20,000 pairs and 5,000 groups of phones, from new seeds each week. A failure names
+# its seed: MERGE_SEEDS=1 MERGE_FIRST=<seed> node --test test/merge-properties.test.mjs
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Joins on random edits
+        run: MERGE_SEEDS=20000 MERGE_FIRST=$(( GITHUB_RUN_NUMBER * 20000 + 1000 )) node --test test/merge-properties.test.mjs

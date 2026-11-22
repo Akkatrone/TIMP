@@ -156,6 +156,12 @@ And these rules:
 - **Versions and merges stay deterministic.** Two phones merging the same two versions
   must end with the same trip and the same version id: conflicts are settled by version
   id, never by which phone runs the merge. `test/versions.test.mjs` checks it.
+- **A join never makes a trip invalid, doubles a stop or loses what one side did.**
+  `test/merge-properties.test.mjs` holds the rules of `js/merge.js` on random edits made
+  on two sides, and on phones that edit, restore and sync in any order. A new kind of
+  edit, or a new list in the format, gets its step in that generator in the same
+  change. A failure names its seed: fix the join, never the seed. A weekly workflow
+  (`merge-fuzz.yml`) looks much further.
 - **Interface texts** go in `js/i18n.js`, in every language. A test compares the keys.
 - **No new dependencies, bundlers or frameworks.** No third-party scripts, fonts or
   requests at startup.
