@@ -490,3 +490,15 @@ test("canonical JSON never changes: the same text as the first way it was writte
   assert.equal(canonical(undefined), reference(undefined));
   assert.equal(canonical([undefined, null, () => 1]), reference([undefined, null, () => 1]));
 });
+
+test("a move and a concurrent edit keep one edited stop on its new day", async () => {
+  const root = await ensureVersion(demo());
+  const ref = {date: DAY1, id: "se"}, stop = stopsOf(root, DAY1).find(s => s.id === ref.id);
+  const moved = await commit(updateStop(root, ref, stop, {date: DAY2}).trip, root);
+  const edited = await commit(updateStop(root, ref, {...stop, cost: 20}).trip, root);
+  for(const [a, b] of [[moved, edited], [edited, moved]]){
+    const merged = mergeTrips(root, a, b);
+    assert.deepEqual(stopsOf(merged, DAY1).filter(s => s.id === ref.id), []);
+    assert.deepEqual(stopsOf(merged, DAY2).filter(s => s.id === ref.id), [{...stop, cost: 20}]);
+  }
+});
