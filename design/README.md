@@ -197,4 +197,6 @@ Part of every component, checked where it can be.
 - **A11 iPhone**: what is typed is at least 16 points (`--fs-field`: Safari zooms into a
   smaller field); what sticks to the top is placed from where the bar ends, under the
   notch (`env(safe-area-inset-top)`); a colour mixed with `color-mix()` has a plain one
-  before it, for Safari before 16.2.
+  before it, for Safari before 16.2. A column that holds text is `minmax(0, 1fr)`, never `auto`, and
+  its children may shrink (`min-width: 0`): Safari sizes an auto column by the full
+  length of a text kept on one line. The e2e fails if a page is wider than the screen.

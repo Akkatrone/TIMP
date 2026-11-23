@@ -108,6 +108,9 @@ await withApp(async ({run, until, reload, blocked}) => {
       }
       const ids = [...document.querySelectorAll("[id]")].map(e => e.id);
       for(const id of new Set(ids.filter((x, i) => ids.indexOf(x) !== i))) out.push("id twice: " + id);
+      // Nothing wider than the screen (Safari once pushed every card past the edge).
+      if(document.documentElement.scrollWidth > innerWidth + 1) out.push("wider than the screen: " + document.documentElement.scrollWidth);
+      for(const el of document.querySelectorAll("#app .stop, #app .dayline, #app .group")) if(el.getBoundingClientRect().right > innerWidth + 1) out.push("past the right edge: " + el.className);
       const levels = [...document.querySelectorAll("#app h1, #app h2, #app h3")].map(h => +h.tagName[1]);
       levels.forEach((l, i) => { if(i && l > levels[i - 1] + 1) out.push("heading skips a level: h" + levels[i - 1] + " → h" + l); });
       return out;`);

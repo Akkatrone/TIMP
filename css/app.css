@@ -50,6 +50,11 @@ html.own-scroll body{height:100%;overflow-x:hidden;overflow-y:auto;scroll-paddin
 html.own-scroll:has(dialog[open]) body{overflow:hidden}
 
 main.gutter{padding-block:16px 56px;display:grid;gap:18px}
+/* The page's one column is never wider than the screen: Safari sizes an auto column by
+   the full length of a text kept on one line (the day's line, a folded description) and
+   pushed every card past the right edge. */
+main.gutter{grid-template-columns:minmax(0,1fr)}
+main.gutter > *{min-width:0}
 
 h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
 .founds{display:grid;gap:8px}

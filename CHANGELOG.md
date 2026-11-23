@@ -4,6 +4,13 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.5
+
+- **iPhone**: a day was wider than the screen (Safari sized the page by the full length
+  of a line kept on one line, such as the day's line or a folded description): the cards
+  went past the right edge and their circle could not be seen. The page's column is now
+  never wider than the screen, and the e2e checks it on every day.
+
 ## 4.1.4
 
 - **Search in the bar**: the lens becomes ✕ and the field takes the title's place; only
