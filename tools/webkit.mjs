@@ -82,14 +82,24 @@ try{
   delete trip.version; delete trip.private;
   Object.assign(trip, {id: "webkit-check", title: "A trip with a rather long title to see how the bar holds it"});
   const long = "Before the controls: the QR code of the arrival form ready on the phone, the passport open at the right page, the address of the first night written down " .repeat(3);
+  // Every stop with a position, so the long note is what the day's line shows closed.
+  for(const d of trip.days) for(const st of d.plans ? d.plans.flatMap(p => p.stops) : d.stops) if(st.lat === undefined){ st.lat = 38.7139; st.lng = -9.1334; }
   trip.days[0].notes = [long];
   const s0 = (trip.days[0].stops || trip.days[0].plans[0].stops)[0];
   s0.text = long;
   s0.title = "A stop with a name long enough to need two lines on a phone held upright";
-  await until("the app", `document.querySelector("#file")`);
-  await run(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(trip))}], "trip.json", {type: "application/json"})); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change"));`);
+  // Pasted, as from a chat: WebKitGTK cannot be handed a file the way Chrome is.
+  await until("the app", `document.querySelector('[data-act="demo"]')`);
+  await run(`document.querySelector('[data-act="demo"]').click();`);
+  await until("the example trip", `document.querySelector(".stop")`);
+  await run(`location.hash = "#trips";`);
+  await until("Paste", `document.querySelector('[data-act="paste"]')`);
+  await run(`document.querySelector('[data-act="paste"]').click();`);
+  await until("the paste form", `document.querySelector("#paste-text")`);
+  await run(`document.querySelector("#paste-text").value = ${JSON.stringify(JSON.stringify(trip))}; document.querySelector("#paste-text").closest("form").requestSubmit();`);
   await until("the trip", `document.title.includes("rather long title")`);
 
+  console.log("  window: " + await run(`return innerWidth + "×" + innerHeight;`));
   const pages = ["#day-1", "#day-2", "#info", "#trips", "#me"];
   const heights = [];
   for(const h of pages){

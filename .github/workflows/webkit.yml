@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   webkit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # webkit2gtk-driver is not in later Ubuntus
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -25,7 +25,7 @@ jobs:
       - name: WebKitGTK, its WebDriver, a screen
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q webkit2gtk-driver libwebkit2gtk-4.1-0 xvfb
+          sudo apt-get install -y -q --no-install-recommends webkit2gtk-driver libwebkit2gtk-4.1-0 xvfb xauth
           find /usr/lib /usr/libexec -name MiniBrowser 2>/dev/null || true
       - name: The app in WebKit
         run: xvfb-run -a node tools/webkit.mjs
