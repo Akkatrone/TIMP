@@ -4,7 +4,7 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
-## Unreleased (4.0.0)
+## 4.0.0
 
 The design system ([design/README.md](design/README.md)): one set of tokens, rules for
 every screen, accessibility in each. This release brings it to the day.

@@ -21,15 +21,16 @@ await withApp(async ({run, until, theme, capture}) => {
     console.log("  docs/screenshots/" + name);
   };
   // Puts the title of the day just under the strip of days, as after a short scroll.
-  const scrollToTitle = `scrollTo(0, document.querySelector(".headrow").getBoundingClientRect().top + scrollY - document.querySelector(".strip").offsetHeight - 14);`;
+  const scrollToTitle = `scrollTo(0, document.querySelector(".dayhead h1").getBoundingClientRect().top + scrollY - document.querySelector(".strip").offsetHeight - 14);`;
 
   await mkdir(OUT, {recursive: true});
   console.log("Writing:");
 
-  // 1. The programme of a day: one stop done, one skipped, one description opened.
+  // 1. The programme of a day: one stop done, one skipped, one opened with its zones.
   await run(`document.querySelector('[data-act="demo"]').click();`);
   await until("the example trip", `document.querySelectorAll("[data-tick]").length > 1`);
-  await run(`document.querySelectorAll("[data-tick]")[0].click(); document.querySelectorAll("[data-skip]")[0].click(); document.querySelectorAll("[data-open]")[2].click(); scrollTo(0, 0);`);
+  const open = i => `document.querySelectorAll("[data-open]")[${i}].click(); await new Promise(r => setTimeout(r, 80));`;
+  await run(`document.querySelectorAll("[data-tick]")[0].click(); await new Promise(r => setTimeout(r, 80)); ${open(1)} document.querySelector(".stop.open [data-skip]").click(); await new Promise(r => setTimeout(r, 80)); ${open(1)} ${open(2)} scrollTo(0, 0);`);
   await shoot("programme.png");
 
   // 2. The interactive map of day 2: train and ferry icons, two stops behind you dashed.
