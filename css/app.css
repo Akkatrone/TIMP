@@ -669,7 +669,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .stops > .group:first-child::before{top:var(--sp-5)}
 .stops > .group:last-child::before{bottom:var(--sp-5)}
 .group .stop{border:0;box-shadow:none;background:none;border-radius:var(--r-m)}
-.group .stop .rail::before{display:none}
+.group .rail::before{display:none}
 .group .gh{display:flex;align-items:baseline;gap:var(--sp-2);margin:0;padding:var(--sp-4) var(--sp-4) 0 calc(var(--sp-3) + var(--rail) + var(--sp-4));font:600 var(--fs-m)/1.3 var(--f-body);color:var(--ink)}
 .group .gh span{color:var(--muted);font-weight:500}
 .gclose{margin-left:auto;padding:0;border:0;background:none;color:var(--muted);font:500 var(--fs-m) var(--f-body);cursor:pointer}

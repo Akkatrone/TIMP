@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TIMP design system</title>
+<meta name="description" content="TIMP's design system: tokens, the line of the day, components and rules, drawn with the app's own styles.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="catalog.css">
+</head>
+<body class="ds">
+<header class="ds-top">
+  <div>
+    <p class="ds-eyebrow">Travel in my pocket</p>
+    <h1>The design system</h1>
+  </div>
+  <div class="vt" role="group" aria-label="Theme">
+    <button type="button" data-ds-theme="light" aria-pressed="true">Light</button>
+    <button type="button" data-ds-theme="dark" aria-pressed="false">Dark</button>
+  </div>
+</header>
+<main class="ds-main">
+  <p class="ds-lead">How TIMP looks and behaves, on every screen, today in the web app and
+  tomorrow in native ones. Everything on this page is drawn with the app's own styles
+  (<code>css/tokens.css</code>, <code>css/app.css</code>): what you see here is what a
+  traveller sees. The rules, in words: <a href="README.md">design/README.md</a>. The
+  values: <a href="tokens.json">design/tokens.json</a>.</p>
+
+  <nav class="ds-toc" aria-label="On this page">
+    <a href="#principles">Principles</a><a href="#colour">Colour</a><a href="#type">Type</a>
+    <a href="#space">Space, shape, motion</a><a href="#line">The line of the day</a>
+    <a href="#stop">A stop</a><a href="#groups">Alternatives</a><a href="#day">The day</a>
+    <a href="#today">On the day</a><a href="#signals">Signals</a><a href="#search">Search</a>
+    <a href="#a11y">Accessibility</a>
+  </nav>
+
+  <section id="principles">
+    <h2>Principles</h2>
+    <div class="ds-grid">
+      <div class="ds-card"><h3>One element, one action</h3><p>Everything that can be tapped does one thing, and it is clear which. A closed stop opens; its circle marks it done. (R1)</p></div>
+      <div class="ds-card"><h3>Little on screen</h3><p>Actions grow only by opening, in zones by meaning, never mixed: Go (out of the app) and Change. (R2)</p></div>
+      <div class="ds-card"><h3>The moment decides</h3><p>One main action per screen: before and after the trip, adding; on the day itself, going to the next stop. (R3, V2)</p></div>
+      <div class="ds-card"><h3>Read at a glance</h3><p>Distinct stops; the time, the name, the place, in the order they are looked for. Made for the street, tired, in the sun. (R13, V5)</p></div>
+      <div class="ds-card"><h3>Full, dots, dashes</h3><p>What is there and ahead; where you have been; what is not there yet. Nowhere for decoration. (R15)</p></div>
+      <div class="ds-card"><h3>For everyone</h3><p>Every control named, every state said, 44-point targets, contrast checked by a test, in both themes. (A1–A10)</p></div>
+    </div>
+  </section>
+
+  <section id="colour">
+    <h2>Colour</h2>
+    <p>Named for what they are for, never for how they look. The contrast shown is
+    computed from the tokens in use, in the theme chosen above.</p>
+    <div class="ds-swatches" data-ds-colours></div>
+    <h3>Kinds of places</h3>
+    <p>A stop's number, in the list and on the map, in both themes (the map is always
+    light). White numbers on them: at least 4.5:1.</p>
+    <div class="ds-swatches" data-ds-places></div>
+    <h3>Cities</h3>
+    <p>The line of the day. Never the accent's hue.</p>
+    <div class="ds-swatches" data-ds-cities></div>
+    <h3>One colour, one meaning, per shape</h3>
+    <table class="ds-table">
+      <tr><td><span class="ds-chip" style="background:var(--accent)"></span>Accent</td><td>Now, and the main action</td></tr>
+      <tr><td><span class="ds-chip" style="background:var(--p0)"></span>City</td><td>The line of the day, the lines on the map</td></tr>
+      <tr><td><span class="ds-chip" style="background:var(--t-museum)"></span>Kind of place</td><td>A station: the stop's number</td></tr>
+      <tr><td><span class="ds-chip" style="background:var(--ink)"></span>Ink</td><td>Text, and a stop done</td></tr>
+      <tr><td><span class="ds-chip" style="background:var(--warn)"></span>Yellow · green · red</td><td>Attention · in order (booked) · error</td></tr>
+    </table>
+  </section>
+
+  <section id="type">
+    <h2>Type</h2>
+    <p>Inter (SIL Open Font License), kept with the app: no request to anyone, offline.
+    Seven sizes, in rem, so they grow with the phone's text size. Figures are tabular
+    where times line up.</p>
+    <div class="ds-type" data-ds-type></div>
+  </section>
+
+  <section id="space">
+    <h2>Space, shape, motion</h2>
+    <div class="ds-grid">
+      <div class="ds-card"><h3>Space</h3><div data-ds-space></div></div>
+      <div class="ds-card"><h3>Radius</h3><div class="ds-radii" data-ds-radii></div></div>
+      <div class="ds-card"><h3>Motion</h3><table class="ds-table" data-ds-motion></table><p>With "reduce motion", things only fade.</p></div>
+      <div class="ds-card"><h3>Sizes</h3><table class="ds-table"><tr><td>Touch</td><td>44 px: the smallest area a finger taps</td></tr><tr><td>Rail</td><td>28 px: the column of a stop's number</td></tr><tr><td>Pin</td><td>22 px: a stop's number</td></tr><tr><td>Line</td><td>3 px: the line of the day</td></tr></table></div>
+    </div>
+  </section>
+
+  <section id="line">
+    <h2>The line of the day</h2>
+    <p>Every city is a line, every stop a station, as on a metro map. The line takes the
+    city's colour; a station shows the stop's number in the colour of its kind of place,
+    the same sign as on the map. Behind you the line turns to dots; ahead it stays full;
+    now is the accent's dot.</p>
+    <div class="ds-row">
+      <div class="ds-phone"><ol class="stops today" style="--c:var(--p0)">
+        <li class="stop done compact past"><div class="rail"><span class="nb" style="--pf:var(--t-sight)">1</span></div><div class="body"><p class="when"><span class="tm">09:30</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Rossio</button></h2></div><button class="tick" type="button" aria-pressed="true" aria-label="Mark as not done: Rossio"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></li>
+        <li class="now"><span class="nrail" aria-hidden="true"><i></i></span><span class="nt">10:50 · Palácio Exemplo in 40 min</span></li>
+        <li class="stop next"><div class="rail"><span class="nb" style="--pf:var(--t-sight)">2</span></div><div class="body"><p class="when"><span class="tm">11:30</span><span class="cost">€10</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Palácio Exemplo</button></h2><p class="desc clamp">Up the hill by bus, the gardens after.</p></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Palácio Exemplo"></button></li>
+        <li class="stop skipped"><div class="rail"><span class="nb" style="--pf:var(--t-walk)">3</span></div><div class="body"><p class="when"><span class="tm">Afternoon</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Sentiero Exemplo</button></h2></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Sentiero Exemplo"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></li>
+        <li class="stop"><div class="rail"><button type="button" class="nopos-sign" aria-label="Cabo Exemplo: no position. Find it, View"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div><div class="body"><p class="when"><span class="tm">20:12</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Cabo Exemplo</button></h2></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Cabo Exemplo"></button></li>
+      </ol></div>
+      <div class="ds-notes">
+        <h3>Stations</h3>
+        <p><span class="nb ds-inline" style="--pf:var(--t-food)">4</span> To do: the kind's colour.</p>
+        <p><span class="ds-done"><span class="nb ds-inline">2</span></span> Done or skipped: empty, grey.</p>
+        <p><span class="nb q ds-inline"></span> To choose: dashed, no number.</p>
+        <p><span class="nopos-sign ds-inline"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span> No position: crossed; a tap finds it.</p>
+        <h3>The circle</h3>
+        <p>To do: an empty ring. Done: a full tick in ink, not green (green means "in order"). Skipped: a dash, the name struck through, out of the route.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="stop">
+    <h2>A stop</h2>
+    <p>A card of its own. Closed: the time, the name on two lines at most, one line of
+    description, one signal and "+N", the circle. Opened: every signal, the description,
+    then two zones, never mixed: <b>Go</b> (out of the app, ↗) and, quieter,
+    <b>Change</b>.</p>
+    <div class="ds-row">
+      <div class="ds-phone"><ol class="stops" style="--c:var(--p0)">
+        <li class="stop"><div class="rail"><span class="nb" style="--pf:var(--t-museum)">5</span></div><div class="body"><p class="when"><span class="tm">15:00</span><span class="cost">€12</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Museu Exemplo de Arte Antiga e Contemporânea</button></h2><p class="desc clamp">Three floors; the azulejos on the second, the café on the roof.</p><p class="sigline"><span class="sig warn"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3M6.3 9.2l3.4 3.1M9.7 9.2l-3.4 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Closed on Friday</span></span><span class="plus">+1</span></p></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Museu Exemplo"></button></li>
+      </ol></div>
+      <div class="ds-phone"><ol class="stops" style="--c:var(--p0)">
+        <li class="stop open"><div class="rail"><span class="nb" style="--pf:var(--t-museum)">5</span></div><div class="body"><p class="when"><span class="tm">15:00</span><span class="cost">€12</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="true">Museu Exemplo de Arte Antiga e Contemporânea</button></h2>
+          <div class="xpand"><div class="sigs"><p class="sigrow warn"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3M6.3 9.2l3.4 3.1M9.7 9.2l-3.4 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Closed on Friday</span><button type="button" class="sigact">Move</button></p><p class="sigrow info"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 5a1 1 0 011-1h10a1 1 0 011 1v1.5a1.5 1.5 0 000 3V11a1 1 0 01-1 1H3a1 1 0 01-1-1V9.5a1.5 1.5 0 000-3z" stroke="currentColor" stroke-width="1.4"/></svg><span>Better booked</span></p></div>
+          <p class="desc">Three floors; the azulejos on the second, the café on the roof.</p>
+          <div class="go" role="group" aria-label="Go there"><a class="maplink" href="#stop">Map ↗</a><a class="maplink" href="#stop">Directions ↗</a></div>
+          <div class="chg" role="group" aria-label="Change"><button type="button"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Edit</button><button type="button" aria-pressed="false"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h8M8 4.5L11.5 8 8 11.5M13.5 3.5v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Skip</button><button type="button">+ Alternative</button></div></div></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Museu Exemplo"></button></li>
+      </ol></div>
+    </div>
+  </section>
+
+  <section id="groups">
+    <h2>Alternatives</h2>
+    <p>One card. Chosen: the option as a stop, "+N" and the others' names. Opened: the
+    options as a choice (radio), one tap chooses, asking first on a shared trip. No
+    choice yet: dashed, the options in view; the route and the costs leave it out.</p>
+    <div class="ds-row">
+      <div class="ds-phone"><ol class="stops" style="--c:var(--p0)">
+        <li class="group"><p class="gh"><b>Lunch</b></p><div class="stop in-group"><div class="rail"><span class="nb" style="--pf:var(--t-food)">4</span></div><div class="body"><p class="when"><span class="tm">14:00</span><span class="cost">~€38</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Lunch in Alfama</button></h2></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Lunch in Alfama"></button></div><button type="button" class="alts-line" aria-expanded="false" aria-label="others: Casa Exemplo, Mercado Exemplo"><span class="plus" aria-hidden="true">+2</span><span class="names" aria-hidden="true">Casa Exemplo · Mercado Exemplo</span></button></li>
+      </ol></div>
+      <div class="ds-phone"><ol class="stops" style="--c:var(--p0)">
+        <li class="group open"><p class="gh"><b>Lunch</b><span>· choose one</span><button type="button" class="gclose" aria-expanded="true">Close</button></p><div class="opts" role="radiogroup" aria-label="Lunch"><button type="button" class="opt" role="radio" aria-checked="true"><span class="rd" aria-hidden="true"></span><span class="ot"><b>Lunch in Alfama</b><small>~€38</small></span><span class="otm">14:00</span></button><button type="button" class="opt" role="radio" aria-checked="false"><span class="rd" aria-hidden="true"></span><span class="ot"><b>Casa Exemplo</b><small>~€25</small></span><span class="otm">14:00</span></button></div><button type="button" class="addopt">+ Alternative</button></li>
+      </ol></div>
+      <div class="ds-phone"><ol class="stops" style="--c:var(--p0)">
+        <li class="group pending"><div class="ghead"><div class="rail"><span class="nb q" role="img" aria-label="To choose"></span></div><div class="body"><p class="when"><span class="tm">20:00</span></p><h2 class="tt"><span class="gname">Dinner</span></h2><p class="where">2 options · €25–€40</p><p class="sigline"><span class="sig warn"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 14.5V9M8 9L3.8 3.8M8 9l4.2-5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="3.5" cy="3.2" r="1.5" fill="currentColor"/><circle cx="12.5" cy="3.2" r="1.5" fill="currentColor"/></svg><span>To choose</span></span></p></div></div><div class="opts" role="radiogroup" aria-label="Dinner"><button type="button" class="opt" role="radio" aria-checked="false"><span class="rd" aria-hidden="true"></span><span class="ot"><b>Taberna Exemplo</b><small>€25</small></span><span class="otm">20:00</span></button><button type="button" class="opt" role="radio" aria-checked="false"><span class="rd" aria-hidden="true"></span><span class="ot"><b>Rifugio Exemplo</b><small>€40</small></span><span class="otm">20:30</span></button></div></li>
+      </ol></div>
+    </div>
+  </section>
+
+  <section id="day">
+    <h2>The day</h2>
+    <p>The top bar: the trip as the title (a tap opens the list of trips), search, List |
+    Map, you; the days under it, today called so. The heading: the day, its title, its
+    city written as the name of a line. The day's line: what matters today in one place,
+    the first and "+N".</p>
+    <div class="ds-row">
+      <div class="ds-phone ds-bar">
+        <div class="tbar"><a class="triptitle" href="#day"><b><span>Lisbon in my pocket</span><svg class="sel" viewBox="0 0 10 14" fill="none" aria-hidden="true"><path d="M2 5l3-3 3 3M2 9l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></b><small>May 14 – 17, 2027</small></a><button type="button" class="tsearch" aria-label="Search"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6l3.4 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><span class="vt" role="group" aria-label="View"><button type="button" aria-pressed="true" aria-label="List"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5.5 4h8M5.5 8h8M5.5 12h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="2.5" cy="4" r="1.1" fill="currentColor"/><circle cx="2.5" cy="8" r="1.1" fill="currentColor"/><circle cx="2.5" cy="12" r="1.1" fill="currentColor"/></svg></button><button type="button" aria-pressed="false" aria-label="Map"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 3.5l4-1.5 5 2 4-1.5v10l-4 1.5-5-2-4 1.5z M5.5 2v10 M10.5 4v10" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button></span></div>
+        <nav class="ds-days" aria-label="Days of the trip"><a class="dchip" href="#day" aria-current="page" style="--c:var(--p0)"><span class="w">Fri</span><span class="n">1</span></a><a class="dchip today" href="#day" style="--c:var(--p0)"><span class="w">Today</span><span class="n">2</span></a><a class="dchip" href="#day" style="--c:var(--p1)"><span class="w">Sun</span><span class="n">3</span></a></nav>
+        <header class="dayhead" style="--c:var(--p0)"><p class="dmeta">Day 1 · Friday, May 14</p><h1 class="ds-h1">Baixa and Alfama on foot</h1><p class="dsub"><span class="cityp">Lisboa</span><span>1/6 done · €78</span></p></header>
+        <section class="dayline" aria-label="To know today"><button type="button" class="lhead" aria-expanded="false"><span class="k warn" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3M6.3 9.2l3.4 3.1M9.7 9.2l-3.4 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="tx"><b>Museu Exemplo: closed on Friday</b></span><span class="plus">+3</span></button></section>
+        <div class="addrow"><button type="button">+ Add a stop</button><button type="button">Paste from a chat</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="today">
+    <h2>On the day</h2>
+    <p>When the day shown is today, the list starts from now: it scrolls to the next stop
+    when the app opens and when it comes back, never while you scroll; a mark of now says
+    how long until the next stop, which is open; the stops done are in one line. When the
+    next stop's card leaves the screen, its bar comes up at the bottom, within reach of a
+    thumb, with Directions from where you are. No + floats that day: adding is the last
+    row.</p>
+    <div class="ds-row"><div class="ds-phone ds-barwrap">
+      <div class="nextbar ds-static"><button type="button" class="nb-t"><span class="nb" style="--pf:var(--t-food)" aria-hidden="true">4</span><span class="nb-tx"><small>Next, in 20 min</small><b>Lunch in Alfama</b><small>14:00</small></span></button><a class="nb-go" href="#today"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 13.5V8.5a3 3 0 013-3h5.5M10 3l2.5 2.5L10 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Directions</a></div>
+    </div></div>
+  </section>
+
+  <section id="signals">
+    <h2>Signals</h2>
+    <p>Four levels; the level gives the colour, the kind the icon. One per closed stop,
+    the first by importance (closed, booking needed, weather, choice, booking advised,
+    label, booked) and "+N"; all of them, each with its action, in the opened stop.</p>
+    <p class="ds-sigs">
+      <span class="sig err"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="currentColor"/></svg><span>Error</span></span>
+      <span class="sig warn"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3M6.3 9.2l3.4 3.1M9.7 9.2l-3.4 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Attention: closed</span></span>
+      <span class="sig info"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>To know</span></span>
+      <span class="sig ok"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 5a1 1 0 011-1h10a1 1 0 011 1v1.5a1.5 1.5 0 000 3V11a1 1 0 01-1 1H3a1 1 0 01-1-1V9.5a1.5 1.5 0 000-3z" stroke="currentColor" stroke-width="1.4"/></svg><span>Booked</span></span>
+    </p>
+  </section>
+
+  <section id="search">
+    <h2>Search</h2>
+    <p>One field, the whole trip, as you type, offline; without accents or case, every word
+    found. A result is the stop's sign, its day and time, its name, the word marked; a tap
+    goes there, open and in view.</p>
+    <div class="ds-row"><div class="ds-phone"><ol class="results">
+      <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">4</span></span><span class="rt"><small>Day 1 · Fri May 14 · 12:30</small><b>Castelo de <mark>São</mark> Jorge</b></span></button></li>
+      <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">2</span></span><span class="rt"><small>Day 1 · Fri May 14 · 11:00</small><b>Lisbon Cathedral</b><small class="rw">…the castle of <mark>São</mark> Jorge is ten minutes up the hill.</small></span></button></li>
+    </ol></div></div>
+  </section>
+
+  <section id="a11y">
+    <h2>Accessibility</h2>
+    <p>Part of every component, checked where it can be: <code>test/design.test.mjs</code>
+    holds the contrast of every pair in both themes; <code>tools/e2e.mjs</code> checks in
+    the browser that every control has a name, every state is said, every target is 44
+    points, headings are in order and no id is used twice.</p>
+    <ul>
+      <li>Semantic HTML first: buttons are buttons, links go somewhere, lists are lists.</li>
+      <li>States are said, not only shown: <code>aria-pressed</code>, <code>aria-expanded</code> with <code>aria-controls</code>, <code>aria-checked</code>, <code>aria-current</code>.</li>
+      <li>Focus is visible and follows the order on screen; a sheet keeps it and gives it back.</li>
+      <li>Colour is never alone: a level has its icon and its word.</li>
+      <li>Text grows: sizes in rem; at twice the size rows wrap, they do not overlap.</li>
+    </ul>
+  </section>
+</main>
+<script src="catalog.js" type="module"></script>
+</body>
+</html>

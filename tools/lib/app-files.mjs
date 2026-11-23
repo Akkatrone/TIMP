@@ -8,12 +8,13 @@ import { fileURLToPath } from "node:url";
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const TOP_FILES = ["index.html", "manifest.webmanifest", "manifest-basic.webmanifest", "sw.js"];
-const TOP_DIRS = ["css", "js", "vendor", "icons", "examples"];
+const TOP_DIRS = ["css", "js", "vendor", "icons", "examples", "design"];
 const JUNK = /(^|\/)\.DS_Store$/;
 // Published with the app, but not needed to run it offline. MapLibre draws only the
 // interactive map, which needs a connection anyway: kept out of the install (1.6 MB),
-// it is downloaded the first time a map is opened.
-const NOT_PRECACHED = /(^|\/)(LICENSE|README\.md)$|^sw\.js$|^vendor\/maplibre\//;
+// it is downloaded the first time a map is opened. The design system's pages (design/)
+// are published for people who build TIMP, not for travellers: never kept offline.
+const NOT_PRECACHED = /(^|\/)(LICENSE|README\.md)$|^sw\.js$|^vendor\/maplibre\/|^design\//;
 
 function walk(dir, root){
   return readdirSync(dir).sort().flatMap(name => {

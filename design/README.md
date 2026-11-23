@@ -12,6 +12,8 @@ native app can follow them too.
 - **`test/design.test.mjs`** holds what can be checked: the contrast of every pair in
   both themes, the colours of the map, and the styles that may only use tokens.
 - **`tools/e2e.mjs`** checks the rest in the browser: names, states, sizes, focus.
+- **`index.html`** (published at `/design/`) shows it all: the tokens, their contrast in
+  the theme chosen, and every component drawn with the app's own styles.
 
 A new component says, in its comment, which rules it follows. A change that breaks one
 needs a reason in its pull request.

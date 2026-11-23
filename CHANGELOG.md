@@ -4,6 +4,15 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.0.1
+
+- **A group of alternatives with no choice yet** no longer draws a stray piece of line in
+  the middle of its card.
+- **The design system as a page** (`design/index.html`, published at `/design/`): the
+  tokens with their contrast in the theme chosen, the line of the day, a stop, the
+  alternatives, the day, the day itself, the signals, search, accessibility; everything
+  drawn with the app's own styles. Never kept offline.
+
 ## 4.0.0
 
 The design system ([design/README.md](design/README.md)): one set of tokens, rules for
