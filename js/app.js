@@ -65,6 +65,7 @@ const INFO = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx
 const SEARCH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6l3.4 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const LOCATE = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 9.5L17 3l-6.5 14-1.6-5.9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 const FRAME = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const SHRINK = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 3v4H3M13 3v4h4M17 13h-4v4M3 13h4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 let uid = 0;   // ids for aria-controls, unique on the page
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -1750,8 +1751,10 @@ function mapStage(zs, color, view, gone, paint){
   const zoneTitle = z => zs.length > 1 ? z.pts[0].name : t("stopsOfDay");
   const zoneLink = z => `<a class="maplink" href="${esc(z.pts.length < 2 ? mapsUrl(z.pts[0].q) : routeUrl(z))}" target="_blank" rel="noopener">${esc(z.pts.length < 2 ? t("mapLink") : t("openInMaps"))}</a>`;
   if(view === "live"){
-    return `<section class="mapstage" style="--c:${color}" aria-label="${esc(t("dayMap"))}"><div id="live-slot"></div>` +
-      `<div class="mctl" role="group" aria-label="${esc(t("mapControls"))}"><button type="button" class="mbtn" data-locate aria-label="${esc(t("mapMe"))}" title="${esc(t("mapMe"))}">${LOCATE}</button><button type="button" class="mbtn" data-fit="" aria-label="${esc(t("mapAll"))}" title="${esc(t("mapAll"))}">${FRAME}</button></div>` +
+    // Larger or smaller (the choice kept): the day is framed again, whole.
+    const big = !!S.ui.mapBig;
+    return `<section class="mapstage${big ? " big" : ""}" style="--c:${color}" aria-label="${esc(t("dayMap"))}"><div id="live-slot"></div>` +
+      `<div class="mctl" role="group" aria-label="${esc(t("mapControls"))}"><button type="button" class="mbtn" data-locate aria-label="${esc(t("mapMe"))}" title="${esc(t("mapMe"))}">${LOCATE}</button><button type="button" class="mbtn" data-map-size aria-pressed="${big}" aria-label="${esc(t("mapLarger"))}" title="${esc(t(big ? "mapSmaller" : "mapLarger"))}">${big ? SHRINK : FRAME}</button></div>` +
       (zs.length > 1 ? `<div class="zchips">${zs.map((z, i) => `<button type="button" class="zchip" data-fit="${i}">${esc(zoneTitle(z))}</button>`).join("")}</div>` : "") + `</section>`;
   }
   let o = `<section class="mapstage sketch" style="--c:${color}" aria-label="${esc(t("dayMap"))}"><p class="off">${esc(t("offlineMap"))}</p>`;
@@ -1766,6 +1769,22 @@ function mapStage(zs, color, view, gone, paint){
     o += `<div class="zone"><div class="zhead"><span class="zname">${esc(zoneTitle(z))}</span>${zoneLink(z)}</div>${zoneSVG(z, zoneTitle(z), gone, true, paint)}</div>`;
   });
   return o + `</section>`;
+}
+
+// The map larger or smaller, without drawing it again: the stage grows, the map follows
+// it and frames the whole day once it has its new size.
+function resizeMap(b){
+  S.ui.mapBig = !S.ui.mapBig;
+  saveUi();
+  const stage = b.closest(".mapstage");
+  stage.classList.toggle("big", S.ui.mapBig);
+  b.setAttribute("aria-pressed", String(S.ui.mapBig));
+  b.title = t(S.ui.mapBig ? "mapSmaller" : "mapLarger");
+  b.innerHTML = S.ui.mapBig ? SHRINK : FRAME;
+  let done = false;
+  const settle = () => { if(done) return; done = true; if(live){ live.handle.refresh(); live.handle.fit(null); } };
+  stage.addEventListener("transitionend", settle, {once: true});
+  setTimeout(settle, 400);
 }
 
 // A stop chosen on the map (M3): its card, just under the map, marked.
@@ -2628,6 +2647,8 @@ $app.addEventListener("click", e => {
   const fit = e.target.closest("[data-fit]");
   if(fit){ if(live) live.handle.fit(fit.dataset.fit === "" ? null : +fit.dataset.fit); return; }
   if(e.target.closest("[data-locate]")){ if(live) live.handle.locate(); return; }
+  const size = e.target.closest("[data-map-size]");
+  if(size){ resizeMap(size); return; }
   const plan = e.target.closest("[data-plan]");
   if(plan){
     const r = route();
@@ -2974,7 +2995,7 @@ async function start(){
     await store.putTrip(rec);
     await versions.put(ready);
   }
-  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll, route: ui.route !== false,
+  if(ui && typeof ui === "object") S.ui = {mapOpen: !!ui.mapOpen, mapBig: !!ui.mapBig, mapView: ui.mapView === "schema" ? "schema" : "live", expandAll: !!ui.expandAll, route: ui.route !== false,
     costsOpen: !!ui.costsOpen, costView: ui.costView === "receipt" ? "receipt" : "sum", costCur: typeof ui.costCur === "string" ? ui.costCur : "", tripSort: ["date", "name", "recent"].includes(ui.tripSort) ? ui.tripSort : "date"};
   if(typeof key === "string") S.deviceKey = key;
   syncThemeColor();

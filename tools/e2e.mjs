@@ -272,7 +272,15 @@ await withApp(async ({run, until, reload, blocked}) => {
     await mapOn();
     const lines = `+(document.querySelector(".live .canvas") || {dataset: {}}).dataset.legs`;
     await until("the lines", `${lines} > 0 && document.querySelectorAll(".live .pin").length === 5`);
-    assert.deepEqual(await run(`return [...document.querySelectorAll(".mctl button")].map(b => b.getAttribute("aria-label"));`), ["My position", "The whole day"]);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".mctl button")].map(b => b.getAttribute("aria-label"));`), ["My position", "Larger map"]);
+    // Larger and back, the same map, the whole day framed again; the choice is kept.
+    await run(`window.__canvas = document.querySelector(".live .maplibregl-canvas"); window.__h = document.querySelector(".mapstage").offsetHeight;`);
+    await run(`document.querySelector("[data-map-size]").click(); await new Promise(r => setTimeout(r, 450));`);
+    assert.equal(await run(`return document.querySelector("[data-map-size]").getAttribute("aria-pressed");`), "true");
+    assert.ok(await run(`return document.querySelector(".mapstage").offsetHeight > window.__h + 50;`), "larger");
+    assert.equal(await run(`return document.querySelector(".live .maplibregl-canvas") === window.__canvas;`), true, "not drawn again");
+    await run(`document.querySelector("[data-map-size]").click(); await new Promise(r => setTimeout(r, 450));`);
+    assert.equal(await run(`return document.querySelector(".mapstage").offsetHeight;`), await run(`return window.__h;`));
     assert.equal(await count(".live .maplibregl-ctrl-zoom-in"), 0, "zoom is with the fingers");
     // A pin: no card on the map; its stop comes up under the map, marked, and the pin is chosen.
     await run(`document.querySelector('.live .pin[aria-label="Miradouro de Santa Luzia"]').click(); await new Promise(r => setTimeout(r, 300));`);
@@ -283,9 +291,15 @@ await withApp(async ({run, until, reload, blocked}) => {
     // A stop's number, in the list under the map: its pin.
     await run(`document.querySelector('.stops .nb[data-pin="0"]').click(); await new Promise(r => setTimeout(r, 200));`);
     assert.equal(await run(`return document.querySelector(".live .pin.sel").getAttribute("aria-label");`), "Praça do Comércio");
-    // The map stays under the bar while the list scrolls (M2).
-    await run(`window.scrollTo(0, 400); await new Promise(r => setTimeout(r, 150));`);
-    assert.ok(await run(`return Math.abs(document.querySelector(".mapstage").getBoundingClientRect().top - document.querySelector(".strip").getBoundingClientRect().bottom) < 2;`), "sticky");
+    // The map is right under the bar, and stays there while the list scrolls (M2): it
+    // does not move, not even at the start.
+    const gap = `Math.abs(document.querySelector(".mapstage").getBoundingClientRect().top - document.querySelector(".strip").getBoundingClientRect().bottom)`;
+    await run(`window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 150));`);
+    assert.ok(await run(`return ${gap} < 1;`), "under the bar from the start");
+    for(const y of [8, 40, 400]){
+      await run(`window.scrollTo(0, ${y}); await new Promise(r => setTimeout(r, 120));`);
+      assert.ok(await run(`return ${gap} < 1;`), "still under the bar at " + y);
+    }
     await run(`window.scrollTo(0, 0);`);
     await click("[data-map]");
   });

@@ -4,6 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.2
+
+- **The map no longer moves** when the list starts to scroll: it is right under the bar
+  from the start (it began 16 points lower, then climbed).
+- **Larger map**: the button with the corners makes the map larger, and smaller again;
+  the whole day is framed again, and the choice is kept. Before, it only framed the day,
+  which the map already showed. The map starts a little lower.
+
 ## 4.1.1
 
 - **List | Map** moves to the end of the row of days, and keeps its place on every page

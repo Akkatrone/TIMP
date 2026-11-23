@@ -154,12 +154,13 @@ moment (a message that passes, with Undo when there is one).
   kind's colour; done or skipped, empty and grey; chosen, larger, with a ring.
 - **M2** A view of the day (List | Map at the end of the row of days, in its place on
   every page of a trip so the bar keeps one size), not a panel: the map takes the
-  heading's place, right under the bar, and stays there while the list scrolls under it.
+  heading's place, right under the bar from the start, and stays there, still, while
+  the list scrolls under it.
 - **M3** A pin, one action: its stop comes up just under the map, marked. No card on the
   map. A stop's number in the list shows its pin.
 - **M4** The lines are always there: full ahead, dots where you have been.
 - **M5** Two controls: my position (asked of the phone only then; it stays on the
-  phone), the whole day. Zoom is with the fingers or the wheel. A day in more than one
+  phone), and larger or smaller (the choice kept), which frames the whole day again. Zoom is with the fingers or the wheel. A day in more than one
   place: a row of their names, a tap shows that one.
 - **M6** Offline, the sketch by itself, in scale.
 - **M7** Always light (R11), with its attribution.
