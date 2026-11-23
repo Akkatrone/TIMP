@@ -133,6 +133,19 @@ moment (a message that passes, with Undo when there is one).
   needed, weather, choice, booking advised, label, booked) and "+N"; opened, all of
   them first, one per row, each with its action.
 
+## Search
+
+- **S1** One field, the whole trip: a stop's name, its local name, description,
+  address, label and group, the plan, the city and title of its day, the day's notes.
+  On the phone, offline (`js/search.js`, no DOM).
+- **S2** Letters without accents or case; every word typed must be found.
+- **S3** A result is the stop's sign (its number in its kind's colour), its day and time,
+  its name; the word found is marked, and where it was found when not in the name.
+- **S4** A tap goes there: the day, the stop open and in view, the focus on it. An option
+  not chosen: its group opened.
+- **S5** At once (R6): the sheet opens with the field ready; results follow every
+  letter; how many were found is said (a `status`), nothing found too.
+
 ## The map
 
 - **M1** The same sign in the list and on the map: the number, in the kind's colour.

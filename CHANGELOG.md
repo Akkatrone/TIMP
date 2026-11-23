@@ -33,6 +33,10 @@ every screen, accessibility in each. This release brings it to the day.
   the other days only.
 - **Accessibility**: every control named and its state said, areas of 44 points, stop
   names as headings under the day's; checked by the e2e.
+- **Search**: a lens in the top bar searches the whole trip as you type, offline: names,
+  local names, descriptions, addresses, labels, groups, plans, the days' notes; without
+  accents or case, every word found. A result shows the stop's sign, its day and time,
+  the word marked; a tap goes to the stop, open and in view (`js/search.js`).
 
 ## 3.32.2
 

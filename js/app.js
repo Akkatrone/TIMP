@@ -33,6 +33,8 @@ import { chooseFirstDay } from "./publishing.js";
 import { asBase } from "./publish.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
+import { searchTrip } from "./search.js";
+import { openSearch } from "./search-sheet.js";
 
 // Where the number of a stop with a position is: a sign, crossed, for one without.
 const NO_POS = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
@@ -60,6 +62,7 @@ const SELECTOR = '<svg class="sel" viewBox="0 0 10 14" fill="none" aria-hidden="
 const LIST = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5.5 4h8M5.5 8h8M5.5 12h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="2.5" cy="4" r="1.1" fill="currentColor"/><circle cx="2.5" cy="8" r="1.1" fill="currentColor"/><circle cx="2.5" cy="12" r="1.1" fill="currentColor"/></svg>';
 const MAPICON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 3.5l4-1.5 5 2 4-1.5v10l-4 1.5-5-2-4 1.5z M5.5 2v10 M10.5 4v10" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
 const INFO = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const SEARCH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6l3.4 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 let uid = 0;   // ids for aria-controls, unique on the page
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -865,6 +868,12 @@ function renderStrip(r){
   title.innerHTML = `<b><span>${esc(tr.title)}</span>${SELECTOR}</b>${first ? `<small>${esc(dateRange(tr, lang))}</small>` : ""}`;
   title.setAttribute("aria-label", t("tripsOf", {s: tr.title}));
   if(r.name === "trips") title.setAttribute("aria-current", "page"); else title.removeAttribute("aria-current");
+  // Search, on every page of a trip (S1).
+  const sb = document.getElementById("search-btn");
+  sb.hidden = false;
+  sb.innerHTML = SEARCH;
+  sb.setAttribute("aria-label", t("search"));
+  sb.title = t("search");
   // List | Map, on a day (M2).
   const vt = document.getElementById("view-toggle");
   vt.hidden = r.name !== "day";
@@ -2268,6 +2277,7 @@ const $fab = $fabs.querySelector(".fab"), $fabPaste = $fabs.querySelector(".fab-
 $fab.addEventListener("click", () => newStop());
 // List | Map in the top bar (M2): Map is pressed while the map shows.
 $strip.addEventListener("click", e => {
+  if(e.target.closest("#search-btn")){ openSearchHere(); return; }
   const b = e.target.closest("#view-toggle button");
   if(!b) return;
   const map = b.hasAttribute("data-map") ? !S.ui.mapOpen : false;
@@ -2293,6 +2303,68 @@ function watchNext(){
   nextSeen.observe(card);
 }
 $next.addEventListener("click", e => { if(e.target.closest("[data-to-next]")) goToNow(true); });
+
+// Search (S1–S5): the trip's stops and notes, found as one types; a tap goes there.
+function openSearchHere(){
+  const tr = trip(), lang = getLang();
+  let shown = [];
+  openSearch({
+    find: q => {
+      shown = searchTrip(tr, q);
+      return shown.map(r => {
+        const d = tr.days[r.dayIndex], dp = dateParts(d.date, lang);
+        const day = `${t("day")} ${r.dayIndex + 1} · ${dp.dow} ${dp.short}`;
+        if(r.kind === "note") return {sign: `<span class="nb blank">${INFO}</span>`, meta: day, name: t("searchNote"), nameMark: null, where: r.where, label: `${t("searchNote")}, ${day}`};
+        // The stop's sign: its number in the day the day goes through, in its kind's colour.
+        const plan = r.planId ? (d.plans || []).find(p => p.id === r.planId) : null;
+        const all = plan ? plan.stops : d.stops, s = all[r.index], i = programOf(all).indexOf(s);
+        const colour = TYPE_COLORS[s.type] || cityColor(d.city);
+        const sign = s.lat !== undefined && i >= 0 ? `<span class="nb" style="--pf:${colour}">${i + 1}</span>` : s.lat === undefined ? `<span class="nopos-sign">${NO_POS}</span>` : `<span class="nb q"></span>`;
+        const meta = [day, r.time, plan ? plan.name : "", r.choice && !s.chosen ? r.choice : ""].filter(Boolean).join(" · ");
+        return {sign, meta, name: r.title, nameMark: r.name, where: r.where, label: [r.title, meta].join(", ")};
+      });
+    },
+    onPick: k => goToResult(shown[k])
+  });
+}
+
+// The day of a result, with the stop open and in view, the focus on it (S4).
+let revealing = null;
+function goToResult(r){
+  if(!r) return;
+  const tr = trip(), d = tr.days[r.dayIndex];
+  if(r.planId && S.state.plans[d.date] !== r.planId){ S.state.plans[d.date] = r.planId; saveState(); }
+  if(r.kind === "note"){
+    S.state.notesOpen = true; saveState();
+    revealing = ".dayline";
+  }else{
+    const plan = r.planId ? (d.plans || []).find(p => p.id === r.planId) : null;
+    const all = plan ? plan.stops : d.stops, s = all[r.index], list = programOf(all), i = list.indexOf(s);
+    if(i < 0 && s.choice){
+      // An option not chosen: its group opened, the option in view.
+      S.openGroups.add(`${d.date}|${r.planId || ""}|${s.choice}`);
+      revealing = `[data-choose="${CSS.escape(s.id)}"]`;
+    }else{
+      const key = stopKey(d, r.planId, s, i);
+      S.openStops.set(key, true);
+      revealing = `[data-open="${CSS.escape(key)}"]`;
+    }
+  }
+  const hash = `#day-${r.dayIndex + 1}`;
+  if(location.hash !== hash){ location.hash = hash; return; }   // hashchange draws and reveals
+  render();
+  reveal();
+}
+function reveal(){
+  if(!revealing) return false;
+  const el = $app.querySelector(revealing);
+  revealing = null;
+  if(!el) return false;
+  const card = el.closest(".stop, .group, .dayline") || el;
+  scrollToY(Math.max(0, scrollTop() + card.getBoundingClientRect().top - $strip.offsetHeight - 12));
+  el.focus({preventScroll: true});
+  return true;
+}
 
 // On the day itself the list starts from now (R14): the mark of now at the top, the
 // stop before just visible above it. Not while the traveller scrolls: only when a day
@@ -2740,7 +2812,7 @@ window.addEventListener("hashchange", () => {
   const pageLink = publicLink(location.hash);
   if(pageLink){ (pageLink.kind === "base" ? useAsBase : openPublic)(pageLink.page); return; }
   S.importError = null; S.menuFor = null; render();
-  if(!goToNow()) scrollToY(0);
+  if(!reveal() && !goToNow()) scrollToY(0);
 });
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
 // The path is the one at the time of the tap: the page may have been redrawn since.

@@ -111,6 +111,31 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.deepEqual(problems, []);
   });
 
+  await step("search: the whole trip as one types, without accents; a tap goes to the stop, open, in view, focused (S1–S5)", async () => {
+    const type = q => run(`const q = document.getElementById("search-q"); q.value = ${JSON.stringify(q)}; q.dispatchEvent(new Event("input"));`);
+    await click("#search-btn");
+    await until("the sheet, ready to type", `document.querySelector("dialog.search[open]") && document.activeElement.id === "search-q"`);
+    await type("sao jorge");
+    assert.equal(await text("dialog.search .search-n"), "1 found");
+    assert.equal(await text("dialog.search .res b mark"), "São");
+    await type("zzzz");
+    assert.equal(await text("dialog.search .search-n"), "Nothing for “zzzz”");
+    await type("sao jorge");
+    await click("dialog.search .res");
+    await until("the stop", `document.activeElement && document.activeElement.matches("[data-open]") && document.activeElement.textContent.includes("São Jorge")`);
+    assert.equal(await run(`return document.activeElement.getAttribute("aria-expanded");`), "true", "opened");
+    // On another day: the day changes, the stop is shown.
+    await click("#search-btn");
+    await until("the sheet", `document.activeElement && document.activeElement.id === "search-q"`);
+    await type("jeronimos");
+    assert.match(await text("dialog.search .res small"), /^Day 2 · /);
+    await run(`document.getElementById("search-q").dispatchEvent(new KeyboardEvent("keydown", {key: "Enter"}));`);
+    await until("day 2, the stop", `location.hash === "#day-2" && document.activeElement && document.activeElement.textContent.includes("Jerónimos")`);
+    assert.ok(await run(`const r = document.activeElement.getBoundingClientRect(); return r.top > 0 && r.bottom < innerHeight;`), "in view");
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelectorAll(".stop").length === 6`);
+  });
+
   await step("a stop can be skipped and restored", async () => {
     await click("[data-skip]", 2);
     assert.equal(await count(".stop.skipped"), 1);

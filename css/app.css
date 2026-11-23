@@ -560,8 +560,8 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 /* ---------- The day (design/README.md: R1–R15, V, W, A). Tokens only. ---------- */
 main.gutter{gap:var(--sp-4)}
 /* A small sign, a finger's area: 44 points around it (A5). */
-:is(.tick,.nopos-sign,.sigact,.gclose,.strip .me-btn:not(.float)){position:relative}
-:is(.tick,.nopos-sign,.sigact,.gclose,.strip .me-btn:not(.float))::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,var(--touch));height:max(100%,var(--touch));transform:translate(-50%,-50%)}
+:is(.tick,.nopos-sign,.sigact,.gclose,.strip .me-btn:not(.float),.tsearch){position:relative}
+:is(.tick,.nopos-sign,.sigact,.gclose,.strip .me-btn:not(.float),.tsearch)::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,var(--touch));height:max(100%,var(--touch));transform:translate(-50%,-50%)}
 
 /* The heading: the day, its title, its city written as the name of a line. */
 .dayhead{display:grid;gap:var(--sp-2);padding:var(--sp-2) var(--sp-1) 0}
@@ -750,3 +750,20 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .dchip.today .w{color:var(--accent);font-weight:700}
 
 .costbtn{min-height:var(--touch)}
+
+/* Search (S1–S5): a lens in the top bar; a sheet that opens at once, results as one types. */
+.tsearch{flex:none;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--r-full);background:none;color:var(--ink);cursor:pointer}
+.tsearch[hidden]{display:none}
+.tsearch svg{width:20px;height:20px}
+.search .search-q{width:100%;min-height:var(--touch);padding:0 var(--sp-4);border:1px solid var(--line-strong);border-radius:var(--r-m);background:var(--bg);color:var(--ink);font:500 var(--fs-base) var(--f-body)}
+.search .search-n:empty{display:none}
+.results{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-1)}
+.res{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);column-gap:var(--sp-4);align-items:start;width:100%;min-height:var(--touch);padding:var(--sp-3) var(--sp-2);border:0;border-radius:var(--r-m);background:none;color:var(--ink);text-align:left;cursor:pointer}
+.res:hover,.res:focus-visible{background:var(--sel)}
+.res .rsign{display:grid;justify-items:center;padding-top:var(--sp-4)}
+.res .nb svg{width:14px;height:14px}
+.res .rt{display:grid;min-width:0}
+.res .rt b{font:500 var(--fs-base)/1.3 var(--f-body)}
+.res .rt small{font:500 var(--fs-s)/1.35 var(--f-body);color:var(--muted)}
+.res .rt .rw{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-weight:400}
+mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:var(--r-s);padding:0 var(--sp-1)}

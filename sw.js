@@ -47,6 +47,8 @@ const FILES = [
   "js/publish.js",
   "js/publishing.js",
   "js/rates.js",
+  "js/search-sheet.js",
+  "js/search.js",
   "js/share-api.js",
   "js/share.js",
   "js/sharing.js",
