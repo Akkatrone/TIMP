@@ -4,6 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.6
+
+- **The app is now checked in Safari** too, on every change (`tools/webkit.mjs`, on a
+  macOS runner, no new dependencies): no page wider than the screen, even with very long
+  texts; the bar of one size on every page; the map still under the bar; a search field
+  Safari does not zoom into, with its results fixed under the bar.
+- Tests: Chrome gets a minute to start on a busy runner, and a second try.
+
 ## 4.1.5
 
 - **iPhone**: a day was wider than the screen (Safari sized the page by the full length
