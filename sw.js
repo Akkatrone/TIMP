@@ -21,6 +21,7 @@ const FILES = [
   "js/app.js",
   "js/ask.js",
   "js/changes.js",
+  "js/choices.js",
   "js/config.js",
   "js/diff.js",
   "js/edit.js",

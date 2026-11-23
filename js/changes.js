@@ -35,6 +35,7 @@ import { FIELDS, FORMAT, validateTrip } from "./trip.js";
 import { addStop, updateStop, removeStop, ensureIds, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense } from "./edit.js";
 import { withPrivate, addPrivate, updatePrivate, removePrivate, followStops, unlinkStop } from "./private.js";
 import { findStopId } from "./ids.js";
+import { groupOf, groupsIn, choose, tidyGroups } from "./choices.js";
 
 export const CHANGES = "travel-in-my-pocket/changes";
 
@@ -43,6 +44,16 @@ const KINDS = "add, update, remove, setDay, addDay, removeDay, addPlan, setPlan,
 const TRIP_SET = Object.keys(FIELDS.trip).filter(k => !FIELDS.trip[k].byApp && !["format", "days", "expenses", "googleMapsKey"].includes(k));
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const clone = v => JSON.parse(JSON.stringify(v));
+
+// The stop `ref` chosen: the other options of its group not (an assistant that chooses
+// one says only that one).
+function chosenAlone(trip, ref){
+  const d = trip.days.find(x => x.date === ref.date), l = d.plans ? d.plans.find(p => p.id === (ref.plan || d.plans[0].id)) : d;
+  const s = l.stops.find(x => x.id === ref.id);
+  if(!s || s.chosen !== true || !groupOf(s)) return trip;
+  l.stops = choose(l.stops, s.id);
+  return trip;
+}
 
 /** Whether a parsed file is a list of changes rather than a whole trip. */
 export const isChanges = data => isObj(data) && data.format === CHANGES;
@@ -54,8 +65,9 @@ export const isChanges = data => isObj(data) && data.format === CHANGES;
  * positions stay out: the assistant does not need them to say what to change.
  */
 export function outline(trip, priv = null){
-  const stop = s => {
-    const extra = [s.type, s.travel && "by " + s.travel, s.booking && "booking " + s.booking, s.closed && "closed " + s.closed.join(" "),
+  const stop = (s, list) => {
+    const g = groupOf(s), inGroup = g && groupsIn(list).has(g);
+    const extra = [s.type, inGroup && `${g}: ${s.chosen === true ? "chosen" : "option"}`, s.travel && "by " + s.travel, s.booking && "booking " + s.booking, s.closed && "closed " + s.closed.join(" "),
       s.cost !== undefined && `cost ${s.cost}${s.currency ? " " + s.currency : ""}`, s.lat === undefined && "no position"].filter(Boolean);
     return `[${s.id}] ${s.time ? s.time + " " : ""}${s.title}${extra.length ? " (" + extra.join(", ") + ")" : ""}`;
   };
@@ -65,8 +77,8 @@ export function outline(trip, priv = null){
   for(const d of trip.days){
     lines.push("", `${d.date}${d.city ? " · " + d.city : ""}${d.title ? " · " + d.title : ""}${stay(d)}`);
     for(const n of d.notes || []) lines.push(`  note: ${n}`);
-    if(d.plans) for(const p of d.plans){ lines.push(`  plan [${p.id}] ${p.name}:`); p.stops.forEach(s => lines.push("    " + stop(s))); }
-    else d.stops.forEach(s => lines.push("  " + stop(s)));
+    if(d.plans) for(const p of d.plans){ lines.push(`  plan [${p.id}] ${p.name}${p.chosen === true ? " (chosen)" : ""}:`); p.stops.forEach(s => lines.push("    " + stop(s, p.stops))); }
+    else d.stops.forEach(s => lines.push("  " + stop(s, d.stops)));
   }
   if(trip.expenses && trip.expenses.length){
     lines.push("", "Expenses outside the stops:");
@@ -104,6 +116,8 @@ export function changesBrief(){
     `  {"addExpense": {"expense": {"title": "…", "cost": 0, "currency": "EUR", "date": "YYYY-MM-DD"}}}  money spent outside the stops (flights, hotels)`,
     `  {"setExpense": {"expense": "<id>", "set": {…}}}  /  {"removeExpense": {"expense": "<id>"}}`,
     `  "private": true next to "expense", in these three: the traveller's private expenses (shopping, a meal alone), not shared with the trip. A private one paid at a stop has "stop": "<stop id>" and that day as "date"`,
+    "",
+    `Options for one moment (a meal): stops with the same "choice" ("Lunch"), 2 to 4; "chosen": true on the one the day goes to (the others lose it). Plans only when the whole day changes.`,
     "",
     `On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline, copied exactly; new stops have none. Give lat and lng for new places when you know them. A cost is what the traveller pays (their share of what is split), in the trip's currency unless the stop says another; write only prices you know.`
   ].join("\n");
@@ -176,7 +190,8 @@ export function applyChanges(trip, data, priv = null, owner = ""){
         stopIn(x.day, x.plan);
         if(!isObj(x.stop)) throw new Error(`"stop" must be an object`);
         const {id, ...stop} = x.stop;
-        out = addStop(out, {date: x.day, plan: x.plan || null}, stop).trip;
+        const added = addStop(out, {date: x.day, plan: x.plan || null}, stop);
+        out = chosenAlone(added.trip, added.ref);
         counts.added++;
       }else if(kind === "update"){
         const id = stopIn(x.day, x.plan, x.stop);
@@ -186,7 +201,7 @@ export function applyChanges(trip, data, priv = null, owner = ""){
         const ref = {date: x.day, plan: x.plan || null, id};
         const dest = to ? {date: to.day, plan: to.plan || null} : ref;
         const res = updateStop(out, ref, x.set === undefined ? old : withSet(old, x.set), dest);
-        out = res.trip;
+        out = chosenAlone(res.trip, res.ref);
         if(to) moves.push({date: ref.date, plan: ref.plan, from: ref.id, to: res.ref.id, toDate: dest.date, toPlan: dest.plan});
         counts.changed++;
       }else if(kind === "remove"){
@@ -257,8 +272,10 @@ export function applyChanges(trip, data, priv = null, owner = ""){
     }
   });
   if(errors.length) return {ok: false, errors};
-  // Stops of a new day or plan get their ids; one copied with its id gets its own.
+  // Stops of a new day or plan get their ids; one copied with its id gets its own. A
+  // choice left on one stop alone is a plain stop.
   out = ensureIds(out, ready.trip).trip;
+  for(const d of out.days) for(const l of d.plans || [d]) l.stops = tidyGroups(l.stops);
   mine = followStops(mine, moves);
   if(mine && !mine.expenses.length) mine = null;
   // The result is checked like any trip file.

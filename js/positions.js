@@ -45,7 +45,8 @@ export function distances(results, around){
 /**
  * The sheet: searches, shows, and answers with what to do.
  * @param o {stops: [{id, title, address?}], city, near, around: [{lat, lng}], googleKey}
- * @returns Promise<{found: [{id, lat, lng}]} | {open: stopId} | null>  null: Not now
+ * @returns Promise<{found: [{id, lat, lng}]} | {open: stopId} | null>  null: Not now; found
+ *   empty: none to save, decided ("Leave as it is")
  */
 export function openFindPositions(o){
   const lang = getLang();
@@ -72,8 +73,11 @@ export function openFindPositions(o){
   const ticked = () => [...dlg.querySelectorAll("[data-found]:checked")].map(x => x.dataset.found);
   const count = () => {
     const n = ticked().length, b = dlg.querySelector("[data-save]");
-    b.textContent = t(!n ? "posSave" : n === 1 ? "posSaveOne" : "posSaveN", {n});
-    b.disabled = !n || results.length < o.stops.length;
+    // Nothing ticked once all are in: "Leave as it is", a decision too (a train has no
+    // position on purpose): the line goes below the stops, as after saving.
+    const done = results.length === o.stops.length;
+    b.textContent = !done ? t("posSave") : t(!n ? "posLeave" : n === 1 ? "posSaveOne" : "posSaveN", {n});
+    b.disabled = !done;
   };
   // Every row drawn again once a result arrives: the distances depend on all of them.
   const draw = () => {

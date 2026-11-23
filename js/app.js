@@ -13,19 +13,21 @@ import { versionStore } from "./objects.js";
 import { REPO_URL } from "./config.js";
 import { openStopEditor, openDayEditor, openExpenseEditor } from "./editor.js";
 import { ask } from "./ask.js";
-import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense, ensureIds } from "./edit.js";
+import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense, ensureIds, chooseOption, addAlternative, moveGroup, leaveGroup, choosePlan } from "./edit.js";
+import { tidyGroups } from "./choices.js";
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
 import { keptRates, fetchMonth } from "./rates.js";
 import { prepare, saveEdit, inspect, apply, restore, moveMarks, followIds, fileName, fileText, separate, joinChanges } from "./trips.js";
 import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop, followIds as followIdsPrivate } from "./private.js";
 import { needsStopIds } from "./ids.js";
 import { openFindPositions } from "./positions.js";
+import { groupOf, groupsIn, chosenIn, programOf, chosenPlan, groupName } from "./choices.js";
 import { areaAround } from "./geocode.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical, contentOf } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl, tripHistory } from "./share.js";
+import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl, tripHistory, tripMembers } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { chooseFirstDay } from "./publishing.js";
 import { asBase } from "./publish.js";
@@ -51,6 +53,7 @@ const S = {
   langPref: "auto",       // "auto" follows the trip, or a language chosen on this device
   theme: document.documentElement.dataset.theme || "auto",   // set early by js/theme.js
   openStops: new Map(),   // descriptions opened or closed one by one, until the page is closed
+  openGroups: new Set(),  // groups of alternatives opened ("date|plan|name"), until the page is closed
   menuFor: null,          // the stop whose ⋯ menu is open
   deviceKey: "",
   useGoogle: true,        // false: always OpenStreetMap, even with a key (saves Google map loads)
@@ -405,7 +408,9 @@ function showHistory(id){
   // On the account, the service says who made each version, and whether a chat did.
   const onAccount = S.account && rec.share && rec.share.id && !rec.share.gone && !rec.public;
   const who = onAccount ? async () => ({me: S.account.handle, versions: new Map((await tripHistory(rec.share.id)).map(v => [v.id, v]))}) : null;
-  openHistory({trip: rec.trip, versions, who, onRestore: async vid => {
+  // Restoring a shared trip changes it for everyone: the question says who will see it.
+  const forAll = async () => { const o = await othersOnTrip(rec); return o === null ? "" : o.length ? t("restoreShared", {who: o.join(", ")}) : t("restoreSharedAnyone"); };
+  openHistory({trip: rec.trip, versions, who, forAll, onRestore: async vid => {
     if(!editable(rec)) return;
     const {trip} = await restore(versions, rec.trip, vid);
     const next = {...rec, trip};
@@ -452,7 +457,9 @@ async function toggleLock(id){
 // as a file. `change(trip)` returns {trip, marks?, priv?}: marks move ticks with a
 // stop; priv, the private expenses after the edit (no version: privMessage says so).
 // A locked trip takes only what leaves its version alone (private expenses).
-async function applyEdit(change, message, extra = {}, privMessage = "privSaved"){
+// `form`: made with a form and Save, so not asked first: on a shared trip, saved for
+// everyone says so after, with Undo.
+async function applyEdit(change, message, extra = {}, privMessage = "privSaved", {form = false} = {}){
   const cur = S.rec.trip, had = privOf();
   const out = change(cur);
   if(isLocked(S.rec) && canonical(contentOf(out.trip)) !== canonical(contentOf(cur))){ toast(lockedText(S.rec, "lockedNoEdit")); return; }
@@ -465,13 +472,24 @@ async function applyEdit(change, message, extra = {}, privMessage = "privSaved")
   await keepRecord(rec);
   render();
   offerSave(rec, changed ? t(message, {v: shortId(next.version.id), ...extra}) : t(privMessage));
+  if(form && changed) othersOnTrip().then(others => {
+    if(others === null || S.rec.trip !== next) return;
+    toast(others.length ? t("savedForAll", {who: others.join(", ")}) : t("savedForAllAnyone"), {label: t("undo"), run: () => undoEdit(cur, next)});
+  });
+}
+
+// Undo, right after a change saved for everyone: a new version with the content from
+// before (as History → Restore), while nothing else changed since.
+async function undoEdit(before, after){
+  if(!S.rec || S.rec.trip.version.id !== after.version.id){ toast(t("undoLate")); return; }
+  await applyEdit(() => ({trip: JSON.parse(JSON.stringify(contentOf(before)))}), "undone");
 }
 
 function currentPlace(){
   const r = route();
   if(r.name !== "day") return {dayIndex: Math.max(0, todayIndex()), planId: null};
   const d = trip().days[r.i];
-  const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
+  const plan = planShown(d);
   return {dayIndex: r.i, planId: plan ? plan.id : null};
 }
 
@@ -493,7 +511,7 @@ function newStop(prefill, newDay = false){
     onSave: ({stop, date, plan, newDay, priv: paid}) => applyEdit(tr => {
       const out = addStop(withDay(tr, newDay), {date, plan}, stop);
       return {trip: out.trip, priv: paid ? setAtStop(privOf(), out.trip, ownerNow(), {date, stop: out.ref.id, title: stop.title}, paid, null) : undefined};
-    }, newDay ? "dayAdded" : "stopAdded", newDay ? {n: trip().days.length + 1} : {}, "privAdded")
+    }, newDay ? "dayAdded" : "stopAdded", newDay ? {n: trip().days.length + 1} : {}, "privAdded", {form: true})
       .then(() => goToDay(date))
       .catch(err => toast(String(err.message || err)))});
 }
@@ -503,7 +521,7 @@ function editDay(){
   if(!editable()) return;
   const i = currentPlace().dayIndex, d = trip().days[i];
   openDayEditor({day: d, number: i + 1, canDelete: trip().days.length > 1,
-    onSave: set => applyEdit(tr => ({trip: updateDay(tr, d.date, set)}), "daySaved").catch(err => toast(String(err.message || err))),
+    onSave: set => applyEdit(tr => ({trip: updateDay(tr, d.date, set)}), "daySaved", {}, "privSaved", {form: true}).catch(err => toast(String(err.message || err))),
     onDelete: () => applyEdit(tr => ({trip: removeDay(tr, d.date)}), "dayDeleted")
       .then(() => { location.hash = "#day-" + Math.max(1, Math.min(i + 1, trip().days.length)); })
       .catch(err => toast(String(err.message || err)))});
@@ -525,8 +543,7 @@ async function findPositions(){
     near: areaAround(around) || areaAround(all), around, googleKey: googleKey()});
   if(!res) return;
   if(res.open){ editStop(res.open); return; }
-  if(!res.found.length) return;
-  await applyEdit(tr => {
+  if(res.found.length) await applyEdit(tr => {
     let out = tr;
     // The trip as it is now (a sync may have come meanwhile): only stops still without one.
     for(const f of res.found){
@@ -538,6 +555,112 @@ async function findPositions(){
   S.state.found = {...(S.state.found || {}), [d.date]: true};
   saveState();
   render();
+}
+
+/* ---------- alternatives (js/choices.js) ---------- */
+
+// The list of the open day (its plan's), as it is in the trip, and where it is.
+function hereList(){
+  const here = currentPlace(), d = trip().days[here.dayIndex];
+  const p = here.planId && d.plans ? d.plans.find(x => x.id === here.planId) : null;
+  return {here, d, ref: {date: d.date, plan: here.planId}, list: p ? p.stops : d.stops};
+}
+
+// A list after an option left it: a group left with one option is a plain stop again.
+function tidyIn(tr, {date, plan}){
+  const out = JSON.parse(JSON.stringify(tr)), d = out.days.find(x => x.date === date);
+  const p = plan && d.plans ? d.plans.find(x => x.id === plan) : null;
+  if(p) p.stops = tidyGroups(p.stops); else if(d.stops) d.stops = tidyGroups(d.stops);
+  return out;
+}
+
+// Whoever else will see a change of the trip's programme: null when nobody else has the
+// trip; [] when they cannot be known now (offline, slow).
+async function othersOnTrip(rec = S.rec){
+  const sh = rec.share;
+  if(!sh || !sh.id || sh.gone) return null;
+  try{
+    const members = await Promise.race([tripMembers(sh.id), new Promise((_, no) => setTimeout(() => no(new Error("slow")), 4000))]);
+    const me = S.account && S.account.handle;
+    const others = members.map(m => m.handle).filter(h => h && h !== me);
+    return others.length ? others : null;
+  }catch(e){ return []; }
+}
+
+// A change everyone with the trip will see, made with one tap: on a shared trip it is
+// asked first, saying what changes and who will see it. A trip of this phone only: never.
+async function sureForAll(title, change){
+  const others = await othersOnTrip();
+  if(others === null) return true;
+  const text = [change, others.length ? t("altConfirmShared", {who: others.join(", ")}) : t("altConfirmSharedAnyone")];
+  return (await ask({title, text, actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("altForAll"), kind: "primary"}]})) === "yes";
+}
+
+// Whether the trip's programme can be changed here: locked, or shared to read only, says why.
+function mayChange(){
+  if(!editable()) return false;
+  if(!canChange()){ toast(t("altReadOnly")); return false; }
+  return true;
+}
+
+const optionLabel = s => s ? [s.title, s.time].filter(Boolean).join(", ") : t("altNone");
+
+// "Choose this": the trip goes to this option of its group.
+async function chooseHere(id){
+  if(!mayChange()) return;
+  const {ref, list} = hereList();
+  const s = list.find(x => x.id === id), g = groupOf(s);
+  if(!g) return;
+  const was = chosenIn(groupsIn(list).get(g) || []);
+  if(was === s) return;
+  if(!(await sureForAll(t("altConfirmTitle", {g}), `${optionLabel(was)} → ${optionLabel(s)}`))) return;
+  await applyEdit(tr => ({trip: chooseOption(tr, {...ref, id})}), "altChosenMsg", {g, s: s.title});
+}
+
+// A tick on an option not chosen: the traveller went there instead. Asked, then chosen and ticked.
+async function wentTo(id, key){
+  if(!mayChange()) return;
+  const {ref, list} = hereList();
+  const s = list.find(x => x.id === id), g = groupOf(s);
+  if(!g) return;
+  const shared = (await othersOnTrip()) !== null;
+  const yes = await ask({title: t("altWentTitle", {s: s.title}), text: [t("altWentText", {g}), ...(shared ? [t("altWentShared")] : [])],
+    actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("altChooseThis"), kind: "primary"}]});
+  if(yes !== "yes") return;
+  S.state.done[key] = 1;
+  delete S.state.skipped[key];
+  saveState();
+  await applyEdit(tr => ({trip: chooseOption(tr, {...ref, id})}), "altChosenMsg", {g, s: s.title});
+}
+
+// "Add an alternative" to a stop: the stop form, with its day, time and kind, in its
+// group (or a new one, named from the time and kind: Lunch, Dinner, Alternatives).
+function addAlternativeHere(id){
+  if(!mayChange()) return;
+  const {here, ref, list} = hereList();
+  const s = list.find(x => x.id === id);
+  if(!s) return;
+  const groups = groupsIn(list), g = groupOf(s);
+  const group = g || groupName(s, {lunch: t("altLunch"), dinner: t("altDinner"), other: t("altOther")}, list);
+  const others = g && groups.has(g) ? groups.get(g).filter(x => x !== s).map(x => x.title) : [];
+  openStopEditor({...editorBase(), money: moneyOptions(), dayIndex: here.dayIndex, planId: here.planId,
+    template: {time: s.time, type: s.type}, alternative: {group, fixed: groups.has(g), of: s.title, others},
+    onSave: ({stop, date, plan, newDay, priv: paid, group: name}) => applyEdit(tr => {
+      // Moved to another day in the form: a plain new stop there.
+      const same = !newDay && date === ref.date && (plan || null) === (ref.plan || null);
+      const out = same ? addAlternative(tr, {...ref, id}, stop, name) : addStop(withDay(tr, newDay), {date, plan}, stop);
+      return {trip: out.trip, priv: paid ? setAtStop(privOf(), out.trip, ownerNow(), {date, stop: out.ref.id, title: stop.title}, paid, null) : undefined};
+    }, "altAdded", {g: groupOf(s) || name || group, s: stop.title}, "privAdded", {form: true}).catch(err => toast(String(err.message || err)))});
+}
+
+// The plan looked at, chosen for the day, for everyone.
+async function choosePlanHere(pid){
+  if(!mayChange()) return;
+  const {d} = hereList();
+  const p = d.plans && d.plans.find(x => x.id === pid), was = chosenPlan(d);
+  if(!p || p === was) return;
+  if(!(await sureForAll(t("planConfirmTitle"), `${was.name} → ${p.name}`))) return;
+  await applyEdit(tr => ({trip: choosePlan(tr, d.date, pid)}), "planChosenMsg", {p: p.name});
 }
 
 function editStop(stopId){
@@ -552,12 +675,33 @@ function editStop(stopId){
   const paid = atStop(privOf(), d.date, stop.id)[0] || null;
   openStopEditor({...editorBase(), money: moneyOptions(), dayIndex: here.dayIndex, planId: here.planId, stop,
     privateCost: paid && {cost: paid.cost, currency: paid.currency},
-    onSave: ({stop: next, date, plan, newDay, priv: cost}) => applyEdit(tr => {
-      const out = updateStop(withDay(tr, newDay), ref, next, {date, plan});
-      const marks = [{date: ref.date, plan: ref.plan, from: ref.id, to: out.ref.id, toDate: date, toPlan: plan}];
-      const priv = setAtStop(followStops(privOf(), marks), out.trip, cost ? ownerNow() : "", {date, stop: out.ref.id, title: next.title}, cost, paid && paid.id);
-      return {trip: out.trip, marks, priv};
-    }, "stopSaved").catch(err => toast(String(err.message || err))),
+    onSave: async ({stop: next, date, plan, newDay, priv: cost}) => {
+      // An option of a group moved to another day or plan: only it (it leaves the group),
+      // or the whole group?
+      const g = groupOf(stop), moved = date !== ref.date || (plan || null) !== (ref.plan || null);
+      const options = g && moved ? groupsIn(list).get(g) : null;
+      let how = "one";
+      if(options){
+        how = await ask({title: t("altMoveTitle", {s: stop.title, g}), text: t("altMoveText"),
+          actions: [{id: "cancel", label: t("cancel")}, {id: "one", label: t("altMoveOne")}, {id: "all", label: t("altMoveAll"), kind: "primary"}]});
+        if(how !== "one" && how !== "all") return;
+      }
+      await applyEdit(tr => {
+        if(how === "all"){
+          const there = updateStop(tr, ref, next).trip;
+          const out = moveGroup(withDay(there, newDay), ref, g, {date, plan});
+          const marks = options.map(o => ({date: ref.date, plan: ref.plan, from: o.id, to: o.id, toDate: date, toPlan: plan}));
+          const priv = setAtStop(followStops(privOf(), marks), out, cost ? ownerNow() : "", {date, stop: ref.id, title: next.title}, cost, paid && paid.id);
+          return {trip: out, marks, priv};
+        }
+        const leaving = options ? leaveGroup(next) : next;
+        const out = updateStop(withDay(tr, newDay), ref, leaving, {date, plan});
+        const trip1 = options ? tidyIn(out.trip, ref) : out.trip;
+        const marks = [{date: ref.date, plan: ref.plan, from: ref.id, to: out.ref.id, toDate: date, toPlan: plan}];
+        const priv = setAtStop(followStops(privOf(), marks), trip1, cost ? ownerNow() : "", {date, stop: out.ref.id, title: next.title}, cost, paid && paid.id);
+        return {trip: trip1, marks, priv};
+      }, "stopSaved", {}, "privSaved", {form: true}).catch(err => toast(String(err.message || err)));
+    },
     // What was paid there privately stays, under its own name.
     onDelete: () => applyEdit(tr => ({trip: removeStop(tr, ref), priv: unlinkStop(privOf(), ref.date, ref.id)}), "stopDeleted").catch(err => toast(String(err.message || err)))});
 }
@@ -1626,8 +1770,8 @@ function comingFrom(dayIndex, list, k, skipped){
   const prev = trip().days[dayIndex - 1];
   if(!prev) return "";
   if(prev.stay && typeof prev.stay === "object") return prev.stay.address || prev.stay.name;
-  const plan = prev.plans ? (prev.plans.find(p => p.id === S.state.plans[prev.date]) || prev.plans[0]) : null;
-  const before = plan ? plan.stops : prev.stops;
+  const plan = planShown(prev);
+  const before = programOf(plan ? plan.stops : prev.stops);
   for(let j = before.length - 1; j >= 0; j--){
     const key = stopKey(prev, plan ? plan.id : null, before[j], j);
     if(!S.state.done[key] && S.state.skipped[key]) continue;
@@ -1713,8 +1857,9 @@ function sumIn(items, to){
 function costItems(tr){
   const items = [], ticked = new Map();
   tr.days.forEach((d, i) => {
-    const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
-    (plan ? plan.stops : d.stops).forEach((s, k) => {
+    const plan = planShown(d);
+    // What the day goes through: the chosen option of each group (js/choices.js).
+    programOf(plan ? plan.stops : d.stops).forEach((s, k) => {
       const key = stopKey(d, plan ? plan.id : null, s, k);
       const done = !!S.state.done[key];
       ticked.set(d.date + "|" + s.id, done);
@@ -1812,23 +1957,45 @@ function notesHTML(notes){
     `<ol class="remind-list" id="day-notes"${open ? "" : " hidden"}>${notes.map(r => `<li class="remind"><div>${rich(r)}</div></li>`).join("")}</ol></div>`;
 }
 
+// Groups of alternatives still to choose: left out of the day's costs (js/choices.js), so
+// said next to them: "1 choice to make", with what it may cost when every option says.
+function toChooseLine(all){
+  const pending = [...groupsIn(all).values()].filter(xs => !chosenIn(xs));
+  if(!pending.length) return "";
+  const xs = pending.length === 1 ? pending[0] : [];
+  const priced = xs.length && xs.every(o => typeof o.cost === "number") && new Set(xs.map(costCurrency)).size === 1;
+  const by = [...xs].sort((a, b) => a.cost - b.cost), range = priced && by[0].cost !== by.at(-1).cost ? ` (${costShort(by[0], [])}–${costShort(by.at(-1), [])})` : "";
+  return " · " + esc(pending.length === 1 ? t("choicesToMakeOne") : t("choicesToMake", {n: pending.length})) + esc(range);
+}
+
+// The plan a day is shown with: the one looked at on this phone, else the trip's chosen one.
+const planShown = d => d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || chosenPlan(d)) : null;
+
 // Whether the open trip can be changed here: not locked, not someone else's page, not
 // shared with this account to read only.
 const canChange = () => !isLocked(S.rec) && !(S.rec.share && !S.rec.share.gone && S.rec.share.role === "read");
 
-function stopsHTML(day, planId, list, parts, paint){
+// The day's stops. `list`: what the day goes through (programOf in js/choices.js), which
+// the numbers, the route and the map follow; `all`: every stop of the list, the options of
+// each group too. A group is drawn once, where its first option is: closed, the chosen
+// option, then the others in one line; to choose, its options in short; opened, all of
+// them, the others with "Choose this", and + Alternative.
+function stopsHTML(day, planId, list, parts, paint, all = list){
   const dayIndex = trip().days.indexOf(day);
   const skippedAt = j => { const k = stopKey(day, planId, list[j], j); return !S.state.done[k] && !!S.state.skipped[k]; };
-  return `<ol class="stops" style="--c:${cityVar(day.city)}">` + list.map((s, i) => {
+  const change = canChange();
+  // i: its place in `list`, or -1 for an option the day does not go to (opt.slot: the
+  // place it would take, for Directions).
+  const stopLi = (s, i, opt = {}) => {
     const id = stopKey(day, planId, s, i);
     const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id], open = isOpen(id);
     const q = placeQuery(s);
     // Left column: when, where on the map, how you get there.
-    const dark = parts && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
+    const dark = parts && i >= 0 && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
     // The cost, small, under them: in the currency it is paid in.
     const paid = atStop(privOf(), day.date, s.id);
     const hasCost = typeof s.cost === "number" || paid.length > 0;
-    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</div>`;
+    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined && i >= 0 ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</div>`;
     // Middle: a label above the title, the title with its kind, the description that folds, the links.
     // The name as on the sign, under the title, in its own language (for the glyphs).
     const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
@@ -1847,28 +2014,64 @@ function stopsHTML(day, planId, list, parts, paint){
     // Map and Directions, and for a place to eat the review site of that part of the world.
     const review = reviewSite(s, {city: day.city, timezone: trip().timezone, lang: getLang()});
     const links = (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
-      (q ? `<a class="maplink" href="${esc(dirUrl(q, comingFrom(dayIndex, list, i, skippedAt)))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
+      (q ? `<a class="maplink" href="${esc(dirUrl(q, comingFrom(dayIndex, list, i >= 0 ? i : opt.slot, skippedAt)))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
       (review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)}</a>` : "");
     const booked = s.booking === "booked" ? `<span class="tag ok">${esc(t("booked"))}</span>` : "";
-    const nopos = s.lat === undefined && canChange() ? `<span class="tag nopos-tag">${esc(t("noPosTag"))}</span>` : "";
-    const meta = isSkipped || links || booked || nopos ? `<div class="meta">${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}${nopos}</div>` : "";
+    const nopos = s.lat === undefined && change ? `<span class="tag nopos-tag">${esc(t("noPosTag"))}</span>` : "";
+    // In an opened group: the chosen one says so, the others can be chosen.
+    const pick = opt.option ? `<button type="button" class="btn small" data-choose="${esc(s.id)}"${change ? "" : ` aria-disabled="true"`}>${esc(t("altChooseThis"))}</button>`
+      : opt.chosen ? `<span class="tag ok">${esc(t("altChosen"))}</span>` : "";
+    const meta = isSkipped || links || booked || nopos || pick ? `<div class="meta">${pick}${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}${nopos}</div>` : "";
     const eyebrow = s.tag ? `<span class="eyebrow">${esc(s.tag)}</span>` : "";
     // Right: the tick, and the ⋯ menu with the actions used less often.
     const menuOpen = S.menuFor === id;
     const items = (s.id ? `<button type="button" role="menuitem" data-edit="${esc(s.id)}">${esc(t("editStop"))}</button>` : "") +
-      (isDone ? "" : `<button type="button" role="menuitem" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`);
-    const side = `<div class="side"><button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button>` +
+      (isDone || opt.option ? "" : `<button type="button" role="menuitem" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`) +
+      (s.id && change ? `<button type="button" role="menuitem" data-alt-add="${esc(s.id)}">${esc(t("altAddOne"))}</button>` : "");
+    const side = `<div class="side"><button class="tick" type="button" data-tick="${esc(id)}"${opt.option ? ` data-option="${esc(s.id)}"` : ""} aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button>` +
       (items ? `<button class="more" type="button" data-more="${esc(id)}" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="${esc(t("moreActions"))}: ${esc(s.title)}">${DOTS}</button>` +
         `<div class="menu" role="menu"${menuOpen ? "" : " hidden"}>${items}</div>` : "") + `</div>`;
     const cost = hasCost && open ? costRow(s, id, day.date, paid) : "";
-    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}${hasCost ? " has-cost" : ""}">${left}<div class="body">${eyebrow}${head}${notices}${meta}${cost}</div>${side}</li>`;
-  }).join("") + `</ol>`;
+    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}${hasCost ? " has-cost" : ""}${opt.option ? " option" : ""}${opt.group ? " in-group" : ""}">${left}<div class="body">${eyebrow}${head}${notices}${meta}${cost}</div>${side}</li>`;
+  };
+  const groups = groupsIn(all), drawn = new Set();
+  let html = "";
+  for(const s of all){
+    const g = groupOf(s);
+    if(!groups.has(g)){ const i = list.indexOf(s); if(i >= 0) html += stopLi(s, i); continue; }
+    if(drawn.has(g)) continue;
+    drawn.add(g);
+    const options = groups.get(g), chosen = chosenIn(options), others = options.filter(o => o !== chosen);
+    const key = `${day.date}|${planId || ""}|${g}`, open = S.openGroups.has(key);
+    // Where the group sits in the day: the chosen option's place, or the next stop's.
+    const at = all.indexOf(s), next = list.findIndex(x => all.indexOf(x) > at), slot = chosen ? list.indexOf(chosen) : next < 0 ? list.length : next;
+    html += `<li class="group-head${open ? " open" : ""}${chosen ? "" : " pending"}"><button type="button" class="gh" data-group="${esc(key)}" aria-expanded="${open}">` +
+      `<b>${esc(g)}</b><span>${esc(t(chosen ? "altCount" : "altToChoose", {n: options.length}))}</span><span class="chev">${CHEVRON}</span></button></li>`;
+    if(open){
+      html += options.map(o => o === chosen ? stopLi(o, slot, {group: g, chosen: true}) : stopLi(o, -1, {group: g, option: true, slot})).join("");
+      if(change) html += `<li class="alts add"><button type="button" class="btn small" data-alt-add="${esc(options[0].id)}">${esc(t("altAdd"))}</button></li>`;
+    }else if(chosen){
+      html += stopLi(chosen, slot, {group: g}) +
+        `<li class="alts"><button type="button" class="alts-line" data-group="${esc(key)}"><span class="names">${esc(t("altOthers", {s: others.map(o => o.title).join(" · ")}))}</span><span class="count">${esc(t("altOthersN", {n: others.length}))}</span><span class="see">${esc(t("altSee"))}</span></button></li>`;
+    }else{
+      const line = o => [o.title, o.time, typeof o.cost === "number" ? costShort(o, []) : ""].filter(Boolean).join(" · ");
+      html += `<li class="alts pending"><ul>${options.map(o => `<li>${esc(line(o))}</li>`).join("")}</ul>` +
+        `<div class="row"><span>${esc(t("altNone"))}</span><button type="button" class="btn small" data-group="${esc(key)}">${esc(t("altChoose"))}</button></div></li>`;
+    }
+  }
+  return `<ol class="stops" style="--c:${cityVar(day.city)}">${html}</ol>`;
 }
 
 // Shows the little arrow only on descriptions that are really cut short.
 function markCut(){
   document.querySelectorAll(".stop:not(.open) .desc").forEach(p => {
     p.closest(".stop").classList.toggle("cut", p.scrollHeight - p.clientHeight > 1);
+  });
+  // "others: Casa · Mercado" on one line; when the names do not fit, how many there are.
+  document.querySelectorAll(".alts-line").forEach(b => {
+    b.classList.remove("short");
+    const names = b.querySelector(".names");
+    b.classList.toggle("short", names.scrollWidth - names.clientWidth > 1);
   });
 }
 
@@ -1877,8 +2080,9 @@ function renderDay(i){
   const tr = trip(), d = tr.days[i], lang = getLang();
   const color = cityVar(d.city);
   const prev = tr.days[i - 1], next = tr.days[i + 1];
-  const plan = d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || d.plans[0]) : null;
-  const list = plan ? plan.stops : d.stops;
+  const plan = planShown(d);
+  // Every stop of the list (options too), and what the day goes through (js/choices.js).
+  const all = plan ? plan.stops : d.stops, list = programOf(all);
   const pid = plan ? plan.id : null;
   const keys = list.map((s, k) => stopKey(d, pid, s, k));
   const doneCount = keys.filter(k => S.state.done[k]).length;
@@ -1934,7 +2138,7 @@ function renderDay(i){
   <div class="headrow">
     ${d.title ? `<h1>${esc(d.title)}</h1>` : ""}
     ${isLocked(S.rec) ? `<p class="lock-note" data-locked>${esc(S.rec.public ? t("publicNote", {h: S.rec.public.by}) : t("lockedNote"))}</p>` : ""}
-    <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}</span></div>
+    <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}${toChooseLine(all)}</span></div>
     <div class="tools">${
       (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
       (anyText ? `<button type="button" class="iconbtn" data-expand aria-pressed="${S.ui.expandAll}" aria-label="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}" title="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}">${S.ui.expandAll ? FOLD : UNFOLD}</button>` : "") +
@@ -1957,13 +2161,16 @@ function renderDay(i){
   if(d.plans){
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
+    // Looking at another plan than the one the day goes with: it can be chosen for everyone.
+    const goes = chosenPlan(d);
+    if(plan !== goes && canChange()) html += `<p class="plan-note"><span>${esc(t("planGoesWith", {p: goes.name}))}</span><button type="button" class="linkbtn" data-plan-choose="${esc(pid)}">${esc(t("planChooseAll", {p: plan.name}))}</button></p>`;
   }
   // Stops without a position: a line with Find, above them until some were chosen from
   // a search on this day (remembered on this phone), then below, to come back to.
-  const missing = canChange() ? list.filter(s => s.lat === undefined && s.id).length : 0;
+  const missing = canChange() ? all.filter(s => s.lat === undefined && s.id).length : 0;
   const later = !!(S.state.found && S.state.found[d.date]);
   const nopos = missing ? `<div class="nopos${later ? " later" : ""}"><span>${esc(t(later ? (missing === 1 ? "posStillOne" : "posStill") : (missing === 1 ? "posMissingOne" : "posMissing"), {n: missing}))}</span><button type="button" class="btn small" data-find-pos>${esc(t("posFind"))}</button></div>` : "";
-  html += (later ? "" : nopos) + stopsHTML(d, pid, list, light ? parts : null, paint) + (later ? nopos : "");
+  html += (later ? "" : nopos) + stopsHTML(d, pid, list, light ? parts : null, paint, all) + (later ? nopos : "");
   html += `<p class="foot dayfoot">${esc(t("footDay"))}</p>`;
   return {html, wanted};
 }
@@ -2072,7 +2279,22 @@ $app.addEventListener("toggle", e => {
 $app.addEventListener("click", e => {
   // Any tap outside the open ⋯ menu closes it first (its own button toggles it below).
   if(S.menuFor && !e.target.closest(".menu") && !e.target.closest("[data-more]")) hideMenu();
+  const group = e.target.closest("[data-group]");
+  if(group){
+    const k = group.dataset.group;
+    if(S.openGroups.has(k)) S.openGroups.delete(k); else S.openGroups.add(k);
+    render();
+    refocus(`[data-group="${CSS.escape(k)}"]`);
+    return;
+  }
+  const choose = e.target.closest("[data-choose]");
+  if(choose){ chooseHere(choose.dataset.choose); return; }
+  const altAdd = e.target.closest("[data-alt-add]");
+  if(altAdd){ S.menuFor = null; render(); addAlternativeHere(altAdd.dataset.altAdd); return; }
+  const planAll = e.target.closest("[data-plan-choose]");
+  if(planAll){ choosePlanHere(planAll.dataset.planChoose); return; }
   const tick = e.target.closest("[data-tick]");
+  if(tick && tick.dataset.option){ wentTo(tick.dataset.option, tick.dataset.tick); return; }
   if(tick){
     const id = tick.dataset.tick;
     if(S.state.done[id]) delete S.state.done[id];

@@ -262,7 +262,8 @@ test("the format in short has every field an assistant writes, a valid example, 
     }
   }
   assert.deepEqual(validateTrip(JSON.parse(brief.split("\n").pop())).errors, []);
-  assert.ok(brief.length < 4500, "short enough to paste on a phone: " + brief.length);
+  // 4,500 until 3.32 (alternatives added three fields): still one paste on a phone.
+  assert.ok(brief.length < 5000, "short enough to paste on a phone: " + brief.length);
 });
 
 test("the format reference documents every field of the format", () => {

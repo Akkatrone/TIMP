@@ -9,7 +9,7 @@
 > look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
-**Version 3.31.0.** TIMP is under active development and this page changes with it.
+**Version 3.32.0.** TIMP is under active development and this page changes with it.
 Remember this version. Before you change a trip later in the conversation, or when a
 message from the app names a newer TIMP version, open this page again: if its version
 is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
@@ -62,6 +62,7 @@ day:
 plan:
   name (required): text. The name of the plan, shown on its button.
   stops (required): list of stop. The stops of this plan, in order.
+  chosen: true. On the plan the day goes with. None: the first.
 stop:
   title (required): text. The name of the place or of the activity.
   local: text. The name in the local script, as on the sign ("一蘭 渋谷店"): to show staff, and to search it.
@@ -78,6 +79,8 @@ stop:
   lat: number from -90 to 90. Latitude, with `lng`: the pin on the map.
   lng: number from -180 to 180. Longitude, with `lat`.
   link: an https:// address. A Google Maps link to the exact place.
+  choice: text. Options for one moment: stops of a day with the same choice ("Lunch"), 2 to 4.
+  chosen: true. On the option the day goes to. None: to choose.
 expense:
   title (required): text. What it was: "Flights", "Hotel, 3 nights".
   cost (required): number, 0 or more. What the traveller pays.
@@ -96,7 +99,7 @@ item:
   label (required): text. What the line is about.
   text (required): text. The line itself. Phone numbers become a link to call.
 
-Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. A cost is what the traveller pays: their share if split. Give lat/lng only for places you are sure about; otherwise an address.
+Rules: days in date order, one per date. A day has stops or plans (two or more), never both. Plans only when the whole day changes; for one meal, a choice. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. A cost is what the traveller pays: their share if split. Give lat/lng only for places you are sure about; otherwise an address.
 
 Example:
 {"format":"travel-in-my-pocket/2","title":"Rome in three days","lang":"en","days":[{"date":"2027-04-10","city":"Rome","title":"The ancient city","stay":{"name":"Hotel Example","address":"Via Cavour 1, Rome"},"notes":["Colosseum tickets booked for 9:00"],"stops":[{"time":"09:00","title":"Colosseum","type":"sight","text":"Enter from the Via Sacra side.","address":"Piazza del Colosseo, Rome","lat":41.8902,"lng":12.4922},{"time":"13:00","title":"Lunch in Monti","type":"food","travel":"metro"}]}],"info":[{"title":"In case of need","items":[{"label":"Emergency","text":"112"}]}]}
@@ -116,7 +119,7 @@ To change an existing trip, answer with ONE JSON object in one code block, forma
 "from" lets the app apply the changes to the trip as you saw it, and join them with what changed on the phone since.
 
 Each change is one of:
-  {"add": {"day": "YYYY-MM-DD", "stop": {…}}}             a new stop (fields: title, local, time, type, travel, text, tag, booking, cost, currency, closed, address, lat, lng, link); it goes in time order
+  {"add": {"day": "YYYY-MM-DD", "stop": {…}}}             a new stop (fields: title, local, time, type, travel, text, tag, booking, cost, currency, closed, address, lat, lng, link, choice, chosen); it goes in time order
   {"update": {"day": "YYYY-MM-DD", "stop": "<id>", "set": {…}}}  changed fields of a stop; null removes a field
   {"update": {"day": …, "stop": "<id>", "to": {"day": "YYYY-MM-DD"}}}  moves the stop to another day (set may go with it)
   {"remove": {"day": "YYYY-MM-DD", "stop": "<id>"}}
@@ -130,6 +133,8 @@ Each change is one of:
   {"addExpense": {"expense": {"title": "…", "cost": 0, "currency": "EUR", "date": "YYYY-MM-DD"}}}  money spent outside the stops (flights, hotels)
   {"setExpense": {"expense": "<id>", "set": {…}}}  /  {"removeExpense": {"expense": "<id>"}}
   "private": true next to "expense", in these three: the traveller's private expenses (shopping, a meal alone), not shared with the trip. A private one paid at a stop has "stop": "<stop id>" and that day as "date"
+
+Options for one moment (a meal): stops with the same "choice" ("Lunch"), 2 to 4; "chosen": true on the one the day goes to (the others lose it). Plans only when the whole day changes.
 
 On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline, copied exactly; new stops have none. Give lat and lng for new places when you know them. A cost is what the traveller pays (their share of what is split), in the trip's currency unless the stop says another; write only prices you know.
 ```
@@ -191,8 +196,12 @@ One entry per date, from the arrival day to the departure day, in date order.
   ferry back leaves at 17:30." "If it rains, swap with day 4." Zero to three per day.
 - `stops`: in the order they happen. Include the practical ones too: arrival,
   check-in, the train to the next city, the way back to the hotel.
-- `plans` instead of `stops` when the travellers will choose on the spot between two
-  or three different days. Each plan has a `name` and its `stops`.
+- `plans` instead of `stops` only when the travellers will choose on the spot between
+  two or three different days (a rainy day, a lazy one). Each plan has a `name` and its
+  `stops`.
+- For options at one moment (three places for lunch, one museum or another), not plans:
+  two to four stops with the same `choice` (`"Lunch"`), side by side in the day, and
+  `"chosen": true` on the one you suggest, or on none to leave it to the travellers.
 
 ## 3. Write the stops
 
@@ -343,7 +352,8 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 
 - `"name"` for a stop: it is `"title"`. And `"format": "travel-in-my-pocket/2"` first.
 - Positions swapped (`lat` is north-south, between -90 and 90).
-- Two entries for the same date. Use `plans` for alternatives.
+- Two entries for the same date. Use `plans` for alternative days, `choice` for options
+  at one moment.
 - A day with both `stops` and `plans`, or with neither.
 - Colours, icons or map settings: the file has none.
 - Long paragraphs in `text`. The traveller reads this standing up.

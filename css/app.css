@@ -158,6 +158,32 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .stop:first-child{border-top-left-radius:20px;border-top-right-radius:20px}
 .stop:last-child{border-bottom-left-radius:20px;border-bottom-right-radius:20px}
 .stop.done,.stop.skipped{background:var(--card-off)}
+/* Alternatives: a group's name above it; the others in one line under the chosen one;
+   opened, every option, the ones not chosen quieter. */
+.group-head{list-style:none;background:var(--card);padding:0}
+.group-head:first-child{border-top-left-radius:20px;border-top-right-radius:20px}
+.gh{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:10px 14px 2px}
+.gh b{font:700 .78rem var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.gh span:not(.chev){font-size:.8rem;color:var(--muted)}
+.gh .chev{display:block;margin:0 0 0 auto}
+.group-head.open .chev{transform:rotate(180deg)}
+.stop.in-group{border-radius:0}
+.stop.option{background:var(--card-off)}
+.stop.option h3{font-weight:600}
+.alts{list-style:none;background:var(--card);padding:0 14px 12px calc(4.3rem + 26px);font-size:.85rem;color:var(--muted);min-width:0;overflow:hidden}
+.group-head{min-width:0}
+.alts:last-child{border-bottom-left-radius:20px;border-bottom-right-radius:20px}
+.alts-line{display:flex;align-items:baseline;gap:8px;width:100%;min-width:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:0}
+.alts-line .names{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden}
+.alts-line .count{display:none;flex:1 1 auto}
+.alts-line.short .names{display:none}
+.alts-line.short .count{display:block}
+.alts-line .see{flex:0 0 auto;color:var(--link);text-decoration:underline}
+.alts.pending{padding:4px 14px 12px}
+.alts.pending ul{margin:0 0 8px;padding:0 0 0 18px;display:grid;gap:3px;color:var(--ink)}
+.alts.pending .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.alts.add{padding:10px 14px 12px}
+.plan-note{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0;font-size:.85rem;color:var(--muted)}
 .time{font:500 .82rem/1.5 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);padding-top:1px;overflow-wrap:anywhere;display:grid;justify-items:start;align-content:start;gap:7px;min-width:0}
 .body{min-width:0}
 .body h3{margin:0;font:600 1rem/1.35 var(--f-body)}

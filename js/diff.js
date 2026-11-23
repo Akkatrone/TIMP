@@ -26,7 +26,8 @@ function rest(trip){
 
 // Fields, grouped by what a traveller would call them.
 const GROUPS = {time: "time", title: "title", local: "title", text: "text", travel: "travel", tag: "tag", type: "type",
-  booking: "booking", closed: "closed", cost: "cost", currency: "cost", lat: "place", lng: "place", address: "place", link: "place"};
+  booking: "booking", closed: "closed", cost: "cost", currency: "cost", lat: "place", lng: "place", address: "place", link: "place",
+  choice: "choice", chosen: "choice"};
 
 // A day's fields and the trip's, grouped the same way.
 const DAY_GROUPS = {notes: "notes", stay: "stay", city: "title", title: "title", plans: "plans"};

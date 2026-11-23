@@ -55,8 +55,12 @@ One entry per date, from the arrival day to the departure day, in date order.
   ferry back leaves at 17:30." "If it rains, swap with day 4." Zero to three per day.
 - `stops`: in the order they happen. Include the practical ones too: arrival,
   check-in, the train to the next city, the way back to the hotel.
-- `plans` instead of `stops` when the travellers will choose on the spot between two
-  or three different days. Each plan has a `name` and its `stops`.
+- `plans` instead of `stops` only when the travellers will choose on the spot between
+  two or three different days (a rainy day, a lazy one). Each plan has a `name` and its
+  `stops`.
+- For options at one moment (three places for lunch, one museum or another), not plans:
+  two to four stops with the same `choice` (`"Lunch"`), side by side in the day, and
+  `"chosen": true` on the one you suggest, or on none to leave it to the travellers.
 
 ## 3. Write the stops
 
@@ -226,7 +230,8 @@ key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
 
 - `"name"` for a stop: it is `"title"`. And `"format": "travel-in-my-pocket/2"` first.
 - Positions swapped (`lat` is north-south, between -90 and 90).
-- Two entries for the same date. Use `plans` for alternatives.
+- Two entries for the same date. Use `plans` for alternative days, `choice` for options
+  at one moment.
 - A day with both `stops` and `plans`, or with neither.
 - Colours, icons or map settings: the file has none.
 - Long paragraphs in `text`. The traveller reads this standing up.

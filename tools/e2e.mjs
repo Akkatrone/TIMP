@@ -77,11 +77,11 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await count(".desc.clamp"), await count(".desc"));
   });
 
-  await step("the ⋯ menu opens with Edit and Skip, and closes with Escape or a tap outside", async () => {
+  await step("the ⋯ menu opens with Edit, Skip and Add an alternative, and closes with Escape or a tap outside", async () => {
     assert.equal(await count(".menu:not([hidden])"), 0);
     await click(".stop [data-more]", 0);
     assert.equal(await count(".menu:not([hidden])"), 1);
-    assert.deepEqual(await run(`return [...document.querySelectorAll(".menu:not([hidden]) [role=menuitem]")].map(b => b.textContent);`), ["Edit", "Skip"]);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".menu:not([hidden]) [role=menuitem]")].map(b => b.textContent);`), ["Edit", "Skip", "Add an alternative"]);
     assert.equal(await run(`return document.activeElement.textContent;`), "Edit", "the first item takes the focus");
     await run(`document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));`);
     assert.equal(await count(".menu:not([hidden])"), 0);
@@ -1933,5 +1933,57 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.deepEqual([lunch.lat, lunch.lng], [38.7115, -9.1305]);
     assert.deepEqual(now.version.parents, [before], "one new version");
     assert.equal(await run(`return document.querySelector(".nopos");`), null, "every stop has its position: the line is gone");
+  });
+
+  await step("alternatives: one added from a stop's menu, another chosen, one not chosen ticked; a plan chosen for everyone", async () => {
+    const tripNow = () => run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip); }; });`);
+    const lunchOf = trip => trip.days[0].stops;
+    const toast = () => run(`return document.getElementById("toast").textContent;`);
+    const lunch = oldStopId("kept-before", "2027-05-14", "lunch");
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector('[data-alt-add="${lunch}"]')`);
+    await run(`document.querySelector('[data-alt-add="${lunch}"]').click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] #stop-group")`);
+    assert.equal(await run(`return document.getElementById("sheet-title").textContent;`), "An alternative to Lunch in Alfama");
+    assert.equal(await run(`return document.getElementById("stop-group").value;`), "Lunch", "a place to eat at 14:00: Lunch");
+    assert.deepEqual(await run(`return [document.getElementById("stop-hh").value, document.getElementById("stop-mm").value];`), ["14", "00"], "its time");
+    await run(`document.getElementById("stop-title").value = "Casa Exemplo"; document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+    await until("added", `/Lunch: Casa Exemplo added · version/.test(document.getElementById("toast").textContent)`);
+    let trip = await tripNow();
+    assert.deepEqual(lunchOf(trip).filter(s => s.choice === "Lunch").map(s => [s.title, !!s.chosen]), [["Lunch in Alfama", true], ["Casa Exemplo", false]]);
+    // Closed: the chosen one, the others in a line; the day goes through one lunch.
+    assert.equal(await run(`return document.querySelector(".group-head .gh").textContent;`), "Lunch2 alternatives");
+    assert.equal(await run(`return document.querySelector(".alts-line .names").textContent;`), "others: Casa Exemplo");
+    assert.equal(await run(`return [...document.querySelectorAll(".stop h3")].filter(h => h.textContent.includes("Casa Exemplo")).length;`), 0);
+    // Opened: every option; "Choose this" (a trip of this phone only: nothing asked).
+    await run(`document.querySelector(".alts-line").click();`);
+    await until("opened", `document.querySelector("[data-choose]")`);
+    const casa = lunchOf(trip).find(s => s.title === "Casa Exemplo").id;
+    await run(`document.querySelector('[data-choose="${casa}"]').click();`);
+    await until("chosen", `/Lunch: Casa Exemplo chosen · version/.test(document.getElementById("toast").textContent)`);
+    trip = await tripNow();
+    assert.deepEqual(lunchOf(trip).filter(s => s.chosen).map(s => s.title), ["Casa Exemplo"]);
+    // A tick on the option not chosen: asked, then chosen and ticked.
+    await until("the other option", `document.querySelector('[data-tick][data-option="${lunch}"]')`);
+    await run(`document.querySelector('[data-tick][data-option="${lunch}"]').click();`);
+    await until("asked", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await text("dialog.ask[open] #ask-title"), "Did you go to Lunch in Alfama?");
+    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
+    await until("chosen again", `/Lunch: Lunch in Alfama chosen/.test(document.getElementById("toast").textContent)`);
+    trip = await tripNow();
+    assert.deepEqual(lunchOf(trip).filter(s => s.chosen).map(s => s.title), ["Lunch in Alfama"]);
+    assert.equal(await run(`return document.querySelector('[data-tick="2027-05-14||${lunch}"]').getAttribute("aria-pressed");`), "true", "and ticked");
+    // Day 3 has two plans: looking at the second, it can be chosen for everyone.
+    await run(`location.hash = "#day-3";`);
+    await until("day 3", `document.querySelectorAll("[data-plan]").length === 2`);
+    assert.equal(await run(`return document.querySelector(".plan-note");`), null, "the day goes with the first: nothing to say");
+    await run(`document.querySelectorAll("[data-plan]")[1].click();`);
+    await until("the note", `document.querySelector("[data-plan-choose]")`);
+    assert.match(await run(`return document.querySelector(".plan-note").textContent;`), /^The day goes with “Sintra”Choose “Cascais.*” for everyone$/);
+    await run(`document.querySelector("[data-plan-choose]").click();`);
+    await until("plan chosen", `/The day goes with “Cascais/.test(document.getElementById("toast").textContent)`);
+    trip = await tripNow();
+    assert.deepEqual(trip.days[2].plans.filter(p => p.chosen).map(p => p.id), [trip.days[2].plans[1].id]);
+    assert.equal(await run(`return document.querySelector(".plan-note");`), null);
   });
 }

@@ -134,7 +134,8 @@ test("changes are checked like a trip file once applied, and must be for the ope
 test("the brief for assistants names every kind of change", () => {
   const brief = changesBrief();
   for(const k of ["add", "update", "remove", "setDay", "addDay", "removeDay", "addPlan", "setPlan", "removePlan"]) assert.match(brief, new RegExp(`"${k}"`));
-  assert.ok(brief.length < 2500, String(brief.length));
+  // 2,500 until 3.32 (the alternatives' line): still short.
+  assert.ok(brief.length < 2800, String(brief.length));
 });
 
 test("changes can set what things cost: a stop's cost, the trip's currency, expenses", () => {

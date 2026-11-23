@@ -7,6 +7,7 @@
 
 import { FIELDS, slug, tripId } from "./trip.js";
 import { newStopId, uniqueStopIds } from "./ids.js";
+import { groupOf, choose, tidyGroups } from "./choices.js";
 
 // An id made from the title, unique among `taken`: for plans and expenses, unique in
 // their list. Stops have ids of their own kind (js/ids.js).
@@ -123,13 +124,70 @@ export function updateStop(trip, ref, stop, to = ref){
   return {trip: out, ref: {date: to.date, plan: to.plan || null, id: next.id}};
 }
 
+// Removes a stop. An option of a group: the group goes on without it (to choose, if it
+// was the one chosen); left with one option, that one is a plain stop again.
 export function removeStop(trip, ref){
   const out = clone(trip);
   const list = listIn(out, ref.date, ref.plan);
   const i = list.findIndex(s => s.id === ref.id);
   if(i < 0) throw new Error(`no stop ${ref.id}`);
-  list.splice(i, 1);
+  const [gone] = list.splice(i, 1);
+  if(groupOf(gone)) list.splice(0, list.length, ...tidyGroups(list));
   return out;
+}
+
+/* ---------- alternatives (js/choices.js) ---------- */
+
+// Chooses the option `ref.id` of its group, for the trip: the others of the group not.
+export function chooseOption(trip, ref){
+  const out = clone(trip);
+  const list = listIn(out, ref.date, ref.plan);
+  list.splice(0, list.length, ...choose(list, ref.id));
+  return out;
+}
+
+// Adds `stop` (without an id) as an alternative to the stop `ref.id`: in its group, or in a
+// new one named `name`, of which that stop is the first option, chosen. Returns {trip, ref}.
+export function addAlternative(trip, ref, stop, name, id = newStopId()){
+  const out = clone(trip);
+  const list = listIn(out, ref.date, ref.plan);
+  const s = list.find(x => x.id === ref.id);
+  if(!s) throw new Error(`no stop ${ref.id}`);
+  const group = groupOf(s) || String(name || "").trim();
+  if(!group) throw new Error("the group needs a name");
+  // The first alternative: the stop becomes the first option, chosen (the day went there).
+  if(list.filter(x => groupOf(x) === group).length < 2){ s.choice = group; s.chosen = true; }
+  const {chosen, ...rest} = stop;
+  const x = {id, ...clean({...rest, choice: group})};
+  list.splice(insertIndex(list, x.time), 0, orderLike({}, x));
+  return {trip: out, ref: {date: ref.date, plan: ref.plan || null, id}};
+}
+
+// Moves every option of the group `name` to another day or plan (`to`), in their order
+// and each in time order there: the group goes on there as it was.
+export function moveGroup(trip, {date, plan}, name, to){
+  const out = clone(trip);
+  const from = listIn(out, date, plan), dest = listIn(out, to.date, to.plan);
+  const options = from.filter(s => groupOf(s) === name);
+  if(!options.length) throw new Error(`no group ${name}`);
+  from.splice(0, from.length, ...from.filter(s => groupOf(s) !== name));
+  for(const s of options) dest.splice(insertIndex(dest, s.time), 0, s);
+  return out;
+}
+
+// The plan `id` chosen for the day, for everyone: the others not.
+export function choosePlan(trip, date, id){
+  const out = clone(trip);
+  const d = dayAt(out, date);
+  if(!d.plans || !d.plans.some(p => p.id === id)) throw new Error(`${date} has no plan "${id}"`);
+  d.plans = d.plans.map(p => p.id === id ? {...p, chosen: true} : (({chosen, ...rest}) => rest)(p));
+  return out;
+}
+
+// A stop out of its group: without `choice` and `chosen`; the group it leaves tidied.
+export function leaveGroup(stop){
+  const {choice, chosen, ...rest} = stop;
+  return rest;
 }
 
 /* ---------- days ---------- */

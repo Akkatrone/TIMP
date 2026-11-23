@@ -11,6 +11,18 @@ import { ask } from "./ask.js";
 const day = date => dateParts(date, getLang()).long;
 const fields = fs => fs.map(f => t("field_" + f)).join(", ");
 
+// Alternatives (js/choices.js) in their own words: "Dinner: Rifugio chosen", "Lunch: +
+// Mercado", "Dinner: 3 alternatives" when a group came all at once.
+function choices(d){
+  const out = [], added = new Map();
+  for(const x of d.added) if(x.stop.choice){ const k = x.stop.choice; if(!added.has(k)) added.set(k, []); added.get(k).push(x.stop); }
+  for(const [g, xs] of added) out.push(xs.length > 1 ? t("histAlts", {g, n: xs.length}) : t("histAltAdded", {g, s: xs[0].title}));
+  // A choice: the option now chosen (the one that lost it says nothing more).
+  for(const x of d.changed) if(x.fields.length === 1 && x.fields[0] === "choice" && x.stop.chosen === true && x.stop.choice && !added.has(x.stop.choice))
+    out.push(t("histChosen", {g: x.stop.choice, s: x.stop.title}));
+  return out;
+}
+
 /** Short lines saying what changed, at most `max` of them. */
 export function describe(d, max = 6){
   // The days and the trip first: few lines, easily lost after many stops.
@@ -19,9 +31,10 @@ export function describe(d, max = 6){
     ...(d.days || []).map(x => `~ ${day(x.date)} · ${x.fields.map(f => t("dayField_" + f)).join(", ")}`),
     ...(d.trip && d.trip.length ? [`~ ${t("tripFields")} · ${d.trip.map(f => t("tripField_" + f)).join(", ")}`] : []),
     ...(d.other && !(d.days || []).length && !(d.trip || []).length ? [t("changedOther")] : []),
-    ...d.added.map(x => "+ " + x.stop.title),
+    ...choices(d),
+    ...d.added.filter(x => !x.stop.choice).map(x => "+ " + x.stop.title),
     ...d.removed.map(x => "− " + x.stop.title),
-    ...d.changed.map(x => `~ ${x.stop.title} · ${fields(x.fields)}`),
+    ...d.changed.filter(x => !(x.fields.length === 1 && x.fields[0] === "choice")).map(x => `~ ${x.stop.title} · ${fields(x.fields)}`),
     ...d.moved.map(x => `→ ${x.stop.title} · ${day(x.date)}`)
   ];
   if(!lines.length) return [t("changedNothing")];
@@ -54,8 +67,9 @@ async function authors(who){
  * @param {{trip: object, versions: object, onRestore: (id: string) => Promise<void>,
  *   who?: () => Promise<{me: string, versions: Map<string, {by: string, via: string|null}>}>}} o
  *   who: the trip's versions as the service has them, when it is on the account
+ *   forAll?: () => Promise<string>: on a shared trip, who will see a version restored
  */
-export async function openHistory({trip, versions, onRestore, who}){
+export async function openHistory({trip, versions, onRestore, who, forAll = null}){
   const asked = authors(who);
   if(!dialog){
     dialog = document.createElement("dialog");
@@ -80,7 +94,8 @@ export async function openHistory({trip, versions, onRestore, who}){
     if(body && !e.target.closest("[data-restore]")){ body.parentElement.open = false; return; }
     const b = e.target.closest("[data-restore]");
     if(!b) return;
-    const answer = await ask({title: t("restoreTitle", {v: shortId(b.dataset.restore)}), text: t("restoreText"),
+    const shared = forAll ? await forAll().catch(() => "") : "";
+    const answer = await ask({title: t("restoreTitle", {v: shortId(b.dataset.restore)}), text: [t("restoreText"), shared],
       actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("restore"), kind: "primary"}]});
     if(answer !== "yes") return;
     dialog.close();

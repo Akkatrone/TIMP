@@ -45,8 +45,38 @@ it is from the other stops, and **Verify**, which opens Google Maps on the point
 result more than 30 km away comes unticked ("probably another place"): a common name
 can be in another town. **Save** keeps the ticked ones as one new version. If some are
 left, the line moves below the stops, to come back to later; one not found opens in the
-stop form, to search by hand. Alternative plans for a day, like one for when it rains, are a job
+stop form, to search by hand. A stop without a position on purpose (a train ride):
+untick it, and **Leave as it is** moves the line below the stops all the same; **Not
+now** leaves it where it is. Alternative plans for a day, like one for when it rains, are a job
 for an AI assistant: "add a plan for day 3 if it rains" is all it takes.
+
+### Alternatives
+
+Options for one moment of the day, a meal at one of three places or one museum or
+another, are a group: its name above it ("Lunch · 3 alternatives"), the option chosen
+as a stop like the others, and the others in one line under it ("others: Casa · Mercado",
+or how many when the names do not fit). The day goes through the chosen one: its
+number, the route, the map, what the day costs. A tap on the group opens it: every
+option in full, **Choose this** on the others, and **+ Alternative**. A group with none
+chosen says "to choose", and the day's costs say "1 choice to make", with what it may
+cost.
+
+**Add an alternative**, in any stop's **⋯**, opens the stop form with its day, time and
+kind, and the group's name: from the time and the kind for a new group (Lunch, Dinner,
+Alternatives), which you can change. A tick on an option not chosen asks whether you
+went there: yes makes it the choice. Moving an option to another day asks whether it goes
+alone (out of its group) or with the whole group. Deleting the chosen one leaves the
+group to choose; one option left is a plain stop again. Options not chosen are never
+deleted for you: they stay for whoever uses the trip as a base.
+
+On a day with plans, the day goes with one of them for everyone (the first, until
+another is chosen). Looking at another, a line says which one the day goes with, and
+**Choose … for everyone**.
+
+**On a shared trip** a choice changes the trip for everyone: Choose this, a plan chosen
+for everyone and History → Restore ask first, saying who will see it. What you change
+with a form and Save is not asked: a message says it was saved for everyone, with
+**Undo**. Shared with you to read only, the trip shows the choices but cannot change them.
 
 ### Places to eat
 

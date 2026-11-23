@@ -60,7 +60,8 @@ function realTimezone(s){
 /*
  * Every field of the format. A field is
  *   {type, req, doc, ...}
- * type: "text" | "number" | "list" | "fixed" | "any" | "<name of another entry>"
+ * type: "text" | "number" | "list" | "fixed" | "yes" | "any" | "<name of another entry>"
+ *   yes: true, or left out.
  *   list: `of` is the type of the items, `min` the fewest items; `item`, a text field
  *     every item must match (its `pattern`, `test` and `hint`).
  *   text: `pattern` + `hint`, or `test` + `hint`, or `values` (one of them).
@@ -99,6 +100,7 @@ export const FIELDS = {
   plan: {
     name: {type: "text", req: true, doc: "The name of the plan, shown on its button."},
     stops: {type: "list", of: "stop", min: 1, req: true, doc: "The stops of this plan, in order."},
+    chosen: {type: "yes", hint: "true", doc: "On the plan the day goes with. None: the first."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
   },
   stop: {
@@ -117,6 +119,8 @@ export const FIELDS = {
     lat: {type: "number", min: -90, max: 90, doc: "Latitude, with `lng`: the pin on the map."},
     lng: {type: "number", min: -180, max: 180, doc: "Longitude, with `lat`."},
     link: {type: "text", pattern: HTTPS, hint: "an https:// address", doc: "A Google Maps link to the exact place."},
+    choice: {type: "text", doc: "Options for one moment: stops of a day with the same choice (\"Lunch\"), 2 to 4."},
+    chosen: {type: "yes", hint: "true", doc: "On the option the day goes to. None: to choose."},
     id: {type: "text", pattern: ID, hint: "lowercase letters, digits and dashes", byApp: true, doc: "Written by the app."}
   },
   expense: {
@@ -166,6 +170,7 @@ export function validateTrip(trip){
   function value(v, f, path){
     switch(f.type){
       case "fixed": if(v !== f.value) err(path, `must be "${f.value}"`); return;
+      case "yes": if(v !== true) err(path, "must be true, or left out"); return;
       case "any": return;
       case "number":
         if(!isNum(v) || v < f.min || v > f.max) err(path, `must be a number between ${f.min} and ${f.max}`);
@@ -231,6 +236,13 @@ const RULES = {
     unique(d.plans, `${path}.plans`, err);
     const all = lists.flatMap(l => Array.isArray(l) ? l : []);
     if(all.length && all.every(s => !isObj(s) || s.lat === undefined)) warn(path, "no stop has lat/lng: this day has no map");
+    // Alternatives: one chosen in a group (two: the first by time is shown).
+    lists.forEach((l, j) => {
+      const chosen = new Map();
+      for(const s of Array.isArray(l) ? l : []) if(isObj(s) && s.chosen === true && isStr(s.choice)) chosen.set(s.choice.trim(), (chosen.get(s.choice.trim()) || 0) + 1);
+      for(const [g, n] of chosen) if(n > 1) warn(`${path}${d.plans ? `.plans[${j}]` : ""}.stops`, `${n} options of "${g}" are chosen: one is enough (the first by time is shown)`);
+    });
+    if(Array.isArray(d.plans) && d.plans.filter(p => isObj(p) && p.chosen === true).length > 1) warn(`${path}.plans`, "more than one plan is chosen: the first is shown");
   },
   private(p, path, err){
     unique(p.expenses, `${path}.expenses`, err);
@@ -263,6 +275,7 @@ export function tripSchema(){
     const doc = {description: f.doc};
     switch(f.type){
       case "fixed": return {...doc, const: f.value};
+      case "yes": return {...doc, const: true};
       case "any": return doc;
       case "number": return {...doc, type: "number", minimum: f.min, maximum: f.max};
       case "text": return {...doc, type: "string", minLength: 1, ...(f.values && !f.soft ? {enum: f.values} : {}), ...(f.values && f.soft ? {examples: f.values} : {}), ...(f.pattern ? {pattern: f.pattern.source} : {})};
@@ -322,7 +335,7 @@ export function formatBrief(){
     "",
     ...Object.keys(FIELDS).filter(k => kinds.has(k)).map(block),
     "",
-    "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. A cost is what the traveller pays: their share if split. Give lat/lng only for places you are sure about; otherwise an address.",
+    "Rules: days in date order, one per date. A day has stops or plans (two or more), never both. Plans only when the whole day changes; for one meal, a choice. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. A cost is what the traveller pays: their share if split. Give lat/lng only for places you are sure about; otherwise an address.",
     "",
     "Example:",
     JSON.stringify(EXAMPLE)

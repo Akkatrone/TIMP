@@ -87,7 +87,7 @@ an `address` and its position (`lat`, `lng`):
 |---|---|---|
 | `date` | yes | `"YYYY-MM-DD"`. |
 | `stops` | one of the two | The stops, in order. |
-| `plans` | one of the two | Two or more alternative plans for the day, each with a `name` (on its button) and its `stops`. The traveller picks one. |
+| `plans` | one of the two | Two or more alternative plans for the day, each with a `name` (on its button) and its `stops`. The day goes with the plan that has `"chosen": true`, for everyone, or the first; on a phone, the traveller can look at another. |
 | `city` | no | Where the day is spent: a city or an area. Days in the same city share a colour; a day in another city than the day before shows "Rome → Naples". |
 | `title` | no | What the day is about, in a few words. |
 | `stay` | no | Where the night is spent: an object with `name` (required), `address` and `note`, listed with its nights on the Info page; or plain text for a night that is not a place to sleep (`"Night train"`), shown on its day only. |
@@ -111,7 +111,27 @@ an `address` and its position (`lat`, `lng`):
 | `address` | no | Where it is, as you would search it in Google Maps: a street address, or name and town (`"Pantheon, Rome"`). Used by the Map and Directions links. |
 | `lat`, `lng` | no | The position, both or neither. Gives the stop its pin on the map. |
 | `link` | no | A Google Maps link (`https://…`) to the exact place. The Map link opens it. |
+| `choice` | no | Options for one moment of the day, like three places for lunch: the stops of a day (or of a plan) with the same `choice` (`"Lunch"`) are one group, shown under that name. Two to four. All stay in the trip; the day goes to the chosen one. See [Alternatives](#alternatives). |
+| `chosen` | no | `true` on the option of its group the day goes to. None: the group is still to choose. |
 | `id` | written by the app | Lets ticks, edits and merges follow the stop. Twelve characters, `0-9` and `a-z`, unique in the trip; a new stop has none (the app gives it one). An id made from a title by an older app (`"lunch"`) becomes one of these by a fixed rule, the same on every device. A stop copied with its id gets its own. |
+
+### Alternatives
+
+A group of options for one moment: a meal at one of three places, one museum or
+another. Each option is a stop like the others, in the same list, with the same
+`choice`; the one chosen has `"chosen": true`:
+
+```json
+{"time": "13:00", "title": "Taberna Exemplo", "type": "food", "choice": "Lunch", "chosen": true},
+{"time": "13:00", "title": "Casa Exemplo", "type": "food", "choice": "Lunch"},
+{"time": "13:15", "title": "Mercado Exemplo", "type": "food", "choice": "Lunch"}
+```
+
+The day goes through the chosen option only: its number, the route, the map, the day's
+costs. The others are shown in one line under it, and in full when the group is opened.
+A group with none chosen is "to choose", and the day's costs leave it out. A `choice` on
+one stop alone is a plain stop. Use plans (below) only when the whole day changes;
+for one meal, a choice.
 
 A stop without a position is still shown, without a pin. A journey can be a stop of its
 own ("Train to Naples", `"travel": "train"`, no position): it marks the leg from the

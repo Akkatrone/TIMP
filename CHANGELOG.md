@@ -4,6 +4,31 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.32.0
+
+- **Alternatives for one moment of the day**: a meal at one of three places, one museum
+  or another. They are stops like the others in the same day, with the same `choice`
+  ("Lunch"), the one the day goes to `"chosen": true` (two optional fields: the format
+  stays `travel-in-my-pocket/2`; an older app shows them as stops one after the other).
+  The day shows the group's name, the chosen option as a stop, the others in one line;
+  a tap opens them all, with **Choose this** and **+ Alternative**. The number, the
+  route, the map and the day's costs follow the chosen one; a group with none chosen
+  says "1 choice to make", with what it may cost. **Add an alternative** in any stop's
+  ⋯; a tick on an option not chosen asks whether you went there; moving one asks
+  whether it goes alone or with its group. Not chosen ones stay in the trip.
+- **The plan a day goes with is in the trip**, for everyone (`"chosen": true` on a plan;
+  without it, the first). Looking at another, **Choose … for everyone**.
+- **On a shared trip, a change everyone will see** made with one tap (choosing an
+  option or a plan, restoring a version) asks first, saying who will see it. Made with a
+  form and Save, it is not asked: a message says it was saved for everyone, with Undo.
+- **Assistants** see the groups in the outline (`Lunch: chosen`, `Lunch: option`), add an
+  option with the same `choice`, and choose one with `"chosen": true` (the others lose
+  it). The guide says: plans only when the whole day changes; for one meal, a choice.
+- **History** says it in words: "Dinner: Rifugio chosen", "Lunch: + Mercado".
+- **Positions: Leave as it is.** After a search, with nothing ticked (a train has no
+  position on purpose), the line about stops without a position moves below the stops,
+  as after saving some.
+
 ## 3.31.0
 
 - **Positions for the stops that lack one, all at once.** Stops an AI assistant wrote

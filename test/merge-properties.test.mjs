@@ -12,7 +12,8 @@
 //               in the result as that side left it;
 //   removal     what one side removed, and the other did not touch, is gone;
 //   converges   joining the result with either side again changes nothing more;
-//   own ids     every stop of the result has an id of its own kind, once in the trip;
+//   own ids     every stop of the result has an id of its own kind, once in the trip
+//               (alternatives, js/choices.js, are stops: added, chosen, and plans chosen);
 //               a side from a phone of before (ids made from titles) or with a stop an
 //               assistant copied with its id joins as it would once converted (js/ids.js);
 //   restores    phones that edit, bring back old versions (History → Restore) and sync
@@ -22,7 +23,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ensureVersion, commit, commitMerge, canonical, contentOf, relation, commonBase } from "../js/version.js";
 import { mergeTrips } from "../js/merge.js";
-import { ensureIds, newId, addStop, updateStop, removeStop, addDay, updateDay, removeDay, dayAfter, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense } from "../js/edit.js";
+import { ensureIds, newId, addStop, updateStop, removeStop, addDay, updateDay, removeDay, dayAfter, addPlan, renamePlan, removePlan, addExpense, updateExpense, removeExpense, addAlternative, chooseOption, choosePlan } from "../js/edit.js";
+import { groupsIn } from "../js/choices.js";
 import { validateTrip } from "../js/trip.js";
 import { oldStopId, uniqueStopIds, isStopId } from "../js/ids.js";
 
@@ -114,24 +116,32 @@ function anyEdit(trip, r, history){
       return {...trip, info};
     }
     if(k < .82){
+      if(d.plans && r() < .25) return choosePlan(trip, d.date, pick(d.plans).id);
       if(d.plans && r() < .4) return removePlan(trip, d.date, pick(d.plans).id).trip;
       if(d.plans && r() < .3) return renamePlan(trip, d.date, pick(d.plans).id, "Plan " + n);
       return addPlan(trip, d.date, {name: "Plan " + n, stops: [{id: idFor(n), time: "11:00", title: "Plan stop " + n}]}, "First " + n).trip;
     }
-    if(k < .88){
+    if(k < .86){
       const xs = trip.expenses || [];
       if(xs.length && r() < .4) return removeExpense(trip, pick(xs).id);
       if(xs.length && r() < .5){ const e = pick(xs); return updateExpense(trip, e.id, {...e, cost: Math.floor(r() * 500)}); }
       return addExpense(trip, {title: "Expense " + n, cost: Math.floor(r() * 500)}).trip;
     }
-    if(k < .93){
+    if(k < .91){
+      // Alternatives (js/choices.js): one more option for a stop, or another one chosen.
+      const l = pick(lists), groups = [...groupsIn(listOf(trip, l)).values()];
+      if(groups.length && r() < .5) return chooseOption(trip, {...l, id: pick(pick(groups)).id});
+      const y = listOf(trip, l).length ? pick(listOf(trip, l)) : null;
+      if(y) return addAlternative(trip, {...l, id: y.id}, {time: time(), title: "Option " + n, type: "food"}, "Group " + n, idFor(n)).trip;
+    }
+    if(k < .95){
       // An assistant's file: a stop copied with its id, here or elsewhere, as it is or
       // changed. Loading it (js/edit.js, ensureIds) gives the copy an id of its own.
       const copy = JSON.parse(JSON.stringify(trip)), l = pick(lists), list = listOf(copy, l);
       list.splice(Math.floor(r() * (list.length + 1)), 0, r() < .5 ? {...x.stop} : {...x.stop, time: time()});
       return ensureIds(copy, trip).trip;
     }
-    if(k < .96){
+    if(k < .975){
       // A phone with the app of before: a new stop's id made from its title.
       const l = pick(lists);
       return addStop(trip, {date: l.date, plan: l.plan}, {time: time(), title: "Old " + n}, newId("Old " + n, new Set(listOf(trip, l).map(s => s.id)))).trip;

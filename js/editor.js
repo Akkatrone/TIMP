@@ -58,6 +58,12 @@ const looksLikeAddress = s => /,|\d/.test(String(s || ""));
  *                               newDay ({date, city}) when that day is still to be made;
  *                               priv: the private cost {cost, currency}, or null
  *   onDelete()                  remove the stop being changed
+ *   alternative                 {group, fixed, of, others}: a new option for the stop `of`
+ *                               (its title), in the group `group` (`fixed`: the group exists,
+ *                               with the options `others`; else a new name, to change);
+ *                               `template` gives the day, time and kind to start from
+ *   template                    {time, type}: the new stop's fields to start from
+ *   onSave(…, group)            with an alternative, the group's name as written
  */
 export function openStopEditor(o){
   const dlg = ensureDialog();
@@ -70,11 +76,12 @@ export function openStopEditor(o){
     link: o.stop ? o.stop.link : undefined,
     address: (o.stop && o.stop.address) || "",
     travel: (o.stop && o.stop.travel) || "",
-    type: (o.stop && o.stop.type) || "",
+    type: (o.stop && o.stop.type) || (o.template && o.template.type) || "",
     booking: (o.stop && o.stop.booking) || "",
     searching: false
   };
-  const s0 = o.stop || {};
+  const s0 = o.stop || o.template || {};
+  const alt = !editing && o.alternative ? o.alternative : null;
   const closed0 = Array.isArray(s0.closed) ? s0.closed : [];
   const tripCurrency = o.trip.currency || "";
   // Two costs at most: what the trip pays there, and what only the traveller pays.
@@ -126,9 +133,10 @@ export function openStopEditor(o){
   dlg.innerHTML = `
   <form method="dialog" class="sheet-form" novalidate>
     <div class="sheet-head">
-      <h2 id="sheet-title">${esc(t(editing ? "editStopTitle" : "newStopTitle"))}</h2>
+      <h2 id="sheet-title">${esc(alt ? (alt.fixed ? t("altFormTitle", {g: alt.group}) : t("altFormTitleNew", {s: alt.of})) : t(editing ? "editStopTitle" : "newStopTitle"))}</h2>
       <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
     </div>
+    ${alt ? `<p class="foot">${esc(t("altFormHelp", {s: alt.of}))}</p>` : ""}
 
     <div class="field">
       <label for="stop-src">${esc(t("fAddress"))}</label>
@@ -143,6 +151,12 @@ export function openStopEditor(o){
       <label for="stop-title">${esc(t("fTitle"))}</label>
       <input id="stop-title" type="text" required value="${esc(s0.title || "")}">
     </div>
+
+    ${alt ? `<div class="field">
+      <label for="stop-group">${esc(t("fGroup"))}</label>
+      <input id="stop-group" type="text" required value="${esc(alt.group)}"${alt.fixed ? " readonly" : ""}>
+      <p class="foot">${esc(t("fGroupHelp", {s: [alt.of, ...(alt.others || [])].join(", ")}))}</p>
+    </div>` : ""}
 
     <div class="field">
       <label for="stop-local">${esc(t("fLocal"))}</label>
@@ -452,7 +466,8 @@ export function openStopEditor(o){
     dlg.close();
     const newDay = day.isNew ? (day.city ? {date: day.date, city: day.city} : {date: day.date}) : null;
     o.onSave({stop, date: day.date, plan: day.plans ? $("#stop-plan").value : null, newDay,
-      priv: priv ? {cost: priv.cost, currency: priv.currency !== tripCurrency ? priv.currency : undefined} : null});
+      priv: priv ? {cost: priv.cost, currency: priv.currency !== tripCurrency ? priv.currency : undefined} : null,
+      ...(alt ? {group: $("#stop-group").value.trim() || alt.group} : {})});
   });
 
   fillPlans();
