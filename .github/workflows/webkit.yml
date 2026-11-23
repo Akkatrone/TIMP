@@ -1,8 +1,9 @@
 name: WebKit
 
-# The app in Safari, on macOS (tools/webkit.mjs): the layout checks Chrome does not catch,
-# such as a page wider than an iPhone's screen. Not yet required for a deploy: it will be
-# once it has proved steady.
+# The app in WebKit, Safari's engine (tools/webkit.mjs): the layout checks Chrome does not
+# catch, such as a page wider than an iPhone's screen. On Ubuntu, with WebKitGTK and its
+# WebDriver: GitHub gives this repository no macOS runner. Not yet required for a deploy:
+# it will be once it has proved steady.
 on:
   push:
     branches: [main]
@@ -13,15 +14,18 @@ permissions:
   contents: read
 
 jobs:
-  safari:
-    runs-on: macos-14
-    timeout-minutes: 20
+  webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      - name: Let safaridriver drive Safari
-        run: sudo safaridriver --enable
-      - name: The app in Safari
-        run: node tools/webkit.mjs
+      - name: WebKitGTK, its WebDriver, a screen
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q webkit2gtk-driver libwebkit2gtk-4.1-0 xvfb
+          find /usr/lib /usr/libexec -name MiniBrowser 2>/dev/null || true
+      - name: The app in WebKit
+        run: xvfb-run -a node tools/webkit.mjs

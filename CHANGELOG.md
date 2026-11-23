@@ -6,8 +6,8 @@ its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocke
 
 ## 4.1.6
 
-- **The app is now checked in Safari** too, on every change (`tools/webkit.mjs`, on a
-  macOS runner, no new dependencies): no page wider than the screen, even with very long
+- **The app is now checked in WebKit**, Safari's engine, on every change
+  (`tools/webkit.mjs`: WebKitGTK on Linux in the CI, Safari on a Mac; no new dependencies): no page wider than the screen, even with very long
   texts; the bar of one size on every page; the map still under the bar; a search field
   Safari does not zoom into, with its results fixed under the bar.
 - Tests: Chrome gets a minute to start on a busy runner, and a second try.

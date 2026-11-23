@@ -1,22 +1,40 @@
 #!/usr/bin/env node
-// The app in Safari (WebKit), driven through safaridriver: the layout checks that Chrome
-// does not catch (design/README.md, A11). No dependencies: WebDriver is plain HTTP.
+// The app in WebKit, Safari's engine: the layout checks that Chrome does not catch
+// (design/README.md, A11). No dependencies: WebDriver is plain HTTP.
 //
-//   sudo safaridriver --enable    # once, on a Mac (the CI's macOS runner does it)
-//   node tools/webkit.mjs
+// On a Mac, Safari through safaridriver (`sudo safaridriver --enable` once). On Linux,
+// WebKitGTK's MiniBrowser through WebKitWebDriver (Debian, Ubuntu: webkit2gtk-driver;
+// Arch: webkitgtk-6.0); without a screen, under xvfb-run. The CI runs it on Ubuntu.
+//
+//   node tools/webkit.mjs        # WEBKIT_DRIVER, WEBKIT_BROWSER to point at others
 //
 // Only the example trip is loaded, with a note and a description made very long on
 // purpose: a text kept on one line must never make a page wider than the screen.
 
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./lib/app-files.mjs";
 import { serve } from "./lib/browser.mjs";
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const PORT = 4444 + Math.floor(Math.random() * 1000);
-const driver = spawn("safaridriver", ["-p", String(PORT)], {stdio: "inherit"});
+const MAC = process.platform === "darwin";
+const DRIVER = process.env.WEBKIT_DRIVER || (MAC ? "safaridriver" : "WebKitWebDriver");
+const driver = spawn(DRIVER, MAC ? ["-p", String(PORT)] : [`--port=${PORT}`], {stdio: "inherit"});
+driver.on("error", e => { console.error(`${DRIVER}: ${e.message}`); process.exit(1); });
+
+// What to drive: Safari on a Mac; elsewhere WebKitGTK's own small browser.
+function capabilities(){
+  if(MAC) return {browserName: "safari"};
+  const binary = process.env.WEBKIT_BROWSER || [
+    "/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/MiniBrowser", "/usr/lib/aarch64-linux-gnu/webkit2gtk-4.1/MiniBrowser",
+    "/usr/lib/x86_64-linux-gnu/webkitgtk-6.0/MiniBrowser", "/usr/lib/webkitgtk-6.0/MiniBrowser", "/usr/lib/webkit2gtk-4.1/MiniBrowser",
+    "/usr/libexec/webkit2gtk-4.1/MiniBrowser", "/usr/libexec/webkitgtk-6.0/MiniBrowser"
+  ].find(p => existsSync(p));
+  if(!binary) throw new Error("WebKitGTK's MiniBrowser not found: set WEBKIT_BROWSER");
+  return {browserName: "MiniBrowser", "webkitgtk:browserOptions": {binary, args: ["--automation"]}};
+}
 const base = `http://127.0.0.1:${PORT}`;
 
 async function wd(method, path, body){
@@ -37,11 +55,11 @@ const ok = (cond, msg) => { if(!cond) throw new Error(msg); };
 try{
   for(let i = 0; ; i++){
     try{ await fetch(base + "/status"); break; }
-    catch(e){ if(i > 75) throw new Error("safaridriver did not start: run `sudo safaridriver --enable` once"); await sleep(200); }
+    catch(e){ if(i > 75) throw new Error(`${DRIVER} did not start` + (MAC ? ": run `sudo safaridriver --enable` once" : "")); await sleep(200); }
   }
   server = await serve({});
   const app = `http://127.0.0.1:${server.address().port}/`;
-  sid = (await wd("POST", "/session", {capabilities: {alwaysMatch: {browserName: "safari"}}})).sessionId;
+  sid = (await wd("POST", "/session", {capabilities: {alwaysMatch: capabilities()}})).sessionId;
   // As narrow as Safari lets a window be: the layout must hold at any width.
   await wd("POST", `/session/${sid}/window/rect`, {width: 390, height: 844}).catch(() => {});
   await wd("POST", `/session/${sid}/url`, {url: app});

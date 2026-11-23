@@ -49,7 +49,7 @@ python3 -m http.server 4173      # run it: http://localhost:4173/ (any static se
 npm run check                    # example trip, offline file list, contract, no private data
 npm test                         # unit and property tests (node:test, no dependencies)
 npm run e2e                      # the app in headless Chrome, with the example trip
-npm run webkit                   # the layout in Safari (macOS only; the CI runs it)
+npm run webkit                   # the layout in WebKit: Safari on a Mac, WebKitGTK on Linux (the CI runs it)
 node tools/check-precache.mjs --fix   # after adding or removing a file of the app
 npm run screenshots              # retake the README pictures
 ```
