@@ -34,7 +34,7 @@ import { asBase } from "./publish.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
 import { searchTrip } from "./search.js";
-import { openSearch } from "./search-sheet.js";
+import { openSearch, closeSearch, searching } from "./search-sheet.js";
 
 // Where the number of a stop with a position is: a sign, crossed, for one without.
 const NO_POS = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
@@ -66,6 +66,7 @@ const SEARCH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle 
 const LOCATE = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 9.5L17 3l-6.5 14-1.6-5.9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 const FRAME = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const SHRINK = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 3v4H3M13 3v4h4M17 13h-4v4M3 13h4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CLOSE = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 let uid = 0;   // ids for aria-controls, unique on the page
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -874,9 +875,12 @@ function renderStrip(r){
   // Search, on every page of a trip (S1).
   const sb = document.getElementById("search-btn");
   sb.hidden = false;
-  sb.innerHTML = SEARCH;
-  sb.setAttribute("aria-label", t("search"));
-  sb.title = t("search");
+  if(!searching()){
+    sb.innerHTML = SEARCH;
+    sb.setAttribute("aria-label", t("search"));
+    sb.title = t("search");
+    sb.setAttribute("aria-expanded", "false");
+  }
   // List | Map, on a day (M2), at the end of the row of days. Elsewhere it keeps its place,
   // unseen: the bar never changes its size from one page to another.
   const vt = document.getElementById("view-toggle"), onDay = r.name === "day";
@@ -2313,7 +2317,9 @@ const $fab = $fabs.querySelector(".fab"), $fabPaste = $fabs.querySelector(".fab-
 $fab.addEventListener("click", () => newStop());
 // List | Map in the top bar (M2): Map is pressed while the map shows.
 $strip.addEventListener("click", e => {
-  if(e.target.closest("#search-btn")){ openSearchHere(); return; }
+  if(e.target.closest("#search-btn")){ if(searching()) closeSearch(); else openSearchHere(); return; }
+  // The circle of you closes the search too, on its way to You.
+  if(e.target.closest("#me-btn")) closeSearch(false);
   const b = e.target.closest("#view-toggle button");
   if(!b) return;
   const map = b.hasAttribute("data-map") ? !S.ui.mapOpen : false;
@@ -2344,7 +2350,7 @@ $next.addEventListener("click", e => { if(e.target.closest("[data-to-next]")) go
 function openSearchHere(){
   const tr = trip(), lang = getLang();
   let shown = [];
-  openSearch({
+  openSearch({strip: $strip, button: document.getElementById("search-btn"), icons: {lens: SEARCH, close: CLOSE},
     find: q => {
       shown = searchTrip(tr, q);
       return shown.map(r => {
@@ -2853,6 +2859,7 @@ window.addEventListener("hashchange", () => {
   if(invite){ takeInvite(invite); return; }
   const pageLink = publicLink(location.hash);
   if(pageLink){ (pageLink.kind === "base" ? useAsBase : openPublic)(pageLink.page); return; }
+  closeSearch(false);
   S.importError = null; S.menuFor = null; render();
   if(!reveal() && !goToNow()) scrollToY(0);
 });

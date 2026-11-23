@@ -742,8 +742,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .tsearch{flex:none;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--r-full);background:none;color:var(--ink);cursor:pointer}
 .tsearch[hidden]{display:none}
 .tsearch svg{width:20px;height:20px}
-.search .search-q{width:100%;min-height:var(--touch);padding:0 var(--sp-4);border:1px solid var(--line-strong);border-radius:var(--r-m);background:var(--bg);color:var(--ink);font:500 var(--fs-field) var(--f-body)}
-.search .search-n:empty{display:none}
+
 .results{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-1)}
 .res{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);column-gap:var(--sp-4);align-items:start;width:100%;min-height:var(--touch);padding:var(--sp-3) var(--sp-2);border:0;border-radius:var(--r-m);background:none;color:var(--ink);text-align:left;cursor:pointer}
 .res:hover,.res:focus-visible{background:var(--sel)}
@@ -781,3 +780,16 @@ mark{background:var(--warn-bg);background:color-mix(in srgb,var(--accent) 22%,tr
 .drow #days{flex:1 1 auto;min-width:0}
 .vt.off{visibility:hidden}
 .mapstage.big{height:min(72dvh,720px)}
+
+/* Search in the bar (S1–S6): the field in the title's place, ✕ for the lens, the circle
+   of you; the results in a panel fixed under the bar, scrolling on its own. */
+.search-q{flex:1;min-width:0;min-height:var(--touch);padding:0 var(--sp-4);border:1px solid var(--line-strong);border-radius:var(--r-m);background:var(--surface);color:var(--ink);font:500 var(--fs-field) var(--f-body)}
+.strip.searching .triptitle,.strip.searching .drow{display:none}
+.search-panel{position:fixed;left:0;right:0;bottom:0;z-index:6;overflow-y:auto;overscroll-behavior:contain;background:var(--bg);padding:var(--sp-3) max(var(--sp-5),env(safe-area-inset-right,0px)) calc(var(--sp-6) + env(safe-area-inset-bottom,0px)) max(var(--sp-5),env(safe-area-inset-left,0px))}
+.search-panel > *{max-width:608px;margin-inline:auto}
+.search-panel .search-n{margin-block:0 var(--sp-2);font:500 var(--fs-s)/1.4 var(--f-body);color:var(--muted)}
+.search-panel .search-n:empty{display:none}
+html.searching body{overflow:hidden}
+html.searching :is(.fabs,.nextbar){display:none}
+/* One ✕ only: the lens's. The browser's own "clear" in the field goes. */
+.search-q::-webkit-search-cancel-button,.search-q::-webkit-search-decoration{-webkit-appearance:none;appearance:none}

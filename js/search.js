@@ -69,8 +69,9 @@ export function searchTrip(trip, query, {limit = 50} = {}){
           where: field && field !== "title" ? snippet(s[field], words) : null});
       });
     }
+    // A note, by its own words only: the day's city would bring every note of the day.
     (Array.isArray(d.notes) ? d.notes : []).forEach((n, index) => {
-      if(!words.every(w => (fold(plain(n)) + " " + daily).includes(w))) return;
+      if(!words.every(w => fold(plain(n)).includes(w))) return;
       out.push({kind: "note", dayIndex, date: d.date, planId: null, index, stopId: null, title: "", time: "", field: "note", score: 1,
         name: null, where: snippet(n, words)});
     });

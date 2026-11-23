@@ -114,27 +114,45 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.deepEqual(problems, []);
   });
 
-  await step("search: the whole trip as one types, without accents; a tap goes to the stop, open, in view, focused (S1–S5)", async () => {
+  await step("search in the bar: the field for the title, ✕ for the lens, results fixed under the bar; ✕ or you close it; a tap goes to the stop (S1–S6)", async () => {
     const type = q => run(`const q = document.getElementById("search-q"); q.value = ${JSON.stringify(q)}; q.dispatchEvent(new Event("input"));`);
+    const box = `JSON.stringify(document.querySelector(".search-panel").getBoundingClientRect())`;
     await click("#search-btn");
-    await until("the sheet, ready to type", `document.querySelector("dialog.search[open]") && document.activeElement.id === "search-q"`);
+    await until("the field, ready to type", `document.activeElement && document.activeElement.id === "search-q" && document.querySelector(".strip.searching")`);
+    assert.equal(await run(`return getComputedStyle(document.querySelector(".triptitle")).display;`), "none", "in the title's place");
+    assert.equal(await run(`return document.getElementById("search-btn").getAttribute("aria-label");`), "Close the search");
+    assert.equal(await run(`return getComputedStyle(document.getElementById("me-btn")).display !== "none";`), true, "you stay");
+    assert.ok(await run(`return Math.abs(document.querySelector(".search-panel").getBoundingClientRect().top - document.querySelector(".strip").getBoundingClientRect().bottom) < 1;`), "right under the bar");
+    const before = await run(`return ${box};`);
     await type("sao jorge");
-    assert.equal(await text("dialog.search .search-n"), "1 found");
-    assert.equal(await text("dialog.search .res b mark"), "São");
+    assert.equal(await text(".search-panel .search-n"), "1 found");
+    assert.equal(await text(".search-panel .res b mark"), "São");
+    await type("a");
+    assert.equal(await run(`return ${box};`), before, "the panel does not move nor change size as one types");
     await type("zzzz");
-    assert.equal(await text("dialog.search .search-n"), "Nothing for “zzzz”");
-    await type("sao jorge");
-    await click("dialog.search .res");
-    await until("the stop", `document.activeElement && document.activeElement.matches("[data-open]") && document.activeElement.textContent.includes("São Jorge")`);
-    assert.equal(await run(`return document.activeElement.getAttribute("aria-expanded");`), "true", "opened");
-    // On another day: the day changes, the stop is shown.
+    assert.equal(await text(".search-panel .search-n"), "Nothing for “zzzz”");
+    // ✕ closes it: the title back, the focus on the lens.
     await click("#search-btn");
-    await until("the sheet", `document.activeElement && document.activeElement.id === "search-q"`);
+    assert.equal(await count(".search-panel, #search-q"), 0);
+    assert.equal(await run(`return getComputedStyle(document.querySelector(".triptitle")).display !== "none" && document.activeElement.id === "search-btn";`), true);
+    // A result: the day, the stop open, in view, focused.
+    await click("#search-btn");
+    await type("sao jorge");
+    await click(".search-panel .res");
+    await until("the stop", `document.activeElement && document.activeElement.matches("[data-open]") && document.activeElement.textContent.includes("São Jorge")`);
+    assert.equal(await count(".search-panel"), 0, "closed on the way");
+    assert.equal(await run(`return document.activeElement.getAttribute("aria-expanded");`), "true", "opened");
+    // On another day, with Enter.
+    await click("#search-btn");
     await type("jeronimos");
-    assert.match(await text("dialog.search .res small"), /^Day 2 · /);
+    assert.match(await text(".search-panel .res small"), /^Day 2 · /);
     await run(`document.getElementById("search-q").dispatchEvent(new KeyboardEvent("keydown", {key: "Enter"}));`);
     await until("day 2, the stop", `location.hash === "#day-2" && document.activeElement && document.activeElement.textContent.includes("Jerónimos")`);
-    assert.ok(await run(`const r = document.activeElement.getBoundingClientRect(); return r.top > 0 && r.bottom < innerHeight;`), "in view");
+    assert.ok(await run(`const r = document.activeElement.getBoundingClientRect(); return r.top > document.querySelector(".strip").getBoundingClientRect().bottom - 1 && r.bottom < innerHeight;`), "in view, under the bar");
+    // The circle of you closes it too, on its way to You.
+    await click("#search-btn");
+    await run(`document.getElementById("me-btn").click(); await new Promise(r => setTimeout(r, 200));`);
+    assert.equal(await count(".search-panel"), 0);
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelectorAll(".stop").length === 6`);
   });

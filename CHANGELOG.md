@@ -4,6 +4,16 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.4
+
+- **Search in the bar**: the lens becomes ✕ and the field takes the title's place; only
+  the circle of you stays. The results fill a panel fixed under the bar that scrolls on
+  its own: on Android it no longer moves or shrinks with the results and the keyboard.
+  ✕, Escape, the circle of you or another page close it. One ✕ only.
+- **A day's notes** are found by their own words: searching a city no longer lists every
+  note of its days.
+- The design system's rules (S5, S6) and page follow.
+
 ## 4.1.3
 
 - **iPhone**: with the app installed on an iPhone with a notch, the map stays right

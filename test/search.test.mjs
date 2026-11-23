@@ -48,6 +48,7 @@ test("labels, addresses, groups, plans and the day's notes are searched", () => 
   const note = searchTrip(trip, "tram crowds");
   assert.deepEqual(note.map(x => [x.kind, x.dayIndex, x.index]), [["note", 0, 0]]);
   assert.deepEqual(note[0].where, {before: "", match: "Tram", after: " 28 early, before the crowds"}, "bold marks are left out");
+  assert.deepEqual(searchTrip(trip, "lisboa").filter(x => x.kind === "note"), [], "a note by its own words, not its day's city");
 });
 
 test("a snippet is cut at a word, and keeps the accents of the text", () => {

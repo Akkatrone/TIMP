@@ -214,13 +214,19 @@
 
   <section id="search">
     <h2>Search</h2>
-    <p>One field, the whole trip, as you type, offline; without accents or case, every word
-    found. A result is the stop's sign, its day and time, its name, the word marked; a tap
-    goes there, open and in view.</p>
-    <div class="ds-row"><div class="ds-phone"><ol class="results">
-      <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">4</span></span><span class="rt"><small>Day 1 · Fri May 14 · 12:30</small><b>Castelo de <mark>São</mark> Jorge</b></span></button></li>
-      <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">2</span></span><span class="rt"><small>Day 1 · Fri May 14 · 11:00</small><b>Lisbon Cathedral</b><small class="rw">…the castle of <mark>São</mark> Jorge is ten minutes up the hill.</small></span></button></li>
-    </ol></div></div>
+    <p>In the bar: the lens becomes ✕, the field takes the title's place, only the circle
+    of you stays. The results fill a panel fixed under the bar, which scrolls on its own
+    and does not move as you type. Without accents or case, every word found; a result is
+    the stop's sign, its day and time, its name, the word marked; a tap goes there, open
+    and in view. ✕, Escape or the circle of you close it.</p>
+    <div class="ds-row"><div class="ds-phone ds-bar">
+      <div class="tbar"><input type="search" class="search-q" value="sao jorge" aria-label="Search the trip" readonly><button type="button" class="tsearch" aria-label="Close the search"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button><a class="me-btn signed" href="#search" aria-label="You"><span>F</span></a></div>
+      <p class="search-n">2 found</p>
+      <ol class="results">
+        <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">4</span></span><span class="rt"><small>Day 1 · Fri May 14 · 12:30</small><b>Castelo de <mark>São</mark> Jorge</b></span></button></li>
+        <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">2</span></span><span class="rt"><small>Day 1 · Fri May 14 · 11:00</small><b>Lisbon Cathedral</b><small class="rw">…the castle of <mark>São</mark> Jorge is ten minutes up the hill.</small></span></button></li>
+      </ol>
+    </div></div>
   </section>
 
   <section id="a11y">

@@ -138,15 +138,19 @@ moment (a message that passes, with Undo when there is one).
 ## Search
 
 - **S1** One field, the whole trip: a stop's name, its local name, description,
-  address, label and group, the plan, the city and title of its day, the day's notes.
-  On the phone, offline (`js/search.js`, no DOM).
+  address, label and group, the plan, the city and title of its day; a day's notes by
+  their own words. On the phone, offline (`js/search.js`, no DOM).
 - **S2** Letters without accents or case; every word typed must be found.
 - **S3** A result is the stop's sign (its number in its kind's colour), its day and time,
   its name; the word found is marked, and where it was found when not in the name.
 - **S4** A tap goes there: the day, the stop open and in view, the focus on it. An option
   not chosen: its group opened.
-- **S5** At once (R6): the sheet opens with the field ready; results follow every
-  letter; how many were found is said (a `status`), nothing found too.
+- **S5** In the bar, at once (R6): the lens becomes ✕, the field takes the title's place,
+  ready to type; only the circle of you stays. The results fill a panel fixed under the
+  bar, which scrolls on its own and never moves or changes size as one types (the
+  keyboard comes and goes on a phone). How many were found is said (a `status`).
+- **S6** ✕, Escape, the circle of you or another page close it; the focus goes back to
+  the lens. One ✕ only: the browser's own "clear" is not shown.
 
 ## The map
 
