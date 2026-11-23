@@ -156,7 +156,7 @@ a line to the rules in `formatBrief()`.
 `node tools/check-precache.mjs --fix` to update the list in `sw.js`. You never need
 to touch the version: the build computes it from the content.
 
-**Styles follow the design system** ([design/README.md](design/README.md)): values from the tokens only, the rules of the components, accessibility as part of each. A colour, a size or a duration is changed in `design/tokens.json`, then `node tools/tokens.mjs --fix`; `test/design.test.mjs` checks the contrast of every pair, in both themes.
+**Styles follow the design system** ([design/README.md](design/README.md)): values from the tokens only, the rules of the components, accessibility as part of each. A colour, a size or a duration is changed in `design/tokens.json`, then `node tools/tokens.mjs --fix`; `test/design.test.mjs` checks the contrast of every pair, in both themes. A change to what a traveller sees updates the rules and the page (`design/index.html`) in the same change.
 
 **Interface texts go in `js/i18n.js`**, in every language. If you do not speak one of
 them, write your best attempt and say so in the pull request. A test checks that all

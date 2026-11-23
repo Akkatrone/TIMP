@@ -78,6 +78,8 @@ The rules, in one line each:
   seed: fix the join, never the seed.
 - **The design system** ([design/README.md](design/README.md)): tokens only (`design/tokens.json`, then
   `node tools/tokens.mjs --fix`), the rules of the components, accessibility in each.
+  A change to what a traveller sees updates its rules (`design/README.md`) and its page
+  (`design/index.html`) in the same commit.
 - **Interface texts** in `js/i18n.js`, in every language (a test compares the keys).
 - **No new dependencies, bundlers or frameworks**; no third-party scripts, fonts or
   requests at startup. **Never edit `VERSION` in `sw.js`**: the build stamps it.
