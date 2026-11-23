@@ -152,7 +152,8 @@ moment (a message that passes, with Undo when there is one).
 
 - **M1** The same sign in the list and on the map: a station, the stop's number in its
   kind's colour; done or skipped, empty and grey; chosen, larger, with a ring.
-- **M2** A view of the day (List | Map in the top bar), not a panel: the map takes the
+- **M2** A view of the day (List | Map at the end of the row of days, in its place on
+  every page of a trip so the bar keeps one size), not a panel: the map takes the
   heading's place, right under the bar, and stays there while the list scrolls under it.
 - **M3** A pin, one action: its stop comes up just under the map, marked. No card on the
   map. A stop's number in the list shows its pin.

@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.1
+
+- **List | Map** moves to the end of the row of days, and keeps its place on every page
+  of a trip: going to Info, Trips or You no longer changes the bar, and the page no
+  longer jumps by two points. The trip's title has more room.
+
 ## 4.1.0
 
 The map, in the design system ([design/README.md](design/README.md), M1–M9).

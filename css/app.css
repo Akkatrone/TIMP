@@ -721,7 +721,6 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .triptitle .sel{flex:none;width:9px;height:13px;color:var(--muted)}
 .triptitle small{font:500 var(--fs-s)/1.3 var(--f-body);color:var(--muted)}
 .vt{flex:none;display:flex;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden;background:var(--surface)}
-.vt[hidden]{display:none}
 .vt button{display:grid;place-items:center;width:var(--touch);height:var(--touch);padding:0;border:0;background:none;color:var(--muted);cursor:pointer}
 .vt button[aria-pressed="true"]{background:var(--sel);color:var(--ink)}
 .vt svg{width:17px;height:17px}
@@ -775,3 +774,9 @@ mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;b
 .live .pin.station.sel{z-index:3;min-width:32px;height:32px;font-size:var(--fs-m);box-shadow:0 0 0 2.5px var(--map-ink),0 4px 10px -2px color-mix(in srgb,var(--map-ink) 45%,transparent)}
 .live .pin.station:focus-visible{outline:2px solid var(--map-ink);outline-offset:2px}
 .me-dot{display:block;width:16px;height:16px;border-radius:var(--r-full);background:var(--map-me);border:3px solid var(--map-card);box-shadow:0 0 0 6px color-mix(in srgb,var(--map-me) 22%,transparent)}
+
+/* The row of days, and at its end List | Map (M2): there on every page of a trip, unseen
+   away from a day, so the bar keeps one size. */
+.drow{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
+.drow #days{flex:1 1 auto;min-width:0}
+.vt.off{visibility:hidden}

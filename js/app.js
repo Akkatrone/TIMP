@@ -876,11 +876,14 @@ function renderStrip(r){
   sb.innerHTML = SEARCH;
   sb.setAttribute("aria-label", t("search"));
   sb.title = t("search");
-  // List | Map, on a day (M2).
-  const vt = document.getElementById("view-toggle");
-  vt.hidden = r.name !== "day";
+  // List | Map, on a day (M2), at the end of the row of days. Elsewhere it keeps its place,
+  // unseen: the bar never changes its size from one page to another.
+  const vt = document.getElementById("view-toggle"), onDay = r.name === "day";
+  vt.classList.toggle("off", !onDay);
+  if(onDay) vt.removeAttribute("aria-hidden"); else vt.setAttribute("aria-hidden", "true");
   vt.setAttribute("aria-label", t("dayView"));
-  vt.innerHTML = `<button type="button" data-view-list aria-pressed="${!S.ui.mapOpen}" aria-label="${esc(t("viewList"))}">${LIST}</button><button type="button" data-map aria-pressed="${S.ui.mapOpen}" aria-label="${esc(t("viewMap"))}">${MAPICON}</button>`;
+  const away = onDay ? "" : ' tabindex="-1"';
+  vt.innerHTML = `<button type="button" data-view-list aria-pressed="${!S.ui.mapOpen}" aria-label="${esc(t("viewList"))}"${away}>${LIST}</button><button type="button" data-map aria-pressed="${S.ui.mapOpen}" aria-label="${esc(t("viewMap"))}"${away}>${MAPICON}</button>`;
   $days.setAttribute("aria-label", t("tripDays"));
   $days.innerHTML = `<a class="dchip info" href="#info"${r.name === "info" ? ' aria-current="page"' : ""}><span class="w">${esc(t("info"))}</span><span class="n">${INFO}</span></a>` + tr.days.map((d, i) => {
     const dp = dateParts(d.date, lang), cur = r.name === "day" && r.i === i;
