@@ -48,56 +48,10 @@ html,*{scrollbar-width:none}
 html.own-scroll{height:100%;overflow:hidden}
 html.own-scroll body{height:100%;overflow-x:hidden;overflow-y:auto;scroll-padding-top:env(safe-area-inset-top,0px)}
 html.own-scroll:has(dialog[open]) body{overflow:hidden}
-.dchip{flex:0 0 auto;min-width:46px;padding:5px 8px 9px;border:1px solid var(--line);border-color:color-mix(in srgb,var(--line) 80%,transparent);background:var(--surface);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:12px;text-align:center;text-decoration:none;color:var(--ink);display:grid;gap:0;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:background-color .15s,border-color .15s,transform .1s}
-.dchip:active{transform:scale(.96)}
-.dchip::after{content:"";position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:var(--c,var(--muted))}
-.dchip .n{font:700 1.05rem/1.1 var(--f-display);font-variant-numeric:tabular-nums}
-.dchip .w{font:500 .66rem/1.2 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.dchip[aria-current="page"]{background:var(--ink);border-color:var(--ink);color:var(--bg);box-shadow:0 4px 12px -4px rgba(0,0,0,.4)}
-.dchip[aria-current="page"] .w{color:var(--bg);opacity:.75}
-.dchip.today .n::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:3px;vertical-align:super}
-.dchip.info{align-content:center;font:600 .8rem var(--f-body);padding-inline:12px}
-.dchip.info::after{display:none}
 
 main.gutter{padding-block:16px 56px;display:grid;gap:18px}
 
-/* day header */
-.sign{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.sign-top{padding:16px 18px 14px;display:flex;justify-content:space-between;align-items:flex-end;gap:14px}
-.kanji{font:700 1.9rem/1.1 var(--f-display);overflow-wrap:anywhere}
-.romaji{font:500 .7rem/1 var(--f-mono);letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:8px}
-.dayno{text-align:right;min-width:0}
-.dayno .g{font:500 .72rem var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.dayno .d{font:600 .95rem/1.3 var(--f-body)}
-.band{height:7px;background:var(--c)}
-.neighbors{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
-.neighbors a,.neighbors span{padding:9px 14px;font:500 .8rem var(--f-body);color:var(--muted);text-decoration:none;min-width:0}
-.neighbors .next{text-align:right;border-left:1px solid var(--line)}
-.neighbors b{color:var(--ink);font-weight:600}
 h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
-.headrow{display:grid;gap:6px}
-.sleep{font-size:.88rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
-.sleep b{color:var(--ink);font-weight:600}
-.progress{font:500 .78rem var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
-/* The day's notes: one line, closed; a tap opens them all, numbered. */
-.reminds{background:var(--warn-bg);border-radius:10px;font-size:.9rem;min-width:0}
-.remind-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;padding:10px 12px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;border-radius:10px}
-.remind-row:focus-visible{outline:2px solid var(--warn);outline-offset:-2px}
-.remind-row .rt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.remind-row .rt b{font-weight:700}
-.remind-row .chev{display:block;margin-top:0}
-.reminds.open .remind-row .chev{transform:rotate(180deg)}
-.reminds .ic{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--warn);color:var(--warn);font:700 .72rem/17px var(--f-mono);text-align:center}
-.remind-list{margin:0;padding:0 14px 12px 44px;display:grid;gap:8px}
-.remind-list .remind::marker{color:var(--warn);font-weight:700}
-/* Stops without a position: a quiet line with Find, above the stops, or below once
-   some were found. */
-.nopos{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1.5px dashed var(--line);border-radius:10px;padding:8px 10px 8px 12px;color:var(--muted);font-size:.86rem}
-.nopos.later{margin-top:6px}
-/* A stop without a position: a crossed sign where its number would be; a tap finds it. */
-.nopos-sign{display:inline-grid;place-items:center;width:28px;height:22px;margin:-2px 0 0 -4px;padding:0;border:0;background:none;color:var(--muted);cursor:pointer;border-radius:999px}
-.nopos-sign svg{width:15px;height:15px;display:block}
-.nopos-sign:focus-visible{outline:2px solid var(--link);outline-offset:1px}
 .founds{display:grid;gap:8px}
 .found{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
 .sheet .found label{display:flex;gap:10px;align-items:flex-start;min-width:0;font-weight:400;font-size:.92rem}
@@ -119,67 +73,12 @@ h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
 .seg button{flex:1 1 auto;min-width:0;border:0;background:none;color:var(--muted);font:600 .8rem var(--f-body);padding:6px 16px;border-radius:999px;cursor:pointer;min-height:34px}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 
-/* stops */
-/* Each stop is a card on the page, as the lists of Android (Gmail, Settings): cards a
-   little apart, rounded more at the two ends of the list. Done and skipped ones sink
-   halfway into the page. */
-ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
-.stop{display:grid;grid-template-columns:4.3rem 1fr auto;gap:12px;padding:14px 10px 14px 14px;background:var(--card);border-radius:6px}
-.stop:first-child{border-top-left-radius:20px;border-top-right-radius:20px}
-.stop:last-child{border-bottom-left-radius:20px;border-bottom-right-radius:20px}
-.stop.done,.stop.skipped{background:var(--card-off)}
-/* Alternatives: a group's name above it; the others in one line under the chosen one;
-   opened, every option, the ones not chosen quieter. */
-.group-head{list-style:none;background:var(--card);padding:0}
-.group-head:first-child{border-top-left-radius:20px;border-top-right-radius:20px}
-.gh{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:10px 14px 2px}
-.gh b{font:700 .78rem var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
-.gh span:not(.chev){font-size:.8rem;color:var(--muted)}
-.gh .chev{display:block;margin:0 0 0 auto}
-.group-head.open .chev{transform:rotate(180deg)}
-.stop.in-group{border-radius:0}
-.stop.option{background:var(--card-off)}
-.stop.option h3{font-weight:600}
-.alts{list-style:none;background:var(--card);padding:0 14px 12px calc(4.3rem + 26px);font-size:.85rem;color:var(--muted);min-width:0;overflow:hidden}
-.group-head{min-width:0}
-.alts:last-child{border-bottom-left-radius:20px;border-bottom-right-radius:20px}
-.alts-line{display:flex;align-items:baseline;gap:8px;width:100%;min-width:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:0}
-.alts-line .names{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden}
-.alts-line .count{display:none;flex:1 1 auto}
-.alts-line.short .names{display:none}
-.alts-line.short .count{display:block}
-.alts-line .see{flex:0 0 auto;color:var(--link);text-decoration:underline}
-.alts.pending{padding:4px 14px 12px}
-.alts.pending ul{margin:0 0 8px;padding:0 0 0 18px;display:grid;gap:3px;color:var(--ink)}
-.alts.pending .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.alts.add{padding:10px 14px 12px}
 .plan-note{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0;font-size:.85rem;color:var(--muted)}
-.time{font:500 .82rem/1.5 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);padding-top:1px;overflow-wrap:anywhere;display:grid;justify-items:start;align-content:start;gap:7px;min-width:0}
-.body{min-width:0}
-.body h3{margin:0;font:600 1rem/1.35 var(--f-body)}
-.body p{margin:.2rem 0 0;color:var(--muted);font-size:.9rem}
-.meta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:7px}
 .tag{font:600 .7rem var(--f-body);letter-spacing:.02em;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn)}
 .maplink{font:500 .8rem var(--f-body);text-decoration:none}
-.tick{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;color:transparent;padding:0}
-.tick svg{width:15px;height:15px}
-.stop.done .tick{background:var(--ok);border-color:var(--ok);color:#fff}
-.stop.done .body h3,.stop.done .time{opacity:.5}
-.stop.done .body h3{text-decoration:line-through;text-decoration-thickness:1px}
-/* a description folds to two lines; the links under it never fold */
-.tap{cursor:pointer;border-radius:8px}
-.tap .h{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .chev{flex:0 0 auto;display:none;color:var(--muted);margin-top:4px;transition:transform .15s}
 .chev svg{width:14px;height:14px;display:block}
-.stop.cut .chev,.stop.open .chev{display:block}
-.stop.open .chev{transform:rotate(180deg)}
-.desc.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
-/* a label above the title: "Booking needed", "Optional" */
 .eyebrow{display:block;font:600 .66rem/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--warn);margin-bottom:4px}
-.stop.done .eyebrow,.stop.skipped .eyebrow{opacity:.5}
-
-/* right column: the tick, and the ⋯ menu below it */
-.side{display:grid;justify-items:center;align-content:start;gap:8px;position:relative}
 .more{width:30px;height:30px;border-radius:50%;border:0;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
 .more svg{width:16px;height:16px}
 .more[aria-expanded="true"]{background:var(--line);color:var(--ink)}
@@ -190,24 +89,9 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .menu button:focus-visible{background:var(--bg)}
 .tag.off{background:var(--line);color:var(--muted)}
 .tag.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
-/* the name as on the sign, under the title */
-.body .local{margin:2px 0 0;font-size:.88rem;color:var(--muted)}
-/* booking needed, closed that day: on the stop, until it is done */
-.body .notice{display:flex;align-items:center;gap:8px;margin:8px 0 0;padding:6px 10px;border-radius:8px;background:var(--warn-bg);color:var(--warn);font:600 .82rem/1.3 var(--f-body)}
-.notice .ic{flex:none;width:17px;height:17px;border-radius:50%;border:1.5px solid currentColor;font:700 .66rem/14px var(--f-mono);text-align:center}
-.body .notice.soft{background:none;color:var(--muted);padding:0;font-weight:500}
-.stop.skipped .body h3,.stop.skipped .time,.stop.skipped .desc{opacity:.5}
-.stop.skipped .body h3{text-decoration:line-through;text-decoration-thickness:1px}
-.tools{display:flex;align-items:center;gap:8px}
 .iconbtn{flex:none;margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
 .iconbtn svg{width:18px;height:18px}
 .iconbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-/* the day's ⋯ menu, at the end of the row of tools */
-.daymore{position:relative;margin-left:auto}
-.tools .iconbtn + .daymore,.daymore .iconbtn{margin-left:0}
-.daymore .iconbtn[aria-expanded="true"]{background:var(--line)}
-.daymore .menu{top:44px;right:0;min-width:190px}
-.daymore .menu.up{top:auto;bottom:44px}
 /* how a stop is travelled: metro, train, plane, boat */
 .tvchip{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:var(--bg);background:color-mix(in srgb,var(--c,var(--muted)) 16%,var(--surface));color:var(--c,var(--ink))}
 .tvchip svg{display:block}
@@ -229,7 +113,6 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .tvpin.gone{border-style:dashed;opacity:.7;box-shadow:none}
 .alt{font-size:.88rem;color:var(--muted);margin:0}
 .alt b{color:var(--ink);font-weight:600}
-.nb{display:inline-block;font:600 .68rem var(--f-mono);border:1.5px solid var(--pf,var(--c,var(--line)));border-radius:999px;padding:0 6px;color:var(--ink)}
 /* held, it shows the stop on the map: no text selection or callout on the way */
 .nb[data-pin]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer}
 .stop .time{-webkit-user-select:none;user-select:none}
@@ -274,8 +157,6 @@ span.costbtn{cursor:auto}
 .rows .v{color:var(--muted);min-width:0}
 .num{font:500 .95rem var(--f-mono);color:var(--ink);user-select:all}
 .foot{font-size:.8rem;color:var(--muted);margin:0}
-/* the note under a day's stops: apart from them, so it does not read as one more stop */
-.dayfoot{margin:36px 0 8px;padding-top:14px;border-top:1px dashed var(--line)}
 
 /* map panel */
 .mapbtn{justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .82rem var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer;min-height:36px}
@@ -598,8 +479,6 @@ button.crow{cursor:pointer}
 
 /* The account with the sharing service, at the top of Trips */
 /* The circle at the top right: You (the account, the settings). */
-.strip .gutter{display:flex;align-items:flex-start;gap:10px}
-#days{flex:1 1 auto;min-width:0}
 #trips-chip{flex:none;margin-top:2px;min-height:47px}
 .me-btn{flex:none;width:40px;height:40px;margin-top:5px;border-radius:50%;display:grid;place-items:center;background:var(--card);color:var(--ink);border:1px solid var(--line);text-decoration:none;font:700 1rem var(--f-display)}
 .me-btn svg{width:22px;height:22px}
@@ -677,3 +556,197 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 
 @media (max-width:380px){ .stop{grid-template-columns:3.4rem 1fr auto;gap:10px;padding-left:12px} .rows > div{grid-template-columns:1fr} }
 @media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} :is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act){transition:none} .costs > summary .chev,.chev,.fab-paste,.fab-paste span{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }
+
+/* ---------- The day (design/README.md: R1–R15, V, W, A). Tokens only. ---------- */
+main.gutter{gap:var(--sp-4)}
+/* A small sign, a finger's area: 44 points around it (A5). */
+:is(.tick,.nopos-sign,.sigact,.gclose,.strip .me-btn:not(.float)){position:relative}
+:is(.tick,.nopos-sign,.sigact,.gclose,.strip .me-btn:not(.float))::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,var(--touch));height:max(100%,var(--touch));transform:translate(-50%,-50%)}
+
+/* The heading: the day, its title, its city written as the name of a line. */
+.dayhead{display:grid;gap:var(--sp-2);padding:var(--sp-2) var(--sp-1) 0}
+.dayhead .dmeta{margin:0;font:500 var(--fs-s)/1.3 var(--f-body);color:var(--muted)}
+.dayhead h1{font:650 var(--fs-xxl)/1.15 var(--f-display);letter-spacing:-.02em}
+.dayhead .dsub{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2) var(--sp-4);font:500 var(--fs-m)/1.4 var(--f-body);color:var(--muted)}
+.dayhead .dsub:empty{display:none}
+.dayhead .dsub b{color:var(--ink);font-weight:600}
+.cityp{display:inline-flex;align-items:center;gap:var(--sp-2);font-weight:600;color:var(--ink)}
+.cityp::before{content:"";width:14px;height:var(--line-w);border-radius:var(--r-full);background:var(--c)}
+.dayhead .sun{display:inline-flex;align-items:center;gap:var(--sp-2);font-variant-numeric:tabular-nums}
+.dayhead .progress{font-variant-numeric:tabular-nums}
+
+/* The day's line (W1–W5): the most important and "+N"; opened, one per row. */
+.dayline{background:var(--card);border:1px solid var(--line);border-radius:var(--r-m)}
+.dayline .lhead{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:var(--touch);padding:var(--sp-3) var(--sp-4);border:0;background:none;color:var(--ink);font:500 var(--fs-m)/1.35 var(--f-body);text-align:left;cursor:pointer;border-radius:var(--r-m)}
+.dayline .lhead .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dayline .close{color:var(--muted)}
+.dayline ul{list-style:none;margin:0;padding:0}
+.dayline li{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-2) var(--sp-4);min-height:var(--touch);border-top:1px solid var(--line);font:400 var(--fs-m)/1.4 var(--f-body)}
+.dayline > ul:first-child > li:first-child{border-top:0}
+.dayline li .tx{flex:1;min-width:0}
+.dayline .k{flex:none;display:grid;width:16px;height:16px;color:var(--muted)}
+.dayline .k svg{width:16px;height:16px}
+.dayline .warn .k,.dayline .k.warn{color:var(--warn)}
+.sigact{flex:none;border:0;background:none;padding:0;color:var(--accent);font:600 var(--fs-m) var(--f-body);cursor:pointer}
+
+/* Signals: the level gives the colour, the kind the icon (W5). */
+.sig{display:inline-flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);border-radius:var(--r-full);font:600 var(--fs-s)/1.35 var(--f-body);min-width:0}
+.sig > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sig svg{width:13px;height:13px;flex:none}
+.sig.warn{background:var(--warn-bg);color:var(--warn)}
+.sig.ok{background:var(--ok-bg);color:var(--ok)}
+.sig.info{color:var(--muted);padding-left:0}
+.sig.err{background:var(--err-bg);color:var(--err)}
+.sigline{display:flex;align-items:center;gap:var(--sp-2);margin:var(--sp-2) 0 0;min-width:0}
+.plus{flex:none;font:600 var(--fs-xs)/1 var(--f-body);padding:var(--sp-2) var(--sp-3);border-radius:var(--r-full);background:var(--chip);color:var(--ink);font-variant-numeric:tabular-nums}
+.sigs{display:grid;gap:var(--sp-2)}
+.sigrow{display:flex;align-items:center;gap:var(--sp-3);margin:0;padding:var(--sp-2) var(--sp-3);border-radius:var(--r-s);font:600 var(--fs-s)/1.35 var(--f-body)}
+.sigrow > span{flex:1;min-width:0}
+.sigrow svg{width:14px;height:14px;flex:none}
+.sigrow.warn{background:var(--warn-bg);color:var(--warn)}
+.sigrow.ok{background:var(--ok-bg);color:var(--ok)}
+.sigrow.info{background:var(--card-off);color:var(--muted)}
+.sigrow .sigact{color:var(--ink)}
+
+/* A stop: a card of its own on the line of the day (R13, M1). */
+ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
+.stop{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr) auto;column-gap:var(--sp-4);align-items:start;padding:var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-3);background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:0 1px 2px color-mix(in srgb,var(--ink) 5%,transparent);cursor:pointer}
+.stop .rail{position:relative;align-self:stretch;display:grid;justify-items:center;align-content:start;padding-top:19px}
+/* The line: through the gaps, from the first stop's number to the last one's (R15). */
+.stops .rail::before,.group::before{content:"";position:absolute;left:50%;width:var(--line-w);transform:translateX(-50%);top:-21px;bottom:-21px;background:var(--c)}
+.stops > li:first-child .rail::before{top:30px}
+.stops > li:last-child .rail::before{bottom:auto;height:51px}
+.stops .past .rail::before{background:radial-gradient(circle,var(--muted) 1.3px,transparent 1.8px) center top/var(--line-w) 7px repeat-y}
+.nb{position:relative;z-index:1;display:grid;place-items:center;width:var(--pin);height:var(--pin);border-radius:var(--r-full);background:var(--pf,var(--c));color:var(--on-place);font:700 var(--fs-xs)/1 var(--f-body);font-variant-numeric:tabular-nums;box-shadow:0 0 0 3px var(--card);box-sizing:border-box}
+.stop.done .nb,.stop.skipped .nb,.nb.blank{background:var(--card);color:var(--muted);box-shadow:inset 0 0 0 1.6px var(--muted),0 0 0 3px var(--card)}
+.nb.q{background:var(--card);border:1.8px dashed var(--muted)}
+.nopos-sign{z-index:1;display:grid;place-items:center;width:var(--pin);height:var(--pin);padding:0;border:0;border-radius:var(--r-full);background:var(--card);color:var(--muted);box-shadow:0 0 0 3px var(--card);cursor:pointer}
+.nopos-sign svg{width:var(--pin);height:var(--pin);display:block}
+.stop .body{min-width:0}
+.when{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);margin:0 0 var(--sp-1);font:600 var(--fs-m)/1.3 var(--f-body);color:var(--ink);font-variant-numeric:tabular-nums}
+.when .tm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.when .cost{font-weight:500;color:var(--muted)}
+.when .tvchip{width:20px;height:20px}
+.when .nightmark{margin:0}
+.tt{margin:0;font:500 var(--fs-base)/1.3 var(--f-body);letter-spacing:-.006em}
+.tt .tap{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;width:100%;padding:0;border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.stop.open .tt .tap{display:block}
+.stop .local{margin:var(--sp-1) 0 0;font:400 var(--fs-m)/1.35 var(--f-body);color:var(--muted)}
+.stop .desc{margin:var(--sp-2) 0 0;font:400 var(--fs-m)/1.45 var(--f-body);color:var(--muted)}
+.stop .desc.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;line-clamp:1;overflow:hidden}
+.stop.done .tt .tap,.stop.done .when,.stop.skipped .when{color:var(--muted)}
+.stop.skipped .tt .tap{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px}
+.stop .tick{width:24px;height:24px;margin-top:17px;padding:0;border-radius:var(--r-full);border:1.6px solid var(--line-strong);background:var(--card);color:transparent;display:grid;place-items:center;cursor:pointer;transition:background-color var(--dur-state) var(--ease),border-color var(--dur-state) var(--ease)}
+.stop .tick svg{width:14px;height:14px}
+/* Done: a full tick in ink, not green (green means "in order"). Skipped: a dash. */
+.stop.done .tick{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.stop.skipped .tick{color:var(--muted)}
+/* Today: the next stop, lifted; the ones done, in one line (R14). */
+.stops .next{border-color:transparent;box-shadow:0 0 0 2px var(--accent),0 8px 20px -12px color-mix(in srgb,var(--ink) 35%,transparent)}
+.stop.compact{align-items:center;padding-block:var(--sp-3)}
+.stop.compact .rail{padding-top:0;align-content:center}
+.stops > li.compact:first-child .rail::before{top:50%}
+.stop.compact .tick{margin-top:0}
+.stop.compact .body{display:flex;align-items:baseline;gap:var(--sp-3)}
+.stop.compact .when{margin:0}
+.stop.compact .tt{font-size:var(--fs-m)}
+.stop.compact .tt .tap{-webkit-line-clamp:1;line-clamp:1}
+/* Opened: every signal, the description, the cost; then two zones, never mixed (R2). */
+.xpand{display:grid;gap:var(--sp-3);margin-top:var(--sp-3);cursor:auto}
+.xpand > .desc{margin:0;color:var(--ink)}
+.go{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden;background:var(--bg)}
+.go a{display:flex;align-items:center;justify-content:center;min-height:var(--touch);padding:0 var(--sp-2);font:600 var(--fs-m) var(--f-body);color:var(--ink);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.go a + a{border-left:1px solid var(--line)}
+.chg{display:flex;flex-wrap:wrap;gap:0 var(--sp-5);border-top:1px solid var(--line)}
+.chg button{display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--touch);padding:0;border:0;background:none;color:var(--muted);font:500 var(--fs-m) var(--f-body);cursor:pointer}
+.chg svg{width:14px;height:14px}
+.chg button[aria-pressed="true"]{color:var(--ink)}
+
+/* A group of alternatives: one card. Chosen: the option and "+N"; opened or with no
+   choice yet: its options as a choice, on the line (R15). */
+.group{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:0 1px 2px color-mix(in srgb,var(--ink) 5%,transparent)}
+.group::before{left:calc(var(--sp-3) + var(--rail) / 2);top:-9px;bottom:-9px}
+.stops > .group:first-child::before{top:var(--sp-5)}
+.stops > .group:last-child::before{bottom:var(--sp-5)}
+.group .stop{border:0;box-shadow:none;background:none;border-radius:var(--r-m)}
+.group .stop .rail::before{display:none}
+.group .gh{display:flex;align-items:baseline;gap:var(--sp-2);margin:0;padding:var(--sp-4) var(--sp-4) 0 calc(var(--sp-3) + var(--rail) + var(--sp-4));font:600 var(--fs-m)/1.3 var(--f-body);color:var(--ink)}
+.group .gh span{color:var(--muted);font-weight:500}
+.gclose{margin-left:auto;padding:0;border:0;background:none;color:var(--muted);font:500 var(--fs-m) var(--f-body);cursor:pointer}
+.group .stop + .alts-line{margin-top:calc(-1 * var(--sp-3))}
+.alts-line{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:var(--touch);padding:0 var(--sp-4) var(--sp-1) calc(var(--sp-3) + var(--rail) + var(--sp-4));border:0;background:none;color:var(--muted);font:400 var(--fs-m) var(--f-body);text-align:left;cursor:pointer}
+.alts-line .names{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opts{display:grid}
+.opt{display:grid;grid-template-columns:var(--rail) minmax(0,1fr) auto;column-gap:var(--sp-4);align-items:center;width:100%;min-height:var(--touch);padding:var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-3);border:0;border-top:1px solid var(--line);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.opt .rd{position:relative;z-index:1;justify-self:center;width:18px;height:18px;border-radius:var(--r-full);border:1.6px solid var(--line-strong);background:var(--card);box-sizing:border-box;transition:border-width var(--dur-state) var(--ease)}
+.opt[aria-checked="true"] .rd{border:5px solid var(--ink)}
+.opt .ot{min-width:0}
+.opt .ot b{display:block;font:500 var(--fs-base)/1.3 var(--f-body)}
+.opt .ot small{display:block;font:400 var(--fs-s)/1.35 var(--f-body);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opt .otm{font:600 var(--fs-m) var(--f-body);color:var(--muted);font-variant-numeric:tabular-nums}
+.opt[aria-disabled="true"]{cursor:default}
+.addopt{display:block;width:100%;min-height:var(--touch);padding:0 var(--sp-4) 0 calc(var(--sp-3) + var(--rail) + var(--sp-4));border:0;border-top:1px solid var(--line);background:none;color:var(--accent);font:600 var(--fs-m) var(--f-body);text-align:left;cursor:pointer}
+.group.open .gh{padding-bottom:var(--sp-3)}
+.group.pending{border:1.5px dashed var(--line-strong)}
+.group.pending::before{background:repeating-linear-gradient(to bottom,var(--c) 0 6px,transparent 6px 11px);opacity:.6}
+.ghead{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);column-gap:var(--sp-4);padding:var(--sp-4) var(--sp-4) var(--sp-3) var(--sp-3)}
+.ghead .rail{display:grid;justify-items:center;align-content:start;padding-top:19px}
+.ghead .gname{font-weight:600}
+.ghead .where{margin:var(--sp-1) 0 0;font:500 var(--fs-s) var(--f-body);color:var(--muted)}
+
+/* Now, on the line: the dots behind, the line ahead (R14, R15). */
+.now{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);column-gap:var(--sp-4);align-items:center;padding:0 var(--sp-4) 0 calc(var(--sp-3) + 1px);font:600 var(--fs-m)/1.3 var(--f-body);color:var(--accent);font-variant-numeric:tabular-nums}
+.now .nrail{position:relative;height:20px;display:grid;place-items:center}
+.now .nrail::before,.now .nrail::after{content:"";position:absolute;left:50%;width:var(--line-w);transform:translateX(-50%)}
+.now .nrail::before{top:-9px;bottom:50%;background:radial-gradient(circle,var(--muted) 1.3px,transparent 1.8px) center bottom/var(--line-w) 7px repeat-y}
+.now .nrail::after{top:50%;bottom:-9px;background:var(--c)}
+.now i{position:relative;z-index:1;width:11px;height:11px;border-radius:var(--r-full);background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+.now .nt{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
+.now .nt::after{content:"";flex:1;min-width:var(--sp-5);height:1.5px;background:color-mix(in srgb,var(--accent) 35%,transparent)}
+
+/* Adding: the last row, dashed like what is not there yet (R3, R15). */
+.addrow{display:flex;gap:var(--sp-3)}
+.addrow button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);min-height:var(--touch);padding:0 var(--sp-3);border:1.5px dashed var(--line-strong);border-radius:var(--r-m);background:none;color:var(--muted);font:600 var(--fs-m) var(--f-body);cursor:pointer}
+.addrow svg{width:16px;height:16px;flex:none}
+.dayfoot{margin-top:var(--sp-2)}
+.stops.today ~ .dayfoot{margin-bottom:var(--sp-7)}
+
+/* The next stop's bar (V3): one thing floating, within reach of a thumb. */
+.nextbar{position:fixed;left:max(var(--sp-4),env(safe-area-inset-left,0px));right:max(var(--sp-4),env(safe-area-inset-right,0px));bottom:calc(var(--sp-4) + env(safe-area-inset-bottom,0px));z-index:15;max-width:608px;margin:0 auto;display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3);border-radius:var(--r-l);background:var(--ink);color:var(--bg);box-shadow:0 12px 28px -10px color-mix(in srgb,var(--ink) 60%,transparent)}
+.nextbar[hidden]{display:none}
+.nextbar .nb-t{flex:1;min-width:0;display:flex;align-items:center;gap:var(--sp-3);min-height:var(--touch);padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.nextbar .nb{box-shadow:0 0 0 2px var(--ink);flex:none}
+.nb-tx{min-width:0;display:grid}
+.nb-tx b{font:600 var(--fs-base)/1.25 var(--f-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nb-tx small{font:500 var(--fs-s)/1.3 var(--f-body);color:color-mix(in srgb,var(--bg) 75%,transparent);font-variant-numeric:tabular-nums}
+.nb-go{flex:none;display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--touch);padding:0 var(--sp-4);border-radius:var(--r-m);background:var(--accent);color:var(--on-accent);font:600 var(--fs-m) var(--f-body);text-decoration:none}
+.nb-go svg{width:16px;height:16px}
+
+
+/* The top bar: the trip as the title (a tap: the list of trips), List | Map, you; under
+   it the days, today called so (R12, M2). */
+.strip .gutter{display:grid;gap:var(--sp-2);padding-block:var(--sp-3) var(--sp-2)}
+.tbar{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
+.triptitle{flex:1;min-width:0;display:grid;min-height:var(--touch);align-content:center;color:var(--ink);text-decoration:none;border-radius:var(--r-s)}
+.triptitle b{display:flex;align-items:center;gap:var(--sp-2);min-width:0;font:650 var(--fs-xl)/1.15 var(--f-display);letter-spacing:-.02em}
+.triptitle b span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.triptitle .sel{flex:none;width:9px;height:13px;color:var(--muted)}
+.triptitle small{font:500 var(--fs-s)/1.3 var(--f-body);color:var(--muted)}
+.vt{flex:none;display:flex;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden;background:var(--surface)}
+.vt[hidden]{display:none}
+.vt button{display:grid;place-items:center;width:var(--touch);height:var(--touch);padding:0;border:0;background:none;color:var(--muted);cursor:pointer}
+.vt button[aria-pressed="true"]{background:var(--sel);color:var(--ink)}
+.vt svg{width:17px;height:17px}
+.strip .me-btn{width:36px;height:36px;margin-top:0}
+#days{gap:var(--sp-1);padding:var(--sp-1) 0 26px;margin-bottom:-24px}
+.dchip{flex:0 0 auto;min-width:var(--touch);display:grid;justify-items:center;gap:var(--sp-1);position:relative;padding:var(--sp-2) var(--sp-3) var(--sp-3);border-radius:var(--r-s);color:var(--muted);text-decoration:none;transition:background-color var(--dur-state) var(--ease)}
+.dchip .w{font:500 var(--fs-xs)/1.2 var(--f-body);letter-spacing:.06em;text-transform:uppercase}
+.dchip .n{display:grid;place-items:center;min-height:20px;font:600 var(--fs-base)/1.1 var(--f-body);color:var(--ink);font-variant-numeric:tabular-nums}
+.dchip .n svg{width:17px;height:17px}
+.dchip::after{content:"";position:absolute;left:var(--sp-4);right:var(--sp-4);bottom:var(--sp-1);height:var(--line-w);border-radius:var(--r-full);background:var(--c,transparent)}
+.dchip.info::after{display:none}
+.dchip[aria-current="page"]{background:var(--sel);color:var(--ink)}
+.dchip[aria-current="page"] .n{font-weight:700}
+.dchip.today .w{color:var(--accent);font-weight:700}
+
+.costbtn{min-height:var(--touch)}

@@ -19,7 +19,7 @@ import { oldStopId } from "../js/ids.js";
 // (js/ids.js). Changes files below still name stops by those, as an outline from before.
 const ID = (old, date = "2027-05-14") => oldStopId("demo-lisbon", date, old);
 // The edit button of the stop with this title.
-const editOf = title => `[...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent === ${JSON.stringify(title)}).querySelector("[data-edit]")`;
+const editOf = title => `[...document.querySelectorAll(".stop")].find(li => li.querySelector(".tt").textContent === ${JSON.stringify(title)}).querySelector("[data-edit]")`;
 
 let passed = 0;
 async function step(name, fn){
@@ -53,42 +53,62 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 200));`);
   });
 
-  await step("descriptions are folded, links stay visible", async () => {
+  await step("a closed stop shows its time, name, one line of description and its circle; nothing else to tap (R1, R13)", async () => {
     assert.equal(await count(".desc.clamp"), await count(".desc"));
-    assert.ok(await count(".stop.cut") > 0, "at least one description is cut short at phone width");
-    assert.equal(await run(`return [...document.querySelectorAll(".stop .maplink, .stop .more, .stop .tick")].every(e => e.offsetParent !== null);`), true);
-    assert.equal(await run(`return [...document.querySelectorAll(".stop .meta")].every(m => m.getBoundingClientRect().height < 30);`), true, "the links fit on one line");
+    assert.equal(await run(`return [...document.querySelectorAll(".stop .tick")].every(e => e.offsetParent !== null);`), true);
+    assert.equal(await count(".stop [data-edit], .stop [data-skip], .stop .maplink"), 0, "going and changing are in the opened stop");
+    assert.equal(await count(".stop [data-more]"), 0, "no ⋯ on a stop");
+    assert.equal(await run(`return [...document.querySelectorAll(".stop .tt .tap")].every(b => b.getBoundingClientRect().height < 46);`), true, "a name takes two lines at most");
   });
 
-  await step("tapping a description opens that one only", async () => {
+  await step("a tap on a stop opens it in place: signals, description, then Go and Change, never mixed (R2)", async () => {
     const all = await count(".desc");
     await click("[data-open]", 0);
     assert.equal(await run(`return document.querySelector("[data-open]").getAttribute("aria-expanded");`), "true");
+    assert.equal(await run(`const b = document.querySelector("[data-open]"); return !!document.getElementById(b.getAttribute("aria-controls"));`), true, "the name controls what it opens");
+    assert.deepEqual(await run(`return [...document.querySelector(".stop.open .go").children].map(a => a.textContent);`), ["Map ↗", "Directions ↗"]);
+    assert.deepEqual(await run(`return [...document.querySelector(".stop.open .chg").children].map(b => b.textContent);`), ["Edit", "Skip", "+ Alternative"]);
     assert.equal(await count(".desc.clamp"), all - 1);
-    await click("[data-open]", 0);
+    // A tap anywhere on the card closes it again, as on its name.
+    await run(`document.querySelector(".stop.open .when").click(); await new Promise(r => setTimeout(r, 60));`);
+    assert.equal(await count(".stop.open"), 0);
+    // Not on a link: it leaves for the map, the card stays as it is.
     assert.equal(await count(".desc.clamp"), all);
   });
 
-  await step("the button above the stops opens and folds them all", async () => {
+  await step("Open all opens every stop and folds them again; from here on they stay open", async () => {
     await click("[data-expand]");
     assert.equal(await count(".desc.clamp"), 0);
     assert.equal(await run(`return document.querySelector("[data-expand]").getAttribute("aria-pressed");`), "true");
     await click("[data-expand]");
     assert.equal(await count(".desc.clamp"), await count(".desc"));
+    // The steps below use Edit and Skip on every stop.
+    await click("[data-expand]");
   });
 
-  await step("the ⋯ menu opens with Edit, Skip and Add an alternative, and closes with Escape or a tap outside", async () => {
-    assert.equal(await count(".menu:not([hidden])"), 0);
-    await click(".stop [data-more]", 0);
-    assert.equal(await count(".menu:not([hidden])"), 1);
-    assert.deepEqual(await run(`return [...document.querySelectorAll(".menu:not([hidden]) [role=menuitem]")].map(b => b.textContent);`), ["Edit", "Skip", "Add an alternative"]);
-    assert.equal(await run(`return document.activeElement.textContent;`), "Edit", "the first item takes the focus");
-    await run(`document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));`);
-    assert.equal(await count(".menu:not([hidden])"), 0);
-    assert.equal(await run(`return document.activeElement.dataset.more !== undefined;`), true, "the focus goes back to ⋯");
-    await click(".stop [data-more]", 0);
-    await run(`document.querySelector("h1").click();`);
-    assert.equal(await count(".menu:not([hidden])"), 0);
+  await step("the day is accessible: every control named, states said, targets of 44 points, headings in order, no id twice (A1–A5)", async () => {
+    const problems = await run(`
+      const out = [];
+      const scope = [...document.querySelectorAll("#app, .strip")];
+      const controls = scope.flatMap(r => [...r.querySelectorAll("button, a[href], [role=button], [role=radio], input, select, textarea")]).filter(e => e.offsetParent !== null);
+      const named = e => (e.getAttribute("aria-label") || e.textContent || e.title || (e.labels && e.labels[0] && e.labels[0].textContent) || "").trim();
+      for(const e of controls){
+        if(!named(e)) out.push("no name: " + e.outerHTML.slice(0, 80));
+        for(const a of ["aria-expanded", "aria-pressed", "aria-checked"]) if(e.hasAttribute(a) && !["true", "false"].includes(e.getAttribute(a))) out.push(a + " " + e.getAttribute(a));
+        const c = e.getAttribute("aria-controls");
+        if(c && !document.getElementById(c)) out.push("aria-controls to nothing: " + c);
+        // The name of a stop is a button, the card around it the target; links in text are text.
+        if(e.closest(".tt") || e.closest(".desc, .local, .dsub")) continue;
+        const r = e.getBoundingClientRect(), after = getComputedStyle(e, "::after");
+        const w = Math.max(r.width, parseFloat(after.width) || 0), h = Math.max(r.height, parseFloat(after.height) || 0);
+        if(h < 44 - 0.5 || w < 24) out.push("small: " + Math.round(w) + "×" + Math.round(h) + " " + e.outerHTML.slice(0, 70));
+      }
+      const ids = [...document.querySelectorAll("[id]")].map(e => e.id);
+      for(const id of new Set(ids.filter((x, i) => ids.indexOf(x) !== i))) out.push("id twice: " + id);
+      const levels = [...document.querySelectorAll("#app h1, #app h2, #app h3")].map(h => +h.tagName[1]);
+      levels.forEach((l, i) => { if(i && l > levels[i - 1] + 1) out.push("heading skips a level: h" + levels[i - 1] + " → h" + l); });
+      return out;`);
+    assert.deepEqual(problems, []);
   });
 
   await step("a stop can be skipped and restored", async () => {
@@ -138,14 +158,12 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("the route through stop 2", `${lines} === 4`);
     await click(".stop:nth-child(2) [data-skip]");
     await until("the route past stop 2", `${lines} === 3`);
-    // Under the open map, ⋯ and Edit leave the page where it is: it used to jump up by
-    // the map's height, from the second time on.
+    // Under the open map, Edit leaves the page where it is: it used to jump up by the
+    // map's height, from the second time on.
     for(let round = 0; round < 3; round++){
-      await run(`const b = [...document.querySelectorAll("[data-more]")].pop(); b.scrollIntoView({block: "center"}); await new Promise(r => setTimeout(r, 150)); window.__y = window.scrollY;`);
+      await run(`const b = [...document.querySelectorAll(".stop [data-edit]")].pop(); b.scrollIntoView({block: "center"}); await new Promise(r => setTimeout(r, 150)); window.__y = window.scrollY;`);
       assert.ok(await run(`return window.__y > 0;`), "the page is scrolled");
-      await run(`[...document.querySelectorAll("[data-more]")].pop().click(); await new Promise(r => setTimeout(r, 300));`);
-      assert.equal(await run(`return window.scrollY - window.__y;`), 0, "⋯ does not scroll the page");
-      await run(`document.querySelector(".menu:not([hidden]) [data-edit]").click(); await new Promise(r => setTimeout(r, 400));`);
+      await run(`[...document.querySelectorAll(".stop [data-edit]")].pop().click(); await new Promise(r => setTimeout(r, 400));`);
       assert.equal(await run(`return window.scrollY - window.__y;`), 0, "Edit does not scroll the page");
       await run(`document.querySelector("dialog.sheet [data-close]").click(); await new Promise(r => setTimeout(r, 300));`);
       assert.equal(await run(`return window.scrollY - window.__y;`), 0, "closing the form does not scroll the page");
@@ -180,7 +198,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#day-2";`);
     await until("day 2", `document.querySelectorAll(".stop").length === 7`);
     assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .tvchip")].map(e => e.getAttribute("aria-label"));`), ["Train", "Boat"]);
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="schema"]').click();`);
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="schema"]').click();`);
     await until("the sketch", `document.querySelector(".mapsvg")`);
     assert.equal(await count(".mapsvg .tv"), 2);
     await click('[data-view="live"]');
@@ -199,10 +217,12 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("day 1", `document.querySelectorAll(".stop").length === 6`);
   });
 
-  await step("each kind of place has its icon, in the list and on the map's pins", async () => {
-    // Day 1: two sights, a view, a sight, food, a view; the train stop has no kind.
-    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .tychip")].map(e => e.getAttribute("aria-label"));`), ["Sight", "Sight", "View", "Sight", "Food", "View"]);
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+  await step("each kind of place has its colour and its name, in the list and on the map's pins (M1)", async () => {
+    // Day 1: two sights, a view, a sight, food, a view. A screen reader hears the kind
+    // with the number; the eye sees it in the number's colour.
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .rail [aria-label]")].map(e => e.getAttribute("aria-label").split(", ").pop());`), ["Sight", "Sight", "View", "Sight", "Food", "View"]);
+    assert.equal(await run(`const n = [...document.querySelectorAll(".stop .nb")]; return n[0].style.getPropertyValue("--pf") !== n[2].style.getPropertyValue("--pf");`), true, "a sight and a view have different colours");
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     await until("the pins", `document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await count(".live .pin.typed svg"), 5);
     // Filled with the colour of their kind, shaded by the part of the day.
@@ -211,14 +231,14 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.ok(fills.every(f => /^#[0-9a-f]{6}$/.test(f)), fills.join(" "));
     assert.notEqual(fills[0], fills[2], "a sight and a view have different colours");
     // Sunrise and sunset worked out for Lisbon, and the stop after dark marked.
-    assert.match(await text(".dayno .sun"), /^\d\d:\d\d–2\d:\d\d$/);
-    assert.match(await run(`return document.querySelector(".dayno .sun").getAttribute("aria-label");`), /^Sunrise \d\d:\d\d · sunset 2\d:\d\d$/);
-    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nightmark")).map(li => li.querySelector("h3").textContent);`), ["Miradouro da Senhora do Monte"]);
+    assert.match(await text(".dayhead .sun"), /^\d\d:\d\d–2\d:\d\d$/);
+    assert.match(await run(`return document.querySelector(".dayhead .sun").getAttribute("aria-label");`), /^Sunrise \d\d:\d\d · sunset 2\d:\d\d$/);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nightmark")).map(li => li.querySelector(".tt").textContent);`), ["Miradouro da Senhora do Monte"]);
     await click("[data-map]");
   });
 
   await step("the lines between the stops can be hidden on both maps, and the choice is kept", async () => {
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     const lines = `+(document.querySelector(".live .canvas") || {dataset: {}}).dataset.legs`;
     await until("the lines", `${lines} > 0`);
     // Hiding them keeps the map as it is: the same map, drawn once.
@@ -246,7 +266,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   await step("holding a stop's number shows it on the map; a tap does nothing", async () => {
     await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200));`);
     await until("day 1", `document.querySelector('.nb[data-pin="2"]')`);
-    if(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded") === "true";`)) await click("[data-map]");
+    if(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed") === "true";`)) await click("[data-map]");
     const press = (ms) => run(`const nb = document.querySelector('.nb[data-pin="2"]'); const r = nb.getBoundingClientRect(); const o = {bubbles: true, clientX: r.x + 4, clientY: r.y + 4, pointerType: "touch"};
       nb.dispatchEvent(new PointerEvent("pointerdown", o)); await new Promise(res => setTimeout(res, ${ms})); nb.dispatchEvent(new PointerEvent("pointerup", o)); await new Promise(res => setTimeout(res, 100));`);
     // While the finger is down nothing can be selected; after a tap, all as before.
@@ -254,9 +274,9 @@ await withApp(async ({run, until, reload, blocked}) => {
       const on = document.documentElement.classList.contains("holding"); document.dispatchEvent(new PointerEvent("pointerup", {bubbles: true, pointerType: "touch"})); await new Promise(res => setTimeout(res, 50));
       return on && !document.documentElement.classList.contains("holding");`), true);
     await press(100);
-    assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded");`), "false", "a tap leaves the map closed");
+    assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed");`), "false", "a tap leaves the map closed");
     await press(700);
-    assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded");`), "true", "a hold opens it");
+    assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed");`), "true", "a hold opens it");
     await run(`document.querySelector('[data-view="live"]').click();`);
     await press(700);
     await until("the card of the third stop", `document.querySelector(".live .maplibregl-popup") && document.querySelector(".live .maplibregl-popup").textContent.includes("Miradouro de Santa Luzia")`);
@@ -271,7 +291,7 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("Directions start from the stop before; the first of a day from where the night was spent", async () => {
     await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200));`);
-    const dir = (title) => run(`const li = [...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent.includes(${JSON.stringify(title)})); const a = [...li.querySelectorAll(".maplink")].find(a => a.textContent.startsWith("Directions")); return new URL(a.href).searchParams.get("origin");`);
+    const dir = (title) => run(`const li = [...document.querySelectorAll(".stop")].find(li => li.querySelector(".tt").textContent.includes(${JSON.stringify(title)})); const a = [...li.querySelectorAll(".maplink")].find(a => a.textContent.startsWith("Directions")); return new URL(a.href).searchParams.get("origin");`);
     assert.equal(await dir("Praça do Comércio"), null, "the first stop of the trip: from where the phone is");
     assert.equal(await dir("Lisbon Cathedral"), "Praça do Comércio Lisboa");
     await run(`location.hash = "#day-2"; await new Promise(r => setTimeout(r, 200));`);
@@ -309,7 +329,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   const PLACE = "https://www.google.com/maps/place/Pastelaria+Exemplo,+Rua+Augusta+10,+Lisboa/@38.7101,-9.1375,18z/data=!4m6!3m5!1s0x0:0x0!8m2!3d38.71012!4d-9.13751";
   const fill = (sel, value) => run(`const el = document.querySelector(${JSON.stringify(sel)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event("change", {bubbles: true}));`);
   const submit = () => run(`document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
-  const stopTitles = () => run(`return [...document.querySelectorAll(".stop h3")].map(h => h.textContent);`);
+  const stopTitles = () => run(`return [...document.querySelectorAll(".stop .tt")].map(h => h.textContent);`);
   const sendFile = trip => run(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(trip))}], "from-a-friend.json")); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change")); await new Promise(r => setTimeout(r, 600));`);
   const answer = id => run(`document.querySelector('dialog.ask [data-answer="${id}"]').click(); await new Promise(r => setTimeout(r, 600));`);
   let otherPhone = null;
@@ -347,7 +367,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await submit();
     assert.ok(!(await stopTitles()).includes("Pastelaria Exemplo"));
     await run(`location.hash = "#day-2";`);
-    await until("day 2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Pastelaria Exemplo")`);
+    await until("day 2", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent === "Pastelaria Exemplo")`);
     assert.equal(await run(`return ${editOf("Pastelaria Exemplo")}.closest(".stop").classList.contains("done");`), true, "the tick moved with it");
     await run(`${editOf("Pastelaria Exemplo")}.click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] [data-delete]")`);
@@ -377,7 +397,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.getElementById("stop-time").hidden && !document.getElementById("stop-time-words").hidden;`), true);
     await fill("#stop-time-words", "Evening");
     await submit();
-    assert.equal(await run(`return [...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent === "Tram 28").querySelector(".maplink").href;`), "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+    assert.equal(await run(`return [...document.querySelectorAll(".stop")].find(li => li.querySelector(".tt").textContent === "Tram 28").querySelector(".maplink").href;`), "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
   });
 
   await step("an address shared on its own is searched around the trip; the pin can be put on a map", async () => {
@@ -446,9 +466,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     const merged = await versionOnPhone();
     assert.deepEqual([...merged.parents].sort(), [saved.version.id, other.version.id].sort());
     await run(`location.hash = "#day-2";`);
-    await until("day 2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Fado evening")`);
+    await until("day 2", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent === "Fado evening")`);
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Tram 28")`);
+    await until("day 1", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent === "Tram 28")`);
     // The same file again: this phone already has everything in it.
     await sendFile(other);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /older than the trip on this phone/);
@@ -468,7 +488,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await answer("theirs");
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Now the trip is the one in the file/);
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Sunset on the river")`);
+    await until("day 1", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent === "Sunset on the river")`);
     assert.ok(!(await stopTitles()).includes("Tram 28"), "this phone's stop is gone");
     assert.deepEqual([...(await versionOnPhone()).parents].sort(), [before.id, third.version.id].sort());
   });
@@ -509,7 +529,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Back to an earlier version · new version [0-9a-f]{7}/);
     assert.deepEqual((await versionOnPhone()).parents, [before.id], "restoring makes a new version");
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Sunset on the river")`);
+    await until("day 1", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent === "Sunset on the river")`);
   });
 
   await step("a place shared from Google Maps on Android opens the form already filled in", async () => {
@@ -530,7 +550,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     const openLiveMap = async () => {
       await run(`location.hash = "#day-1";`);
       await until("day 1", `document.querySelector("[data-map]")`);
-      await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+      await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     };
 
     await run(`location.hash = "#me";`);
@@ -573,7 +593,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("no key", `document.querySelector('[data-map-status="statusNoKey"]')`);
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelector("[data-map]")`);
-    if(await run(`return document.querySelector("[data-map]").getAttribute("aria-expanded") === "true";`)) await click("[data-map]");
+    if(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed") === "true";`)) await click("[data-map]");
   });
 
   await step("a hostile trip file cannot run code or add elements", async () => {
@@ -592,7 +612,8 @@ await withApp(async ({run, until, reload, blocked}) => {
     }
     await run(`await new Promise(r => setTimeout(r, 300));`);
     assert.equal(await run(`return window.__pwned === undefined;`), true);
-    assert.equal(await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 150)); return !!document.querySelector(".remind b");`), true);
+    // The note's bold is kept, in the day's line once it is opened.
+    assert.equal(await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 150)); const h = document.querySelector(".dayline [data-notes]"); if(h && h.getAttribute("aria-expanded") === "false") h.click(); await new Promise(r => setTimeout(r, 100)); return !!document.querySelector(".dayline li .tx b");`), true);
   });
 
   await step("a file that is not a trip is refused with reasons", async () => {
@@ -694,13 +715,13 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.deepEqual(after.parents, [before.id], "one new version");
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Changes applied: 1 added, 1 changed, 0 removed/);
     await run(`location.hash = "#day-1";`);
-    await until("the new stop", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Ginjinha bar"))`);
+    await until("the new stop", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent.includes("Ginjinha bar"))`);
     // Android: the assistant's answer shared to the app is loaded the same way.
     // The new stop's id, as the assistant reads it in the outline.
     const ginjinha = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip.days[0].stops.find(s => s.title === "Ginjinha bar").id); }; });`);
     const shared = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{remove: {day: "2027-05-14", stop: ginjinha}}]};
     await run(`location.href = location.pathname + "?text=" + encodeURIComponent("Done! " + ${JSON.stringify(JSON.stringify(shared))}) + "#day-1";`);
-    await until("the stop removed", `document.querySelectorAll(".stop").length > 0 && ![...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Ginjinha bar"))`);
+    await until("the stop removed", `document.querySelectorAll(".stop").length > 0 && ![...document.querySelectorAll(".stop .tt")].some(h => h.textContent.includes("Ginjinha bar"))`);
     assert.equal(await run(`return location.search;`), "");
   });
 
@@ -719,7 +740,8 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.deepEqual([...v3.parents].sort().includes(v2.id), true);
     assert.equal(v3.parents.length, 2, "joined, as two files are");
     await run(`location.hash = "#day-1";`);
-    await until("both tags", `["Changed on the phone", "From the assistant"].every(t => [...document.querySelectorAll(".eyebrow")].some(e => e.textContent === t))`);
+    // Both changes are in the trip (a stop done shows no signals: W3).
+    await until("both tags", `await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => { const tags = g.result.trip.days[0].stops.map(s => s.tag); r(["Changed on the phone", "From the assistant"].every(t => tags.includes(t))); }; }; })`);
     // A friend's trip with the same name and first day: same id, no version in common.
     const friend = JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
     delete friend.private;
@@ -784,7 +806,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Changes applied: 0 added, 1 changed/);
     // The phone refuses the clipboard: the field takes the focus, to paste by hand.
     await clip(null);
-    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200)); document.querySelector(".fab-paste").click(); await new Promise(r => setTimeout(r, 100)); document.querySelector("dialog.sheet[open] [data-paste]").click(); await new Promise(r => setTimeout(r, 100));`);
+    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200)); document.querySelector("[data-add-paste]").click(); await new Promise(r => setTimeout(r, 100)); document.querySelector("dialog.sheet[open] [data-paste]").click(); await new Promise(r => setTimeout(r, 100));`);
     assert.equal(await run(`return document.activeElement.id;`), "paste-text");
     await run(`document.querySelector("#paste-text").value = ${JSON.stringify(PLACE)}; document.querySelector("#paste-text").closest("form").requestSubmit();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-title")`);
@@ -792,21 +814,19 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
   });
 
-  await step("the day's ⋯ menu changes the day, adds one after the last with its first stop, and deletes it", async () => {
+  await step("the day's own changes, at its end: edit it, add one after the last with its first stop, delete it", async () => {
     await run(`location.hash = "#day-2";`);
-    await until("day 2", `document.querySelector('[data-more="day"]')`);
+    await until("day 2", `document.querySelector("[data-day-edit]")`);
     // Edit day: a new title and a note, the stops untouched.
-    await run(`document.querySelector('[data-more="day"]').click();`);
-    await until("the menu", `!document.querySelector('[data-more="day"] + .menu').hidden`);
     await run(`document.querySelector("[data-day-edit]").click();`);
     await until("the day form", `document.querySelector("dialog.sheet[open] #day-title")`);
     assert.equal(await run(`return document.getElementById("day-city").value;`), "Lisboa");
     await run(`document.getElementById("day-title").value = "Belém slowly"; document.getElementById("day-notes").value = "Pastéis before ten\\n\\nTram 15 from Praça da Figueira"; document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
-    assert.equal(await text(".headrow h1"), "Belém slowly");
-    assert.deepEqual(await run(`return [...document.querySelectorAll(".remind div")].map(d => d.textContent);`), ["Pastéis before ten", "Tram 15 from Praça da Figueira"]);
+    assert.equal(await text(".dayhead h1"), "Belém slowly");
+    assert.deepEqual(await run(`const h = document.querySelector(".dayline [data-notes]"); if(h && h.getAttribute("aria-expanded") === "false") h.click(); await new Promise(r => setTimeout(r, 100)); return [...document.querySelectorAll(".dayline li .tx")].map(d => d.textContent).slice(-2);`), ["Pastéis before ten", "Tram 15 from Praça da Figueira"]);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Day saved · version [0-9a-f]{7}/);
     // Add a day: the stop form, on a new day after the last.
-    await run(`document.querySelector('[data-more="day"]').click(); document.querySelector("[data-day-add]").click();`);
+    await run(`document.querySelector("[data-day-add]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-day")`);
     assert.match(await run(`const s = document.getElementById("stop-day"); return s.options[s.selectedIndex].textContent;`), /^New day · Tue May 18/);
     await fill("#stop-src", PLACE);
@@ -816,7 +836,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await count(".dchip:not(.info)"), 5);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Day 5 added · version/);
     // Delete it: asked first, then gone with its stop.
-    await run(`document.querySelector('[data-more="day"]').click(); document.querySelector("[data-day-edit]").click();`);
+    await run(`document.querySelector("[data-day-edit]").click();`);
     await until("the day form", `document.querySelector("dialog.sheet[open] [data-delete]")`);
     await run(`document.querySelector("[data-delete]").click();`);
     await until("the question", `document.querySelector("dialog.ask[open]")`);
@@ -828,11 +848,11 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("places to eat: review link, local name, booking and closing-day warnings that follow the stop", async () => {
     await run(`location.hash = "#day-2";`);
-    await until("day 2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Pastéis de Belém"))`);
-    const stop = title => `[...document.querySelectorAll(".stop")].find(li => li.querySelector("h3").textContent.includes(${JSON.stringify(title)}))`;
+    await until("day 2", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent.includes("Pastéis de Belém"))`);
+    const stop = title => `[...document.querySelectorAll(".stop")].find(li => li.querySelector(".tt").textContent.includes(${JSON.stringify(title)}))`;
     // Lisbon is in Europe: TheFork, searched by name and city; a museum gets none.
     assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector('a[aria-label="Reviews on TheFork"]').href;`), "https://www.google.com/search?q=site%3Athefork.com%20Dinner%20in%20Cacilhas%20Lisboa");
-    assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector(".notice").textContent;`), "!Better booked");
+    assert.equal(await run(`return ${stop("Dinner in Cacilhas")}.querySelector(".sigrow > span").textContent;`), "Better booked");
     assert.equal(await run(`return ${stop("Mosteiro")}.querySelector('a[aria-label^="Reviews"]');`), null);
     // Booking required, closed on Saturdays (this day): two warnings, and the name on the sign.
     await run(`document.querySelector('[data-edit="${ID("pasteis", "2027-05-15")}"]').click();`);
@@ -840,10 +860,11 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.getElementById("stop-local").value = "Antiga Confeitaria de Belém"; document.querySelector('[data-booking="required"]').click(); document.querySelector('[data-closed="sat"]').click();`);
     assert.equal(await run(`return document.querySelector('[data-closed="sat"]').getAttribute("aria-pressed");`), "true");
     await submit();
-    assert.deepEqual(await run(`return [...${stop("Pastéis de Belém")}.querySelectorAll(".notice")].map(n => n.textContent);`), ["!Booking required: not done yet", "!Closed on Saturday"]);
+    // Most important first (W5): the closed door, then the booking.
+    assert.deepEqual(await run(`return [...${stop("Pastéis de Belém")}.querySelectorAll(".sigrow > span")].map(n => n.textContent);`), ["Closed on Saturday", "Booking required: not done yet"]);
     assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".local").textContent;`), "Antiga Confeitaria de Belém");
     // On the map too: the card of the pin has the name on the sign and the review link.
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-expanded") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
     await until("the pins", `document.querySelector('.live .pin[aria-label="Pastéis de Belém"]')`);
     await run(`document.querySelector('.live .pin[aria-label="Pastéis de Belém"]').click();`);
     await until("the card", `document.querySelector(".live .maplibregl-popup .local")`);
@@ -858,8 +879,8 @@ await withApp(async ({run, until, reload, blocked}) => {
     await submit();
     await run(`location.hash = "#day-3";`);
     await until("day 3", `${stop("Pastéis de Belém")}`);
-    assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelectorAll(".notice").length;`), 0, "Sunday: open, and booked");
-    assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".tag.ok").textContent;`), "Booked");
+    assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelectorAll(".sigrow.warn").length;`), 0, "Sunday: open, and booked");
+    assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".sigrow.ok > span").textContent;`), "Booked");
     const saved = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => { const d = g.result.trip.days[2]; r((d.plans ? d.plans[0].stops : d.stops).find(s => s.id === "${ID("pasteis", "2027-05-15")}")); }; }; });`);
     assert.deepEqual([saved.local, saved.booking, saved.closed], ["Antiga Confeitaria de Belém", "booked", ["sat"]]);
   });
@@ -872,11 +893,13 @@ await withApp(async ({run, until, reload, blocked}) => {
       for(const m of new Set(Object.keys(days).map(d => d.slice(0, 7)))) await store.setKV("rates:" + m, {fetched: today, days});`);
     await reload();
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `document.querySelector('[data-edit="${ID("castelo")}"]')`);
-    const stop = id => `document.querySelector('[data-edit="${id}"]').closest(".stop")`;
+    await until("day 1", `document.querySelector("[data-expand]")`);
+    // Closed stops for this step: Open all off.
+    if(await run(`return document.querySelector("[data-expand]").getAttribute("aria-pressed") === "true";`)) await click("[data-expand]");
+    const stop = id => `[...document.querySelectorAll(".stop")].find(li => li.querySelector("[data-open]").dataset.open.endsWith("|${id}"))`;
     // In the margin, in the currency it is paid in; the day's total, and what it makes at home
     // (en-US: dollars), as an estimate: the trip is still to come.
-    assert.equal(await run(`return ${stop(ID("castelo"))}.querySelector(".time .cost").textContent;`), "€30");
+    assert.equal(await run(`return ${stop(ID("castelo"))}.querySelector(".when .cost").textContent;`), "€30");
     // Lisbon Cathedral (€10) was skipped above: left out of the day.
     assert.equal(await run(`return document.querySelector(".daycost").textContent;`), "€68 · ≈ $85");
     assert.equal(await run(`return ${stop(ID("castelo"))}.querySelector(".costrow");`), null, "closed: no cost line");
@@ -902,7 +925,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-error]").textContent;`), "Write only the amount, like 16000 or 4.50.");
     await run(`const a = document.getElementById("stop-cost-amount"); a.value = "40"; document.querySelector('[data-cur="USD"]').click();`);
     await submit();
-    assert.equal(await run(`return ${stop(ID("castelo"))}.querySelector(".time .cost").textContent;`), "$40");
+    assert.equal(await run(`return ${stop(ID("castelo"))}.querySelector(".when .cost").textContent;`), "$40");
     const saved = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip); }; });`);
     const castelo = saved.days[0].stops.find(s => s.id === ID("castelo")), se = saved.days[0].stops.find(s => s.id === ID("se"));
     assert.deepEqual([castelo.cost, castelo.currency, se.cost, se.currency], [40, "USD", 10, undefined], "a cost in the trip's currency has no currency of its own");
@@ -939,6 +962,8 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return ${stop(ID("se"))}.querySelector("[data-cost-rate]");`), null);
     assert.equal(await run(`return !!${stop(ID("castelo"))}.querySelector("[data-cost-rate]");`), true, "dollars still convert");
     await run(`const st = await import(new URL("js/store.js", location.href)); await st.delKV("home");`);
+    // Open all again, for the steps below.
+    if(await run(`return document.querySelector("[data-expand]") && document.querySelector("[data-expand]").getAttribute("aria-pressed") !== "true";`)) await click("[data-expand]");
   });
 
   await step("private expenses: by a stop or alone, out of the versions; a mistake moves with one tap; a file carries them only if asked", async () => {
@@ -1040,7 +1065,8 @@ await withApp(async ({run, until, reload, blocked}) => {
     if(!await run(`return !!navigator.serviceWorker.controller;`)){ await reload(); await until("the service worker", `!!navigator.serviceWorker.controller`); }
     const shared = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "se", set: {tag: "Shared as a file"}}}]};
     await run(`const fd = new FormData(); fd.append("title", "changes.json"); fd.append("file", new File([${JSON.stringify(JSON.stringify(shared))}], "changes.json", {type: "application/json"})); const res = await fetch("share", {method: "POST", body: fd}); window.__shareStatus = res.status; location.href = location.pathname + "?shared=1#day-1";`);
-    await until("the change applied", `[...document.querySelectorAll(".eyebrow")].some(e => e.textContent === "Shared as a file")`);
+    // In the trip (the Cathedral was skipped above: a stop skipped shows no signals, W3).
+    await until("the change applied", `await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip.days[0].stops.some(s => s.tag === "Shared as a file")); }; })`);
     assert.equal(await run(`return location.search;`), "", "nothing left in the address");
     assert.equal(await run(`return (await caches.open("timp-share").then(c => c.match("shared"))) === undefined;`), true, "read once, then gone");
   });
@@ -1073,7 +1099,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return ${card}.querySelector('[data-act="lock"]').textContent;`), "Unlock");
     // The day: said so, no + button.
     await run(`${card}.querySelector('[data-act="open"]') && ${card}.querySelector('[data-act="open"]').click(); location.hash = "#day-1";`);
-    await until("the day", `document.querySelector(".lock-note")`);
+    await until("the day", `document.querySelector(".dayline [data-locked]")`);
     assert.equal(await run(`return document.querySelector(".fabs .fab").hidden;`), true);
     // Changes pasted (an assistant's): not taken.
     const changes = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "comercio", set: {time: "09:45"}}}]};
@@ -1093,7 +1119,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return !!${card}.querySelector("[data-locked]");`), false);
     await run(`location.hash = "#day-1";`);
     await until("the day", `document.querySelector(".stop")`);
-    assert.equal(await run(`return document.querySelector(".fabs .fab").hidden || !!document.querySelector(".lock-note");`), false);
+    assert.equal(await run(`return document.querySelector(".fabs .fab").hidden || !!document.querySelector(".dayline [data-locked]");`), false);
   });
 
   await step("Trips: the open trip on top; the others a line each, grouped by when, sorted, found; a line opens to its trip", async () => {
@@ -1147,6 +1173,45 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`const s = document.querySelector("[data-trips-sort]"); s.value = "date"; s.dispatchEvent(new Event("change", {bubbles: true}));`);
   });
 
+  await step("on the day itself the list starts from now: the mark of now, the next stop open, the ones done in a line, the next stop's bar off screen; no + (R14, V3)", async () => {
+    // The example trip, moved to today on Lisbon's clock, with times around now.
+    const trip = JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"));
+    const [today, min] = await run(`const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {timeZone: "Europe/Lisbon", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"}).formatToParts(new Date()).map(x => [x.type, x.value])); return [p.year + "-" + p.month + "-" + p.day, +p.hour * 60 + +p.minute];`);
+    const at = m => { const x = Math.max(0, Math.min(1439, min + m)); return String(Math.floor(x / 60)).padStart(2, "0") + ":" + String(x % 60).padStart(2, "0"); };
+    delete trip.version; delete trip.private;
+    Object.assign(trip, {id: "today-trip", title: "Today in Lisbon", timezone: "Europe/Lisbon"});
+    const day = {...trip.days[0], date: today, notes: undefined};
+    // Enough stops for the next one to leave the screen when the list scrolls.
+    const places = trip.days.flatMap(d => d.plans ? d.plans[0].stops : d.stops).filter(x => x.lat !== undefined && !x.choice).slice(0, 9);
+    day.stops = places.map((x, i) => ({...x, id: undefined, time: at([-120, -60, 40, 70, 100, 130, 160, 190, 220][i])}));
+    trip.days = [day];
+    await run(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(JSON.stringify(trip))}], "today.json", {type: "application/json"})); const f = document.getElementById("file"); f.files = dt.files; f.dispatchEvent(new Event("change"));`);
+    await until("today's trip", `document.title.includes("Today in Lisbon")`);
+    await run(`location.hash = "#day-1";`);
+    await until("the day", `document.querySelectorAll(".stop").length === 9`);
+    if(await run(`return document.querySelector("[data-expand]").getAttribute("aria-pressed") === "true";`)) await click("[data-expand]");
+    await click("[data-tick]", 0);
+    await click("[data-tick]", 1);
+    assert.equal(await count(".stops.today"), 1);
+    assert.equal(await count(".stop.compact"), 2, "the stops done today, in a line");
+    assert.equal(await count(".stop.past"), 2, "behind now: the line in dots");
+    assert.equal(await run(`return document.querySelector(".stops .now + .stop").classList.contains("next");`), true, "now, then the next stop");
+    assert.match(await text(".stops .now .nt"), /^\d\d:\d\d · .+ in \d+ min$/);
+    assert.equal(await run(`return document.querySelector(".stop.next [data-open]").getAttribute("aria-expanded");`), "true", "the next stop is open");
+    assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "no + floating on the day itself");
+    assert.equal(await count(".addrow [data-add-stop]"), 1, "adding is the last row");
+    // The next stop's bar: hidden while its card shows; there when it leaves the screen.
+    await run(`document.querySelector(".stop.next").scrollIntoView({block: "center"});`);
+    await until("no bar while the card shows", `document.querySelector(".nextbar").hidden`);
+    await run(`document.querySelector(".dayfoot").scrollIntoView({block: "end"}); window.scrollBy(0, 2000); await new Promise(r => setTimeout(r, 300));`);
+    await until("the bar", `!document.querySelector(".nextbar").hidden`);
+    assert.match(await run(`return document.querySelector(".nextbar .nb-go").href;`), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=/, "Directions from where the traveller is");
+    await run(`document.querySelector(".nextbar [data-to-next]").click();`);
+    await until("back to the next stop", `(() => { const r = document.querySelector(".stop.next").getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight; })()`);
+    // Away from the app for a while, back on another day: no jump, the day starts at the top.
+    await run(`location.hash = "#trips";`);
+  });
+
   await step("a phone coming from 2.1 moves its full copies of versions into pieces", async () => {
     // Rebuild the 2.1 database: a trip, and two versions kept as full copies.
     const {trip: v1} = await prepare(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8")));
@@ -1170,7 +1235,7 @@ await withApp(async ({run, until, reload, blocked}) => {
         };
       });`);
     await run(`location.href = location.origin + "/#day-1";`);
-    await until("the trip, opened by 2.2", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent === "Gelato")`);
+    await until("the trip, opened by 2.2", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent === "Gelato")`);
     const counts = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const db = q.result, tx = db.transaction(["versions", "commits", "objects"]); const out = {version: db.version}; let n = 0; for(const s of ["versions", "commits", "objects"]){ const c = tx.objectStore(s).count(); c.onsuccess = () => { out[s] = c.result; if(++n === 3){ db.close(); r(out); } }; } }; });`);
     assert.equal(counts.version, 3);
     assert.equal(counts.versions, 0, "the full copies are gone");
@@ -1489,7 +1554,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.equal(await text(".tripcard .where"), "On your account");
     await run(`document.querySelector('[data-act="sync"]').click();`);
     await run(`location.hash = "#day-1";`);
-    await until("the other phone's stop", `[...document.querySelectorAll(".stop h3")].some(h => h.textContent.includes("Added on the other phone"))`, 15000);
+    await until("the other phone's stop", `[...document.querySelectorAll(".stop .tt")].some(h => h.textContent.includes("Added on the other phone"))`, 15000);
     await run(`location.hash = "#trips";`);
     await until("synced again", `document.querySelector('[data-sync="ok"]')`, 15000);
     assert.equal(await run(`return !!document.querySelector(".tripcard .unsaved");`), false, "on the account: no file needed to keep it");
@@ -1721,7 +1786,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`location.hash = "#day-1";`);
     await until("its day", `document.querySelector(".stop")`);
     assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "nothing to add");
-    assert.match(await text(".lock-note"), /^This trip is @fra's, read only/);
+    assert.match(await text(".dayline [data-locked]"), /^This trip is @fra's, read only/);
     // On Trips, apart, with its month only (its dates were not published).
     await run(`location.hash = "#trips";`);
     await until("its card", `document.querySelector("[data-public-badge]")`);
@@ -1894,33 +1959,35 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await reload();
     await run(`location.hash = "#day-1";`);
     const se = oldStopId("kept-before", "2027-05-14", "se");
-    await until("the trip", `document.querySelector('[data-edit="${se}"]')`);
-    assert.equal(await run(`return document.querySelector('[data-edit="${se}"]').closest(".stop").classList.contains("done");`), true, "the tick followed");
+    await until("the trip", `document.querySelector('[data-open$="|${se}"]')`);
+    assert.equal(await run(`return document.querySelector('[data-open$="|${se}"]').closest(".stop").classList.contains("done");`), true, "the tick followed");
     const now = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip); }; });`);
     assert.deepEqual(now.version.parents, [kept.version.id], "a version made from the one it had");
     assert.equal(now.version.id, (await prepare(kept)).trip.version.id, "the same version any phone makes");
   });
 
-  await step("a day's notes in one line, opened with a tap and kept so; its stops without a position found at once, checked, saved as one version", async () => {
+  await step("the day's line: what matters today in one place, the first and +N; opened with a tap and kept so; its stop without a position found, checked, saved as one version", async () => {
     await run(`location.hash = "#day-1";`);
-    await until("the notes", `document.querySelector("[data-notes]")`);
-    assert.equal(await run(`return document.querySelector("[data-notes] .rt").textContent;`), "2 notes · This is an invented trip, here to show what the app does. Times and descriptions are examples: check everything before a real visit.");
-    assert.equal(await run(`return document.getElementById("day-notes").hidden;`), true, "closed at first");
+    await until("the day's line", `document.querySelector(".dayline [data-notes]")`);
+    // Closed: the first (a stop without a position comes before the notes) and how many more.
+    assert.equal(await run(`return document.querySelector(".dayline .lhead .tx").textContent;`), "1 stop without a position");
+    assert.equal(await run(`return document.querySelector(".dayline .lhead .plus").textContent;`), "+2");
+    assert.equal(await run(`return document.getElementById("day-line").hidden;`), true, "closed at first");
     await run(`document.querySelector("[data-notes]").click();`);
-    assert.equal(await run(`return document.getElementById("day-notes").hidden;`), false);
-    assert.equal(await run(`return document.querySelector("[data-notes] .rt").textContent;`), "2 notes for the day");
+    assert.equal(await run(`return document.getElementById("day-line").hidden;`), false);
+    assert.equal(await run(`return document.querySelector(".dayline .lhead .tx").textContent;`), "To know today · 3");
+    assert.equal(await run(`return [...document.querySelectorAll(".dayline li .tx")].length;`), 3);
+    assert.equal(await run(`return document.querySelector(".dayline li [data-find-pos]").textContent;`), "Find", "each with its action (W1)");
     await reload();
     await run(`location.hash = "#day-1";`);
-    await until("the notes", `document.querySelector("[data-notes]")`);
+    await until("the day's line", `document.querySelector("[data-notes]")`);
     assert.equal(await run(`return document.querySelector("[data-notes]").getAttribute("aria-expanded");`), "true", "kept open for this trip");
     await run(`document.querySelector("[data-notes]").click();`);
-    assert.equal(await run(`return document.getElementById("day-notes").hidden;`), true);
-    // One stop without a position: a line above the stops, and the stop says so.
-    assert.equal(await run(`return document.querySelector(".nopos span").textContent;`), "1 stop without a position");
-    assert.equal(await run(`return !!document.querySelector(".nopos + .stops");`), true, "above the stops");
+    assert.equal(await run(`return document.getElementById("day-line").hidden;`), true);
+    // Where the stop's number would be, a crossed sign (P1).
     // Where its number would be, a crossed sign: a tap finds that stop's position.
-    assert.equal(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nopos-sign")).map(li => li.querySelector("h3").textContent).join();`), "Lunch in Alfama");
-    assert.equal(await run(`return document.querySelector(".stop .nopos-sign").getAttribute("aria-label");`), "Lunch in Alfama: no position. Find it");
+    assert.equal(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nopos-sign")).map(li => li.querySelector(".tt").textContent).join();`), "Lunch in Alfama");
+    assert.equal(await run(`return document.querySelector(".stop .nopos-sign").getAttribute("aria-label");`), "Lunch in Alfama: no position. Find it, Food");
     const before = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip.version.id); }; });`);
     await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.7115","lon":"-9.1305","category":"amenity","type":"restaurant","display_name":"Taberna Exemplo, Rua dos Remédios, Lisboa"}]'))) : real(u, o);`);
     await run(`document.querySelector(".nopos-sign").click();`);
@@ -1936,16 +2003,18 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     const lunch = now.days[0].stops.find(s => s.title === "Lunch in Alfama");
     assert.deepEqual([lunch.lat, lunch.lng], [38.7115, -9.1305]);
     assert.deepEqual(now.version.parents, [before], "one new version");
-    assert.equal(await run(`return document.querySelector(".nopos");`), null, "every stop has its position: the line is gone");
+    assert.equal(await run(`return [...document.querySelectorAll(".dayline li .tx")].some(t => /without a position/.test(t.textContent));`), false, "every stop has its position: it is no longer said");
   });
 
-  await step("alternatives: one added from a stop's menu, another chosen, one not chosen ticked; a plan chosen for everyone", async () => {
+  await step("alternatives: one added from an opened stop, another chosen with a tap, then the first again; a plan chosen for everyone", async () => {
     const tripNow = () => run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip); }; });`);
     const lunchOf = trip => trip.days[0].stops;
     const toast = () => run(`return document.getElementById("toast").textContent;`);
     const lunch = oldStopId("kept-before", "2027-05-14", "lunch");
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `document.querySelector('[data-alt-add="${lunch}"]')`);
+    await until("day 1", `document.querySelector('[data-open$="|${lunch}"]')`);
+    if(!await run(`return !!document.querySelector('[data-alt-add="${lunch}"]');`)) await run(`document.querySelector('[data-open$="|${lunch}"]').click();`);
+    await until("opened", `document.querySelector('[data-alt-add="${lunch}"]')`);
     await run(`document.querySelector('[data-alt-add="${lunch}"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-group")`);
     assert.equal(await run(`return document.getElementById("sheet-title").textContent;`), "An alternative to Lunch in Alfama");
@@ -1955,27 +2024,29 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("added", `/Lunch: Casa Exemplo added · version/.test(document.getElementById("toast").textContent)`);
     let trip = await tripNow();
     assert.deepEqual(lunchOf(trip).filter(s => s.choice === "Lunch").map(s => [s.title, !!s.chosen]), [["Lunch in Alfama", true], ["Casa Exemplo", false]]);
-    // Closed: the chosen one, the others in a line; the day goes through one lunch.
-    assert.equal(await run(`return document.querySelector(".group-head .gh").textContent;`), "Lunch2 alternatives");
-    assert.equal(await run(`return document.querySelector(".alts-line .names").textContent;`), "others: Casa Exemplo");
-    assert.equal(await run(`return [...document.querySelectorAll(".stop h3")].filter(h => h.textContent.includes("Casa Exemplo")).length;`), 0);
-    // Opened: every option; "Choose this" (a trip of this phone only: nothing asked).
+    // Closed: the chosen one, "+1" and the others' names; the day goes through one lunch.
+    assert.equal(await run(`return document.querySelector(".group .gh").textContent;`), "Lunch");
+    assert.equal(await run(`return document.querySelector(".alts-line .plus").textContent;`), "+1");
+    assert.equal(await run(`return document.querySelector(".alts-line .names").textContent;`), "Casa Exemplo");
+    assert.equal(await run(`return document.querySelector(".alts-line").getAttribute("aria-label");`), "others: Casa Exemplo");
+    assert.equal(await run(`return [...document.querySelectorAll(".stop .tt")].filter(h => h.textContent.includes("Casa Exemplo")).length;`), 0);
+    // Opened: every option, a choice to make (a trip of this phone only: nothing asked).
     await run(`document.querySelector(".alts-line").click();`);
-    await until("opened", `document.querySelector("[data-choose]")`);
+    await until("opened", `document.querySelector('.opts[role="radiogroup"] [data-choose]')`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll('.opts [role="radio"]')].map(b => [b.querySelector("b").textContent, b.getAttribute("aria-checked")]);`), [["Lunch in Alfama", "true"], ["Casa Exemplo", "false"]]);
     const casa = lunchOf(trip).find(s => s.title === "Casa Exemplo").id;
     await run(`document.querySelector('[data-choose="${casa}"]').click();`);
     await until("chosen", `/Lunch: Casa Exemplo chosen · version/.test(document.getElementById("toast").textContent)`);
     trip = await tripNow();
     assert.deepEqual(lunchOf(trip).filter(s => s.chosen).map(s => s.title), ["Casa Exemplo"]);
-    // A tick on the option not chosen: asked, then chosen and ticked.
-    await until("the other option", `document.querySelector('[data-tick][data-option="${lunch}"]')`);
-    await run(`document.querySelector('[data-tick][data-option="${lunch}"]').click();`);
-    await until("asked", `document.querySelector("dialog.ask[open]")`);
-    assert.equal(await text("dialog.ask[open] #ask-title"), "Did you go to Lunch in Alfama?");
-    await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
+    // The first again, with a tap on it; then closed, the chosen one can be ticked.
+    await until("still open", `document.querySelector('[role="radio"][data-choose="${lunch}"]')`);
+    await run(`document.querySelector('[role="radio"][data-choose="${lunch}"]').click();`);
     await until("chosen again", `/Lunch: Lunch in Alfama chosen/.test(document.getElementById("toast").textContent)`);
     trip = await tripNow();
     assert.deepEqual(lunchOf(trip).filter(s => s.chosen).map(s => s.title), ["Lunch in Alfama"]);
+    await run(`document.querySelector(".gclose").click(); await new Promise(r => setTimeout(r, 100));`);
+    await run(`document.querySelector('[data-tick="2027-05-14||${lunch}"]').click(); await new Promise(r => setTimeout(r, 100));`);
     assert.equal(await run(`return document.querySelector('[data-tick="2027-05-14||${lunch}"]').getAttribute("aria-pressed");`), "true", "and ticked");
     // Day 3 has two plans: looking at the second, it can be chosen for everyone.
     await run(`location.hash = "#day-3";`);

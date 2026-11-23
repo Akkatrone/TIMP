@@ -65,7 +65,7 @@ test("colours are defined only in the tokens", () => {
 
 // R10: only token values. The styles written before the design system still have their
 // own; these numbers may only go down, release after release, to zero.
-const LEFT = {hex: 41, font: 165, radius: 86, rgba: 16};
+const LEFT = {hex: 40, font: 142, radius: 70, rgba: 14};
 test("the styles use tokens, and fewer values of their own than before (R10)", () => {
   const count = {
     hex: (css.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length,

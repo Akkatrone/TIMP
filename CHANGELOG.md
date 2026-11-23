@@ -4,6 +4,36 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## Unreleased (4.0.0)
+
+The design system ([design/README.md](design/README.md)): one set of tokens, rules for
+every screen, accessibility in each. This release brings it to the day.
+
+- **Tokens** (`design/tokens.json`, `css/tokens.css` made from it): colours checked for
+  contrast in both themes, seven text sizes in rem, spaces, radii, durations. **Inter**,
+  kept with the app (no request at startup, offline). "Reduce motion" is followed.
+- **The map is always light**, in the dark theme too; pins are never lighter than their
+  kind's colour, so their numbers stay readable.
+- **The top bar**: the trip is the title (a tap opens the list of trips), List | Map, you;
+  the days under it, today called so.
+- **A day**: its heading with its city written as the name of a line. **The day's line**:
+  what matters today in one place (closed doors and bookings of the stops ahead, choices
+  to make, stops without a position, the notes), the first and "+N", each with its action.
+- **A stop**: a card of its own on the line of the day, its number in the colour of its
+  kind (the same sign as on the map), the time above the name, the name on two lines,
+  one signal and "+N". Opened: every signal, the description, then "Go" (Map, Directions,
+  TheFork) and, quieter, "Change" (Edit, Skip, + Alternative): no more ⋯. Done: a tick
+  in ink.
+- **Alternatives**: chosen, the option and "+N"; opened, the options as a choice to make;
+  with no choice yet, dashed, the options in view.
+- **On the day itself**: the list goes to now, a mark says how long until the next stop,
+  which is open; the stops done are in one line; when the next stop's card leaves the
+  screen, a bar at the bottom brings it back and gives Directions from where you are.
+- **Adding** is the last row of every day (a new stop, or what a chat wrote); + floats on
+  the other days only.
+- **Accessibility**: every control named and its state said, areas of 44 points, stop
+  names as headings under the day's; checked by the e2e.
+
 ## 3.32.2
 
 - **A stop without a position** has a crossed sign where its number would be, instead of

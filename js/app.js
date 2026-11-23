@@ -3,7 +3,7 @@ import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
 import { esc, rich, mapsUrl, dirUrl, dateParts as calendarParts, todayIn, jsonIn, weekdayName } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
-import { daylight, partsOfDay } from "./sun.js";
+import { daylight, partsOfDay, clockOf } from "./sun.js";
 import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
 import { clockMinutes } from "./edit.js";
 import { icon } from "./icons.js";
@@ -43,6 +43,24 @@ const PLUS = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M
 const CLIP = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5.5" y="4.5" width="13" height="16" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M9 4.5h6v2.5H9z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12h6M9 15.5h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const DOTS = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="12.5" cy="8" r="1.5" fill="currentColor"/></svg>';
 const LOCK = '<svg class="lock" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" fill="currentColor"/><path d="M5.5 7V5.2a2.5 2.5 0 015 0V7" stroke="currentColor" stroke-width="1.6"/></svg>';
+// Icons of the opened stop's actions, and of the signals: the level gives the colour,
+// the kind the icon (design/README.md, W5).
+const EDIT = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+const SKIP = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h8M8 4.5L11.5 8 8 11.5M13.5 3.5v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const DASH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const SIG_ICON = {
+  closed: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3M6.3 9.2l3.4 3.1M9.7 9.2l-3.4 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  ticket: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 5a1 1 0 011-1h10a1 1 0 011 1v1.5a1.5 1.5 0 000 3V11a1 1 0 01-1 1H3a1 1 0 01-1-1V9.5a1.5 1.5 0 000-3z" stroke="currentColor" stroke-width="1.4"/></svg>',
+  choice: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 14.5V9M8 9L3.8 3.8M8 9l4.2-5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="3.5" cy="3.2" r="1.5" fill="currentColor"/><circle cx="12.5" cy="3.2" r="1.5" fill="currentColor"/></svg>',
+  note: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  warn: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.6 11.7H1.4z" fill="currentColor"/><path d="M8 6.2v3.6M8 11.6v.1" stroke="var(--warn-bg)" stroke-width="1.6" stroke-linecap="round"/></svg>'
+};
+const ROUTE = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 13.5V8.5a3 3 0 013-3h5.5M10 3l2.5 2.5L10 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SELECTOR = '<svg class="sel" viewBox="0 0 10 14" fill="none" aria-hidden="true"><path d="M2 5l3-3 3 3M2 9l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const LIST = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5.5 4h8M5.5 8h8M5.5 12h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="2.5" cy="4" r="1.1" fill="currentColor"/><circle cx="2.5" cy="8" r="1.1" fill="currentColor"/><circle cx="2.5" cy="12" r="1.1" fill="currentColor"/></svg>';
+const MAPICON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 3.5l4-1.5 5 2 4-1.5v10l-4 1.5-5-2-4 1.5z M5.5 2v10 M10.5 4v10" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+const INFO = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+let uid = 0;   // ids for aria-controls, unique on the page
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const S = {
@@ -620,22 +638,6 @@ async function chooseHere(id){
   await applyEdit(tr => ({trip: chooseOption(tr, {...ref, id})}), "altChosenMsg", {g, s: s.title});
 }
 
-// A tick on an option not chosen: the traveller went there instead. Asked, then chosen and ticked.
-async function wentTo(id, key){
-  if(!mayChange()) return;
-  const {ref, list} = hereList();
-  const s = list.find(x => x.id === id), g = groupOf(s);
-  if(!g) return;
-  const shared = (await othersOnTrip()) !== null;
-  const yes = await ask({title: t("altWentTitle", {s: s.title}), text: [t("altWentText", {g}), ...(shared ? [t("altWentShared")] : [])],
-    actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("altChooseThis"), kind: "primary"}]});
-  if(yes !== "yes") return;
-  S.state.done[key] = 1;
-  delete S.state.skipped[key];
-  saveState();
-  await applyEdit(tr => ({trip: chooseOption(tr, {...ref, id})}), "altChosenMsg", {g, s: s.title});
-}
-
 // "Add an alternative" to a stop: the stop form, with its day, time and kind, in its
 // group (or a new one, named from the time and kind: Lunch, Dinner, Alternatives).
 function addAlternativeHere(id){
@@ -856,16 +858,23 @@ function renderStrip(r){
   if(!trip()){ $strip.hidden = true; return; }
   $strip.hidden = false;
   const lang = getLang(), ti = todayIndex();
-  $days.setAttribute("aria-label", trip().title);
-  $days.innerHTML = trip().days.map((d, i) => {
+  // The trip is the title: a tap opens the list of trips (R12: a sign for what leads
+  // elsewhere). Its dates under it.
+  const tr = trip(), first = tr.days[0], last = tr.days[tr.days.length - 1];
+  const title = document.getElementById("trip-title");
+  title.innerHTML = `<b><span>${esc(tr.title)}</span>${SELECTOR}</b>${first ? `<small>${esc(dateRange(tr, lang))}</small>` : ""}`;
+  title.setAttribute("aria-label", t("tripsOf", {s: tr.title}));
+  if(r.name === "trips") title.setAttribute("aria-current", "page"); else title.removeAttribute("aria-current");
+  // List | Map, on a day (M2).
+  const vt = document.getElementById("view-toggle");
+  vt.hidden = r.name !== "day";
+  vt.setAttribute("aria-label", t("dayView"));
+  vt.innerHTML = `<button type="button" data-view-list aria-pressed="${!S.ui.mapOpen}" aria-label="${esc(t("viewList"))}">${LIST}</button><button type="button" data-map aria-pressed="${S.ui.mapOpen}" aria-label="${esc(t("viewMap"))}">${MAPICON}</button>`;
+  $days.setAttribute("aria-label", t("tripDays"));
+  $days.innerHTML = `<a class="dchip info" href="#info"${r.name === "info" ? ' aria-current="page"' : ""}><span class="w">${esc(t("info"))}</span><span class="n">${INFO}</span></a>` + tr.days.map((d, i) => {
     const dp = dateParts(d.date, lang), cur = r.name === "day" && r.i === i;
-    return `<a class="dchip${i === ti ? " today" : ""}" href="#day-${i + 1}" style="--c:${cityVar(d.city)}"${cur ? ' aria-current="page"' : ""} aria-label="${esc(t("day"))} ${i + 1}, ${esc(dp.long)}${i === ti ? ", " + esc(t("today")) : ""}"><span class="n">${i + 1}</span><span class="w">${esc(dp.dow)}</span></a>`;
-  }).join("") +
-    `<a class="dchip info" href="#info"${r.name === "info" ? ' aria-current="page"' : ""}>${esc(t("info"))}</a>`;
-  // Trips stays in view on the right, next to the circle: the days scroll on their own.
-  const tripsChip = document.getElementById("trips-chip");
-  tripsChip.textContent = t("trips");
-  if(r.name === "trips") tripsChip.setAttribute("aria-current", "page"); else tripsChip.removeAttribute("aria-current");
+    return `<a class="dchip${i === ti ? " today" : ""}" href="#day-${i + 1}" style="--c:${cityVar(d.city)}"${cur ? ' aria-current="page"' : ""} aria-label="${esc(t("day"))} ${i + 1}, ${esc(dp.long)}${i === ti ? ", " + esc(t("today")) : ""}"><span class="w">${esc(i === ti ? t("today") : dp.dow)}</span><span class="n">${i + 1}</span></a>`;
+  }).join("");
   const active = $days.querySelector('[aria-current="page"]');
   if(active) $days.scrollLeft = active.offsetLeft - ($days.clientWidth - active.offsetWidth) / 2;
   markStrip();
@@ -887,7 +896,7 @@ function drawMeButton(r){
   const float = !trip();
   b.classList.toggle("float", float);
   if(float && b.parentElement !== document.body) document.body.appendChild(b);
-  if(!float && b.parentElement === document.body) document.querySelector(".strip .gutter").appendChild(b);
+  if(!float && b.parentElement === document.body) document.querySelector(".strip .tbar").appendChild(b);
 }
 
 // The bar of days: an edge once the page has scrolled under it, and a fade on each side
@@ -1947,29 +1956,7 @@ function dayTotal(items){
   return homeText ? ` · <span class="daycost"><b>${esc(homeText)}</b></span>` : "";
 }
 
-// The day's notes in one line, closed: how many and the start of the first (one alone:
-// its start). A tap opens them all, numbered; open or closed is kept for the trip on
-// this phone.
-function notesHTML(notes){
-  const open = !!S.state.notesOpen, n = notes.length;
-  const plain = x => String(x).replace(/\*\*/g, "");
-  const head = open ? `<b>${esc(t(n === 1 ? "notesOpenOne" : "notesOpen", {n}))}</b>`
-    : n === 1 ? `<span class="first">${esc(plain(notes[0]))}</span>` : `<b>${esc(t("notesClosed", {n}))}</b><span class="first"> · ${esc(plain(notes[0]))}</span>`;
-  return `<div class="reminds${open ? " open" : ""}"><button type="button" class="remind-row" data-notes aria-expanded="${open}" aria-controls="day-notes">` +
-    `<span class="ic" aria-hidden="true">!</span><span class="rt">${head}</span><span class="chev">${CHEVRON}</span></button>` +
-    `<ol class="remind-list" id="day-notes"${open ? "" : " hidden"}>${notes.map(r => `<li class="remind"><div>${rich(r)}</div></li>`).join("")}</ol></div>`;
-}
 
-// Groups of alternatives still to choose: left out of the day's costs (js/choices.js), so
-// said next to them: "1 choice to make", with what it may cost when every option says.
-function toChooseLine(all){
-  const pending = [...groupsIn(all).values()].filter(xs => !chosenIn(xs));
-  if(!pending.length) return "";
-  const xs = pending.length === 1 ? pending[0] : [];
-  const priced = xs.length && xs.every(o => typeof o.cost === "number") && new Set(xs.map(costCurrency)).size === 1;
-  const by = [...xs].sort((a, b) => a.cost - b.cost), range = priced && by[0].cost !== by.at(-1).cost ? ` (${costShort(by[0], [])}–${costShort(by.at(-1), [])})` : "";
-  return " · " + esc(pending.length === 1 ? t("choicesToMakeOne") : t("choicesToMake", {n: pending.length})) + esc(range);
-}
 
 // The plan a day is shown with: the one looked at on this phone, else the trip's chosen one.
 const planShown = d => d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || chosenPlan(d)) : null;
@@ -1978,105 +1965,165 @@ const planShown = d => d.plans ? (d.plans.find(p => p.id === S.state.plans[d.dat
 // shared with this account to read only.
 const canChange = () => !isLocked(S.rec) && !(S.rec.share && !S.rec.share.gone && S.rec.share.role === "read");
 
-// The day's stops. `list`: what the day goes through (programOf in js/choices.js), which
-// the numbers, the route and the map follow; `all`: every stop of the list, the options of
-// each group too. A group is drawn once, where its first option is: closed, the chosen
-// option, then the others in one line; to choose, its options in short; opened, all of
-// them, the others with "Choose this", and + Alternative.
-function stopsHTML(day, planId, list, parts, paint, all = list){
+// The day's stops (design/README.md: R1, R2, R12–R15, W5, M1). `list`: what the day goes
+// through (programOf in js/choices.js), which the numbers, the route and the map follow;
+// `all`: every stop of the list, the options of each group too; `now`: where the day is,
+// when it is today (nowOf). A group is drawn once, where its first option is: with a
+// choice, the chosen option and "+N" for the others; opened, or with no choice yet, its
+// options as a choice to make.
+function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: false, next: -1}){
   const dayIndex = trip().days.indexOf(day);
   const skippedAt = j => { const k = stopKey(day, planId, list[j], j); return !S.state.done[k] && !!S.state.skipped[k]; };
   const change = canChange();
-  // i: its place in `list`, or -1 for an option the day does not go to (opt.slot: the
-  // place it would take, for Directions).
-  const stopLi = (s, i, opt = {}) => {
+  // i: its place in `list` (-1 for an option the day does not go to); opt.slot: the
+  // place it would take, for Directions.
+  const stopEl = (s, i, opt = {}, tag = "li") => {
     const id = stopKey(day, planId, s, i);
-    const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id], open = isOpen(id);
+    const isDone = !!S.state.done[id], isSkipped = !isDone && !!S.state.skipped[id];
+    const isNext = i >= 0 && i === now.next;
+    // The next stop of today is open, unless the traveller closed it (R14).
+    const open = S.openStops.has(id) ? S.openStops.get(id) : (S.ui.expandAll || isNext);
+    const compact = now.today && isDone && !open;
+    const past = now.today && i >= 0 && (now.next < 0 || i < now.next);
     const q = placeQuery(s);
-    // Left column: when, where on the map, how you get there.
-    const dark = parts && i >= 0 && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
-    // The cost, small, under them: in the currency it is paid in.
     const paid = atStop(privOf(), day.date, s.id);
     const hasCost = typeof s.cost === "number" || paid.length > 0;
-    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined && i >= 0 ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>`
-      : s.lat === undefined && change && s.id ? `<button type="button" class="nopos-sign" data-find-pos="${esc(s.id)}" aria-label="${esc(t("noPosFind", {s: s.title}))}" title="${esc(t("noPosTag"))}">${NO_POS}</button>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</div>`;
-    // Middle: a label above the title, the title with its kind, the description that folds, the links.
-    // The name as on the sign, under the title, in its own language (for the glyphs).
+    const mid = "more-" + (++uid);
+    // The rail: the stop's number, the same sign as on the map (M1); a crossed sign for a
+    // stop without a position, which finds it (P1).
+    const kind = TYPES.includes(s.type) ? t("type_" + s.type) : "";
+    const rail = s.lat !== undefined && i >= 0
+      ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}" role="img" aria-label="${esc(t("stopNumber", {n: i + 1}) + (kind ? ", " + kind : ""))}">${i + 1}</span>`
+      : s.lat === undefined && change && s.id ? `<button type="button" class="nopos-sign" data-find-pos="${esc(s.id)}" aria-label="${esc(t("noPosFind", {s: s.title}) + (kind ? ", " + kind : ""))}" title="${esc(t("noPosTag"))}">${NO_POS}</button>`
+      : s.lat === undefined ? `<span class="nopos-sign" role="img" aria-label="${esc(t("noPosTag") + (kind ? ", " + kind : ""))}">${NO_POS}</span>` : `<span class="nb blank" aria-hidden="true"></span>`;
+    // Above the name: when, after dark, how you get there, what it costs (R13).
+    const night = parts && i >= 0 && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
+    const when = s.time || night || s.travel || (hasCost && !compact)
+      ? `<p class="when">${s.time ? `<span class="tm">${esc(s.time)}</span>` : ""}${night}${chip("travel", s.travel)}${hasCost && !compact ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</p>` : "";
+    const name = `<h2 class="tt"><button type="button" class="tap" data-open="${esc(id)}" aria-expanded="${open}" aria-controls="${mid}">${esc(s.title)}</button></h2>`;
     const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
-    const titleRow = `<div class="h"><h3>${chip("type", s.type)}${esc(s.title)}</h3>${s.text || hasCost ? `<span class="chev">${CHEVRON}</span>` : ""}</div>` +
-      (s.local ? `<p class="local"${lang ? ` lang="${lang}"` : ""}>${esc(s.local)}</p>` : "");
-    // Opened, a stop shows all its description, and its cost as the last line.
-    const head = s.text || hasCost
-      ? `<div class="tap" role="button" tabindex="0" data-open="${esc(id)}" aria-expanded="${open}">${titleRow}${s.text ? `<p class="desc${open ? "" : " clamp"}">${rich(s.text)}</p>` : ""}</div>`
-      : titleRow;
-    // What could leave the traveller at a closed door, while the stop is still ahead.
-    const closed = closedOn(s, day.date);
-    const notices = isDone || isSkipped ? "" : [
-      s.booking === "required" ? ["warn", t("bookingRequired")] : s.booking === "advised" ? ["soft", t("bookingAdvised")] : null,
-      closed ? ["warn", closed.date ? t("closedDate") : t("closedWeekday", {d: weekdayName(closed.weekday, getLang())})] : null
-    ].filter(Boolean).map(([k, x]) => `<p class="notice ${k}"><span class="ic" aria-hidden="true">!</span><span>${esc(x)}</span></p>`).join("");
-    // Map and Directions, and for a place to eat the review site of that part of the world.
-    const review = reviewSite(s, {city: day.city, timezone: trip().timezone, lang: getLang()});
-    const links = (q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "") +
-      (q ? `<a class="maplink" href="${esc(dirUrl(q, comingFrom(dayIndex, list, i >= 0 ? i : opt.slot, skippedAt)))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
-      (review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)}</a>` : "");
-    const booked = s.booking === "booked" ? `<span class="tag ok">${esc(t("booked"))}</span>` : "";
-    // In an opened group: the chosen one says so, the others can be chosen.
-    const pick = opt.option ? `<button type="button" class="btn small" data-choose="${esc(s.id)}"${change ? "" : ` aria-disabled="true"`}>${esc(t("altChooseThis"))}</button>`
-      : opt.chosen ? `<span class="tag ok">${esc(t("altChosen"))}</span>` : "";
-    const meta = isSkipped || links || booked || pick ? `<div class="meta">${pick}${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}</div>` : "";
-    const eyebrow = s.tag ? `<span class="eyebrow">${esc(s.tag)}</span>` : "";
-    // Right: the tick, and the ⋯ menu with the actions used less often.
-    const menuOpen = S.menuFor === id;
-    const items = (s.id ? `<button type="button" role="menuitem" data-edit="${esc(s.id)}">${esc(t("editStop"))}</button>` : "") +
-      (isDone || opt.option ? "" : `<button type="button" role="menuitem" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${esc(t(isSkipped ? "unskip" : "skip"))}</button>`) +
-      (s.id && change ? `<button type="button" role="menuitem" data-alt-add="${esc(s.id)}">${esc(t("altAddOne"))}</button>` : "");
-    const side = `<div class="side"><button class="tick" type="button" data-tick="${esc(id)}"${opt.option ? ` data-option="${esc(s.id)}"` : ""} aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${CHECK}</button>` +
-      (items ? `<button class="more" type="button" data-more="${esc(id)}" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="${esc(t("moreActions"))}: ${esc(s.title)}">${DOTS}</button>` +
-        `<div class="menu" role="menu"${menuOpen ? "" : " hidden"}>${items}</div>` : "") + `</div>`;
-    const cost = hasCost && open ? costRow(s, id, day.date, paid) : "";
-    return `<li class="stop${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${open ? " open" : ""}${hasCost ? " has-cost" : ""}${opt.option ? " option" : ""}${opt.group ? " in-group" : ""}">${left}<div class="body">${eyebrow}${head}${notices}${meta}${cost}</div>${side}</li>`;
+    const local = s.local && !compact ? `<p class="local"${lang ? ` lang="${lang}"` : ""}>${esc(s.local)}</p>` : "";
+    const sigs = compact ? [] : signalsOf(s, day, isDone || isSkipped);
+    // Closed: the first signal, and how many more (W5); the description in one line.
+    const closedPart = open || compact ? "" :
+      (s.text ? `<p class="desc clamp">${rich(s.text)}</p>` : "") +
+      (sigs.length ? `<p class="sigline">${sigHTML(sigs[0])}${sigs.length > 1 ? `<span class="plus" role="img" aria-label="${esc(t("sigMore", {n: sigs.length - 1}))}">+${sigs.length - 1}</span>` : ""}</p>` : "");
+    // Opened: every signal first, the description, the cost; then two zones, never mixed
+    // (R2): going there, out of the app (↗), and changing it, quieter.
+    let more = "";
+    if(open){
+      const review = reviewSite(s, {city: day.city, timezone: trip().timezone, lang: getLang()});
+      const go = [
+        q || s.link ? `<a class="maplink" href="${esc(s.link || mapsUrl(q))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : "",
+        q ? `<a class="maplink" href="${esc(dirUrl(q, comingFrom(dayIndex, list, i >= 0 ? i : opt.slot, skippedAt)))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "",
+        review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)} ↗</a>` : ""
+      ].filter(Boolean);
+      const changes = [
+        s.id ? `<button type="button" data-edit="${esc(s.id)}">${EDIT}${esc(t("editStop"))}</button>` : "",
+        isDone ? "" : `<button type="button" data-skip="${esc(id)}" aria-pressed="${isSkipped}">${SKIP}${esc(t(isSkipped ? "unskip" : "skip"))}</button>`,
+        s.id && change && !opt.group ? `<button type="button" data-alt-add="${esc(s.id)}">${esc(t("altAdd"))}</button>` : ""
+      ].filter(Boolean);
+      more = `<div class="xpand" id="${mid}">` +
+        (sigs.length ? `<div class="sigs">${sigs.map(x => `<p class="sigrow ${x.level}">${SIG_ICON[x.kind]}<span>${esc(x.text)}</span>${x.act || ""}</p>`).join("")}</div>` : "") +
+        (s.text ? `<p class="desc">${rich(s.text)}</p>` : "") +
+        (hasCost ? costRow(s, id, day.date, paid) : "") +
+        (go.length ? `<div class="go" role="group" aria-label="${esc(t("goZone"))}">${go.join("")}</div>` : "") +
+        (changes.length ? `<div class="chg" role="group" aria-label="${esc(t("changeZone"))}">${changes.join("")}</div>` : "") +
+        `</div>`;
+    }
+    const tick = `<button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${isSkipped ? DASH : CHECK}</button>`;
+    const cls = ["stop", isDone && "done", isSkipped && "skipped", open && "open", isNext && "next", compact && "compact", past && "past", hasCost && "has-cost", opt.group && "in-group"].filter(Boolean).join(" ");
+    return `<${tag} class="${cls}"><div class="rail">${rail}</div><div class="body">${when}${name}${local}${closedPart}${more}</div>${tick}</${tag}>`;
+  };
+  // The mark of now, on the line, before the next stop (R14).
+  const nowMark = () => {
+    const s = list[now.next], m = clockMinutes(s.time), hh = hhmm(now.min);
+    const text = m !== null && m >= now.min ? t("nowNext", {t: hh, s: s.title, m: m - now.min}) : t("nowNextNoTime", {t: hh, s: s.title});
+    return `<li class="now"><span class="nrail" aria-hidden="true"><i></i></span><span class="nt">${esc(text)}</span></li>`;
   };
   const groups = groupsIn(all), drawn = new Set();
   let html = "";
   for(const s of all){
     const g = groupOf(s);
-    if(!groups.has(g)){ const i = list.indexOf(s); if(i >= 0) html += stopLi(s, i); continue; }
+    if(!groups.has(g)){
+      const i = list.indexOf(s);
+      if(i < 0) continue;
+      if(i === now.next) html += nowMark();
+      html += stopEl(s, i);
+      continue;
+    }
     if(drawn.has(g)) continue;
     drawn.add(g);
     const options = groups.get(g), chosen = chosenIn(options), others = options.filter(o => o !== chosen);
-    const key = `${day.date}|${planId || ""}|${g}`, open = S.openGroups.has(key);
+    const key = `${day.date}|${planId || ""}|${g}`, opened = S.openGroups.has(key);
     // Where the group sits in the day: the chosen option's place, or the next stop's.
-    const at = all.indexOf(s), next = list.findIndex(x => all.indexOf(x) > at), slot = chosen ? list.indexOf(chosen) : next < 0 ? list.length : next;
-    html += `<li class="group-head${open ? " open" : ""}${chosen ? "" : " pending"}"><button type="button" class="gh" data-group="${esc(key)}" aria-expanded="${open}">` +
-      `<b>${esc(g)}</b><span>${esc(t(chosen ? "altCount" : "altToChoose", {n: options.length}))}</span><span class="chev">${CHEVRON}</span></button></li>`;
-    if(open){
-      html += options.map(o => o === chosen ? stopLi(o, slot, {group: g, chosen: true}) : stopLi(o, -1, {group: g, option: true, slot})).join("");
-      if(change) html += `<li class="alts add"><button type="button" class="btn small" data-alt-add="${esc(options[0].id)}">${esc(t("altAdd"))}</button></li>`;
-    }else if(chosen){
-      html += stopLi(chosen, slot, {group: g}) +
-        `<li class="alts"><button type="button" class="alts-line" data-group="${esc(key)}"><span class="names">${esc(t("altOthers", {s: others.map(o => o.title).join(" · ")}))}</span><span class="count">${esc(t("altOthersN", {n: others.length}))}</span><span class="see">${esc(t("altSee"))}</span></button></li>`;
+    const at = all.indexOf(s), nx = list.findIndex(x => all.indexOf(x) > at), slot = chosen ? list.indexOf(chosen) : nx < 0 ? list.length : nx;
+    const gid = "grp-" + (++uid);
+    // Its options, a choice to make: one tap chooses (R1), asking first on a shared trip (A9).
+    const options_ = `<div class="opts" id="${gid}" role="radiogroup" aria-label="${esc(g)}">` + options.map(o => {
+      const line = [typeof o.cost === "number" ? costShort(o, []) : "", o.local || ""].filter(Boolean).join(" · ");
+      return `<button type="button" class="opt" role="radio" aria-checked="${o === chosen}" data-choose="${esc(o.id)}"${change ? "" : ` aria-disabled="true"`}><span class="rd" aria-hidden="true"></span><span class="ot"><b>${esc(o.title)}</b>${line ? `<small>${esc(line)}</small>` : ""}</span>${o.time ? `<span class="otm">${esc(o.time)}</span>` : ""}</button>`;
+    }).join("") + `</div>` + (change ? `<button type="button" class="addopt" data-alt-add="${esc(options[0].id)}">${esc(t("altAdd"))}</button>` : "");
+    if(chosen && slot === now.next) html += nowMark();
+    if(!chosen){
+      // No choice yet: dashed, like everything not there yet (R15); the route and the
+      // costs leave it out until one is chosen.
+      html += `<li class="group pending"><div class="ghead"><div class="rail"><span class="nb q" role="img" aria-label="${esc(t("altPendingSig"))}"></span></div><div class="body">` +
+        `${options[0].time ? `<p class="when"><span class="tm">${esc(options[0].time)}</span></p>` : ""}<h2 class="tt"><span class="gname">${esc(g)}</span></h2>` +
+        `<p class="where">${esc(t("altOptions", {n: options.length}))}${groupRange(options)}</p><p class="sigline">${sigHTML({level: "warn", kind: "choice", text: t("altPendingSig")})}</p></div></div>${options_}</li>`;
+    }else if(opened){
+      html += `<li class="group open"><p class="gh"><b>${esc(g)}</b><span>${esc(t("altChooseOne"))}</span><button type="button" class="gclose" data-group="${esc(key)}" aria-expanded="true" aria-controls="${gid}">${esc(t("close"))}</button></p>${options_}</li>`;
     }else{
-      const line = o => [o.title, o.time, typeof o.cost === "number" ? costShort(o, []) : ""].filter(Boolean).join(" · ");
-      html += `<li class="alts pending"><ul>${options.map(o => `<li>${esc(line(o))}</li>`).join("")}</ul>` +
-        `<div class="row"><span>${esc(t("altNone"))}</span><button type="button" class="btn small" data-group="${esc(key)}">${esc(t("altChoose"))}</button></div></li>`;
+      html += `<li class="group${slot === now.next ? " next" : ""}"><p class="gh"><b>${esc(g)}</b></p>${stopEl(chosen, slot, {group: g, chosen: true}, "div")}` +
+        `<button type="button" class="alts-line" data-group="${esc(key)}" aria-expanded="false" aria-label="${esc(t("altOthers", {s: others.map(o => o.title).join(", ")}))}"><span class="plus" aria-hidden="true">+${others.length}</span><span class="names" aria-hidden="true">${esc(others.map(o => o.title).join(" · "))}</span></button></li>`;
     }
   }
-  return `<ol class="stops" style="--c:${cityVar(day.city)}">${html}</ol>`;
+  return `<ol class="stops${now.today ? " today" : ""}" style="--c:${cityVar(day.city)}">${html}</ol>`;
 }
 
-// Shows the little arrow only on descriptions that are really cut short.
-function markCut(){
-  document.querySelectorAll(".stop:not(.open) .desc").forEach(p => {
-    p.closest(".stop").classList.toggle("cut", p.scrollHeight - p.clientHeight > 1);
-  });
-  // "others: Casa · Mercado" on one line; when the names do not fit, how many there are.
-  document.querySelectorAll(".alts-line").forEach(b => {
-    b.classList.remove("short");
-    const names = b.querySelector(".names");
-    b.classList.toggle("short", names.scrollWidth - names.clientWidth > 1);
-  });
+// What a stop has to say, the most important first (W5): closed that day, booking
+// needed, booking advised, the trip's own label (W4), booked. Nothing once it is done or
+// skipped (W3).
+function signalsOf(s, day, ended){
+  if(ended) return [];
+  const out = [];
+  const closed = closedOn(s, day.date);
+  if(closed) out.push({level: "warn", kind: "closed", text: closed.date ? t("closedDate") : t("closedWeekday", {d: weekdayName(closed.weekday, getLang())}),
+    act: s.id && canChange() ? `<button type="button" class="sigact" data-edit="${esc(s.id)}">${esc(t("sigMove"))}</button>` : ""});
+  if(s.booking === "required") out.push({level: "warn", kind: "ticket", text: t("bookingRequired")});
+  if(s.booking === "advised") out.push({level: "info", kind: "ticket", text: t("bookingAdvised")});
+  if(s.tag) out.push({level: "info", kind: "note", text: s.tag});
+  if(s.booking === "booked") out.push({level: "ok", kind: "ticket", text: t("booked")});
+  return out;
 }
+const sigHTML = x => `<span class="sig ${x.level}">${SIG_ICON[x.kind]}<span>${esc(x.text)}</span></span>`;
+
+// What a group of options may cost, when every option says it in the same currency.
+function groupRange(options){
+  const priced = options.every(o => typeof o.cost === "number") && new Set(options.map(costCurrency)).size === 1;
+  if(!priced) return "";
+  const by = [...options].sort((a, b) => a.cost - b.cost);
+  return " · " + (by[0].cost === by.at(-1).cost ? costShort(by[0], []) : `${costShort(by[0], [])}–${costShort(by.at(-1), [])}`);
+}
+
+// Where today is (R14): the next stop to do (the first not done nor skipped from now,
+// by the clock; or after the last done), and the time now, on the trip's clock. Stops
+// left behind stay as they are (V6).
+function nowOf(day, planId, list){
+  const today = trip().days.indexOf(day) === todayIndex();
+  if(!today) return {today: false, next: -1, min: null};
+  const min = clockOf(new Date(), trip().timezone);
+  const ended = j => { const k = stopKey(day, planId, list[j], j); return !!(S.state.done[k] || S.state.skipped[k]); };
+  let last = -1;
+  list.forEach((s, j) => { if(ended(j)) last = j; });
+  const byClock = list.findIndex((s, j) => !ended(j) && j > last && (clockMinutes(s.time) ?? -1) >= min - 30);
+  const next = byClock >= 0 ? byClock : list.findIndex((s, j) => j > last && !ended(j));
+  return {today: true, next, min};
+}
+const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+
+// One line of a description, cut with "…" (R12): nothing else to mark.
+function markCut(){}
 
 // Returns the page and, when the interactive map is showing, what it must display.
 function renderDay(i){
@@ -2111,45 +2158,22 @@ function renderDay(i){
   const here = list.find(s => s.lat !== undefined);
   const light = here ? daylight(d.date, here.lat, here.lng, tr.timezone) : null;
   const parts = partsOfDay(list, light, clockMinutes);
-  const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
   // The colours of this day's pins, lines and numbers (js/geo.js).
   const paint = painter(cityColor(d.city), parts);
   const dp = dateParts(d.date, lang), ti = todayIndex();
-  // The sign at the top: the city, and where the day starts when that is another one.
+  // The heading: the day, its title, its city as the name of a line; the night, the
+  // sun, how far the day has gone.
   const city = d.city || "";
   const from = prev && prev.city && city && prev.city !== city ? prev.city : "";
-  const sign = `<div class="kanji">${esc(city || dp.long)}</div>${from ? `<div class="romaji">${esc(from + " → " + city)}</div>` : ""}`;
-  const neighbor = (x, k, cls) => {
-    const p = dateParts(x.date, lang), name = x.city ? " · " + esc(x.city) : "";
-    return cls
-      ? `<a class="next" href="#day-${k + 1}">${esc(p.dow)} <b>${k + 1}</b>${name} →</a>`
-      : `<a href="#day-${k + 1}">← <b>${k + 1}</b> ${esc(p.dow)}${name}</a>`;
-  };
-
+  const now = nowOf(d, pid, list);
+  const cityLine = city ? `<span class="cityp" style="--c:${cityVar(prev && from ? prev.city : city)}">${esc(from || city)}</span>${from ? ` → <span class="cityp" style="--c:${color}">${esc(city)}</span>` : ""}` : "";
   let html = `
-  <section class="sign" style="--c:${color}" aria-label="${esc(t("day"))} ${i + 1}">
-    <div class="sign-top">
-      <div>${sign}</div>
-      <div class="dayno"><div class="g">${esc(t("day"))} ${i + 1}${i === ti ? " · " + esc(t("today")) : ""}</div><div class="d">${esc(dp.long)}</div>${light ? `<div class="sun" role="img" aria-label="${esc(t("sunTimes", {r: hhmm(light.sunrise), s: hhmm(light.sunset)}))}">${icon("sun", 13)}<span>${hhmm(light.sunrise)}–${hhmm(light.sunset)}</span></div>` : ""}</div>
-    </div>
-    <div class="band"></div>
-    <div class="neighbors">
-      ${prev ? neighbor(prev, i - 1, false) : `<span>${esc(t("arrival"))}</span>`}
-      ${next ? neighbor(next, i + 1, true) : `<a class="next" href="#info">${esc(t("info"))} →</a>`}
-    </div>
-  </section>
-  <div class="headrow">
-    ${d.title ? `<h1>${esc(d.title)}</h1>` : ""}
-    ${isLocked(S.rec) ? `<p class="lock-note" data-locked>${esc(S.rec.public ? t("publicNote", {h: S.rec.public.by}) : t("lockedNote"))}</p>` : ""}
-    <div class="sleep">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b></span>${typeof d.stay === "object" ? `<a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}${toChooseLine(all)}</span></div>
-    <div class="tools">${
-      (zs.length ? `<button type="button" class="mapbtn" data-map aria-expanded="${S.ui.mapOpen}">${esc(t(S.ui.mapOpen ? "mapClose" : "mapOpen"))}</button>` : "") +
-      (anyText ? `<button type="button" class="iconbtn" data-expand aria-pressed="${S.ui.expandAll}" aria-label="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}" title="${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}">${S.ui.expandAll ? FOLD : UNFOLD}</button>` : "") +
-      // The day's own ⋯ menu: change the day, or add one after the last.
-      `<span class="daymore"><button type="button" class="iconbtn" data-more="day" aria-haspopup="menu" aria-expanded="${S.menuFor === "day"}" aria-label="${esc(t("dayActions"))}" title="${esc(t("dayActions"))}">${DOTS}</button>` +
-      `<div class="menu" role="menu"${S.menuFor === "day" ? "" : " hidden"}><button type="button" role="menuitem" data-day-edit>${esc(t("editDay"))}</button><button type="button" role="menuitem" data-day-add>${esc(t("addDay"))}</button></div></span>`
-    }</div>
-  </div>`;
+  <header class="dayhead" style="--c:${color}">
+    <p class="dmeta">${esc(t("day"))} ${i + 1}${i === ti ? " · " + esc(t("today")) : ""} · ${esc(dp.long)}</p>
+    <h1>${esc(d.title || city || dp.long)}</h1>
+    <p class="dsub">${cityLine}${light ? `<span class="sun" role="img" aria-label="${esc(t("sunTimes", {r: hhmm(light.sunrise), s: hhmm(light.sunset)}))}">${icon("sun", 13)}${hhmm(light.sunrise)}–${hhmm(light.sunset)}</span>` : ""}</p>
+    <p class="dsub">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b>${typeof d.stay === "object" ? ` <a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}</span>` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}</span></p>
+  </header>`;
 
   let wanted = null;
   if(S.ui.mapOpen && zs.length){
@@ -2159,7 +2183,7 @@ function renderDay(i){
     // The lines are not in the key: hiding them keeps the map, its zoom and its place.
     if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, skippedNow].join("|"), zones: zs, color: mapColor(d.city), gone, paint: painter(mapColor(d.city), parts)};
   }
-  if(d.notes) html += notesHTML(d.notes);
+  html += dayLine(d, pid, list, all);
   if(d.plans){
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
@@ -2167,14 +2191,53 @@ function renderDay(i){
     const goes = chosenPlan(d);
     if(plan !== goes && canChange()) html += `<p class="plan-note"><span>${esc(t("planGoesWith", {p: goes.name}))}</span><button type="button" class="linkbtn" data-plan-choose="${esc(pid)}">${esc(t("planChooseAll", {p: plan.name}))}</button></p>`;
   }
-  // Stops without a position: a line with Find, above them until some were chosen from
-  // a search on this day (remembered on this phone), then below, to come back to.
+  html += stopsHTML(d, pid, list, light ? parts : null, paint, all, now);
+  // Adding is always the last row (R3, V2): a new stop, or what a chat wrote.
+  if(!isLocked(S.rec)) html += `<div class="addrow"><button type="button" data-add-stop>${PLUS}${esc(t("addStop"))}</button><button type="button" data-add-paste>${CLIP}${esc(t("addPaste"))}</button></div>`;
+  // Changing the day itself: quiet, at the end (R2).
+  html += `<div class="chg dayfoot" role="group" aria-label="${esc(t("dayActions"))}">${isLocked(S.rec) ? "" : `<button type="button" data-day-edit>${EDIT}${esc(t("editDay"))}</button><button type="button" data-day-add>${PLUS}${esc(t("addDay"))}</button>`}${anyText ? `<button type="button" data-expand aria-pressed="${S.ui.expandAll}">${S.ui.expandAll ? FOLD : UNFOLD}${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}</button>` : ""}</div>`;
+  // The next stop's bar (V3): its number, its name, how long until it, Directions from
+  // where the traveller is (no origin: the phone's position).
+  let bar = "";
+  if(now.today && now.next >= 0){
+    const s = list[now.next], m = clockMinutes(s.time), q = placeQuery(s);
+    const when = m !== null && m >= now.min ? t("nextIn", {m: m - now.min}) : t("nextLabel");
+    bar = `<button type="button" class="nb-t" data-to-next><span class="nb" style="--pf:${paint.stop(s.type, now.next)}" aria-hidden="true">${s.lat !== undefined ? now.next + 1 : ""}</span><span class="nb-tx"><small>${esc(when)}</small><b>${esc(s.title)}</b>${s.time ? `<small>${esc(s.time)}</small>` : ""}</span></button>` +
+      (q ? `<a class="nb-go" href="${esc(dirUrl(q, ""))}" target="_blank" rel="noopener">${ROUTE}${esc(t("routeShort"))}</a>` : "");
+  }
+  return {html, wanted, now, bar};
+}
+
+// The day's line (W1–W5): what matters today, in one place. Closed, the most important
+// and "+N"; opened, one per row, each with its action. Closures and bookings of the
+// stops still ahead, choices to make, stops without a position, the lock, the notes.
+function dayLine(d, pid, list, all){
+  const items = [];
+  const ended = s => { const j = list.indexOf(s), k = stopKey(d, pid, s, j); return !!(S.state.done[k] || S.state.skipped[k]); };
+  for(const s of list){
+    if(ended(s)) continue;
+    const closed = closedOn(s, d.date);
+    if(closed) items.push({level: "warn", kind: "closed", text: t("lineClosed", {s: s.title, d: closed.date ? t("closedDate").toLowerCase() : t("closedWeekday", {d: weekdayName(closed.weekday, getLang())}).toLowerCase()}),
+      act: s.id && canChange() ? `<button type="button" class="sigact" data-edit="${esc(s.id)}">${esc(t("sigMove"))}</button>` : ""});
+    if(s.booking === "required") items.push({level: "warn", kind: "ticket", text: t("lineBooking", {s: s.title})});
+  }
+  for(const [g, xs] of groupsIn(all)) if(!chosenIn(xs)) items.push({level: "warn", kind: "choice", text: t("lineChoose", {g})});
   const missing = canChange() ? all.filter(s => s.lat === undefined && s.id).length : 0;
-  const later = !!(S.state.found && S.state.found[d.date]);
-  const nopos = missing ? `<div class="nopos${later ? " later" : ""}"><span>${esc(t(later ? (missing === 1 ? "posStillOne" : "posStill") : (missing === 1 ? "posMissingOne" : "posMissing"), {n: missing}))}</span><button type="button" class="btn small" data-find-pos>${esc(t("posFind"))}</button></div>` : "";
-  html += (later ? "" : nopos) + stopsHTML(d, pid, list, light ? parts : null, paint, all) + (later ? nopos : "");
-  html += `<p class="foot dayfoot">${esc(t("footDay"))}</p>`;
-  return {html, wanted};
+  // "Leave as it is" decided it on this phone: the line no longer asks (W3).
+  if(missing && !(S.state.found && S.state.found[d.date])) items.push({level: "info", kind: "nopos", text: t(missing === 1 ? "posMissingOne" : "posMissing", {n: missing}),
+    act: `<button type="button" class="sigact" data-find-pos>${esc(t("posFind"))}</button>`});
+  if(isLocked(S.rec)) items.push({level: "info", kind: "note", text: S.rec.public ? t("publicNote", {h: S.rec.public.by}) : t("lockedNote"), locked: true});
+  for(const n of d.notes || []) items.push({level: "info", kind: "note", html: rich(n), text: String(n).replace(/\*\*/g, "")});
+  if(!items.length) return "";
+  const open = !!S.state.notesOpen;
+  const icon_ = x => x.kind === "nopos" ? NO_POS : SIG_ICON[x.kind];
+  const row = x => `<li class="${x.level}"><span class="k" aria-hidden="true">${icon_(x)}</span><span class="tx"${x.locked ? " data-locked" : ""}>${x.html || esc(x.text)}</span>${x.act || ""}</li>`;
+  if(!open && items.length === 1 && items[0].act) return `<section class="dayline" aria-label="${esc(t("lineTitle"))}"><ul>${row(items[0])}</ul></section>`;
+  const first = items[0];
+  const head = open
+    ? `<button type="button" class="lhead" data-notes aria-expanded="true" aria-controls="day-line"><span class="tx"><b>${esc(t("lineTitle"))}</b> · ${items.length}</span><span class="close">${esc(t("close"))}</span></button>`
+    : `<button type="button" class="lhead" data-notes aria-expanded="false" aria-controls="day-line"><span class="k ${first.level}" aria-hidden="true">${icon_(first)}</span><span class="tx"><b>${esc(first.text)}</b></span>${items.length > 1 ? `<span class="plus" aria-label="${esc(t("sigMore", {n: items.length - 1}))}">+${items.length - 1}</span>` : ""}</button>`;
+  return `<section class="dayline${open ? " open" : ""}" aria-label="${esc(t("lineTitle"))}">${head}<ul id="day-line"${open ? "" : " hidden"}>${items.map(row).join("")}</ul></section>`;
 }
 
 function syncLive(wanted){
@@ -2203,13 +2266,57 @@ $fabs.innerHTML = `<button type="button" class="fab-paste">${CLIP}<span></span><
 document.body.appendChild($fabs);
 const $fab = $fabs.querySelector(".fab"), $fabPaste = $fabs.querySelector(".fab-paste");
 $fab.addEventListener("click", () => newStop());
+// List | Map in the top bar (M2): Map is pressed while the map shows.
+$strip.addEventListener("click", e => {
+  const b = e.target.closest("#view-toggle button");
+  if(!b) return;
+  const map = b.hasAttribute("data-map") ? !S.ui.mapOpen : false;
+  if(S.ui.mapOpen !== map){ S.ui.mapOpen = map; saveUi(); render(); }
+  refocus(map || b.hasAttribute("data-map") ? "#view-toggle [data-map]" : "#view-toggle [data-view-list]");
+});
 $fabPaste.addEventListener("click", () => pasteAnything());
+
+// The next stop's bar (V3): at the bottom, within reach of a thumb, only while the next
+// stop's card is off the screen. A tap on it brings the card back.
+const $next = document.createElement("div");
+$next.className = "nextbar";
+$next.hidden = true;
+$next.setAttribute("role", "region");
+document.body.appendChild($next);
+let nextSeen = null;
+function watchNext(){
+  if(nextSeen){ nextSeen.disconnect(); nextSeen = null; }
+  const card = $app.querySelector(".stops .next");
+  $next.setAttribute("aria-label", t("nextLabel"));
+  if(!card || !$next.innerHTML || typeof IntersectionObserver !== "function"){ $next.hidden = true; return; }
+  nextSeen = new IntersectionObserver(([e]) => { $next.hidden = e.isIntersecting; }, {root: scroller, rootMargin: "-60px 0px -40px 0px"});
+  nextSeen.observe(card);
+}
+$next.addEventListener("click", e => { if(e.target.closest("[data-to-next]")) goToNow(true); });
+
+// On the day itself the list starts from now (R14): the mark of now at the top, the
+// stop before just visible above it. Not while the traveller scrolls: only when a day
+// opens and when the app comes back. True when it moved the page.
+function goToNow(smooth = false){
+  const r = route();
+  if(r.name !== "day" || r.i !== todayIndex()) return false;
+  const mark = $app.querySelector(".stops .now") || $app.querySelector(".stops .next");
+  if(!mark) return false;
+  const y = scrollTop() + mark.getBoundingClientRect().top - $strip.offsetHeight - 56;
+  if(smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches) (scroller || window).scrollTo({top: Math.max(0, y), behavior: "smooth"});
+  else scrollToY(Math.max(0, y));
+  return true;
+}
 
 function render(){
   const r = route();
   renderStrip(r);
   $fabs.hidden = r.name === "welcome" || r.name === "me";
-  $fab.hidden = r.name !== "day" || isLocked(S.rec);
+  // On a day, pasting is in the last row; on the day itself (today) the next stop's bar
+  // floats instead of + (R3, V2): one thing at a time.
+  const isToday = r.name === "day" && r.i === todayIndex();
+  $fab.hidden = r.name !== "day" || isLocked(S.rec) || isToday;
+  $fabPaste.hidden = r.name === "day";
   $fab.setAttribute("aria-label", t("addStop"));
   $fab.title = t("addStop");
   $fabPaste.querySelector("span").textContent = t("paste");
@@ -2223,12 +2330,14 @@ function render(){
   const y = scrollTop();
   $app.style.minHeight = $app.offsetHeight + "px";
   if(live) live.handle.el.remove(); // keep the map alive while the page is rebuilt
-  let wanted = null;
+  let wanted = null, bar = "";
   if(r.name === "welcome") $app.innerHTML = renderWelcome();
   else if(r.name === "me") $app.innerHTML = renderMe();
   else if(r.name === "trips") $app.innerHTML = renderTrips();
   else if(r.name === "info") $app.innerHTML = renderInfo();
-  else { const out = renderDay(r.i); $app.innerHTML = out.html; wanted = out.wanted; }
+  else { const out = renderDay(r.i); $app.innerHTML = out.html; wanted = out.wanted; bar = out.bar; }
+  $next.innerHTML = bar;
+  watchNext();
   syncLive(wanted);
   markCut();
   $app.style.minHeight = "";
@@ -2296,7 +2405,6 @@ $app.addEventListener("click", e => {
   const planAll = e.target.closest("[data-plan-choose]");
   if(planAll){ choosePlanHere(planAll.dataset.planChoose); return; }
   const tick = e.target.closest("[data-tick]");
-  if(tick && tick.dataset.option){ wentTo(tick.dataset.option, tick.dataset.tick); return; }
   if(tick){
     const id = tick.dataset.tick;
     if(S.state.done[id]) delete S.state.done[id];
@@ -2339,6 +2447,13 @@ $app.addEventListener("click", e => {
   }
   const tap = e.target.closest("[data-open]");
   if(tap){ toggleStop(tap.dataset.open); return; }
+  // Adding: a new stop, or what a chat wrote (the last row of a day, R3).
+  if(e.target.closest("[data-add-stop]")){ newStop(); return; }
+  if(e.target.closest("[data-add-paste]")){ pasteAnything(); return; }
+  // A tap anywhere on a stop's card opens or closes it, like its name (R1), but not on
+  // a link, a button or what the opened card shows.
+  const card = !e.target.closest("a, button, input, select, label, .xpand, .opts") && e.target.closest(".stop");
+  if(card){ const b = card.querySelector("[data-open]"); if(b && getSelection().isCollapsed) toggleStop(b.dataset.open); return; }
   for(const [attr, field] of [["data-cost-view", "costView"], ["data-cost-cur", "costCur"]]){
     const b = e.target.closest(`[${attr}]`);
     if(!b) continue;
@@ -2624,14 +2739,21 @@ window.addEventListener("hashchange", () => {
   if(invite){ takeInvite(invite); return; }
   const pageLink = publicLink(location.hash);
   if(pageLink){ (pageLink.kind === "base" ? useAsBase : openPublic)(pageLink.page); return; }
-  S.importError = null; S.menuFor = null; render(); scrollToY(0);
+  S.importError = null; S.menuFor = null; render();
+  if(!goToNow()) scrollToY(0);
 });
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
 // The path is the one at the time of the tap: the page may have been redrawn since.
 document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().includes($app)) closeMenu(); });
 window.addEventListener("resize", markCut);
 window.addEventListener("online", () => { S.online = true; retryRates(); render(); syncSoon(200); });
-document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") syncSoon(800); });
+// Back in the app after a while, on the day itself: the list goes to now again (R14).
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "hidden"){ hiddenAt = Date.now(); return; }
+  syncSoon(800);
+  if(hiddenAt && Date.now() - hiddenAt > 5 * 60000){ render(); goToNow(); }
+});
 window.addEventListener("offline", () => { S.online = false; render(); });
 
 /* ---------- offline support ---------- */
@@ -2771,6 +2893,7 @@ async function start(){
   const chat = chatRequestId(location.hash), invite = inviteToken(location.hash), pageLink = publicLink(location.hash);
   if(chat || invite || pageLink) history.replaceState(null, "", location.pathname + location.search);
   render();
+  goToNow();
   setupServiceWorker();
   takeSharedPlace();
   if(chat) answerChatApp(chat);
