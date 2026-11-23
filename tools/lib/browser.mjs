@@ -61,7 +61,8 @@ async function launch(profile){
   const chrome = spawn(findChrome(), flags, {stdio: ["ignore", "ignore", "pipe"]});
   const wsUrl = await new Promise((resolve, reject) => {
     let log = "";
-    const timer = setTimeout(() => reject(new Error("Chrome did not start:\n" + log)), 20000);
+    // A busy runner can take its time: a minute before giving up.
+    const timer = setTimeout(() => { chrome.kill(); reject(new Error("Chrome did not start:\n" + log)); }, 60000);
     chrome.stderr.on("data", chunk => {
       log += chunk;
       const m = log.match(/DevTools listening on (ws:\/\/\S+)/);
@@ -117,7 +118,8 @@ export async function withApp(work, {share = "", api = null, host = "127.0.0.1"}
   const server = await serve({share, api});
   const base = `http://${host}:${server.address().port}/`;
   const profile = await mkdtemp(join(tmpdir(), "timp-browser-"));
-  const {chrome, wsUrl} = await launch(profile);
+  // One more try when Chrome does not start: on a shared runner it sometimes stalls.
+  const {chrome, wsUrl} = await launch(profile).catch(e => { console.error("  " + e.message.split("\n")[0] + ": trying again"); return launch(profile); });
   try{
     const {page, close, events, on} = await connect(wsUrl);
     const blocked = () => events.filter(e => /Content Security Policy/i.test(e.text || "")).map(e => e.text);
