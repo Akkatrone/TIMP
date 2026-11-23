@@ -115,3 +115,32 @@ test("ticks and private expenses saved under the ids of before follow the trip t
   assert.equal(followIdsPrivate({owner: "p-x", expenses: [{id: "c", title: "Ticket", cost: 3, date: D3, stop: "station"}]}, trip).expenses[0].stop, ID("station", D3, day(trip, D3).plans[0].id));
   assert.ok(plan);
 });
+
+test("a join an app of before made with a converted trip is made again, converting first: nothing twice, removals kept", async () => {
+  const { ensureVersion, commit, commitMerge, contentOf } = await import("../js/version.js");
+  const { prepare, rejoin } = await import("../js/trips.js");
+  const { updateStop, removeStop } = await import("../js/edit.js");
+  const { mergeTrips } = await import("../js/merge.js");
+  const { versionStore } = await import("../js/objects.js");
+  const { memoryBackend } = await import("../js/store.js");
+  const store = versionStore(memoryBackend());
+  // The trip from before; this phone changed it offline; meanwhile it was converted elsewhere.
+  const H = await ensureVersion(demoFile());
+  const se = listOf(H, D1).find(s => s.id === "se");
+  const L = await commit(removeStop(updateStop(H, {date: D1, id: "se"}, {...se, text: "Changed offline"}).trip, {date: D1, id: "castelo"}), H);
+  const V = (await prepare(H)).trip;
+  // The app of before joined them without converting: "se" twice, the castle back.
+  const bad = JSON.parse(JSON.stringify(contentOf(L)));
+  bad.days[0].stops.push(...listOf(V, D1));
+  const M = await commitMerge(bad, L, V);
+  for(const v of [H, L, V, M]) await store.put(v);
+  const fixed = await rejoin(store, M);
+  assert.deepEqual(fixed.version.parents, M.version.parents, "the same two versions joined");
+  assert.equal(needsStopIds(fixed), false);
+  assert.deepEqual(contentOf(fixed), contentOf(await commitMerge(mergeTrips(H, L, V), L, V)));
+  const day1 = listOf(fixed, D1);
+  assert.equal(day1.filter(s => s.title === se.title).length, 1, "once");
+  assert.equal(day1.find(s => s.id === ID("se")).text, "Changed offline");
+  assert.equal(day1.some(s => s.id === ID("castelo")), false, "the removal kept");
+  assert.equal(await rejoin(store, V), V, "not such a join: as it is");
+});

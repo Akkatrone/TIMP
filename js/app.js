@@ -17,7 +17,7 @@ import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpen
 import { tidyGroups } from "./choices.js";
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
 import { keptRates, fetchMonth } from "./rates.js";
-import { prepare, saveEdit, inspect, apply, restore, moveMarks, followIds, fileName, fileText, separate, joinChanges } from "./trips.js";
+import { prepare, saveEdit, inspect, apply, restore, moveMarks, followIds, rejoin, fileName, fileText, separate, joinChanges } from "./trips.js";
 import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop, followIds as followIdsPrivate } from "./private.js";
 import { needsStopIds } from "./ids.js";
 import { openFindPositions } from "./positions.js";
@@ -2739,20 +2739,25 @@ async function start(){
   // of their own, a version, format 2. A converted trip is a new version made from the
   // old one, the same one every phone makes; ticks and the private expenses paid at a
   // stop follow. A trip on the account is converted by the sharing service, once for
-  // everyone, and comes back newer: they follow then (followNewIds).
+  // everyone, and comes back newer: they follow then (followNewIds). Unless this phone
+  // has changes not sent yet, made by the app of before (the service refuses ids of
+  // before on a converted trip): converted here, so they can go; a join the app of before
+  // made with the converted trip, made again first (rejoin).
   for(const rec of S.records){
     if(rec.public) continue;
     const onAccount = !!(rec.share && rec.share.id && !rec.share.gone);
-    const old = !rec.trip.version || rec.trip.format !== FORMAT || (needsStopIds(rec.trip) && !onAccount);
-    const {trip: ready, renamed} = old ? await prepare(rec.trip) : {trip: rec.trip, renamed: []};
+    const unsent = onAccount && rec.share.head !== (rec.trip.version && rec.trip.version.id);
+    const start = unsent && rec.trip.version ? await rejoin(versions, rec.trip) : rec.trip;
+    const old = !start.version || start.format !== FORMAT || (needsStopIds(start) && (!onAccount || unsent));
+    const {trip: ready, renamed} = old ? await prepare(start) : {trip: start, renamed: []};
     const saved = await store.getKV("state:" + rec.id);
     if(saved && typeof saved === "object"){
       const state = followIds(moveMarks({done: {}, skipped: {}, plans: {}, ...saved}, renamed), ready);
       if(canonical(state) !== canonical({done: {}, skipped: {}, plans: {}, ...saved})) await store.setKV("state:" + rec.id, state);
     }
     const priv = rec.priv ? followIdsPrivate(followStops(rec.priv, renamed), ready) : rec.priv;
-    if(!old && priv === rec.priv) continue;
-    Object.assign(rec, {trip: ready, priv, ...(old ? {exported: ready.version.id} : {})});
+    if(!old && priv === rec.priv && start === rec.trip) continue;
+    Object.assign(rec, {trip: ready, priv, ...(old || start !== rec.trip ? {exported: ready.version.id} : {})});
     await store.putTrip(rec);
     await versions.put(ready);
   }

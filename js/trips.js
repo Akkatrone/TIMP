@@ -6,7 +6,7 @@
 
 import { validateTrip, upgrade } from "./trip.js";
 import { ensureIds } from "./edit.js";
-import { findStopId } from "./ids.js";
+import { findStopId, needsStopIds } from "./ids.js";
 import { ensureVersion, childOf, commit, commitMerge, relation, commonBase, isIntact, unrelated, canonical, contentOf } from "./version.js";
 import { mergeTrips } from "./merge.js";
 import { diffTrips } from "./diff.js";
@@ -135,6 +135,25 @@ export function moveMarks(state, moves){
     }
   }
   return out;
+}
+
+/**
+ * A join an app of before made of a version with stop ids of before and a converted one:
+ * it joined them without converting (a stop it changed kept twice, a removal undone), and
+ * the service refused it. Made again with this app's join, which converts first; the
+ * trip as it is when it is not such a join. Never sent: nobody else has it.
+ * versions: as in inspect.
+ */
+export async function rejoin(versions, trip){
+  const ps = (trip.version && trip.version.parents) || [];
+  if(ps.length !== 2 || !needsStopIds(trip)) return trip;
+  const [a, b] = await Promise.all(ps.map(id => versions.get(trip.id, id)));
+  if(!a || !b || needsStopIds(a) === needsStopIds(b)) return trip;
+  const baseId = commonBase(a, b, new Set(await versions.ids(trip.id)));
+  const base = baseId ? await versions.get(trip.id, baseId) : null;
+  const joined = await commitMerge(mergeTrips(base, a, b), a, b);
+  await versions.put(joined);
+  return joined;
 }
 
 /**

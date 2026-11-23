@@ -4,6 +4,15 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.32.1
+
+- **A phone that had the app of before when its shared trip was converted** (3.30.0)
+  sends its changes once updated. The service refuses, from an app of before, a version
+  with stop ids made from titles on a converted trip; this app now converts the changes
+  not yet sent when it starts. And if the app of before joined the converted trip with
+  them (it joined without converting: a stop it changed kept twice, a removal undone),
+  that join is made again with this app's, first: nothing twice, nothing lost.
+
 ## 3.32.0
 
 - **Alternatives for one moment of the day**: a meal at one of three places, one museum
