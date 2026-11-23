@@ -18,7 +18,7 @@ const TYPES = {".html": "text/html", ".js": "text/javascript", ".css": "text/css
 // share: the address of a sharing service, put in js/config.js and in the page's
 // Content-Security-Policy the way tools/build.mjs does it; "self" for `api`, a fake of
 // the service answering /v1/ on this very server: (method, path, body) → {status, body}.
-function serve({share, api} = {}){
+export function serve({share, api} = {}){
   const server = createServer(async (req, res) => {
     if(api && req.url.startsWith("/v1/")){
       let raw = "";
