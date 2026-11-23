@@ -190,3 +190,7 @@ Part of every component, checked where it can be.
   time and name.
 - **A10 Language**: the page's `lang` follows the interface; a local name carries its
   own.
+- **A11 iPhone**: what is typed is at least 16 points (`--fs-field`: Safari zooms into a
+  smaller field); what sticks to the top is placed from where the bar ends, under the
+  notch (`env(safe-area-inset-top)`); a colour mixed with `color-mix()` has a plain one
+  before it, for Safari before 16.2.

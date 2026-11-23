@@ -630,7 +630,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .stop.done .tick{background:var(--ink);border-color:var(--ink);color:var(--card)}
 .stop.skipped .tick{color:var(--muted)}
 /* Today: the next stop, lifted; the ones done, in one line (R14). */
-.stops .next{border-color:transparent;box-shadow:0 0 0 2px var(--accent),0 8px 20px -12px color-mix(in srgb,var(--ink) 35%,transparent)}
+.stops .next{border-color:transparent;box-shadow:0 0 0 2px var(--accent);box-shadow:0 0 0 2px var(--accent),0 8px 20px -12px color-mix(in srgb,var(--ink) 35%,transparent)}
 .stop.compact{align-items:center;padding-block:var(--sp-3)}
 .stop.compact .rail{padding-top:0;align-content:center}
 .stops > li.compact:first-child .rail::before{top:50%}
@@ -690,7 +690,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .now .nrail::after{top:50%;bottom:-9px;background:var(--c)}
 .now i{position:relative;z-index:1;width:11px;height:11px;border-radius:var(--r-full);background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
 .now .nt{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
-.now .nt::after{content:"";flex:1;min-width:var(--sp-5);height:1.5px;background:color-mix(in srgb,var(--accent) 35%,transparent)}
+.now .nt::after{content:"";flex:1;min-width:var(--sp-5);height:1.5px;background:var(--line);background:color-mix(in srgb,var(--accent) 35%,transparent)}
 
 /* Adding: the last row, dashed like what is not there yet (R3, R15). */
 .addrow{display:flex;gap:var(--sp-3)}
@@ -706,7 +706,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .nextbar .nb{box-shadow:0 0 0 2px var(--ink);flex:none}
 .nb-tx{min-width:0;display:grid}
 .nb-tx b{font:600 var(--fs-base)/1.25 var(--f-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nb-tx small{font:500 var(--fs-s)/1.3 var(--f-body);color:color-mix(in srgb,var(--bg) 75%,transparent);font-variant-numeric:tabular-nums}
+.nb-tx small{font:500 var(--fs-s)/1.3 var(--f-body);color:var(--bg);color:color-mix(in srgb,var(--bg) 75%,transparent);font-variant-numeric:tabular-nums}
 .nb-go{flex:none;display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--touch);padding:0 var(--sp-4);border-radius:var(--r-m);background:var(--accent);color:var(--on-accent);font:600 var(--fs-m) var(--f-body);text-decoration:none}
 .nb-go svg{width:16px;height:16px}
 
@@ -715,9 +715,9 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
    it the days, today called so (R12, M2). */
 .strip .gutter{display:grid;gap:var(--sp-2);padding-block:var(--sp-3) var(--sp-2)}
 .tbar{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
-.triptitle{flex:1;min-width:0;display:grid;min-height:var(--touch);align-content:center;color:var(--ink);text-decoration:none;border-radius:var(--r-s)}
-.triptitle b{display:flex;align-items:center;gap:var(--sp-2);min-width:0;font:650 var(--fs-xl)/1.15 var(--f-display);letter-spacing:-.02em}
-.triptitle b span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.triptitle{flex:1;min-width:0;display:flex;align-items:center;gap:var(--sp-2);min-height:var(--touch);color:var(--ink);text-decoration:none;border-radius:var(--r-s)}
+.triptitle .tt2{display:grid;min-width:0}
+.triptitle b{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:650 var(--fs-xl)/1.15 var(--f-display);letter-spacing:-.02em}
 .triptitle .sel{flex:none;width:9px;height:13px;color:var(--muted)}
 .triptitle small{font:500 var(--fs-s)/1.3 var(--f-body);color:var(--muted)}
 .vt{flex:none;display:flex;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden;background:var(--surface)}
@@ -742,7 +742,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .tsearch{flex:none;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--r-full);background:none;color:var(--ink);cursor:pointer}
 .tsearch[hidden]{display:none}
 .tsearch svg{width:20px;height:20px}
-.search .search-q{width:100%;min-height:var(--touch);padding:0 var(--sp-4);border:1px solid var(--line-strong);border-radius:var(--r-m);background:var(--bg);color:var(--ink);font:500 var(--fs-base) var(--f-body)}
+.search .search-q{width:100%;min-height:var(--touch);padding:0 var(--sp-4);border:1px solid var(--line-strong);border-radius:var(--r-m);background:var(--bg);color:var(--ink);font:500 var(--fs-field) var(--f-body)}
 .search .search-n:empty{display:none}
 .results{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-1)}
 .res{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);column-gap:var(--sp-4);align-items:start;width:100%;min-height:var(--touch);padding:var(--sp-3) var(--sp-2);border:0;border-radius:var(--r-m);background:none;color:var(--ink);text-align:left;cursor:pointer}
@@ -753,11 +753,11 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .res .rt b{font:500 var(--fs-base)/1.3 var(--f-body)}
 .res .rt small{font:500 var(--fs-s)/1.35 var(--f-body);color:var(--muted)}
 .res .rt .rw{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-weight:400}
-mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:var(--r-s);padding:0 var(--sp-1)}
+mark{background:var(--warn-bg);background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:var(--r-s);padding:0 var(--sp-1)}
 
 /* The day as a map (M2–M7): the stage under the bar, the list scrolling under it. Always
    light (R11): the map's own tokens. */
-.mapstage{position:sticky;top:var(--strip-h,0px);z-index:4;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-top:calc(-1 * var(--sp-5));height:min(38dvh,360px);transition:height var(--dur-expand) var(--ease);background:var(--map-bg);color-scheme:light;box-shadow:0 8px 16px -12px color-mix(in srgb,var(--map-ink) 45%,transparent)}
+.mapstage{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--strip-h,0px));z-index:4;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-top:calc(-1 * var(--sp-5));height:min(38dvh,360px);transition:height var(--dur-expand) var(--ease);background:var(--map-bg);color-scheme:light;box-shadow:0 8px 16px -12px color-mix(in srgb,var(--map-ink) 45%,transparent)}
 .mapstage #live-slot,.mapstage .live{height:100%;border-radius:var(--r-none)}
 .mapstage.sketch{position:static;height:auto;margin-inline:0;margin-top:0;padding:var(--sp-4);border-radius:var(--r-m);display:grid;gap:var(--sp-4);background:var(--surface);color-scheme:normal;box-shadow:none}
 .mctl{position:absolute;right:var(--sp-4);top:var(--sp-4);z-index:2;display:grid;gap:var(--sp-3)}
@@ -766,7 +766,7 @@ mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;b
 .mapstage .zchips{position:absolute;left:var(--sp-4);bottom:var(--sp-4);right:calc(var(--touch) + var(--sp-6));z-index:2;display:flex;flex-wrap:wrap;gap:var(--sp-2)}
 .mapstage .zchip{min-height:36px;padding:0 var(--sp-4);border:0;border-radius:var(--r-full);background:var(--map-card);color:var(--map-ink);font:600 var(--fs-s) var(--f-body);box-shadow:0 2px 8px -2px color-mix(in srgb,var(--map-ink) 40%,transparent);cursor:pointer}
 .mapstage + .stops,.mapstage + .seg{margin-top:var(--sp-2)}
-.stops .picked{box-shadow:0 0 0 2px var(--ink),0 8px 20px -12px color-mix(in srgb,var(--ink) 35%,transparent);border-color:transparent}
+.stops .picked{box-shadow:0 0 0 2px var(--ink);box-shadow:0 0 0 2px var(--ink),0 8px 20px -12px color-mix(in srgb,var(--ink) 35%,transparent);border-color:transparent}
 /* A station on the map: the stop's number in its kind's colour (M1); done, empty and grey;
    chosen, larger, with a ring. */
 .live .pin.station{display:grid;place-items:center;min-width:24px;height:24px;padding:0 var(--sp-2);border:2px solid var(--map-card);border-radius:var(--r-full);background:var(--pf);color:var(--on-place);font:700 var(--fs-xs)/1 var(--f-body);font-variant-numeric:tabular-nums;box-shadow:0 1px 4px color-mix(in srgb,var(--map-ink) 35%,transparent);cursor:pointer}

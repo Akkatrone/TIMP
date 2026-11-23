@@ -868,7 +868,7 @@ function renderStrip(r){
   // elsewhere). Its dates under it.
   const tr = trip(), first = tr.days[0], last = tr.days[tr.days.length - 1];
   const title = document.getElementById("trip-title");
-  title.innerHTML = `<b><span>${esc(tr.title)}</span>${SELECTOR}</b>${first ? `<small>${esc(dateRange(tr, lang))}</small>` : ""}`;
+  title.innerHTML = `<span class="tt2"><b>${esc(tr.title)}</b>${first ? `<small>${esc(dateRange(tr, lang))}</small>` : ""}</span>${SELECTOR}`;
   title.setAttribute("aria-label", t("tripsOf", {s: tr.title}));
   if(r.name === "trips") title.setAttribute("aria-current", "page"); else title.removeAttribute("aria-current");
   // Search, on every page of a trip (S1).
@@ -916,6 +916,9 @@ function drawMeButton(r){
 
 // The bar of days: an edge once the page has scrolled under it, and a fade on each side
 // of the list of days where there is more to scroll (css/app.css, .strip).
+// Where the bar ends on the screen: under an iPhone's notch, the notch is above it.
+const barBottom = () => $strip.getBoundingClientRect().bottom;
+
 function markStrip(){
   $strip.classList.toggle("scrolled", scrollTop() > 4);
   // The map stays right under the bar (M2).
@@ -1795,7 +1798,7 @@ function pickStop(idx){
   $app.querySelectorAll(".stops .picked").forEach(c => c.classList.remove("picked"));
   card.classList.add("picked");
   const stage = $app.querySelector(".mapstage:not(.sketch)");
-  const top = $strip.offsetHeight + (stage ? stage.offsetHeight : 0) + 8;
+  const top = (stage ? stage.getBoundingClientRect().bottom : barBottom()) + 8;
   scrollToY(Math.max(0, scrollTop() + card.getBoundingClientRect().top - top));
 }
 
@@ -2394,7 +2397,7 @@ function reveal(){
   revealing = null;
   if(!el) return false;
   const card = el.closest(".stop, .group, .dayline") || el;
-  scrollToY(Math.max(0, scrollTop() + card.getBoundingClientRect().top - $strip.offsetHeight - 12));
+  scrollToY(Math.max(0, scrollTop() + card.getBoundingClientRect().top - barBottom() - 12));
   el.focus({preventScroll: true});
   return true;
 }
@@ -2407,7 +2410,7 @@ function goToNow(smooth = false){
   if(r.name !== "day" || r.i !== todayIndex()) return false;
   const mark = $app.querySelector(".stops .now") || $app.querySelector(".stops .next");
   if(!mark) return false;
-  const y = scrollTop() + mark.getBoundingClientRect().top - $strip.offsetHeight - 56;
+  const y = scrollTop() + mark.getBoundingClientRect().top - barBottom() - 56;
   if(smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches) (scroller || window).scrollTo({top: Math.max(0, y), behavior: "smooth"});
   else scrollToY(Math.max(0, y));
   return true;

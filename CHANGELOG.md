@@ -4,6 +4,16 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.3
+
+- **iPhone**: with the app installed on an iPhone with a notch, the map stays right
+  under the bar (it went partly under it), and the list goes to now, to a search result
+  or to a stop chosen on the map, under the bar too. The search field no longer makes
+  Safari zoom the page. On Safari before 16.2 the ring of the next stop, the line of now
+  and the marked words stay.
+- **The trip's title**: the sign that opens the list of trips sits beside the title and
+  its dates, in line with the search and the circle of you.
+
 ## 4.1.2
 
 - **The map no longer moves** when the list starts to scroll: it is right under the bar
