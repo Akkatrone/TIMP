@@ -39,6 +39,9 @@ await withApp(async ({run, until, reload, blocked}) => {
   // What is done and skipped, without the day's cost after it.
   const progress = () => run(`const p = document.querySelector(".progress").cloneNode(true); const c = p.querySelector(".daycost"); if(c) c.remove(); return p.textContent.replace(/ · $/, "");`);
   const click = (sel, i = 0) => run(`document.querySelectorAll(${JSON.stringify(sel)})[${i}].click(); await new Promise(r => setTimeout(r, 60));`);
+  // The map view (M2), and the phone without a connection (the sketch, M6).
+  const mapOn = () => run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); await new Promise(r => setTimeout(r, 80));`);
+  const offline = on => run(`window.dispatchEvent(new Event(${on ? '"offline"' : '"online"'})); await new Promise(r => setTimeout(r, 150));`);
 
   await step("the example trip opens on its first day", async () => {
     await click('[data-act="demo"]');
@@ -156,9 +159,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     await click(".stop:nth-child(2) [data-skip]"); // now: stops 1 and 3 done, stop 2 skipped
   });
 
-  await step("the sketch draws done stops dashed and takes skipped ones off the route", async () => {
+  await step("offline, the map is the sketch by itself (M6): done stops dashed, skipped ones off the route", async () => {
     await click("[data-map]");
-    await click('[data-view="schema"]');
+    assert.equal(await count("[data-view], [data-route]"), 0, "no view and no lines to choose (M4, M6)");
+    await offline(true);
     await until("the sketch", `document.querySelector(".mapsvg")`);
     assert.equal(await count(".mapsvg .badge"), 5);
     assert.equal(await count(".mapsvg .badge.gone"), 3);   // pins 1, 2, 3
@@ -167,7 +171,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   });
 
   await step("the interactive map does the same, and keeps the map when a stop is ticked", async () => {
-    await click('[data-view="live"]');
+    await offline(false);
     await until("the map", `document.querySelector(".live .maplibregl-map") && document.querySelectorAll(".live .pin").length === 5`);
     assert.equal(await count(".live .pin.gone"), 3);
     // A map drawn by the phone has no elements to count: it says what it draws.
@@ -223,10 +227,11 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#day-2";`);
     await until("day 2", `document.querySelectorAll(".stop").length === 7`);
     assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .tvchip")].map(e => e.getAttribute("aria-label"));`), ["Train", "Boat"]);
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="schema"]').click();`);
+    await mapOn();
+    await offline(true);
     await until("the sketch", `document.querySelector(".mapsvg")`);
     assert.equal(await count(".mapsvg .tv"), 2);
-    await click('[data-view="live"]');
+    await offline(false);
     await until("the map", `document.querySelectorAll(".live .tvpin").length === 2`);
     assert.deepEqual(await run(`return [...document.querySelectorAll(".live .tvpin")].map(e => e.getAttribute("aria-label")).sort();`), ["Boat", "Train"]);
     await click("[data-map]");
@@ -247,44 +252,41 @@ await withApp(async ({run, until, reload, blocked}) => {
     // with the number; the eye sees it in the number's colour.
     assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .rail [aria-label]")].map(e => e.getAttribute("aria-label").split(", ").pop());`), ["Sight", "Sight", "View", "Sight", "Food", "View"]);
     assert.equal(await run(`const n = [...document.querySelectorAll(".stop .nb")]; return n[0].style.getPropertyValue("--pf") !== n[2].style.getPropertyValue("--pf");`), true, "a sight and a view have different colours");
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
-    await until("the pins", `document.querySelectorAll(".live .pin").length === 5`);
-    assert.equal(await count(".live .pin.typed svg"), 5);
-    // Filled with the colour of their kind, shaded by the part of the day.
-    assert.equal(await count(".live .pin.painted"), 5);
-    const fills = await run(`return [...document.querySelectorAll(".live .pin")].map(p => p.style.getPropertyValue("--pf"));`);
-    assert.ok(fills.every(f => /^#[0-9a-f]{6}$/.test(f)), fills.join(" "));
-    assert.notEqual(fills[0], fills[2], "a sight and a view have different colours");
     // Sunrise and sunset worked out for Lisbon, and the stop after dark marked.
     assert.match(await text(".dayhead .sun"), /^\d\d:\d\d–2\d:\d\d$/);
     assert.match(await run(`return document.querySelector(".dayhead .sun").getAttribute("aria-label");`), /^Sunrise \d\d:\d\d · sunset 2\d:\d\d$/);
     assert.deepEqual(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nightmark")).map(li => li.querySelector(".tt").textContent);`), ["Miradouro da Senhora do Monte"]);
+    await mapOn();
+    await until("the pins", `document.querySelectorAll(".live .pin").length === 5`);
+    // Stations: the number in the colour of its kind, the same as in the list.
+    assert.equal(await count(".live .pin.station"), 5);
+    assert.equal(await count(".live .pin svg"), 0, "no icon: the colour says the kind");
+    const fills = await run(`return [...document.querySelectorAll(".live .pin")].map(p => p.style.getPropertyValue("--pf"));`);
+    assert.ok(fills.every(f => /^#[0-9a-f]{6}$/.test(f)), fills.join(" "));
+    assert.notEqual(fills[0], fills[2], "a sight and a view have different colours");
+    assert.equal(await count(".dayhead"), 0, "the map takes the heading's place (M2)");
     await click("[data-map]");
   });
 
-  await step("the lines between the stops can be hidden on both maps, and the choice is kept", async () => {
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+  await step("the map: the lines always there, two controls, a tap on a pin brings its stop under the map (M3–M5)", async () => {
+    await mapOn();
     const lines = `+(document.querySelector(".live .canvas") || {dataset: {}}).dataset.legs`;
-    await until("the lines", `${lines} > 0`);
-    // Hiding them keeps the map as it is: the same map, drawn once.
-    await run(`window.__map = document.querySelector(".live .maplibregl-canvas");`);
-    await click("[data-route]");
-    await until("no lines", `${lines} === 0 && document.querySelectorAll(".live .pin").length === 5`);
-    assert.equal(await run(`return document.querySelector("[data-route]").getAttribute("aria-pressed");`), "false");
-    assert.equal(await run(`return document.querySelector(".live .maplibregl-canvas") === window.__map;`), true, "the map was not drawn again");
-    await click("[data-route]");
-    await until("the lines back", `${lines} > 0`);
-    assert.equal(await run(`return document.querySelector(".live .maplibregl-canvas") === window.__map;`), true);
-    await click("[data-route]");
-    await until("no lines", `${lines} === 0`);
-    await click('[data-view="schema"]');
-    await until("the sketch", `document.querySelector(".mapsvg")`);
-    assert.equal(await count(".mapsvg .route"), 0);
-    await reload();
-    await until("day 1", `document.querySelector("[data-route]")`);
-    assert.equal(await run(`return document.querySelector("[data-route]").getAttribute("aria-pressed");`), "false", "kept after a reload");
-    await click("[data-route]");
-    assert.ok(await count(".mapsvg .route") > 0);
+    await until("the lines", `${lines} > 0 && document.querySelectorAll(".live .pin").length === 5`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".mctl button")].map(b => b.getAttribute("aria-label"));`), ["My position", "The whole day"]);
+    assert.equal(await count(".live .maplibregl-ctrl-zoom-in"), 0, "zoom is with the fingers");
+    // A pin: no card on the map; its stop comes up under the map, marked, and the pin is chosen.
+    await run(`document.querySelector('.live .pin[aria-label="Miradouro de Santa Luzia"]').click(); await new Promise(r => setTimeout(r, 300));`);
+    assert.equal(await count(".live .maplibregl-popup"), 0);
+    assert.equal(await run(`return document.querySelector(".live .pin.sel").getAttribute("aria-label");`), "Miradouro de Santa Luzia");
+    assert.equal(await run(`return document.querySelector(".stops .picked .tt").textContent;`), "Miradouro de Santa Luzia");
+    assert.ok(await run(`const r = document.querySelector(".stops .picked").getBoundingClientRect(), m = document.querySelector(".mapstage").getBoundingClientRect(); return r.top >= m.bottom - 2 && r.top < innerHeight;`), "just under the map");
+    // A stop's number, in the list under the map: its pin.
+    await run(`document.querySelector('.stops .nb[data-pin="0"]').click(); await new Promise(r => setTimeout(r, 200));`);
+    assert.equal(await run(`return document.querySelector(".live .pin.sel").getAttribute("aria-label");`), "Praça do Comércio");
+    // The map stays under the bar while the list scrolls (M2).
+    await run(`window.scrollTo(0, 400); await new Promise(r => setTimeout(r, 150));`);
+    assert.ok(await run(`return Math.abs(document.querySelector(".mapstage").getBoundingClientRect().top - document.querySelector(".strip").getBoundingClientRect().bottom) < 2;`), "sticky");
+    await run(`window.scrollTo(0, 0);`);
     await click("[data-map]");
   });
 
@@ -302,15 +304,14 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed");`), "false", "a tap leaves the map closed");
     await press(700);
     assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed");`), "true", "a hold opens it");
-    await run(`document.querySelector('[data-view="live"]').click();`);
     await press(700);
-    await until("the card of the third stop", `document.querySelector(".live .maplibregl-popup") && document.querySelector(".live .maplibregl-popup").textContent.includes("Miradouro de Santa Luzia")`);
+    await until("the pin of the third stop", `document.querySelector(".live .pin.sel") && document.querySelector(".live .pin.sel").getAttribute("aria-label") === "Miradouro de Santa Luzia"`);
     // The sketch: the badge of that stop pulses.
-    await click('[data-view="schema"]');
+    await offline(true);
     await until("the sketch", `document.querySelector(".mapsvg")`);
     await press(700);
     assert.equal(await run(`return [...document.querySelectorAll(".mapsvg .badge.hit")].map(b => b.dataset.idx).join();`), "2");
-    await click('[data-view="live"]');
+    await offline(false);
     await click("[data-map]");
   });
 
@@ -338,7 +339,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await bg(), dark);
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelector("[data-map]")`);
-    await run(`document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    await run(`document.querySelector("[data-map]").click();`);
     await until("the map", `document.querySelector(".live .maplibregl-map")`);
     assert.equal(await run(`return document.querySelector(".live.dark");`), null, "the map is not darkened");
     assert.equal(await run(`return getComputedStyle(document.querySelector(".live")).colorScheme;`), "light");
@@ -575,7 +576,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     const openLiveMap = async () => {
       await run(`location.hash = "#day-1";`);
       await until("day 1", `document.querySelector("[data-map]")`);
-      await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+      await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click();`);
     };
 
     await run(`location.hash = "#me";`);
@@ -888,14 +889,14 @@ await withApp(async ({run, until, reload, blocked}) => {
     // Most important first (W5): the closed door, then the booking.
     assert.deepEqual(await run(`return [...${stop("Pastéis de Belém")}.querySelectorAll(".sigrow > span")].map(n => n.textContent);`), ["Closed on Saturday", "Booking required: not done yet"]);
     assert.equal(await run(`return ${stop("Pastéis de Belém")}.querySelector(".local").textContent;`), "Antiga Confeitaria de Belém");
-    // On the map too: the card of the pin has the name on the sign and the review link.
-    await run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+    // On the map, its pin brings the stop itself: the name on the sign, the review link,
+    // Directions from the stop before.
+    await mapOn();
     await until("the pins", `document.querySelector('.live .pin[aria-label="Pastéis de Belém"]')`);
-    await run(`document.querySelector('.live .pin[aria-label="Pastéis de Belém"]').click();`);
-    await until("the card", `document.querySelector(".live .maplibregl-popup .local")`);
-    assert.equal(await run(`return document.querySelector(".live .maplibregl-popup .local").textContent;`), "Antiga Confeitaria de Belém");
-    assert.ok(await run(`return !!document.querySelector('.live .maplibregl-popup a[aria-label="Reviews on TheFork"]');`));
-    assert.equal(await run(`return new URL([...document.querySelectorAll(".live .maplibregl-popup a")].find(a => a.textContent.startsWith("Directions")).href).searchParams.get("origin");`), "Mosteiro dos Jerónimos");
+    await run(`document.querySelector('.live .pin[aria-label="Pastéis de Belém"]').click(); await new Promise(r => setTimeout(r, 200));`);
+    assert.equal(await run(`return document.querySelector(".stops .picked .local").textContent;`), "Antiga Confeitaria de Belém");
+    assert.ok(await run(`return !!document.querySelector('.stops .picked a[aria-label="Reviews on TheFork"]');`));
+    assert.equal(await run(`return new URL([...document.querySelectorAll(".stops .picked .maplink")].find(a => a.textContent.startsWith("Directions")).href).searchParams.get("origin");`), "Mosteiro dos Jerónimos");
     await click("[data-map]");
     // Booked: the warning goes, Booked shows; the closing day stays until the stop moves.
     await run(`document.querySelector('[data-edit="${ID("pasteis", "2027-05-15")}"]').click();`);

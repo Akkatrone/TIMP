@@ -158,10 +158,6 @@ span.costbtn{cursor:auto}
 .num{font:500 .95rem var(--f-mono);color:var(--ink);user-select:all}
 .foot{font-size:.8rem;color:var(--muted);margin:0}
 
-/* map panel */
-.mapbtn{justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .82rem var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer;min-height:36px}
-.mapbtn[aria-expanded="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.mapbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:14px}
 .zone{display:grid;gap:8px;min-width:0}
 .zhead{display:flex;justify-content:space-between;align-items:baseline;gap:6px 10px;flex-wrap:wrap}
 .zname{font:500 .72rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
@@ -176,20 +172,12 @@ span.costbtn{cursor:auto}
 .mapsvg .bt{font:600 11px var(--f-body);fill:var(--ink);text-anchor:middle}
 .mapsvg .sb{stroke:var(--muted);stroke-width:1.5;fill:none}
 .mapsvg .sbt{font:500 10px var(--f-mono);fill:var(--muted)}
-.mlegend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px 12px;font-size:.84rem}
-.mlegend li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline;min-width:0}
 .mb{display:inline-block;font:600 .7rem var(--f-mono);border:1.5px solid var(--pf,var(--c));border-radius:999px;padding:1px 6px;min-width:22px;text-align:center;color:var(--ink)}
-.mlegend a{color:var(--ink);text-decoration:none;min-width:0;overflow-wrap:anywhere}
 .off{font-size:.84rem;color:var(--muted);margin:0;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 
 /* live map */
-.livewrap{display:grid;gap:8px;min-width:0}
 .zchips{display:flex;flex-wrap:wrap;gap:6px}
 .zchip{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:600 .76rem var(--f-body);padding:5px 12px;border-radius:999px;cursor:pointer;min-height:32px}
-/* the map's view picker and the switch for the lines between the stops */
-.maptools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
-.chipbtn{font:600 .84rem var(--f-body);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;min-height:36px}
-.chipbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .live{height:min(62vh,380px);border-radius:10px;overflow:hidden;background:#f2efe9;color-scheme:light;position:relative;isolation:isolate}
 .live .canvas{position:absolute;inset:0}
 .live .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:var(--muted);font-size:.88rem}
@@ -767,3 +755,23 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .res .rt small{font:500 var(--fs-s)/1.35 var(--f-body);color:var(--muted)}
 .res .rt .rw{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-weight:400}
 mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:var(--r-s);padding:0 var(--sp-1)}
+
+/* The day as a map (M2–M7): the stage under the bar, the list scrolling under it. Always
+   light (R11): the map's own tokens. */
+.mapstage{position:sticky;top:var(--strip-h,0px);z-index:4;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));height:min(48dvh,460px);background:var(--map-bg);color-scheme:light;box-shadow:0 8px 16px -12px color-mix(in srgb,var(--map-ink) 45%,transparent)}
+.mapstage #live-slot,.mapstage .live{height:100%;border-radius:var(--r-none)}
+.mapstage.sketch{position:static;height:auto;margin-inline:0;padding:var(--sp-4);border-radius:var(--r-m);display:grid;gap:var(--sp-4);background:var(--surface);color-scheme:normal;box-shadow:none}
+.mctl{position:absolute;right:var(--sp-4);top:var(--sp-4);z-index:2;display:grid;gap:var(--sp-3)}
+.mbtn{display:grid;place-items:center;width:var(--touch);height:var(--touch);padding:0;border:0;border-radius:var(--r-m);background:var(--map-card);color:var(--map-ink);box-shadow:0 2px 8px -2px color-mix(in srgb,var(--map-ink) 40%,transparent);cursor:pointer}
+.mbtn svg{width:19px;height:19px}
+.mapstage .zchips{position:absolute;left:var(--sp-4);bottom:var(--sp-4);right:calc(var(--touch) + var(--sp-6));z-index:2;display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.mapstage .zchip{min-height:36px;padding:0 var(--sp-4);border:0;border-radius:var(--r-full);background:var(--map-card);color:var(--map-ink);font:600 var(--fs-s) var(--f-body);box-shadow:0 2px 8px -2px color-mix(in srgb,var(--map-ink) 40%,transparent);cursor:pointer}
+.mapstage + .stops,.mapstage + .seg{margin-top:var(--sp-2)}
+.stops .picked{box-shadow:0 0 0 2px var(--ink),0 8px 20px -12px color-mix(in srgb,var(--ink) 35%,transparent);border-color:transparent}
+/* A station on the map: the stop's number in its kind's colour (M1); done, empty and grey;
+   chosen, larger, with a ring. */
+.live .pin.station{display:grid;place-items:center;min-width:24px;height:24px;padding:0 var(--sp-2);border:2px solid var(--map-card);border-radius:var(--r-full);background:var(--pf);color:var(--on-place);font:700 var(--fs-xs)/1 var(--f-body);font-variant-numeric:tabular-nums;box-shadow:0 1px 4px color-mix(in srgb,var(--map-ink) 35%,transparent);cursor:pointer}
+.live .pin.station.gone{opacity:1;border:1.8px solid var(--map-muted);background:var(--map-card);color:var(--map-muted);box-shadow:none}
+.live .pin.station.sel{z-index:3;min-width:32px;height:32px;font-size:var(--fs-m);box-shadow:0 0 0 2.5px var(--map-ink),0 4px 10px -2px color-mix(in srgb,var(--map-ink) 45%,transparent)}
+.live .pin.station:focus-visible{outline:2px solid var(--map-ink);outline-offset:2px}
+.me-dot{display:block;width:16px;height:16px;border-radius:var(--r-full);background:var(--map-me);border:3px solid var(--map-card);box-shadow:0 0 0 6px color-mix(in srgb,var(--map-me) 22%,transparent)}

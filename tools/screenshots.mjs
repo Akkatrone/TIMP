@@ -36,16 +36,17 @@ await withApp(async ({run, until, theme, capture}) => {
   // 2. The interactive map of day 2: train and ferry icons, two stops behind you dashed.
   await run(`location.hash = "#day-2";`);
   await until("day 2", `document.querySelectorAll(".stop").length === 7`);
-  await run(`for(const i of [0, 1]) document.querySelectorAll("[data-tick]")[i].click(); document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
+  await run(`for(const i of [0, 1]) document.querySelectorAll("[data-tick]")[i].click(); document.querySelector("[data-map]").click();`);
   await until("the map drawn", `document.querySelector(".live .canvas[data-ready]")`, 40000);
-  await run(scrollToTitle);
+  await run(`document.querySelectorAll(".live .pin.station")[3].click(); scrollTo(0, 0);`);
   await new Promise(r => setTimeout(r, 600)); // tiles fade in
   await shoot("map.png");
 
   // 3. The sketch that replaces it offline.
-  await run(`document.querySelector('[data-view="schema"]').click(); ${scrollToTitle}`);
+  await run(`window.dispatchEvent(new Event("offline")); scrollTo(0, 0);`);
   await until("the sketch", `document.querySelector(".mapsvg")`);
   await shoot("sketch.png");
+  await run(`window.dispatchEvent(new Event("online"));`);
 
   // 4. A stop added from a Google Maps link (an invented place), with how you get there.
   const PLACE = "https://www.google.com/maps/place/Pastelaria+Exemplo,+Rua+Augusta+10,+Lisboa/@38.7101,-9.1375,18z/data=!4m6!3m5!1s0x0:0x0!8m2!3d38.71012!4d-9.13751";

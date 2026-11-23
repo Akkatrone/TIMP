@@ -19,6 +19,11 @@
   --map-p5:#4f8a2a;
   --map-p6:#5a6a7a;
   --map-p7:#3d5a99;
+  --map-bg:#f2efe9;
+  --map-card:#ffffff;
+  --map-ink:#1b1b1f;
+  --map-muted:#6f6e77;
+  --map-me:#1d6fe0;
   --fs-xs:0.6875rem;
   --fs-s:0.75rem;
   --fs-m:0.8125rem;
@@ -33,6 +38,7 @@
   --sp-5:16px;
   --sp-6:24px;
   --sp-7:32px;
+  --r-none:0px;
   --r-s:7px;
   --r-m:12px;
   --r-l:18px;

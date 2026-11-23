@@ -4,6 +4,21 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.0
+
+The map, in the design system ([design/README.md](design/README.md), M1–M9).
+
+- **A view of the day**: List | Map in the top bar. The map takes the heading's place,
+  right under the bar, and stays there while the day's stops scroll under it.
+- **Pins are stations**: the stop's number in its kind's colour, the same sign as in the
+  list; done, empty and grey. A tap on a pin brings its stop just under the map, marked
+  (no card on the map); a tap on a number in the list shows its pin.
+- **The lines are always there**, in dots where you have been. No switch for them, and no
+  choice between map and sketch: the sketch comes by itself without a connection.
+- **Two controls**: my position (asked of the phone only when tapped; it stays on the
+  phone) and the whole day. Zoom with the fingers.
+- The design system's page shows the map too.
+
 ## 4.0.1
 
 - **A group of alternatives with no choice yet** no longer draws a stray piece of line in

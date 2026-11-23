@@ -150,15 +150,20 @@ moment (a message that passes, with Undo when there is one).
 
 ## The map
 
-- **M1** The same sign in the list and on the map: the number, in the kind's colour.
-- **M2** A view of the day (List | Map at the top), not a panel inside the list.
-- **M3** A number, one action: its card comes up in the sheet below.
+- **M1** The same sign in the list and on the map: a station, the stop's number in its
+  kind's colour; done or skipped, empty and grey; chosen, larger, with a ring.
+- **M2** A view of the day (List | Map in the top bar), not a panel: the map takes the
+  heading's place, right under the bar, and stays there while the list scrolls under it.
+- **M3** A pin, one action: its stop comes up just under the map, marked. No card on the
+  map. A stop's number in the list shows its pin.
 - **M4** The lines are always there: full ahead, dots where you have been.
-- **M5** Two controls: my position, the whole day.
-- **M6** Offline, the sketch by itself.
+- **M5** Two controls: my position (asked of the phone only then; it stays on the
+  phone), the whole day. Zoom is with the fingers or the wheel. A day in more than one
+  place: a row of their names, a tap shows that one.
+- **M6** Offline, the sketch by itself, in scale.
 - **M7** Always light (R11), with its attribution.
-- **M8** At once (R6), and one map that moves from day to day.
-- **M9** Choosing a point: the sign stays in the middle, the map moves under it.
+- **M8** At once (R6): the stage has its size before the tiles come.
+- **M9** Choosing a point (the stop form): the sign stays in the middle, the map moves.
 
 ## Accessibility
 

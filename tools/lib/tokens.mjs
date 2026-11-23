@@ -41,6 +41,7 @@ export function tokensCss(t = readTokens()){
   const always = [
     ...Object.entries(place).map(([k, v]) => `--t-${k}:${v};`),
     ...lightCities.map((c, i) => `--map-p${i}:${c};`),
+    ...Object.entries(values(t.map)).map(([k, v]) => `--map-${k}:${v};`),
     ...Object.entries(text).map(([k, v]) => `--fs-${k}:${v};`),
     ...Object.entries(space).map(([k, v]) => `--sp-${k}:${v};`),
     ...Object.entries(radius).map(([k, v]) => `--r-${k}:${v};`),

@@ -63,6 +63,8 @@ const LIST = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M
 const MAPICON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 3.5l4-1.5 5 2 4-1.5v10l-4 1.5-5-2-4 1.5z M5.5 2v10 M10.5 4v10" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
 const INFO = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const SEARCH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.8" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6l3.4 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const LOCATE = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 9.5L17 3l-6.5 14-1.6-5.9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+const FRAME = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 let uid = 0;   // ids for aria-controls, unique on the page
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -912,6 +914,8 @@ function drawMeButton(r){
 // of the list of days where there is more to scroll (css/app.css, .strip).
 function markStrip(){
   $strip.classList.toggle("scrolled", scrollTop() > 4);
+  // The map stays right under the bar (M2).
+  document.documentElement.style.setProperty("--strip-h", $strip.offsetHeight + "px");
   const max = $days.scrollWidth - $days.clientWidth;
   $days.classList.toggle("more-l", $days.scrollLeft > 2);
   $days.classList.toggle("more-r", $days.scrollLeft < max - 2);
@@ -1731,29 +1735,23 @@ function costReceipt(items, to, all){
     (todo.value ? line(t("costTodoOf"), approxMoney(todo, to), " sub") : "") + `</div>`;
 }
 
+// Live when there is a connection, the sketch when not (M6): no choice to make.
 function effectiveView(){
-  return S.ui.mapView === "schema" || !S.online ? "schema" : "live";
+  return S.online ? "live" : "schema";
 }
 
-function mapPanel(zs, color, view, gone, paint){
-  const zoneLink = z => `<a class="maplink" href="${esc(z.pts.length < 2 ? mapsUrl(z.pts[0].q) : routeUrl(z))}" target="_blank" rel="noopener">${esc(z.pts.length < 2 ? t("mapLink") : t("openInMaps"))}</a>`;
+// The day as a map (M2–M7): a stage on top of the list, which scrolls under it. The lines
+// always (M4); two controls, you and the whole day (M5); a row of zones on a day with
+// more than one. Offline, the sketch, in scale.
+function mapStage(zs, color, view, gone, paint){
   const zoneTitle = z => zs.length > 1 ? z.pts[0].name : t("stopsOfDay");
-  const views = [["live", t("viewLive")], ["schema", t("viewSchema")]];
-
-  let o = `<section class="mapbox" style="--c:${color}" aria-label="${esc(t("dayMap"))}">`;
-  o += `<div class="maptools"><div class="seg" role="group" aria-label="${esc(t("mapType"))}">${views.map(([id, name]) => `<button type="button" data-view="${id}" aria-pressed="${id === view}">${esc(name)}</button>`).join("")}</div>` +
-    `<button type="button" class="chipbtn" data-route aria-pressed="${S.ui.route}">${esc(t("routeLines"))}</button></div>`;
-  if(!S.online && S.ui.mapView === "live") o += `<p class="off">${esc(t("offlineMap"))}</p>`;
-
+  const zoneLink = z => `<a class="maplink" href="${esc(z.pts.length < 2 ? mapsUrl(z.pts[0].q) : routeUrl(z))}" target="_blank" rel="noopener">${esc(z.pts.length < 2 ? t("mapLink") : t("openInMaps"))}</a>`;
   if(view === "live"){
-    o += `<div class="livewrap">`;
-    if(zs.length > 1) o += `<div class="zchips">${zs.map((z, i) => `<button type="button" class="zchip" data-fit="${i}">${esc(zoneTitle(z))}</button>`).join("")}</div>`;
-    o += `<div id="live-slot"></div>`;
-    o += zs.map(z => `<p class="off"><span>${esc(zoneTitle(z))}</span>${zoneLink(z)}</p>`).join("");
-    o += `</div>`;
-    return o + `<p class="foot">${esc(t("footLive"))}</p></section>`;
+    return `<section class="mapstage" style="--c:${color}" aria-label="${esc(t("dayMap"))}"><div id="live-slot"></div>` +
+      `<div class="mctl" role="group" aria-label="${esc(t("mapControls"))}"><button type="button" class="mbtn" data-locate aria-label="${esc(t("mapMe"))}" title="${esc(t("mapMe"))}">${LOCATE}</button><button type="button" class="mbtn" data-fit="" aria-label="${esc(t("mapAll"))}" title="${esc(t("mapAll"))}">${FRAME}</button></div>` +
+      (zs.length > 1 ? `<div class="zchips">${zs.map((z, i) => `<button type="button" class="zchip" data-fit="${i}">${esc(zoneTitle(z))}</button>`).join("")}</div>` : "") + `</section>`;
   }
-
+  let o = `<section class="mapstage sketch" style="--c:${color}" aria-label="${esc(t("dayMap"))}"><p class="off">${esc(t("offlineMap"))}</p>`;
   zs.forEach(z => {
     if(z.enter && z.enter.travel){
       o += `<p class="off move${gone(z.enter.idx) ? " gone" : ""}"><span class="tvchip">${icon(z.enter.travel, 16)}</span><span>${esc(t("travel_" + z.enter.travel))} · ${esc(z.enter.from.name)} → ${esc(zoneTitle(z))}</span></p>`;
@@ -1762,10 +1760,21 @@ function mapPanel(zs, color, view, gone, paint){
       o += `<p class="off"><span class="mb" style="--pf:${paint.pin(z.pts[0])}">${z.pts[0].nums.join("·")}</span><span>${esc(z.pts[0].name)} · ${esc(t("offSketch"))}</span>${zoneLink(z)}</p>`;
       return;
     }
-    const head = `<div class="zhead"><span class="zname">${esc(zoneTitle(z))}</span>${zoneLink(z)}</div>`;
-    o += `<div class="zone">${head}${zoneSVG(z, zoneTitle(z), gone, S.ui.route, paint)}<ol class="mlegend">${z.pts.map(p => `<li><span class="mb" style="--pf:${paint.pin(p)}">${p.nums.join("·")}</span><a href="${esc(mapsUrl(p.q))}" target="_blank" rel="noopener">${esc(p.name)}</a></li>`).join("")}</ol></div>`;
+    o += `<div class="zone"><div class="zhead"><span class="zname">${esc(zoneTitle(z))}</span>${zoneLink(z)}</div>${zoneSVG(z, zoneTitle(z), gone, true, paint)}</div>`;
   });
-  return o + `<p class="foot">${esc(t("footSketch") + " " + t("footNumbers"))}</p></section>`;
+  return o + `</section>`;
+}
+
+// A stop chosen on the map (M3): its card, just under the map, marked.
+function pickStop(idx){
+  const nb = $app.querySelector(`.stops .nb[data-pin="${idx}"]`);
+  const card = nb && nb.closest(".stop, .group");
+  if(!card) return;
+  $app.querySelectorAll(".stops .picked").forEach(c => c.classList.remove("picked"));
+  card.classList.add("picked");
+  const stage = $app.querySelector(".mapstage:not(.sketch)");
+  const top = $strip.offsetHeight + (stage ? stage.offsetHeight : 0) + 8;
+  scrollToY(Math.max(0, scrollTop() + card.getBoundingClientRect().top - top));
 }
 
 const stopKey = (day, planId, s, i) => `${day.date}|${planId || ""}|${s.id || "#" + i}`;
@@ -2185,14 +2194,16 @@ function renderDay(i){
   </header>`;
 
   let wanted = null;
-  if(S.ui.mapOpen && zs.length){
-    html += mapPanel(zs, color, view, gone, paint);
+  // The day as a map (M2): the map takes the heading's place, the list scrolls under it.
+  const mapMode = S.ui.mapOpen && zs.length > 0;
+  if(mapMode){
+    html = mapStage(zs, color, view, gone, paint);
     // Skipping a stop changes the route: the map is drawn again.
     const skippedNow = list.map((s, k) => isSkipped(k) ? k : -1).filter(k => k >= 0).join(",");
     // The lines are not in the key: hiding them keeps the map, its zoom and its place.
     if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, skippedNow].join("|"), zones: zs, color: mapColor(d.city), gone, paint: painter(mapColor(d.city), parts)};
   }
-  html += dayLine(d, pid, list, all);
+  if(!mapMode) html += dayLine(d, pid, list, all);
   if(d.plans){
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
@@ -2204,7 +2215,7 @@ function renderDay(i){
   // Adding is always the last row (R3, V2): a new stop, or what a chat wrote.
   if(!isLocked(S.rec)) html += `<div class="addrow"><button type="button" data-add-stop>${PLUS}${esc(t("addStop"))}</button><button type="button" data-add-paste>${CLIP}${esc(t("addPaste"))}</button></div>`;
   // Changing the day itself: quiet, at the end (R2).
-  html += `<div class="chg dayfoot" role="group" aria-label="${esc(t("dayActions"))}">${isLocked(S.rec) ? "" : `<button type="button" data-day-edit>${EDIT}${esc(t("editDay"))}</button><button type="button" data-day-add>${PLUS}${esc(t("addDay"))}</button>`}${anyText ? `<button type="button" data-expand aria-pressed="${S.ui.expandAll}">${S.ui.expandAll ? FOLD : UNFOLD}${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}</button>` : ""}</div>`;
+  if(!mapMode) html += `<div class="chg dayfoot" role="group" aria-label="${esc(t("dayActions"))}">${isLocked(S.rec) ? "" : `<button type="button" data-day-edit>${EDIT}${esc(t("editDay"))}</button><button type="button" data-day-add>${PLUS}${esc(t("addDay"))}</button>`}${anyText ? `<button type="button" data-expand aria-pressed="${S.ui.expandAll}">${S.ui.expandAll ? FOLD : UNFOLD}${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}</button>` : ""}</div>`;
   // The next stop's bar (V3): its number, its name, how long until it, Directions from
   // where the traveller is (no origin: the phone's position).
   let bar = "";
@@ -2259,12 +2270,12 @@ function syncLive(wanted){
   if(applyMapSettings()) return;
   if(!live || live.key !== wanted.key){
     if(live) live.handle.destroy();
-    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), route: S.ui.route, paint: wanted.paint, onNotice: k => toast(t(k))})};
+    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), paint: wanted.paint, onNotice: k => toast(t(k)), onPick: pickStop})};
   }
   slot.appendChild(live.handle.el);
   live.handle.refresh();
   live.handle.setMarks(wanted.gone);
-  live.handle.setRoute(S.ui.route);
+  live.handle.setRoute(true);
 }
 
 // The buttons at the bottom right: Paste on every page of an open trip, + on a day.
@@ -2462,6 +2473,9 @@ $app.addEventListener("toggle", e => {
 $app.addEventListener("click", e => {
   // Any tap outside the open ⋯ menu closes it first (its own button toggles it below).
   if(S.menuFor && !e.target.closest(".menu") && !e.target.closest("[data-more]")) hideMenu();
+  // On the map, a stop's number shows its pin (M3).
+  const num = S.ui.mapOpen && live && e.target.closest(".stops .nb[data-pin]");
+  if(num){ live.handle.focus(+num.dataset.pin); pickStop(+num.dataset.pin); return; }
   const group = e.target.closest("[data-group]");
   if(group){
     const k = group.dataset.group;
@@ -2609,7 +2623,8 @@ $app.addEventListener("click", e => {
     return;
   }
   const fit = e.target.closest("[data-fit]");
-  if(fit){ if(live) live.handle.fit(+fit.dataset.fit); return; }
+  if(fit){ if(live) live.handle.fit(fit.dataset.fit === "" ? null : +fit.dataset.fit); return; }
+  if(e.target.closest("[data-locate]")){ if(live) live.handle.locate(); return; }
   const plan = e.target.closest("[data-plan]");
   if(plan){
     const r = route();
@@ -2708,9 +2723,9 @@ document.addEventListener("selectionchange", () => { if(hold && hold.fired) clea
 function showOnMap(idx){
   try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
   if(!S.ui.mapOpen){ S.ui.mapOpen = true; saveUi(); render(); }
-  const box = document.querySelector(".mapbox");
+  const box = document.querySelector(".mapstage");
   if(!box) return;
-  scrollToY(scrollTop() + box.getBoundingClientRect().top - $strip.offsetHeight - 12);
+  pickStop(idx);
   if(live && document.getElementById("live-slot")) live.handle.focus(idx);
   // The sketch: its badge for that stop pulses.
   else box.querySelectorAll(".badge").forEach(b => {

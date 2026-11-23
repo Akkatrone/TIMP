@@ -33,7 +33,7 @@
     <a href="#principles">Principles</a><a href="#colour">Colour</a><a href="#type">Type</a>
     <a href="#space">Space, shape, motion</a><a href="#line">The line of the day</a>
     <a href="#stop">A stop</a><a href="#groups">Alternatives</a><a href="#day">The day</a>
-    <a href="#today">On the day</a><a href="#signals">Signals</a><a href="#search">Search</a>
+    <a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a>
     <a href="#a11y">Accessibility</a>
   </nav>
 
@@ -180,6 +180,21 @@
     row.</p>
     <div class="ds-row"><div class="ds-phone ds-barwrap">
       <div class="nextbar ds-static"><button type="button" class="nb-t"><span class="nb" style="--pf:var(--t-food)" aria-hidden="true">4</span><span class="nb-tx"><small>Next, in 20 min</small><b>Lunch in Alfama</b><small>14:00</small></span></button><a class="nb-go" href="#today"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 13.5V8.5a3 3 0 013-3h5.5M10 3l2.5 2.5L10 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Directions</a></div>
+    </div></div>
+  </section>
+
+  <section id="map">
+    <h2>The map</h2>
+    <p>A view of the day, not a panel: List | Map in the top bar. The map takes the
+    heading's place, right under the bar, and stays there while the list scrolls under
+    it. A pin is a station, the same sign as in the list; a tap brings its stop just
+    under the map. The lines are always there, dots behind you. Two controls: my
+    position, the whole day. Always light. Offline, the sketch.</p>
+    <div class="ds-row"><div class="ds-phone ds-mapdemo">
+      <div class="ds-map"><span class="mbtns"><span class="mbtn" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3 9.5L17 3l-6.5 14-1.6-5.9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span><span class="mbtn" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span></span>
+        <svg class="ds-route" viewBox="0 0 300 200" aria-hidden="true"><path d="M40 150 L95 120" stroke="var(--map-p0)" stroke-width="4" stroke-linecap="round" stroke-dasharray="0.1 9"/><path d="M95 120 L160 90 L230 110 L250 50" stroke="var(--map-p0)" stroke-width="4" stroke-linecap="round" fill="none" opacity=".8"/></svg>
+        <span class="live"><span class="pin station gone" style="left:40px;top:150px;--pf:var(--t-sight)">1</span><span class="pin station" style="left:95px;top:120px;--pf:var(--t-sight)">2</span><span class="pin station sel" style="left:160px;top:90px;--pf:var(--t-food)">3</span><span class="pin station" style="left:230px;top:110px;--pf:var(--t-museum)">4</span><span class="pin station" style="left:250px;top:50px;--pf:var(--t-view)">5</span><span class="me-dot" style="position:absolute;left:120px;top:160px"></span></span>
+      </div>
     </div></div>
   </section>
 

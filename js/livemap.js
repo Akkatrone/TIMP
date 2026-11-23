@@ -77,13 +77,14 @@ export function mapStyle(){
 }
 
 /** A MapLibre map in `canvas`, kept north up, with zoom buttons. */
-export async function newMap(canvas, options){
+export async function newMap(canvas, {zoomButtons = true, ...options} = {}){
   const ml = await loadMapLibre();
   const style = await mapStyle();
   const map = new ml.Map({container: canvas, style, attributionControl: {compact: true}, dragRotate: false, pitchWithRotate: false, touchPitch: false, ...options});
   map.touchZoomRotate.disableRotation();
   map.keyboard.disableRotation();
-  map.addControl(new ml.NavigationControl({showCompass: false}), "top-left");
+  // The day's map has two controls of its own (M5): zoom is with the fingers or the wheel.
+  if(zoomButtons) map.addControl(new ml.NavigationControl({showCompass: false}), "top-left");
   // Vector tiles that keep failing before any arrives: the images of OpenStreetMap instead.
   let failed = 0, arrived = !style.sources.openmaptiles;
   map.on("sourcedata", e => { if(e.sourceId === "openmaptiles" && e.tile) arrived = true; });
@@ -142,17 +143,41 @@ function routeOf(zones){
 // colour `paint` gives it (js/geo.js, painter).
 function pinNode(pt, color, paint){
   const el = document.createElement("span");
-  el.className = "pin" + (pt.type ? " typed" : "") + (paint ? " painted" : "");
+  // A station: the stop's number in the colour of its kind, the same sign as in the list
+  // (design/README.md, M1). Without colours (no painter), the icon of its kind.
+  el.className = "pin" + (paint ? " painted station" : pt.type ? " typed" : "");
   el.style.setProperty("--pc", color);
   if(paint) el.style.setProperty("--pf", paint.pin(pt));
-  el.innerHTML = icon(pt.type, 13) + `<span>${esc(pt.nums.join("·"))}</span>`;
+  el.innerHTML = (paint ? "" : icon(pt.type, 13)) + `<span>${esc(pt.nums.join("·"))}</span>`;
   el.setAttribute("role", "button");
+  el.setAttribute("tabindex", "0");
   el.setAttribute("aria-label", pt.name);
+  if(pt.type) el.dataset.type = pt.type;
   return el;
 }
 
-async function drawOsm(canvas, zones, color, paint){
-  const {ml, map} = await newMap(canvas, {});
+// You, on the map: a dot, where the phone says it is. Asked only when the traveller
+// taps "my position"; the position stays on the phone (V4).
+// One action on a pin, by finger or keyboard.
+function pick(el, fn){
+  el.addEventListener("click", fn);
+  el.addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); fn(e); } });
+}
+
+function meNode(){
+  const el = document.createElement("span");
+  el.className = "me-dot";
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", t("mapYou"));
+  return el;
+}
+const where = () => new Promise((ok, no) => {
+  if(!navigator.geolocation) return no(new Error("no-geolocation"));
+  navigator.geolocation.getCurrentPosition(p => ok([p.coords.latitude, p.coords.longitude]), no, {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000});
+});
+
+async function drawOsm(canvas, zones, color, paint, onPick){
+  const {ml, map} = await newMap(canvas, {zoomButtons: !onPick});
   const route = routeOf(zones);
   let gone = () => false, routeOn = true;
   // The legs as lines: a jump between zones (Hakone → Kyoto) is thinner, it is not a
@@ -169,7 +194,7 @@ async function drawOsm(canvas, zones, color, paint){
     map.addSource("route", {type: "geojson", data: lines()});
     const visibility = routeOn ? "visible" : "none";
     map.addLayer({id: "route", type: "line", source: "route", filter: ["!", ["get", "gone"]], layout: {"line-cap": "round", visibility}, paint: paintOf});
-    map.addLayer({id: "route-gone", type: "line", source: "route", filter: ["get", "gone"], layout: {visibility}, paint: {...paintOf, "line-dasharray": [1.25, 2.5]}});
+    map.addLayer({id: "route-gone", type: "line", source: "route", filter: ["get", "gone"], layout: {"line-cap": "round", visibility}, paint: {...paintOf, "line-dasharray": [0.1, 2.2]}});
   };
   map.on("style.load", addRoute);
   if(map.isStyleLoaded()) addRoute();
@@ -177,12 +202,23 @@ async function drawOsm(canvas, zones, color, paint){
     const el = travelNode(leg, paint ? paint.leg(leg) : color);
     return {leg, el, m: new ml.Marker({element: at(el)}).setLngLat(lngLat(midpoint(leg.from.ll, leg.to.ll))).addTo(map)};
   });
+  // A pin, one action (M3): with onPick, the stop it is; without, its card on the map.
   const pins = zones.flatMap(z => z.pts.map(pt => {
     const el = pinNode(pt, color, paint);
-    const popup = new ml.Popup({offset: 14, maxWidth: "250px"}).setDOMContent(popupNode(pt));
-    const m = new ml.Marker({element: at(el)}).setLngLat(lngLat(pt.ll)).setPopup(popup).addTo(map);
+    const m = new ml.Marker({element: at(el)}).setLngLat(lngLat(pt.ll));
+    if(onPick) pick(el, () => { select(pt); onPick(pt.items[0].idx); });
+    else m.setPopup(new ml.Popup({offset: 14, maxWidth: "250px"}).setDOMContent(popupNode(pt)));
+    m.addTo(map);
     return {pt, el, m};
   }));
+  const select = pt => pins.forEach(p => p.el.classList.toggle("sel", p.pt === pt));
+  let me = null;
+  const locate = async () => {
+    const ll = await where();
+    if(!me) me = new ml.Marker({element: meNode()});
+    me.setLngLat(lngLat(ll)).addTo(map);
+    map.jumpTo({center: lngLat(ll), zoom: Math.max(map.getZoom(), 15)});
+  };
   // What the map draws, said on the page (a canvas has no elements to count): the
   // lines on show and how many are dashed; "ready" once the tiles are drawn.
   const say = () => {
@@ -212,17 +248,18 @@ async function drawOsm(canvas, zones, color, paint){
     for(const id of ["route", "route-gone"]) if(map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
     marks.forEach(k => on ? k.m.addTo(map) : k.m.remove());
   };
-  // The pin of the stop at `idx` in the day's list, in the middle, with its card.
+  // The pin of the stop at `idx` in the day's list, in the middle, chosen (or with its card).
   const focus = idx => {
     const p = pins.find(x => x.pt.items.some(it => it.idx === idx));
     if(!p) return;
     map.jumpTo({center: lngLat(p.pt.ll), zoom: Math.max(map.getZoom(), 16)});
-    if(!p.m.getPopup().isOpen()) p.m.togglePopup();
+    if(onPick) select(p.pt);
+    else if(!p.m.getPopup().isOpen()) p.m.togglePopup();
   };
-  return {fit, mark, showRoute, focus, refresh: () => map.resize(), destroy: () => map.remove()};
+  return {fit, mark, showRoute, focus, locate, refresh: () => map.resize(), destroy: () => map.remove()};
 }
 
-async function drawGoogle(canvas, zones, color, key, paint){
+async function drawGoogle(canvas, zones, color, key, paint, onPick){
   const gm = await loadGoogle(key);
   const {Map, Polyline, InfoWindow, OverlayView} = await gm.importLibrary("maps");
   const {LatLng, LatLngBounds, ColorScheme} = await gm.importLibrary("core");
@@ -248,6 +285,7 @@ async function drawGoogle(canvas, zones, color, key, paint){
     center: {lat: zones[0].pts[0].ll[0], lng: zones[0].pts[0].ll[1]},
     zoom: 13,
     mapTypeControl: false,
+    zoomControl: !onPick,
     streetViewControl: false,
     fullscreenControl: true,
     clickableIcons: false,
@@ -278,7 +316,8 @@ async function drawGoogle(canvas, zones, color, key, paint){
     z.pts.forEach(pt => {
       const pos = new LatLng(pt.ll[0], pt.ll[1]);
       const el = pinNode(pt, color, paint);
-      el.addEventListener("click", e => {
+      if(onPick) pick(el, e => { e.stopPropagation(); pins.forEach(p => p.el.classList.toggle("sel", p.pt === pt)); onPick(pt.items[0].idx); });
+      else el.addEventListener("click", e => {
         e.stopPropagation();
         const head = document.createElement("b");
         head.className = "pop-h";
@@ -318,19 +357,32 @@ async function drawGoogle(canvas, zones, color, key, paint){
     if(!p) return;
     map.setCenter(p.pos);
     if(map.getZoom() < 16) map.setZoom(16);
-    p.el.click();
+    if(onPick) pins.forEach(x => x.el.classList.toggle("sel", x === p)); else p.el.click();
   };
-  return {fit, mark, showRoute, focus, refresh: () => {}, destroy: () => { info.close(); drawn.forEach(d => d.setMap(null)); }};
+  let me = null;
+  const locate = async () => {
+    const [lat, lng] = await where();
+    const pos = new LatLng(lat, lng);
+    if(me) me.setMap(null);
+    me = new Pin(pos, meNode(), "overlayLayer");
+    me.setMap(map);
+    drawn.push(me);
+    map.setCenter(pos);
+    if(map.getZoom() < 15) map.setZoom(15);
+  };
+  return {fit, mark, showRoute, focus, locate, refresh: () => {}, destroy: () => { info.close(); drawn.forEach(d => d.setMap(null)); }};
 }
 
 /**
  * Creates the map element. Append `el` to the page right away; drawing starts on its own.
- * @param {{zones: object[], color: string, googleKey: string, route?: boolean, onNotice: (key: string) => void}} o
+ * @param {{zones: object[], color: string, googleKey: string, route?: boolean, onNotice: (key: string) => void, onPick?: (idx: number) => void}} o
+ *   onPick: a tap on a pin chooses that stop (its index in the day's list), instead of
+ *   opening a card on the map (M3).
  *   route: false hides the lines between the stops (and the travel icons on them);
  *   setRoute changes it later without drawing the map again.
  *   paint: the colours of pins and lines (painter in js/geo.js); without it, `color`.
  */
-export function createLiveMap({zones, color, googleKey, route = true, paint = null, onNotice}){
+export function createLiveMap({zones, color, googleKey, route = true, paint = null, onNotice, onPick = null}){
   const el = document.createElement("div");
   el.className = "live";
   let canvas = null, impl = null, dead = false;
@@ -350,7 +402,7 @@ export function createLiveMap({zones, color, googleKey, route = true, paint = nu
     try{
       // The canvas must be on the page (with a size) before a map is drawn into it.
       el.appendChild(fresh);
-      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, paint) : await drawOsm(fresh, zones, color, paint);
+      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, paint, onPick) : await drawOsm(fresh, zones, color, paint, onPick);
       if(dead){ made.destroy(); return; }
       const msg = el.querySelector(".msg");
       if(msg) msg.remove();
@@ -378,6 +430,8 @@ export function createLiveMap({zones, color, googleKey, route = true, paint = nu
     setRoute: on => { if(on !== routeOn){ routeOn = on; if(impl) impl.showRoute(on); } },
     // Shows the pin of the stop at `idx` in the day's list, now or once the map is drawn.
     focus: idx => { if(impl) impl.focus(idx); else pending = idx; },
+    // You on the map (M5): asked of the phone now; refused, said.
+    locate: () => impl ? impl.locate().catch(() => onNotice("mapNoPosition")) : Promise.resolve(),
     onGoogleRefused: () => { if(!dead){ onNotice("googleKeyBad"); start(false); } },
     destroy: () => {
       dead = true;
