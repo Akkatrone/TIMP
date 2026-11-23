@@ -279,7 +279,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 200));`);
   });
 
-  await step("the dark theme can be chosen, survives a reload, and darkens the map", async () => {
+  await step("the dark theme can be chosen and survives a reload; the map stays light (R11)", async () => {
     const bg = () => run(`return getComputedStyle(document.body).backgroundColor;`);
     const light = await bg();
     await run(`location.hash = "#me";`);
@@ -294,7 +294,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelector("[data-map]")`);
     await run(`document.querySelector("[data-map]").click(); document.querySelector('[data-view="live"]').click();`);
-    await until("a dark map", `document.querySelector(".live.dark .maplibregl-map")`);
+    await until("the map", `document.querySelector(".live .maplibregl-map")`);
+    assert.equal(await run(`return document.querySelector(".live.dark");`), null, "the map is not darkened");
+    assert.equal(await run(`return getComputedStyle(document.querySelector(".live")).colorScheme;`), "light");
     await click("[data-map]");
     await run(`location.hash = "#me";`);
     await until("the trips page", `document.querySelector('[data-theme-choice="auto"]')`);

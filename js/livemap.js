@@ -13,15 +13,14 @@ const active = new Set();           // live maps currently on screen
 
 /* ---------- MapLibre and OpenFreeMap ---------- */
 
-// The map of OpenStreetMap as vector tiles: free, no key, no cookies (openfreemap.org),
-// in a light and a dark style.
-const STYLE_URL = dark => "https://tiles.openfreemap.org/styles/" + (dark ? "dark" : "liberty");
+// The map of OpenStreetMap as vector tiles: free, no key, no cookies (openfreemap.org).
+// Always light, in the dark theme too: a dark map is not readable on a phone outdoors
+// (design/README.md, R11).
+const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const OSM = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
-// The same map as images, from OpenStreetMap itself, when the vector one cannot be had;
-// in the dark theme its light turned around (a minimum brightness above the maximum).
-const raster = dark => ({version: 8, sources: {osm: {type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19, attribution: OSM}},
-  layers: [{id: "osm", type: "raster", source: "osm",
-    paint: dark ? {"raster-brightness-min": 0.88, "raster-brightness-max": 0.1, "raster-hue-rotate": 180, "raster-saturation": -0.3} : {}}]});
+// The same map as images, from OpenStreetMap itself, when the vector one cannot be had.
+const raster = () => ({version: 8, sources: {osm: {type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19, attribution: OSM}},
+  layers: [{id: "osm", type: "raster", source: "osm"}]});
 
 function hasWebGL(){
   try{ const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }
@@ -61,26 +60,26 @@ function readable(style, lang){
   })};
 }
 
-const styles = new Map();   // "<lang>|<dark>" → the style, asked for once
+const styles = new Map();   // language → the style, asked for once
 // The vector style, or the images of OpenStreetMap when it does not come.
-export function mapStyle(dark){
-  const key = getLang() + "|" + !!dark;
+export function mapStyle(){
+  const key = getLang();
   if(!styles.has(key)){
     const ask = new AbortController();
     const late = setTimeout(() => ask.abort(), 8000);
-    styles.set(key, fetch(STYLE_URL(dark), {signal: ask.signal})
+    styles.set(key, fetch(STYLE_URL, {signal: ask.signal})
       .then(r => r.ok ? r.json() : Promise.reject(new Error("style " + r.status)))
       .then(style => readable(style, getLang()))
-      .catch(() => { styles.delete(key); return raster(dark); })
+      .catch(() => { styles.delete(key); return raster(); })
       .finally(() => clearTimeout(late)));
   }
   return styles.get(key).then(style => structuredClone(style));
 }
 
 /** A MapLibre map in `canvas`, kept north up, with zoom buttons. */
-export async function newMap(canvas, options, dark = false){
+export async function newMap(canvas, options){
   const ml = await loadMapLibre();
-  const style = await mapStyle(dark);
+  const style = await mapStyle();
   const map = new ml.Map({container: canvas, style, attributionControl: {compact: true}, dragRotate: false, pitchWithRotate: false, touchPitch: false, ...options});
   map.touchZoomRotate.disableRotation();
   map.keyboard.disableRotation();
@@ -90,7 +89,7 @@ export async function newMap(canvas, options, dark = false){
   map.on("sourcedata", e => { if(e.sourceId === "openmaptiles" && e.tile) arrived = true; });
   map.on("error", e => {
     if(arrived || e.sourceId !== "openmaptiles") return;
-    if(++failed === 4) map.setStyle(raster(dark));
+    if(++failed === 4) map.setStyle(raster());
   });
   return {ml, map};
 }
@@ -152,8 +151,8 @@ function pinNode(pt, color, paint){
   return el;
 }
 
-async function drawOsm(canvas, zones, color, dark, paint){
-  const {ml, map} = await newMap(canvas, {}, dark);
+async function drawOsm(canvas, zones, color, paint){
+  const {ml, map} = await newMap(canvas, {});
   const route = routeOf(zones);
   let gone = () => false, routeOn = true;
   // The legs as lines: a jump between zones (Hakone → Kyoto) is thinner, it is not a
@@ -223,7 +222,7 @@ async function drawOsm(canvas, zones, color, dark, paint){
   return {fit, mark, showRoute, focus, refresh: () => map.resize(), destroy: () => map.remove()};
 }
 
-async function drawGoogle(canvas, zones, color, key, dark, paint){
+async function drawGoogle(canvas, zones, color, key, paint){
   const gm = await loadGoogle(key);
   const {Map, Polyline, InfoWindow, OverlayView} = await gm.importLibrary("maps");
   const {LatLng, LatLngBounds, ColorScheme} = await gm.importLibrary("core");
@@ -252,8 +251,8 @@ async function drawGoogle(canvas, zones, color, key, dark, paint){
     streetViewControl: false,
     fullscreenControl: true,
     clickableIcons: false,
-    // Can only be chosen when the map is made: a change of theme makes a new map.
-    ...(ColorScheme ? {colorScheme: dark ? ColorScheme.DARK : ColorScheme.LIGHT} : {})
+    // Always light (R11), whatever the theme of the page.
+    ...(ColorScheme ? {colorScheme: ColorScheme.LIGHT} : {})
   });
   const info = new InfoWindow({maxWidth: 260});
   // A tap on the map, outside the card, closes it, as on the OpenStreetMap map.
@@ -326,14 +325,14 @@ async function drawGoogle(canvas, zones, color, key, dark, paint){
 
 /**
  * Creates the map element. Append `el` to the page right away; drawing starts on its own.
- * @param {{zones: object[], color: string, googleKey: string, dark: boolean, route?: boolean, onNotice: (key: string) => void}} o
+ * @param {{zones: object[], color: string, googleKey: string, route?: boolean, onNotice: (key: string) => void}} o
  *   route: false hides the lines between the stops (and the travel icons on them);
  *   setRoute changes it later without drawing the map again.
  *   paint: the colours of pins and lines (painter in js/geo.js); without it, `color`.
  */
-export function createLiveMap({zones, color, googleKey, dark, route = true, paint = null, onNotice}){
+export function createLiveMap({zones, color, googleKey, route = true, paint = null, onNotice}){
   const el = document.createElement("div");
-  el.className = "live" + (dark ? " dark" : "");
+  el.className = "live";
   let canvas = null, impl = null, dead = false;
   let gone = () => false;   // which stops are done or skipped; kept so a map that loads late still shows them
   let routeOn = route, pending = null;   // the same for the lines, and a pin to show once drawn
@@ -351,7 +350,7 @@ export function createLiveMap({zones, color, googleKey, dark, route = true, pain
     try{
       // The canvas must be on the page (with a size) before a map is drawn into it.
       el.appendChild(fresh);
-      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, dark, paint) : await drawOsm(fresh, zones, color, dark, paint);
+      const made = useGoogle ? await drawGoogle(fresh, zones, color, googleKey, paint) : await drawOsm(fresh, zones, color, paint);
       if(dead){ made.destroy(); return; }
       const msg = el.querySelector(".msg");
       if(msg) msg.remove();

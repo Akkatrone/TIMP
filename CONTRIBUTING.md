@@ -48,6 +48,7 @@ taps, add a check to `tools/e2e.mjs`.
 | Path | What it does |
 |---|---|
 | `index.html`, `css/app.css` | The page and its styles. |
+| `design/` | The design system: `tokens.json` (colours, type, space, shapes, motion) and the rules every screen follows (`README.md`). `css/tokens.css` and the fonts in `css/fonts/` (Inter, SIL Open Font License) go with it. |
 | `js/app.js` | Screens, navigation, events. The only file that touches the page. |
 | `js/trip.js` | The trip file format: `FIELDS`, one table for every field, from which come the checks and the JSON Schema; the conversion of format 1; what the app works out (trip id, cities). No DOM. |
 | `js/geo.js` | Groups stops into map zones, draws the offline sketch, and gives pins and lines their colours (kind of place, part of the day). No DOM. |
@@ -154,6 +155,8 @@ a line to the rules in `formatBrief()`.
 **New files must be available offline.** If you add or remove a file of the app, run
 `node tools/check-precache.mjs --fix` to update the list in `sw.js`. You never need
 to touch the version: the build computes it from the content.
+
+**Styles follow the design system** ([design/README.md](design/README.md)): values from the tokens only, the rules of the components, accessibility as part of each. A colour, a size or a duration is changed in `design/tokens.json`, then `node tools/tokens.mjs --fix`; `test/design.test.mjs` checks the contrast of every pair, in both themes.
 
 **Interface texts go in `js/i18n.js`**, in every language. If you do not speak one of
 them, write your best attempt and say so in the pull request. A test checks that all

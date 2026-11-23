@@ -50,7 +50,7 @@ const looksLikeAddress = s => /,|\d/.test(String(s || ""));
  *   newDay                      true: it goes by default on a new day after the last
  *   stop                        the stop to change (absent: a new stop)
  *   prefill                     text to read as if pasted (a shared place)
- *   timezone, googleKey, dark
+ *   timezone, googleKey
  *   money                       for the costs: see moneyField
  *   privateCost                 {cost, currency}: what the traveller paid there only for
  *                               themselves, or null
@@ -210,7 +210,7 @@ export function openStopEditor(o){
       </div>
       <div class="pickwrap" data-pick-box hidden>
         <p class="foot">${esc(t("posPickHelp"))}</p>
-        <div class="live pick${o.dark ? " dark" : ""}"><div class="msg">${esc(t("mapLoading"))}</div></div>
+        <div class="live pick"><div class="msg">${esc(t("mapLoading"))}</div></div>
       </div>
     </div>
 
@@ -281,7 +281,7 @@ export function openStopEditor(o){
       const a = area();
       const start = st.lat !== undefined ? [st.lng, st.lat] : a ? [(a.west + a.east) / 2, (a.south + a.north) / 2] : [0, 0];
       el.innerHTML = "";
-      const {ml, map} = await newMap(el, {center: start, zoom: st.lat !== undefined ? 17 : a ? 14 : 1}, o.dark);
+      const {ml, map} = await newMap(el, {center: start, zoom: st.lat !== undefined ? 17 : a ? 14 : 1});
       if(box.hidden || !dlg.open){ map.remove(); return; }
       const node = document.createElement("div");
       node.className = "pinwrap";

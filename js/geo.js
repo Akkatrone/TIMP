@@ -9,14 +9,16 @@ import { TRAVEL, TYPES, placeQuery } from "./trip.js";
 const SPLIT_KM = 12;
 
 // Colours on the maps. The kind of place gives a pin its hue, the city of the day gives
-// the lines theirs; the part of the day gives the shade: lighter in the morning, full in
-// the afternoon, darker after sunset (js/sun.js). Stops of no kind take the city's hue.
-export const TYPE_COLORS = {sight: "#c98a00", museum: "#7a55c7", food: "#d24f2b", park: "#3a8a3a",
-  view: "#178aae", shop: "#c23f7e", walk: "#8a6a3a", hotel: "#4a5fb0"};
+// the lines theirs; after sunset a pin is darker (js/sun.js). Never lighter: its white
+// number must stay readable. Stops of no kind take the city's hue.
+// The same as the "place" tokens (design/tokens.json; test/design.test.mjs checks):
+// white numbers on them are readable (4.5:1).
+export const TYPE_COLORS = {sight: "#9b6a00", museum: "#7a55c7", food: "#c74b29", park: "#378337",
+  view: "#157d9e", shop: "#c23f7e", walk: "#8a6a3a", hotel: "#5166b6"};
 
 export function shade(hex, part){
   if(!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
-  const k = part === "morning" ? 0.3 : part === "night" ? -0.45 : 0;
+  const k = part === "night" ? -0.45 : 0;
   return "#" + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
     .map(v => Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k)).toString(16).padStart(2, "0")).join("");
 }

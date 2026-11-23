@@ -76,6 +76,8 @@ The rules, in one line each:
   holds the rules of `js/merge.js` on random edits. A new kind of edit, or a new list in
   the format, gets its step in that generator in the same change. A failure names its
   seed: fix the join, never the seed.
+- **The design system** ([design/README.md](design/README.md)): tokens only (`design/tokens.json`, then
+  `node tools/tokens.mjs --fix`), the rules of the components, accessibility in each.
 - **Interface texts** in `js/i18n.js`, in every language (a test compares the keys).
 - **No new dependencies, bundlers or frameworks**; no third-party scripts, fonts or
   requests at startup. **Never edit `VERSION` in `sw.js`**: the build stamps it.

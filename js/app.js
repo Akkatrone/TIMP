@@ -128,6 +128,8 @@ const cityIndex = city => Math.max(0, citiesOf(trip()).indexOf(city || "")) % PA
 const cityVar = city => `var(--p${cityIndex(city)})`;
 // The same colour as a value, for the interactive map, in the theme on screen.
 const cityColor = city => getComputedStyle(document.documentElement).getPropertyValue(`--p${cityIndex(city)}`).trim();
+// The same city on the map, which is always light (R11): the light colour in both themes.
+const mapColor = city => getComputedStyle(document.documentElement).getPropertyValue(`--map-p${cityIndex(city)}`).trim();
 // The key the interactive map uses: none if Google is turned off on this device;
 // otherwise the key saved on this device, which wins over the one in the trip file.
 const tripKey = () => (trip() && trip().googleMapsKey) || "";
@@ -174,8 +176,6 @@ function dateParts(iso, lang){
 
 /* ---------- theme ---------- */
 
-const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
-const isDark = () => S.theme === "dark" || (S.theme === "auto" && !!darkQuery && darkQuery.matches);
 
 // "auto" follows the phone; "light" and "dark" are a choice made on this device.
 // The choice is kept in localStorage so js/theme.js can apply it before the page is drawn.
@@ -191,7 +191,7 @@ function setTheme(value){
 function syncThemeColor(){
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
     if(!m.dataset.auto) m.dataset.auto = m.getAttribute("content");
-    m.setAttribute("content", S.theme === "auto" ? m.dataset.auto : (S.theme === "dark" ? "#0d1012" : "#eceeeb"));
+    m.setAttribute("content", S.theme === "auto" ? m.dataset.auto : (S.theme === "dark" ? "#0f1113" : "#f7f7f8"));
   });
 }
 
@@ -496,7 +496,7 @@ function currentPlace(){
 }
 
 function editorBase(){
-  return {trip: trip(), timezone: trip().timezone, googleKey: googleKey(), dark: isDark()};
+  return {trip: trip(), timezone: trip().timezone, googleKey: googleKey()};
 }
 
 // The trip with the day a stop goes to, when the form chose a new one after the last.
@@ -2154,11 +2154,10 @@ function renderDay(i){
   let wanted = null;
   if(S.ui.mapOpen && zs.length){
     html += mapPanel(zs, color, view, gone, paint);
-    const dark = isDark();
     // Skipping a stop changes the route: the map is drawn again.
     const skippedNow = list.map((s, k) => isSkipped(k) ? k : -1).filter(k => k >= 0).join(",");
     // The lines are not in the key: hiding them keeps the map, its zoom and its place.
-    if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, dark, skippedNow].join("|"), zones: zs, color: cityColor(d.city), dark, gone, paint};
+    if(view === "live") wanted = {key: [S.rec.id, S.rec.trip.version.id, i, pid || "", googleKey(), lang, skippedNow].join("|"), zones: zs, color: mapColor(d.city), gone, paint: painter(mapColor(d.city), parts)};
   }
   if(d.notes) html += notesHTML(d.notes);
   if(d.plans){
@@ -2188,7 +2187,7 @@ function syncLive(wanted){
   if(applyMapSettings()) return;
   if(!live || live.key !== wanted.key){
     if(live) live.handle.destroy();
-    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), dark: wanted.dark, route: S.ui.route, paint: wanted.paint, onNotice: k => toast(t(k))})};
+    live = {key: wanted.key, handle: createLiveMap({zones: wanted.zones, color: wanted.color, googleKey: googleKey(), route: S.ui.route, paint: wanted.paint, onNotice: k => toast(t(k))})};
   }
   slot.appendChild(live.handle.el);
   live.handle.refresh();
@@ -2631,8 +2630,6 @@ window.addEventListener("hashchange", () => {
 // The path is the one at the time of the tap: the page may have been redrawn since.
 document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().includes($app)) closeMenu(); });
 window.addEventListener("resize", markCut);
-// When the phone switches between light and dark, maps follow it.
-if(darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if(S.theme === "auto") render(); });
 window.addEventListener("online", () => { S.online = true; retryRates(); render(); syncSoon(200); });
 document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") syncSoon(800); });
 window.addEventListener("offline", () => { S.online = false; render(); });
