@@ -38,7 +38,8 @@ day after the last. The day's notes are one line at the top ("3 notes · …"): 
 them all, another closes them; the app remembers which, for each trip.
 
 **Stops without a position** (an AI assistant often leaves them out) have no pin and no
-route. A line above the stops says how many, with **Find**: the app looks for all of
+route: a crossed sign where their number would be (a tap finds that one). A line above
+the stops says how many, with **Find**: the app looks for all of
 them, one after the other, the way the stop form does, and shows what it found before
 saving anything: the place in the search's own words, what kind of place it is, how far
 it is from the other stops, and **Verify**, which opens Google Maps on the point found. A

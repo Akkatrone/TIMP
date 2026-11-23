@@ -1916,10 +1916,12 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     // One stop without a position: a line above the stops, and the stop says so.
     assert.equal(await run(`return document.querySelector(".nopos span").textContent;`), "1 stop without a position");
     assert.equal(await run(`return !!document.querySelector(".nopos + .stops");`), true, "above the stops");
-    assert.equal(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nopos-tag")).map(li => li.querySelector("h3").textContent).join();`), "Lunch in Alfama");
+    // Where its number would be, a crossed sign: a tap finds that stop's position.
+    assert.equal(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nopos-sign")).map(li => li.querySelector("h3").textContent).join();`), "Lunch in Alfama");
+    assert.equal(await run(`return document.querySelector(".stop .nopos-sign").getAttribute("aria-label");`), "Lunch in Alfama: no position. Find it");
     const before = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip.version.id); }; });`);
     await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.7115","lon":"-9.1305","category":"amenity","type":"restaurant","display_name":"Taberna Exemplo, Rua dos Remédios, Lisboa"}]'))) : real(u, o);`);
-    await run(`document.querySelector("[data-find-pos]").click();`);
+    await run(`document.querySelector(".nopos-sign").click();`);
     await until("the result", `document.querySelector("dialog.sheet[open] [data-found]")`, 15000);
     assert.equal(await run(`return document.querySelector("#pos-title").textContent;`), "Positions found");
     assert.match(await run(`return document.querySelector("dialog.sheet[open] .found").textContent;`), /Lunch in AlfamaTaberna Exemplo, Rua dos Remédios, LisboaFood · 0\.\d km from the other stops/);

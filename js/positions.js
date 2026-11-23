@@ -60,7 +60,7 @@ export function openFindPositions(o){
       <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
     </div>
     <p class="foot">${esc(t("posFindHelp"))}</p>
-    <div class="founds" data-founds aria-busy="true">${o.stops.map(s => `<div class="found wait" data-row="${esc(s.id)}"><span class="what"><b>${esc(s.title)}</b><small>…</small></span></div>`).join("")}</div>
+    <div class="founds" data-founds aria-busy="true">${o.stops.map(s => `<div class="found wait" data-row="${esc(s.id)}"><label><span class="tickph" aria-hidden="true"></span><span class="what"><b>${esc(s.title)}</b><small>${esc(t("posSearching"))}</small><small>&nbsp;</small></span></label></div>`).join("")}</div>
     <div class="sheet-actions">
       <button type="button" class="btn" data-close>${esc(t("notNow"))}</button>
       <button type="button" class="btn primary" data-save disabled>${esc(t("posSave"))}</button>
@@ -79,7 +79,15 @@ export function openFindPositions(o){
     b.textContent = !done ? t("posSave") : t(!n ? "posLeave" : n === 1 ? "posSaveOne" : "posSaveN", {n});
     b.disabled = !done;
   };
-  // Every row drawn again once a result arrives: the distances depend on all of them.
+  // Every row looked at again once a result arrives (the distances depend on all of
+  // them), but changed only when what it shows changes: no flicker, no jump.
+  const shown = new Map();
+  const put = (row, cls, html) => {
+    if(shown.get(row) === cls + html) return;
+    shown.set(row, cls + html);
+    row.className = cls;
+    row.innerHTML = html;
+  };
   const draw = () => {
     // A tick the traveller changed stays; the others follow how far the result is.
     const far = distances(results, o.around), was = new Set(ticked());
@@ -87,15 +95,13 @@ export function openFindPositions(o){
       const row = dlg.querySelector(`[data-row="${CSS.escape(r.id)}"]`);
       const s = o.stops.find(x => x.id === r.id);
       if(!r.hit){
-        row.className = "found none";
-        row.innerHTML = `<span class="what"><b>${esc(s.title)}</b><small>${esc(t("posNoneFound"))}</small></span><button type="button" class="btn small" data-open-stop="${esc(r.id)}">${esc(t("posOpen"))}</button>`;
+        put(row, "found none", `<span class="what"><b>${esc(s.title)}</b><small>${esc(t("posNoneFound"))}</small></span><button type="button" class="btn small" data-open-stop="${esc(r.id)}">${esc(t("posOpen"))}</button>`);
         continue;
       }
       const f = far.get(r.id), on = touched.has(r.id) ? was.has(r.id) : !(f && f.far);
       const where = [r.hit.type ? t("type_" + r.hit.type) : "", f ? t(f.far ? "posFar" : "posNear", {d: fmt(f.km)}) : ""].filter(Boolean).join(" · ");
-      row.className = "found" + (f && f.far ? " far" : "");
-      row.innerHTML = `<label><input type="checkbox" data-found="${esc(r.id)}"${on ? " checked" : ""}><span class="what"><b>${esc(s.title)}</b>${r.hit.label ? `<small>${esc(r.hit.label)}</small>` : ""}${where ? `<small class="dist">${esc(where)}</small>` : ""}</span></label>` +
-        `<a class="maplink" href="${esc(mapsUrl(r.hit.lat + "," + r.hit.lng))}" target="_blank" rel="noopener">${esc(t("posVerify"))}</a>`;
+      put(row, "found" + (f && f.far ? " far" : ""), `<label><input type="checkbox" data-found="${esc(r.id)}"${on ? " checked" : ""}><span class="what"><b>${esc(s.title)}</b>${r.hit.label ? `<small>${esc(r.hit.label)}</small>` : ""}${where ? `<small class="dist">${esc(where)}</small>` : ""}</span></label>` +
+        `<a class="maplink" href="${esc(mapsUrl(r.hit.lat + "," + r.hit.lng))}" target="_blank" rel="noopener">${esc(t("posVerify"))}</a>`);
     }
     count();
   };

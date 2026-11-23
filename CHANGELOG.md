@@ -4,6 +4,13 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 3.32.2
+
+- **A stop without a position** has a crossed sign where its number would be, instead of
+  the "no position" label: a tap finds its position (that stop only).
+- **The search for positions** no longer jumps while it searches: the rows have their
+  final size from the start, and only the one that changes is drawn again.
+
 ## 3.32.1
 
 - **A phone that had the app of before when its shared trip was converted** (3.30.0)

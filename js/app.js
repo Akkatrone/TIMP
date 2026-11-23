@@ -34,6 +34,8 @@ import { asBase } from "./publish.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
 
+// Where the number of a stop with a position is: a sign, crossed, for one without.
+const NO_POS = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const CHEVRON = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const UNFOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 6L8 2.5 11.5 6M4.5 10L8 13.5 11.5 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const FOLD = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l3.5-3.5M4.5 13.5L8 10l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -528,13 +530,14 @@ function editDay(){
 }
 
 // The stops of the open day without a position, found all at once (js/positions.js),
-// checked, and the ticked ones saved as one version. Once some are saved, the line
-// that says what is left goes below the stops.
-async function findPositions(){
+// checked, and the ticked ones saved as one version; `only`: one stop's (its sign, where
+// its number would be). Once some are saved, the line that says what is left goes below
+// the stops.
+async function findPositions(only = null){
   if(!editable()) return;
   const here = currentPlace(), d = trip().days[here.dayIndex];
   const listIn = t => { const x = t.days.find(y => y.date === d.date); return !x ? [] : here.planId ? ((x.plans || []).find(p => p.id === here.planId) || {stops: []}).stops : x.stops || []; };
-  const list = listIn(trip()), missing = list.filter(s => s.lat === undefined && s.id);
+  const list = listIn(trip()), missing = list.filter(s => s.lat === undefined && s.id && (!only || s.id === only));
   if(!missing.length) return;
   if(navigator.onLine === false){ toast(t("posFindOffline")); return; }
   const around = list.filter(s => s.lat !== undefined);
@@ -1995,7 +1998,8 @@ function stopsHTML(day, planId, list, parts, paint, all = list){
     // The cost, small, under them: in the currency it is paid in.
     const paid = atStop(privOf(), day.date, s.id);
     const hasCost = typeof s.cost === "number" || paid.length > 0;
-    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined && i >= 0 ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</div>`;
+    const left = `<div class="time"><span>${esc(s.time || "")}${dark}</span>${s.lat !== undefined && i >= 0 ? `<span class="nb" data-pin="${i}" style="--pf:${paint.stop(s.type, i)}">${i + 1}</span>`
+      : s.lat === undefined && change && s.id ? `<button type="button" class="nopos-sign" data-find-pos="${esc(s.id)}" aria-label="${esc(t("noPosFind", {s: s.title}))}" title="${esc(t("noPosTag"))}">${NO_POS}</button>` : ""}${chip("travel", s.travel)}${hasCost ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</div>`;
     // Middle: a label above the title, the title with its kind, the description that folds, the links.
     // The name as on the sign, under the title, in its own language (for the glyphs).
     const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
@@ -2017,11 +2021,10 @@ function stopsHTML(day, planId, list, parts, paint, all = list){
       (q ? `<a class="maplink" href="${esc(dirUrl(q, comingFrom(dayIndex, list, i >= 0 ? i : opt.slot, skippedAt)))}" target="_blank" rel="noopener">${esc(t("routeLink"))}</a>` : "") +
       (review ? `<a class="maplink" href="${esc(review.url)}" target="_blank" rel="noopener" aria-label="${esc(t("reviewsOn", {s: review.site}))}">${esc(review.site)}</a>` : "");
     const booked = s.booking === "booked" ? `<span class="tag ok">${esc(t("booked"))}</span>` : "";
-    const nopos = s.lat === undefined && change ? `<span class="tag nopos-tag">${esc(t("noPosTag"))}</span>` : "";
     // In an opened group: the chosen one says so, the others can be chosen.
     const pick = opt.option ? `<button type="button" class="btn small" data-choose="${esc(s.id)}"${change ? "" : ` aria-disabled="true"`}>${esc(t("altChooseThis"))}</button>`
       : opt.chosen ? `<span class="tag ok">${esc(t("altChosen"))}</span>` : "";
-    const meta = isSkipped || links || booked || nopos || pick ? `<div class="meta">${pick}${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}${nopos}</div>` : "";
+    const meta = isSkipped || links || booked || pick ? `<div class="meta">${pick}${isSkipped ? `<span class="tag off">${esc(t("skipped"))}</span>` : ""}${booked}${links}</div>` : "";
     const eyebrow = s.tag ? `<span class="eyebrow">${esc(s.tag)}</span>` : "";
     // Right: the tick, and the ⋯ menu with the actions used less often.
     const menuOpen = S.menuFor === id;
@@ -2394,7 +2397,8 @@ $app.addEventListener("click", e => {
     refocus("[data-notes]");
     return;
   }
-  if(e.target.closest("[data-find-pos]")){ findPositions(); return; }
+  const findPos = e.target.closest("[data-find-pos]");
+  if(findPos){ findPositions(findPos.dataset.findPos || null); return; }
   if(e.target.closest("[data-map]")){
     S.ui.mapOpen = !S.ui.mapOpen;
     saveUi();
