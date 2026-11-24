@@ -22,6 +22,13 @@ const ID = (old, date = "2027-05-14") => oldStopId("demo-lisbon", date, old);
 // The edit button of the stop with this title.
 const editOf = title => `[...document.querySelectorAll(".stop")].find(li => li.querySelector(".tt").textContent === ${JSON.stringify(title)}).querySelector("[data-edit]")`;
 
+// R6, SH2: a sheet is open on the first frame after the tap, within 100 ms; what comes
+// from far arrives inside it afterwards. `tap`: the tap, as code run in the page.
+async function atOnce(run, tap, what){
+  const ms = await run(`const t0 = performance.now(); ${tap}; await new Promise(r => requestAnimationFrame(r)); return document.querySelector("dialog.sheet[open]") ? Math.round(performance.now() - t0) : -1;`);
+  assert.ok(ms >= 0 && ms <= 100, `${what}: ${ms < 0 ? "no sheet on the first frame" : `open in ${ms} ms`}, at most 100 (R6)`);
+}
+
 let passed = 0;
 async function step(name, fn){
   try{
@@ -450,8 +457,7 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("a stop can be edited, moved to another day with its tick, and deleted", async () => {
     await click('[data-tick]', 3);   // the new stop, ticked
-    await run(`${editOf("Pastelaria Exemplo")}.click();`);
-    await until("the form", `document.querySelector("dialog.sheet[open]")`);
+    await atOnce(run, `${editOf("Pastelaria Exemplo")}.click()`, "a stop's form");
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
     await run(`document.getElementById("stop-day").value = "1"; document.getElementById("stop-day").dispatchEvent(new Event("change"));`);
     await submit();
@@ -602,7 +608,7 @@ await withApp(async ({run, until, reload, blocked}) => {
   await step("the history lists the versions with what changed, and restores one", async () => {
     await run(`location.hash = "#trips";`);
     await until("the trips page", `document.querySelector('[data-act="history"][data-id="demo-lisbon"]')`);
-    await run(`document.querySelector('[data-act="history"][data-id="demo-lisbon"]').click();`);
+    await atOnce(run, `document.querySelector('[data-act="history"][data-id="demo-lisbon"]').click()`, "the history");
     await until("the versions", `document.querySelector("dialog.history .versions [data-restore]")`);
     const rows = await run(`return [...document.querySelectorAll("dialog.history .versions > li")].map(li => li.textContent);`);
     assert.match(rows[0], /now/, "the current version first");
@@ -1640,7 +1646,8 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     // Out, then in again with the same passkey (the phone lists it; one here).
     // On You: the account, its actions, the circle at the top right with its initial.
     assert.equal(await text("#me-btn span"), "F");
-    assert.equal(await run(`return document.getElementById("me-btn").getAttribute("aria-current");`), "page");
+    assert.deepEqual(await run(`const b = document.getElementById("me-btn"); return [b.classList.contains("on"), b.getAttribute("href"), b.getAttribute("aria-label"), !!document.querySelector("#app .back")];`),
+      [true, "#", "Back", false], "on You the circle is the way back; no Back link");
     await run(`document.querySelector("#app [data-me='signout']").click();`);
     await until("signed out", `document.querySelector(".acct [data-act='signin']")`);
     await run(`document.querySelector(".acct [data-act='signin']").click();`);
@@ -1748,10 +1755,9 @@ async function accountSteps({run, until, reload, page, blocked, service}){
   await step("linked chats: what each can do and since when; unlinking asks first, then stops it", async () => {
     await run(`location.hash = "#me";`);
     await until("the account", `document.querySelector("#app [data-me='chats']")`);
-    await run(`document.querySelector("#app [data-me='chats']").click();`);
-    // The sheet opens whole: never a "…" that grows into the list under the finger.
-    await until("the sheet", `document.querySelector("dialog.sheet[open]")`);
-    assert.equal(await run(`return !!document.querySelector("dialog.sheet[open] [data-chat]") && !document.querySelector("dialog.sheet[open] [aria-busy]");`), true, "whole when it opens");
+    // Open at once and tall (SH2): the list arrives inside it.
+    await atOnce(run, `document.querySelector("#app [data-me='chats']").click()`, "linked chats");
+    await until("the list", `document.querySelector("dialog.sheet[open] [data-chat]") && !document.querySelector("dialog.sheet[open] [aria-busy]")`);
     assert.equal(await text("dialog.sheet[open] h2"), "Linked chats");
     assert.equal(await text("dialog.sheet[open] [data-chat] b"), "Claude");
     assert.equal(await text("dialog.sheet[open] [data-chat] small"), "reads and changes your trips");
@@ -1818,8 +1824,8 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`location.hash = "#trips";`);
     const card = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="demo-lisbon"]'))`;
     await until("the trip on the account", `${card} && ${card}.querySelector('[data-act="share-trip"]')`, 15000);
-    await run(`${card}.querySelector('[data-act="share-trip"]').click();`);
-    await until("the sheet", `document.querySelector("dialog.sheet[open] [data-person]")`);
+    await atOnce(run, `${card}.querySelector('[data-act="share-trip"]').click()`, "sharing");
+    await until("the people", `document.querySelector("dialog.sheet[open] [data-person]")`);
     assert.match(await text("dialog.sheet[open] h2"), /^Share “Lisbon in my pocket \(example\)”$/);
     // A long title wraps beside the ×, which keeps its size (every sheet has this head).
     assert.deepEqual(await run(`const h = document.querySelector("dialog.sheet[open] h2"), was = h.textContent; h.textContent = "Share “" + "A very long trip title ".repeat(6) + "”";
@@ -1868,7 +1874,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.equal(await run(`return document.querySelector('dialog.sheet[open] [data-take="stays"]').checked;`), true);
     // A trip not over yet: its dates hidden unless chosen.
     assert.equal(await run(`return document.querySelector('dialog.sheet[open] [data-dates="hidden"]').getAttribute("aria-pressed");`), "true");
-    assert.match(await text("dialog.sheet[open] .publish .foot:last-of-type"), /./);
+    assert.match(await text("dialog.publish[open] .foot:last-of-type"), /./);
     await run(`document.querySelector('dialog.sheet[open] [data-take="stays"]').click(); document.querySelector("dialog.sheet[open] #publish-title").closest("form").requestSubmit();`);
     await until("published", `/Published: send the link/.test(document.getElementById("toast").textContent)`, 15000);
     assert.deepEqual(service.lastPublish, {dates: "hidden", remove: {codes: true, phones: true, emails: true, stays: false}}, "the stays kept, as unticked");
@@ -2006,9 +2012,8 @@ async function accountSteps({run, until, reload, page, blocked, service}){
   await step("passkeys and devices: one more after the passkey asked again, one taken off but never the last, the other devices signed out", async () => {
     const openDevices = async () => {
       await openMe();
-      await run(`document.querySelector("#app [data-me='devices']").click();`);
-      await until("the sheet", `document.querySelector("dialog.sheet[open]")`);
-      assert.equal(await run(`return !!document.querySelector("dialog.sheet[open] [data-keys] .chat") && !!document.querySelector("dialog.sheet[open] [data-sessions] .chat") && !document.querySelector("dialog.sheet[open] [aria-busy]");`), true, "whole when it opens");
+      await atOnce(run, `document.querySelector("#app [data-me='devices']").click()`, "passkeys and devices");
+      await until("the lists", `document.querySelector("dialog.sheet[open] [data-keys] .chat") && document.querySelector("dialog.sheet[open] [data-sessions] .chat") && !document.querySelector("dialog.sheet[open] [aria-busy]")`);
     };
     const answer = async (title, id = "yes") => {
       await until(`asked: ${title}`, `document.querySelector("dialog.ask[open] #ask-title") && document.querySelector("dialog.ask[open] #ask-title").textContent === ${JSON.stringify(title)}`, 15000);
@@ -2170,11 +2175,18 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.equal(await run(`return document.querySelector(".stop .nopos-sign").getAttribute("aria-label");`), "Lunch in Alfama: no position. Find it, Food");
     const before = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("kept-before"); g.onsuccess = () => r(g.result.trip.version.id); }; });`);
     await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.7115","lon":"-9.1305","category":"amenity","type":"restaurant","display_name":"Taberna Exemplo, Rua dos Remédios, Lisboa"}]'))) : real(u, o);`);
-    await run(`document.querySelector(".nopos-sign").click();`);
+    await atOnce(run, `document.querySelector(".nopos-sign").click()`, "finding positions");
     await until("the result", `document.querySelector("dialog.sheet[open] [data-found]")`, 15000);
     assert.equal(await run(`return document.querySelector("#pos-title").textContent;`), "Positions found");
     assert.match(await run(`return document.querySelector("dialog.sheet[open] .found").textContent;`), /Lunch in AlfamaTaberna Exemplo, Rua dos Remédios, LisboaFood · 0\.\d km from the other stops/);
-    assert.equal(await run(`return document.querySelector("dialog.sheet[open] .found .maplink").href;`), "https://www.google.com/maps/search/?api=1&query=38.7115%2C-9.1305");
+    // A tap on the row shows the point on a small map in the sheet, with the day's stops (SH3).
+    await run(`document.querySelector("dialog.sheet[open] [data-show]").click();`);
+    await until("the small map", `document.querySelector("dialog.sheet[open] .live.mini.maplibregl-map") && document.querySelector("dialog.sheet[open] .mini-here")`, 15000);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-show]").getAttribute("aria-expanded");`), "true");
+    assert.ok(await run(`return document.querySelectorAll("dialog.sheet[open] .mini-dot").length;`) > 0, "the day's other stops around it");
+    assert.equal(await run(`return document.querySelector("[data-found]").checked;`), true, "showing it does not tick or untick it");
+    await run(`document.querySelector("dialog.sheet[open] [data-show]").click();`);
+    assert.equal(await run(`return document.querySelectorAll("dialog.sheet[open] .live.mini").length;`), 0, "a tap again closes it");
     assert.equal(await run(`return document.querySelector("[data-found]").checked;`), true, "near: ticked");
     assert.match(await run(`return window.__geo[0];`), /q=Lunch\+in\+Alfama%2C\+Lisboa/, "its name and the day's city");
     await run(`document.querySelector("dialog.sheet[open] [data-save]").click();`);
@@ -2197,7 +2209,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("opened", `document.querySelector('[data-alt-add="${lunch}"]')`);
     await run(`document.querySelector('[data-alt-add="${lunch}"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-group")`);
-    assert.equal(await run(`return document.getElementById("sheet-title").textContent;`), "An alternative to Lunch in Alfama");
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] h2").textContent;`), "An alternative to Lunch in Alfama");
     assert.equal(await run(`return document.getElementById("stop-group").value;`), "Lunch", "a place to eat at 14:00: Lunch");
     assert.deepEqual(await run(`return [document.getElementById("stop-hh").value, document.getElementById("stop-mm").value];`), ["14", "00"], "its time");
     await run(`document.getElementById("stop-title").value = "Casa Exemplo"; document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);

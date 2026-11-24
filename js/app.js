@@ -14,6 +14,7 @@ import { versionStore } from "./objects.js";
 import { REPO_URL } from "./config.js";
 import { openStopEditor, openDayEditor, openExpenseEditor } from "./editor.js";
 import { ask } from "./ask.js";
+import { openSheet } from "./sheet.js";
 import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense, ensureIds, chooseOption, addAlternative, moveGroup, leaveGroup, choosePlan } from "./edit.js";
 import { tidyGroups } from "./choices.js";
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
@@ -1003,9 +1004,12 @@ function drawMeButton(r){
   const u = hasService() && S.account;
   b.innerHTML = u ? `<span>${esc(u.handle.slice(0, 1).toUpperCase())}</span>` : PERSON;
   b.classList.toggle("signed", !!u);
-  b.setAttribute("aria-label", t("meTitle") + (u ? " · @" + u.handle : ""));
-  b.title = t("meTitle");
-  if(r.name === "me") b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  // On You, the circle is the way back (no Back link: the bar is there, or nothing else is).
+  const here = r.name === "me";
+  b.href = here ? "#" : "#me";
+  b.setAttribute("aria-label", here ? t("back") : t("meTitle") + (u ? " · @" + u.handle : ""));
+  b.title = here ? t("back") : t("meTitle");
+  b.classList.toggle("on", here);
   // Without the bar it goes on the page itself, top right.
   const float = !trip();
   b.classList.toggle("float", float);
@@ -1127,18 +1131,8 @@ function copyErrors(){
 // A trip pasted as text, as a chat assistant gives it: no file to save on the phone.
 // `any`: opened by the Paste button at the bottom, so it takes a place too (takeText
 // decides what it is).
-let pasteDialog = null;
 function pasteTrip(any = false){
-  if(!pasteDialog){
-    pasteDialog = document.createElement("dialog");
-    pasteDialog.className = "sheet";
-    pasteDialog.setAttribute("aria-labelledby", "paste-title");
-    document.body.appendChild(pasteDialog);
-    pasteDialog.addEventListener("click", e => { if(e.target === pasteDialog) pasteDialog.close(); });
-  }
-  const d = pasteDialog;
-  d.innerHTML = `<form class="sheet-form" novalidate>
-    <div class="sheet-head"><h2 id="paste-title">${esc(t(any ? "paste" : "pasteTrip"))}</h2><button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button></div>
+  const d = openSheet({id: "paste-title", title: t(any ? "paste" : "pasteTrip"), form: true, body: `
     <p class="foot">${esc(t(any ? "pasteAnyHelp" : "pasteHelp"))}</p>
     <textarea id="paste-text" rows="8" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(any ? t("pasteAnyPh") : '{"format": "travel-in-my-pocket/2", …}')}"></textarea>
     <p class="errbox" data-error role="alert" hidden></p>
@@ -1147,11 +1141,9 @@ function pasteTrip(any = false){
       <span class="grow"></span>
       <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
       <button type="submit" class="btn primary">${esc(t(any ? "pasteGo" : "pasteLoad"))}</button>
-    </div>
-  </form>`;
+    </div>`});
   const area = d.querySelector("#paste-text");
   d.onclick = async e => {
-    if(e.target.closest("[data-close]")){ d.close(); return; }
     if(e.target.closest("[data-paste]")){
       try{ area.value = await navigator.clipboard.readText(); }
       catch(err){ area.focus(); }
@@ -1169,7 +1161,6 @@ function pasteTrip(any = false){
     try{ if(any) await takeText(area.value, "pasted.json"); else await importText(jsonIn(area.value), "pasted.json"); }
     catch(err){ S.importError = {title: t("importFailed"), items: [String(err && err.message || err)]}; render(); }
   };
-  d.showModal();
   // From the Paste button the next tap is Paste in the sheet: no keyboard over it.
   if(!any) area.focus();
 }
@@ -1254,9 +1245,7 @@ function syncLine(){
 
 // You: the account, then the settings of this device, then the app.
 function renderMe(){
-  const back = trip() ? "#trips" : "#";
   return `
-  <div class="me-head"><a class="back" href="${back}">${esc(t("back"))}</a></div>
   <h1>${esc(t("meTitle"))}</h1>
   ${errorBox()}
   ${accountSection()}

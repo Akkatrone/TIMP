@@ -65,7 +65,8 @@ around the map follows the theme.
 **R12. No arrows to open in place.** What opens says so by what it hides: "+2" beside
 alternatives, "+3" on the day's line, a description ending in "…". Opened, it closes
 with "Close" or a tap on its heading. A sign remains only for what leads elsewhere (the
-trip's title opens the list of trips) or out of the app (↗).
+trip's title opens the list of trips) or out of the app (↗). No Back links: the circle
+of you opens You, and on You it is the way back.
 
 **R13. Distinct stops, read at a glance.** Every stop is a card of its own; the line of
 the day joins them in the gaps. Inside, in the order they are looked for: the time
@@ -235,6 +236,24 @@ A signal like the others (W1–W5), from MET Norway through TIMP's service (`js/
 - **M10** Under the bar, the map has an edge and a shadow: the list slides under it.
   Larger or smaller, List or Map: the list is pushed, never covered, and the stop read
   first stays at its line, just under the map or the bar.
+
+## Sheets
+
+A sheet comes up over the page for what is done apart: a form, the history, finding
+positions, sharing, the account. One for all (`js/sheet.js`).
+
+- **SH1** One shape: from the bottom on a phone, in the middle on a wide screen; the
+  title and × at the top (× says Cancel on a form), the actions at the bottom. A tap
+  outside, × or Escape closes it; the focus stays inside (A4).
+- **SH2** At once (R6): open on the first frame after the tap, in its final shape. What
+  comes from far (the history, the people of a trip, passkeys, linked chats) arrives
+  inside it; such a sheet is tall from the start, so nothing moves when it comes. The
+  e2e measures the opening: over 100 ms fails.
+- **SH3** Finding positions: one row, two actions. The tick takes the point found; a tap
+  on the row shows it on a small map in the sheet, with the day's other stops around it
+  (no leaving the app). Far from them (over 30 km): unticked, and it says how far.
+- **SH4** One main action that says what it does: "Save 2 positions", or with none
+  ticked "Leave as it is"; saved as one version.
 
 ## Accessibility
 

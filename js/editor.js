@@ -13,20 +13,8 @@ import { TRAVEL, TYPES } from "./trip.js";
 import { clockMinutes, dayAfter } from "./edit.js";
 import { PARTS, partOf } from "./parts.js";
 import { ask } from "./ask.js";
+import { openSheet } from "./sheet.js";
 import { parseAmount, formatPlain, formatMoney, symbolOf, currencies, currencyName } from "./money.js";
-
-let dialog = null;
-
-function ensureDialog(){
-  if(dialog) return dialog;
-  dialog = document.createElement("dialog");
-  dialog.className = "sheet";
-  dialog.setAttribute("aria-labelledby", "sheet-title");
-  document.body.appendChild(dialog);
-  // A tap on the dimmed backdrop closes it, as people expect from a sheet.
-  dialog.addEventListener("click", e => { if(e.target === dialog) dialog.close(); });
-  return dialog;
-}
 
 // "14:05" in the trip's time zone, for a stop added now.
 function timeNow(timezone){
@@ -67,7 +55,7 @@ const looksLikeAddress = s => /,|\d/.test(String(s || ""));
  *   onSave(…, group)            with an alternative, the group's name as written
  */
 export function openStopEditor(o){
-  const dlg = ensureDialog();
+  let dlg;
   const editing = !!o.stop;
   const lang = getLang();
   const st = {
@@ -136,12 +124,7 @@ export function openStopEditor(o){
       </div>
     </div>`;
 
-  dlg.innerHTML = `
-  <form method="dialog" class="sheet-form" novalidate>
-    <div class="sheet-head">
-      <h2 id="sheet-title">${esc(alt ? (alt.fixed ? t("altFormTitle", {g: alt.group}) : t("altFormTitleNew", {s: alt.of})) : t(editing ? "editStopTitle" : "newStopTitle"))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
-    </div>
+  dlg = openSheet({title: alt ? (alt.fixed ? t("altFormTitle", {g: alt.group}) : t("altFormTitleNew", {s: alt.of})) : t(editing ? "editStopTitle" : "newStopTitle"), form: true, body: `
     ${alt ? `<p class="foot">${esc(t("altFormHelp", {s: alt.of}))}</p>` : ""}
 
     <div class="field">
@@ -227,8 +210,7 @@ export function openStopEditor(o){
       <span class="grow"></span>
       <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
       <button type="submit" class="btn primary">${esc(t("save"))}</button>
-    </div>
-  </form>`;
+    </div>`});
 
   const $ = sel => dlg.querySelector(sel);
   const form = $("form");
@@ -364,7 +346,7 @@ export function openStopEditor(o){
 
   dlg.onclick = async e => {
     if(e.target === dlg) return;
-    if(e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-close]")) return;
     if(e.target.closest("[data-time-mode]")){
       const clock = $("#stop-time"), words = $("#stop-time-words");
       const toWords = !clock.hidden;
@@ -478,7 +460,6 @@ export function openStopEditor(o){
 
   fillPlans();
   showPos();
-  dlg.showModal();
   if(o.prefill){ $("#stop-src").value = o.prefill; readSource(o.prefill); }
   else if(!editing) $("#stop-src").focus();
 }
@@ -502,17 +483,12 @@ function noteRow(text){
 }
 
 export function openDayEditor(o){
-  const dlg = ensureDialog();
+  let dlg;
   const d = o.day, lang = getLang();
   const $ = sel => dlg.querySelector(sel);
   const stay = typeof d.stay === "string" ? {name: d.stay} : (d.stay || {});
   const p = dateParts(d.date, lang);
-  dlg.innerHTML = `
-  <form method="dialog" class="sheet-form" novalidate>
-    <div class="sheet-head">
-      <h2 id="sheet-title">${esc(t("editDayTitle", {n: o.number}))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
-    </div>
+  dlg = openSheet({title: t("editDayTitle", {n: o.number}), form: true, body: `
     <p class="foot">${esc(p.long)}</p>
     <div class="field">
       <label for="day-city">${esc(t("fCity"))}</label>
@@ -540,12 +516,11 @@ export function openDayEditor(o){
       <span class="grow"></span>
       <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
       <button type="submit" class="btn primary">${esc(t("save"))}</button>
-    </div>
-  </form>`;
+    </div>`});
 
   dlg.onclick = async e => {
     if(e.target === dlg) return;
-    if(e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-close]")) return;
     // A note taken away, or one more: each note is a field of its own.
     const gone = e.target.closest("[data-note-remove]");
     if(gone){
@@ -586,7 +561,6 @@ export function openDayEditor(o){
       notes: [...dlg.querySelectorAll("#day-notes textarea")].map(x => x.value.trim()).filter(Boolean)
     });
   });
-  dlg.showModal();
 }
 
 /* ---------- money ---------- */
@@ -704,16 +678,11 @@ const shortDate = (date, lang) => new Intl.DateTimeFormat(lang, {day: "numeric",
  *   onDelete()
  */
 export function openExpenseEditor(o){
-  const dlg = ensureDialog();
+  let dlg;
   const x = o.expense || {}, editing = !!o.expense;
   const $ = sel => dlg.querySelector(sel);
   const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", t("fCostHelp"), {kind: o.private ? "private" : "trip"});
-  dlg.innerHTML = `
-  <form method="dialog" class="sheet-form" novalidate>
-    <div class="sheet-head">
-      <h2 id="sheet-title">${esc(t(editing ? "editExpenseTitle" : "newExpenseTitle"))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
-    </div>
+  dlg = openSheet({title: t(editing ? "editExpenseTitle" : "newExpenseTitle"), form: true, body: `
     <p class="foot">${esc(t("expenseHelp"))}</p>
     <div class="field">
       <label for="exp-title">${esc(t("fExpense"))}</label>
@@ -730,14 +699,13 @@ export function openExpenseEditor(o){
       <span class="grow"></span>
       <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
       <button type="submit" class="btn primary">${esc(t("save"))}</button>
-    </div>
-  </form>`;
+    </div>`});
   const dateNow = () => $("#exp-date").value || o.today || "";
   money.wire(dlg, dateNow);
   $("#exp-date").addEventListener("change", () => money.update());
   dlg.onclick = async e => {
     if(e.target === dlg) return;
-    if(e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-close]")) return;
     if(money.click(e)) return;
     if(e.target.closest("[data-delete]")){
       const answer = await ask({title: t("deleteExpenseTitle"), text: t("deleteExpenseText", {t: x.title}),
@@ -761,6 +729,5 @@ export function openExpenseEditor(o){
     o.onSave({title, date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined, cost: cost.cost,
       currency: cost.currency !== o.tripCurrency ? cost.currency : undefined, stop}, cost.private);
   });
-  dlg.showModal();
   if(!editing) $("#exp-title").focus();
 }

@@ -5,6 +5,7 @@
 
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
+import { openSheet } from "./sheet.js";
 import { ask } from "./ask.js";
 import { createInvite, pendingInvites, revokeInvite, tripMembers, leaveTrip, inviteLink, pageUrl, unpublishTrip } from "./share.js";
 import { accountError } from "./account.js";
@@ -19,15 +20,7 @@ import { shortId } from "./version.js";
  */
 export async function openShareSheet({rec, toast, onPublication = () => {}}){
   const id = rec.share.id;
-  const dlg = document.createElement("dialog");
-  dlg.className = "sheet";
-  dlg.setAttribute("aria-labelledby", "share-title");
-  dlg.innerHTML = `
-  <div class="sheet-form">
-    <div class="sheet-head">
-      <h2 id="share-title">${esc(t("shareTitle", {t: rec.trip.title}))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
-    </div>
+  const dlg = openSheet({id: "share-title", title: t("shareTitle", {t: rec.trip.title}), cls: "tall", body: `
     <section><h3 class="sheet-h">${esc(t("whoSees"))}</h3><div class="people" data-people aria-busy="true"><p class="foot">…</p></div></section>
     <section data-pending-box hidden><h3 class="sheet-h">${esc(t("pendingInvites"))}</h3><div class="people" data-pending></div></section>
     <section><h3 class="sheet-h">${esc(t("invitePerson"))}</h3>
@@ -41,9 +34,7 @@ export async function openShareSheet({rec, toast, onPublication = () => {}}){
       </div>
       <p class="foot">${esc(t("linkHelp"))}</p>
     </section>
-    <section><h3 class="sheet-h">${esc(t("withLink"))}</h3><div class="pub" data-pub></div></section>
-  </div>`;
-  document.body.appendChild(dlg);
+    <section><h3 class="sheet-h">${esc(t("withLink"))}</h3><div class="pub" data-pub></div></section>`});
   const $ = sel => dlg.querySelector(sel);
   const role = r => t(r === "owner" ? "roleOwner" : r === "edit" ? "roleEdit" : "roleRead");
   const until = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short"}).format(new Date(d));
@@ -74,9 +65,8 @@ export async function openShareSheet({rec, toast, onPublication = () => {}}){
     try{ [people, pending] = await Promise.all([tripMembers(id), pendingInvites(id)]); draw(); }
     catch(e){ $("[data-people]").removeAttribute("aria-busy"); $("[data-people]").innerHTML = `<p class="errbox" role="alert">${esc(accountError(e))}</p>`; }
   };
-  dlg.addEventListener("close", () => dlg.remove());
   dlg.addEventListener("click", async e => {
-    if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-close]")) return;
     const b = e.target.closest("button");
     if(!b) return;
     try{
@@ -125,8 +115,7 @@ export async function openShareSheet({rec, toast, onPublication = () => {}}){
     }catch(err){ toast(accountError(err)); }
     finally{ b.disabled = false; }
   });
-  // Who sees it first, then the sheet, already whole: it does not grow under the finger.
+  // The sheet is open and tall already (SH2): who sees the trip arrives inside it.
   drawPub();
   await load();
-  dlg.showModal();
 }

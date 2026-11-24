@@ -53,6 +53,7 @@ const FILES = [
   "js/share-api.js",
   "js/share.js",
   "js/sharing.js",
+  "js/sheet.js",
   "js/store.js",
   "js/sun.js",
   "js/sync.js",

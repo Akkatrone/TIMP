@@ -6,6 +6,7 @@
 
 import { t } from "./i18n.js";
 import { esc } from "./util.js";
+import { openSheet } from "./sheet.js";
 import { publishable } from "./publish.js";
 import { publishTrip } from "./share.js";
 import { accountError } from "./account.js";
@@ -31,19 +32,11 @@ export function openPublishSheet({rec, toast, onDone}){
   let dates = before ? before.dates : (over(trip) ? "real" : "hidden");
   // Unsynced changes stay out: the service publishes the version it has.
   const behind = rec.share.head && rec.share.head !== rec.trip.version.id;
-  const dlg = document.createElement("dialog");
-  dlg.className = "sheet";
-  dlg.setAttribute("aria-labelledby", "publish-title");
   const examples = list => [...new Set(list.map(x => x.label ? `${x.label}${x.match ? ": " + x.match : ""}` : x.match))].slice(0, 3);
   const rows = KINDS.filter(k => found[k].length).map(k => `
     <label class="found-row"><input type="checkbox" data-take="${k}" checked>
       <span><b>${esc(t("found_" + k, {n: found[k].length}))}</b>${examples(found[k]).map(e => `<small>${esc(e)}</small>`).join("")}</span></label>`).join("");
-  dlg.innerHTML = `
-  <form method="dialog" class="sheet-form publish">
-    <div class="sheet-head">
-      <h2 id="publish-title">${esc(t(before ? "republishTitle" : "publishTitle", {t: rec.trip.title}))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
-    </div>
+  const dlg = openSheet({id: "publish-title", title: t(before ? "republishTitle" : "publishTitle", {t: rec.trip.title}), form: true, cls: "publish", body: `
     <p class="foot">${esc(t("publishLinkHelp"))}</p>
     <section><h3 class="sheet-h">${esc(t("publishDates"))}</h3>
       <div class="seg" role="group" aria-label="${esc(t("publishDates"))}">
@@ -53,7 +46,7 @@ export function openPublishSheet({rec, toast, onDone}){
       <p class="foot" data-dates-help>${esc(t(dates === "hidden" ? "datesHiddenHelp" : "datesRealHelp"))}</p>
     </section>
     <section><h3 class="sheet-h">${esc(t("publishFound"))}</h3>
-      ${rows ? `<div class="found">${rows}</div><p class="foot">${esc(t("publishFoundHelp"))}</p>` : `<p class="foot">${esc(t("publishNothing"))}</p>`}
+      ${rows ? `<div class="found-rows">${rows}</div><p class="foot">${esc(t("publishFoundHelp"))}</p>` : `<p class="foot">${esc(t("publishNothing"))}</p>`}
     </section>
     <p class="foot">${esc(t("publishNever"))}</p>
     ${behind ? `<p class="warnline">${esc(t("publishBehind"))}</p>` : ""}
@@ -62,13 +55,10 @@ export function openPublishSheet({rec, toast, onDone}){
       <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
       <span class="grow"></span>
       <button type="submit" class="btn primary">${esc(t("publishNow"))}</button>
-    </div>
-  </form>`;
-  document.body.appendChild(dlg);
+    </div>`});
   const $ = sel => dlg.querySelector(sel);
-  dlg.addEventListener("close", () => dlg.remove());
   dlg.addEventListener("click", e => {
-    if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-close]")) return;
     const d = e.target.closest("[data-dates]");
     if(!d) return;
     dates = d.dataset.dates;
@@ -90,7 +80,6 @@ export function openPublishSheet({rec, toast, onDone}){
       box.hidden = false;
     }finally{ go.disabled = false; }
   });
-  dlg.showModal();
 }
 
 /**
@@ -100,15 +89,7 @@ export function openPublishSheet({rec, toast, onDone}){
  */
 export function chooseFirstDay({title, by, hidden, first}){
   return new Promise(resolve => {
-    const dlg = document.createElement("dialog");
-    dlg.className = "sheet";
-    dlg.setAttribute("aria-labelledby", "base-title");
-    dlg.innerHTML = `
-    <form method="dialog" class="sheet-form" novalidate>
-      <div class="sheet-head">
-        <h2 id="base-title">${esc(t("baseTitle", {t: title}))}</h2>
-        <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
-      </div>
+    const dlg = openSheet({id: "base-title", title: t("baseTitle", {t: title}), form: true, body: `
       <p class="foot">${esc(t("baseText", {h: by}))}</p>
       <div class="field">
         <label for="base-first">${esc(t("baseFirst"))}</label>
@@ -120,12 +101,9 @@ export function chooseFirstDay({title, by, hidden, first}){
         <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
         <span class="grow"></span>
         <button type="submit" class="btn primary">${esc(t("baseMake"))}</button>
-      </div>
-    </form>`;
-    document.body.appendChild(dlg);
+      </div>`});
     let chosen = null;
-    dlg.addEventListener("close", () => { dlg.remove(); resolve(chosen); });
-    dlg.addEventListener("click", e => { if(e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+    dlg.addEventListener("close", () => resolve(chosen));
     dlg.querySelector("form").addEventListener("submit", e => {
       e.preventDefault();
       const v = dlg.querySelector("#base-first").value;
@@ -138,7 +116,6 @@ export function chooseFirstDay({title, by, hidden, first}){
       chosen = v;
       dlg.close();
     });
-    dlg.showModal();
     dlg.querySelector("#base-first").focus();
   });
 }

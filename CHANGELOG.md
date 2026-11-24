@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.5.0
+
+- **Every sheet opens at once**, on the tap: what comes from far (the history, the
+  people of a trip, passkeys, linked chats) arrives inside it, and such a sheet is tall
+  from the start, so nothing moves when it comes. The history no longer waits for the
+  service to say who made each version: the rows come first, the names after.
+- **Finding positions**: a tap on a row shows the point found on a small map in the
+  sheet, with the day's other stops around it; the tick takes it. Verify no longer
+  leaves the app for Google Maps.
+- One sheet for all (`js/sheet.js`): the same title and ×, a tap outside or Escape
+  closes it. Measured in the tests: a sheet that takes more than 100 ms to appear fails.
+- **You** has no Back link: the circle at the top right, which opens You, is the way
+  back from it.
+
 ## 4.4.0
 
 - **The weather**, from today to 3 days ahead: the day's sky and its lowest and highest

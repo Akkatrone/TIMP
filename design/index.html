@@ -33,7 +33,7 @@
     <a href="#principles">Principles</a><a href="#colour">Colour</a><a href="#type">Type</a>
     <a href="#space">Space, shape, motion</a><a href="#line">The line of the day</a>
     <a href="#stop">A stop</a><a href="#groups">Alternatives</a><a href="#day">The day</a>
-    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a>
+    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a><a href="#sheets">Sheets</a>
     <a href="#a11y">Accessibility</a>
   </nav>
 
@@ -240,6 +240,27 @@
         <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">4</span></span><span class="rt"><small>Day 1 · Fri May 14 · 12:30</small><b>Castelo de <mark>São</mark> Jorge</b></span></button></li>
         <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">2</span></span><span class="rt"><small>Day 1 · Fri May 14 · 11:00</small><b>Lisbon Cathedral</b><small class="rw">…the castle of <mark>São</mark> Jorge is ten minutes up the hill.</small></span></button></li>
       </ol>
+    </div></div>
+  </section>
+
+  <section id="sheets">
+    <h2>Sheets</h2>
+    <p>One sheet for everything done apart: title and × on top, actions at the bottom; a
+    tap outside, × or Escape closes it. It is there on the tap, in its final shape; what
+    comes from far arrives inside it, and such a sheet is tall from the start. Finding
+    positions: the tick takes the point, a tap on the row shows it on a small map with
+    the day's other stops.</p>
+    <div class="ds-row"><div class="ds-phone">
+      <div class="sheet ds-sheet"><div class="sheet-form">
+        <div class="sheet-head"><h2>Positions found</h2><button type="button" class="iconbtn" aria-label="Close">×</button></div>
+        <p class="foot">Tap a row to see it on the map, with the day's other stops. Untick the wrong ones.</p>
+        <div class="founds">
+          <div class="found"><input type="checkbox" checked aria-label="Pastelaria Exemplo"><button type="button" class="what" aria-expanded="true"><b>Pastelaria Exemplo</b><small>Rua de Belém 84, Lisboa</small><small class="dist">Food · 0.3 km from the other stops</small></button></div>
+          <div class="live mini ds-mini" aria-hidden="true"><span class="mini-dot" style="left:22%;top:30%;--pc:var(--t-sight)"></span><span class="mini-dot" style="left:74%;top:44%;--pc:var(--t-museum)"></span><span class="mini-here" style="left:46%;top:52%"></span></div>
+          <div class="found far"><input type="checkbox" aria-label="Mercado Exemplo"><button type="button" class="what" aria-expanded="false"><b>Mercado Exemplo</b><small>Mercado Exemplo, Porto</small><small class="dist">Market · 274 km from the other stops: probably another place</small></button></div>
+        </div>
+        <div class="sheet-actions"><button type="button" class="btn">Not now</button><button type="button" class="btn primary">Save 1 position</button></div>
+      </div></div>
     </div></div>
   </section>
 

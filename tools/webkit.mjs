@@ -144,6 +144,21 @@ try{
     await run(`window.scrollTo(0, 0); document.getElementById("room").remove(); document.querySelector("#view-toggle [data-view-list]").click();`);
   });
 
+  await check("a sheet: open on the first frame, as wide as the screen at most, tall when its content comes from far", async () => {
+    await run(`location.hash = "#trips"; await new Promise(r => setTimeout(r, 300));`);
+    // A frame of this machine first: without a GPU (Xvfb) an empty one can take 300 ms.
+    const empty = await run(`const t0 = performance.now(); document.body.dataset.f = Date.now(); await new Promise(r => requestAnimationFrame(r)); return Math.round(performance.now() - t0);`);
+    const out = await run(`const t0 = performance.now(); document.querySelector('[data-act="history"]').click(); await new Promise(r => requestAnimationFrame(r));
+      const d = document.querySelector("dialog.sheet[open]"); if(!d) return null; const r = d.getBoundingClientRect();
+      return {ms: Math.round(performance.now() - t0), right: Math.round(r.right), h: Math.round(r.height), tall: Math.round(Math.min(innerHeight * .92, innerHeight))};`);
+    ok(out, "no sheet on the first frame");
+    ok(out.ms <= empty + 100, `open in ${out.ms} ms, at most 100 more than an empty frame (${empty} ms)`);
+    ok(out.right <= await run(`return innerWidth;`) + 1, `it ends at ${out.right}`);
+    ok(Math.abs(out.h - out.tall) <= 2, `${out.h}px tall, ${out.tall} expected`);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+    ok(await run(`return !document.querySelector("dialog.sheet");`), "closed, it is still on the page");
+  });
+
   await check("search: a field Safari does not zoom into, results fixed under the bar", async () => {
     await run(`document.getElementById("search-btn").click(); await new Promise(r => setTimeout(r, 300));`);
     const size = await run(`return parseFloat(getComputedStyle(document.getElementById("search-q")).fontSize);`);

@@ -4,6 +4,7 @@
 
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
+import { openSheet } from "./sheet.js";
 import { ask } from "./ask.js";
 import { signUp, ShareError, linkedApps, unlinkApp, passkeys, openSessions, endOtherSessions, removePasskey, addPasskey, needsSignIn, signInAgain,
   recoveryState, makeRecoveryCodes, recoverAccount, connectorAddress } from "./share.js";
@@ -32,15 +33,7 @@ export function accountError(e){
  *   onRecover()    the person lost every passkey and has a recovery code
  */
 export function openSignUp(o){
-  const dlg = document.createElement("dialog");
-  dlg.className = "sheet";
-  dlg.setAttribute("aria-labelledby", "acct-title");
-  dlg.innerHTML = `
-  <form method="dialog" class="sheet-form" novalidate>
-    <div class="sheet-head">
-      <h2 id="acct-title">${esc(t("signUpTitle"))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
-    </div>
+  const dlg = openSheet({id: "acct-title", title: t("signUpTitle"), form: true, body: `
     <p class="foot">${esc(t("accountHelp"))}</p>
     <div class="field">
       <label for="acct-code">${esc(t("fSignupCode"))}</label>
@@ -58,15 +51,11 @@ export function openSignUp(o){
       <button type="button" class="btn" data-signin>${esc(t("haveAccount"))}</button>
       <span class="grow"></span>
       <button type="submit" class="btn primary">${esc(t("createPasskey"))}</button>
-    </div>
-  </form>`;
-  document.body.appendChild(dlg);
+    </div>`});
   const $ = sel => dlg.querySelector(sel);
   const fail = (text, focus) => { const box = $("[data-error]"); box.textContent = text; box.hidden = false; if(focus) $(focus).focus(); };
-  dlg.addEventListener("close", () => dlg.remove());
   dlg.addEventListener("click", e => {
-    if(e.target === dlg || e.target.closest("[data-close]")) dlg.close();
-    else if(e.target.closest("[data-signin]")){ dlg.close(); o.onSignIn(); }
+    if(e.target.closest("[data-signin]")){ dlg.close(); o.onSignIn(); }
     else if(e.target.closest("[data-recover]")){ dlg.close(); o.onRecover(); }
   });
   $("form").addEventListener("submit", async e => {
@@ -83,7 +72,6 @@ export function openSignUp(o){
       fail(accountError(err), /^handle/.test(err && err.message) ? "#acct-handle" : /^code/.test(err && err.message) ? "#acct-code" : null);
     }finally{ go.disabled = false; }
   });
-  dlg.showModal();
   $("#acct-code").focus();
 }
 
@@ -93,15 +81,7 @@ export function openSignUp(o){
  * @param toast  says something short over the page
  */
 export async function openLinkedApps(toast){
-  const dlg = document.createElement("dialog");
-  dlg.className = "sheet";
-  dlg.setAttribute("aria-labelledby", "chats-title");
-  dlg.innerHTML = `
-  <div class="sheet-form">
-    <div class="sheet-head">
-      <h2 id="chats-title">${esc(t("chatsTitle"))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
-    </div>
+  const dlg = openSheet({id: "chats-title", title: t("chatsTitle"), cls: "tall", body: `
     <p class="foot">${esc(t("chatsHelp"))}</p>
     <div class="chats" data-chats aria-busy="true"><p class="foot">…</p></div>
     <section class="connect" aria-labelledby="connect-title">
@@ -113,9 +93,7 @@ export async function openLinkedApps(toast){
       </div>
       <ul class="foot steps"><li>${esc(t("connectClaude"))}</li><li>${esc(t("connectChatgpt"))}</li></ul>
       <p class="foot">${esc(t("connectAfter"))}</p>
-    </section>
-  </div>`;
-  document.body.appendChild(dlg);
+    </section>`});
   const $list = dlg.querySelector("[data-chats]");
   const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(d));
   const can = scopes => t(scopes.includes("trips:write") ? (scopes.includes("trips:read") ? "chatsReadWrite" : "chatsWrite") : "chatsRead")
@@ -130,9 +108,8 @@ export async function openLinkedApps(toast){
       </div>`).join("");
   };
   const failed = e => { $list.removeAttribute("aria-busy"); $list.innerHTML = `<p class="errbox" role="alert">${esc(accountError(e))}</p>`; };
-  dlg.addEventListener("close", () => dlg.remove());
   dlg.addEventListener("click", async e => {
-    if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-close]")) return;
     if(e.target.closest("[data-copy-connector]")){
       const field = dlg.querySelector("[data-connector]");
       await navigator.clipboard.writeText(field.textContent).then(() => toast(t("connectCopied")), () => getSelection().selectAllChildren(field));
@@ -153,9 +130,8 @@ export async function openLinkedApps(toast){
       toast(t("chatUnlinked", {app: app.client}));
     }catch(err){ b.disabled = false; toast(accountError(err)); }
   });
-  // The list first, then the sheet, already whole: it does not grow under the finger.
+  // The sheet is open and tall already (SH2): the list arrives inside it.
   await linkedApps().then(list => { apps = list; draw(); }, failed);
-  dlg.showModal();
 }
 
 /** A browser's User-Agent in a few words, "iPhone · Safari", "" if nothing is recognised. */
@@ -194,15 +170,7 @@ export async function recently(fn, again){
  * @param o.handle the account's handle, for the codes' file
  */
 export async function openDevices({toast, save, handle}){
-  const dlg = document.createElement("dialog");
-  dlg.className = "sheet";
-  dlg.setAttribute("aria-labelledby", "devices-title");
-  dlg.innerHTML = `
-  <div class="sheet-form devices">
-    <div class="sheet-head">
-      <h2 id="devices-title">${esc(t("devicesTitle"))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
-    </div>
+  const dlg = openSheet({id: "devices-title", title: t("devicesTitle"), cls: "devices tall", body: `
     <section>
       <h3 class="sheet-h">${esc(t("passkeysTitle"))}</h3>
       <p class="foot">${esc(t("passkeysHelp"))}</p>
@@ -223,9 +191,7 @@ export async function openDevices({toast, save, handle}){
       <h3 class="sheet-h">${esc(t("sessionsTitle"))}</h3>
       <div class="chats" data-sessions aria-busy="true"><p class="foot">…</p></div>
       <button type="button" class="btn danger" data-end-others hidden>${esc(t("endOthers"))}</button>
-    </section>
-  </div>`;
-  document.body.appendChild(dlg);
+    </section>`});
   const $ = sel => dlg.querySelector(sel);
   // The year only when it is not this one.
   const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
@@ -258,9 +224,8 @@ export async function openDevices({toast, save, handle}){
     try{ await fn(); }catch(err){ toast(accountError(err)); }
     finally{ b.disabled = false; }
   };
-  dlg.addEventListener("close", () => dlg.remove());
   dlg.addEventListener("click", async e => {
-    if(e.target === dlg || e.target.closest("[data-close]")){ dlg.close(); return; }
+    if(e.target.closest("[data-close]")) return;
     const add = e.target.closest("[data-add-key]"), off = e.target.closest("[data-remove-key]"), others = e.target.closest("[data-end-others]");
     const make = e.target.closest("[data-make-codes]"), copy = e.target.closest("[data-copy-codes]"), keep = e.target.closest("[data-save-codes]");
     if(make){
@@ -303,7 +268,6 @@ export async function openDevices({toast, save, handle}){
     }
   });
   await load();
-  dlg.showModal();
 }
 
 /**
@@ -313,15 +277,7 @@ export async function openDevices({toast, save, handle}){
  * @param onClose()     the form is closed, done or not
  */
 export function openRecover({onDone, onClose = () => {}}){
-  const dlg = document.createElement("dialog");
-  dlg.className = "sheet";
-  dlg.setAttribute("aria-labelledby", "recover-title");
-  dlg.innerHTML = `
-  <form method="dialog" class="sheet-form" novalidate>
-    <div class="sheet-head">
-      <h2 id="recover-title">${esc(t("recoverTitle"))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("cancel"))}">×</button>
-    </div>
+  const dlg = openSheet({id: "recover-title", title: t("recoverTitle"), form: true, body: `
     <p class="foot">${esc(t("recoverHelp"))}</p>
     <div class="field">
       <label for="rec-handle">${esc(t("fHandle"))}</label>
@@ -336,13 +292,10 @@ export function openRecover({onDone, onClose = () => {}}){
     <div class="sheet-actions">
       <span class="grow"></span>
       <button type="submit" class="btn primary">${esc(t("createPasskey"))}</button>
-    </div>
-  </form>`;
-  document.body.appendChild(dlg);
+    </div>`});
   const $ = sel => dlg.querySelector(sel);
   const fail = text => { const box = $("[data-error]"); box.textContent = text; box.hidden = false; };
-  dlg.addEventListener("close", () => { dlg.remove(); onClose(); });
-  dlg.addEventListener("click", e => { if(e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+  dlg.addEventListener("close", onClose);
   $("form").addEventListener("submit", async e => {
     e.preventDefault();
     const handle = $("#rec-handle").value.trim(), code = $("#rec-code").value.trim();
@@ -355,6 +308,5 @@ export function openRecover({onDone, onClose = () => {}}){
     }catch(err){ fail(accountError(err)); }
     finally{ go.disabled = false; }
   });
-  dlg.showModal();
   $("#rec-handle").focus();
 }

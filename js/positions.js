@@ -1,12 +1,14 @@
 // The stops of a day without a position, found all at once: each one searched as the
 // stop form searches it (js/geocode.js, findStop), one after the other, then shown to be
 // checked before anything is saved: the place found in the service's words, its kind,
-// how far it is from the other stops, and Verify, Google Maps on the point found. A
-// result far from the day comes unticked: a common name ("Taberna") can be in another
-// town. What is ticked is saved by the caller, as one new version.
+// how far it is from the other stops, and on a tap the point on a small map with the
+// day's other stops (design/README.md, SH3). A result far from the day comes unticked: a
+// common name ("Taberna") can be in another town. What is ticked is saved by the
+// caller, as one new version.
 
 import { t, getLang } from "./i18n.js";
-import { esc, mapsUrl } from "./util.js";
+import { esc } from "./util.js";
+import { openSheet } from "./sheet.js";
 
 // Farther than this from the other stops of the day: probably another place.
 export const FAR_KM = 30;
@@ -50,27 +52,18 @@ export function distances(results, around){
  */
 export function openFindPositions(o){
   const lang = getLang();
-  const dlg = document.createElement("dialog");
-  dlg.className = "sheet";
-  dlg.setAttribute("aria-labelledby", "pos-title");
-  dlg.innerHTML = `
-  <div class="sheet-form">
-    <div class="sheet-head">
-      <h2 id="pos-title">${esc(t("posFinding", {a: 0, b: o.stops.length}))}</h2>
-      <button type="button" class="iconbtn" data-close aria-label="${esc(t("close"))}">×</button>
-    </div>
+  const dlg = openSheet({id: "pos-title", title: t("posFinding", {a: 0, b: o.stops.length}), body: `
     <p class="foot">${esc(t("posFindHelp"))}</p>
-    <div class="founds" data-founds aria-busy="true">${o.stops.map(s => `<div class="found wait" data-row="${esc(s.id)}"><label><span class="tickph" aria-hidden="true"></span><span class="what"><b>${esc(s.title)}</b><small>${esc(t("posSearching"))}</small><small>&nbsp;</small></span></label></div>`).join("")}</div>
+    <div class="founds" data-founds aria-busy="true">${o.stops.map(s => `<div class="found wait" data-row="${esc(s.id)}"><span class="tickph" aria-hidden="true"></span><span class="what"><b>${esc(s.title)}</b><small>${esc(t("posSearching"))}</small><small>&nbsp;</small></span></div>`).join("")}</div>
     <div class="sheet-actions">
       <button type="button" class="btn" data-close>${esc(t("notNow"))}</button>
       <button type="button" class="btn primary" data-save disabled>${esc(t("posSave"))}</button>
-    </div>
-  </div>`;
-  document.body.appendChild(dlg);
+    </div>`});
   const results = [], touched = new Set();
-  let closed = false, answer = null;
+  let closed = false, answer = null, mini = null;
   const fmt = d => new Intl.NumberFormat(lang, {maximumFractionDigits: d < 10 ? 1 : 0}).format(d);
   const ticked = () => [...dlg.querySelectorAll("[data-found]:checked")].map(x => x.dataset.found);
+  const rowOf = id => dlg.querySelector(`[data-row="${CSS.escape(id)}"]`);
   const count = () => {
     const n = ticked().length, b = dlg.querySelector("[data-save]");
     // Nothing ticked once all are in: "Leave as it is", a decision too (a train has no
@@ -92,30 +85,65 @@ export function openFindPositions(o){
     // A tick the traveller changed stays; the others follow how far the result is.
     const far = distances(results, o.around), was = new Set(ticked());
     for(const r of results){
-      const row = dlg.querySelector(`[data-row="${CSS.escape(r.id)}"]`);
-      const s = o.stops.find(x => x.id === r.id);
+      const row = rowOf(r.id), s = o.stops.find(x => x.id === r.id);
       if(!r.hit){
         put(row, "found none", `<span class="what"><b>${esc(s.title)}</b><small>${esc(t("posNoneFound"))}</small></span><button type="button" class="btn small" data-open-stop="${esc(r.id)}">${esc(t("posOpen"))}</button>`);
         continue;
       }
       const f = far.get(r.id), on = touched.has(r.id) ? was.has(r.id) : !(f && f.far);
       const where = [r.hit.type ? t("type_" + r.hit.type) : "", f ? t(f.far ? "posFar" : "posNear", {d: fmt(f.km)}) : ""].filter(Boolean).join(" · ");
-      put(row, "found" + (f && f.far ? " far" : ""), `<label><input type="checkbox" data-found="${esc(r.id)}"${on ? " checked" : ""}><span class="what"><b>${esc(s.title)}</b>${r.hit.label ? `<small>${esc(r.hit.label)}</small>` : ""}${where ? `<small class="dist">${esc(where)}</small>` : ""}</span></label>` +
-        `<a class="maplink" href="${esc(mapsUrl(r.hit.lat + "," + r.hit.lng))}" target="_blank" rel="noopener">${esc(t("posVerify"))}</a>`);
+      // Two actions: the tick takes the point, the row shows it (SH3).
+      put(row, "found" + (f && f.far ? " far" : ""), `<input type="checkbox" data-found="${esc(r.id)}" aria-label="${esc(s.title)}"${on ? " checked" : ""}>` +
+        `<button type="button" class="what" data-show="${esc(r.id)}" aria-expanded="${!!mini && mini.id === r.id}"><b>${esc(s.title)}</b>${r.hit.label ? `<small>${esc(r.hit.label)}</small>` : ""}${where ? `<small class="dist">${esc(where)}</small>` : ""}</button>`);
     }
     count();
   };
-  const finish = () => {
-    if(closed) return;
-    closed = true;
-    if(dlg.open) dlg.close();
-    dlg.remove();
+  // The small map under a row: the point found, the day's stops around it. One at a time;
+  // a tap on its row again closes it.
+  const hide = () => {
+    if(!mini) return;
+    if(mini.map) mini.map.remove();
+    mini.box.remove();
+    const b = rowOf(mini.id).querySelector("[data-show]");
+    if(b) b.setAttribute("aria-expanded", "false");
+    mini = null;
   };
+  async function show(id){
+    const again = mini && mini.id === id;
+    hide();
+    if(again) return;
+    const hit = results.find(x => x.id === id).hit, at = [hit.lng, hit.lat], row = rowOf(id);
+    const m = mini = {id, box: document.createElement("div"), map: null};
+    m.box.className = "live mini";
+    m.box.innerHTML = `<div class="msg">${esc(t("mapLoading"))}</div>`;
+    row.after(m.box);
+    row.querySelector("[data-show]").setAttribute("aria-expanded", "true");
+    try{
+      const {newMap} = await import("./livemap.js");
+      const {ml, map} = await newMap(m.box, {zoomButtons: false, center: at, zoom: 15});
+      if(mini !== m){ map.remove(); return; }
+      m.map = map;
+      m.box.querySelector(".msg").remove();
+      const mark = (cls, ll, type) => {
+        const el = document.createElement("span");
+        el.className = cls;
+        if(type) el.style.setProperty("--pc", `var(--t-${type})`);
+        new ml.Marker({element: el}).setLngLat(ll).addTo(map);
+      };
+      const bounds = new ml.LngLatBounds(at, at);
+      for(const s of o.around){ mark("mini-dot", [s.lng, s.lat], s.type); bounds.extend([s.lng, s.lat]); }
+      mark("mini-here", at);
+      map.fitBounds(bounds, {padding: 32, maxZoom: 16, duration: 0});
+    }catch(e){
+      if(mini === m) m.box.innerHTML = `<div class="msg">${esc(t("mapFailed"))}</div>`;
+    }
+  }
   return new Promise(resolve => {
-    dlg.addEventListener("close", () => { finish(); resolve(answer); });
+    dlg.addEventListener("close", () => { closed = true; hide(); resolve(answer); });
     dlg.addEventListener("change", e => { if(e.target.matches("[data-found]")){ touched.add(e.target.dataset.found); count(); } });
     dlg.addEventListener("click", e => {
-      if(e.target === dlg || e.target.closest("[data-close]")){ finish(); resolve(null); return; }
+      const row = e.target.closest("[data-show]");
+      if(row){ show(row.dataset.show); return; }
       const open = e.target.closest("[data-open-stop]");
       if(open){ answer = {open: open.dataset.openStop}; dlg.close(); return; }
       if(e.target.closest("[data-save]")){
@@ -124,7 +152,6 @@ export function openFindPositions(o){
         dlg.close();
       }
     });
-    dlg.showModal();
     (async () => {
       // Loaded here: the search needs a page (Google's script), the rest of this file does not.
       const {findStop} = await import("./geocode.js");
