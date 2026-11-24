@@ -93,8 +93,8 @@ try{
   await run(`document.querySelector('[data-act="demo"]').click();`);
   await until("the example trip", `document.querySelector(".stop")`);
   await run(`location.hash = "#trips";`);
-  await until("Paste", `document.querySelector('[data-act="paste"]')`);
-  await run(`document.querySelector('[data-act="paste"]').click();`);
+  await until("Paste", `document.querySelector('[data-act="paste-any"]')`);
+  await run(`document.querySelector('[data-act="paste-any"]').click();`);
   await until("the paste form", `document.querySelector("#paste-text")`);
   await run(`document.querySelector("#paste-text").value = ${JSON.stringify(JSON.stringify(trip))}; document.querySelector("#paste-text").closest("form").requestSubmit();`);
   await until("the trip", `document.title.includes("rather long title")`);
@@ -148,7 +148,8 @@ try{
     await run(`location.hash = "#trips"; await new Promise(r => setTimeout(r, 300));`);
     // A frame of this machine first: without a GPU (Xvfb) an empty one can take 300 ms.
     const empty = await run(`const t0 = performance.now(); document.body.dataset.f = Date.now(); await new Promise(r => requestAnimationFrame(r)); return Math.round(performance.now() - t0);`);
-    const out = await run(`const t0 = performance.now(); document.querySelector('[data-act="history"]').click(); await new Promise(r => requestAnimationFrame(r));
+    await run(`document.querySelector('[data-act="trip-menu"]').click();`);
+    const out = await run(`const t0 = performance.now(); document.querySelector('dialog.tripmenu[open] [data-act="history"]').click(); await new Promise(r => requestAnimationFrame(r));
       const d = document.querySelector("dialog.sheet[open]"); if(!d) return null; const r = d.getBoundingClientRect();
       return {ms: Math.round(performance.now() - t0), right: Math.round(r.right), h: Math.round(r.height), tall: Math.round(Math.min(innerHeight * .92, innerHeight))};`);
     ok(out, "no sheet on the first frame");

@@ -64,6 +64,8 @@ const WX_ICON = Object.fromEntries(Object.entries({
 }).map(([k, v]) => [k, `<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">${v}</svg>`]));
 const SIG_ICON = {
   weather: WX_ICON.rain,
+  shared: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.3" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6.5" r="1.9" stroke="currentColor" stroke-width="1.4"/><path d="M1.8 13c.6-2.3 2-3.5 3.7-3.5s3.1 1.2 3.7 3.5M9.5 13c.3-1.6 1-2.6 2-2.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  link: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6.5 9.5l3-3M5 8l-1.3 1.3a2.1 2.1 0 003 3L8 11M11 8l1.3-1.3a2.1 2.1 0 00-3-3L8 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   closed: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3M6.3 9.2l3.4 3.1M9.7 9.2l-3.4 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   ticket: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 5a1 1 0 011-1h10a1 1 0 011 1v1.5a1.5 1.5 0 000 3V11a1 1 0 01-1 1H3a1 1 0 01-1-1V9.5a1.5 1.5 0 000-3z" stroke="currentColor" stroke-width="1.4"/></svg>',
   choice: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 14.5V9M8 9L3.8 3.8M8 9l4.2-5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="3.5" cy="3.2" r="1.5" fill="currentColor"/><circle cx="12.5" cy="3.2" r="1.5" fill="currentColor"/></svg>',
@@ -179,10 +181,12 @@ let toastTimer = 0;
 
 let pendingOffer = null;  // a toast with a button waits behind short messages instead of being lost
 
-// A short message at the bottom. With an action it stays, with its button and a ✕,
-// until the traveller answers; messages without one go after four seconds.
+// A short message at the bottom: four seconds; with an action (Undo, Save the file), ten,
+// with its button and a ✕. A short message meanwhile puts it back after itself; once its
+// time is over it is gone: what it offered is still there (the history, the card's
+// signal). A finger or the focus on it keeps it while there.
+const TOAST_MS = 4000, OFFER_MS = 10000;
 function toast(text, action){
-  clearTimeout(toastTimer);
   $toast.innerHTML = `<span class="msg">${esc(text)}</span>` + (action
     ? `<button type="button" class="act">${esc(action.label)}</button><button type="button" class="x" aria-label="${esc(t("close"))}">×</button>`
     : "");
@@ -191,13 +195,20 @@ function toast(text, action){
     pendingOffer = {text, action};
     $toast.querySelector(".act").onclick = () => { pendingOffer = null; $toast.hidden = true; action.run(); };
     $toast.querySelector(".x").onclick = () => { pendingOffer = null; $toast.hidden = true; };
-  }else{
-    toastTimer = setTimeout(() => {
-      $toast.hidden = true;
-      if(pendingOffer) toast(pendingOffer.text, pendingOffer.action);
-    }, 4000);
   }
+  toastFor(action ? OFFER_MS : TOAST_MS);
 }
+function toastFor(ms){
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    const offer = pendingOffer, itself = !!$toast.querySelector(".act");
+    $toast.hidden = true;
+    pendingOffer = null;
+    if(offer && !itself) toast(offer.text, offer.action);
+  }, ms);
+}
+for(const [on, keep] of [["pointerenter", true], ["focusin", true], ["pointerleave", false], ["focusout", false]])
+  $toast.addEventListener(on, () => { if($toast.hidden) return; if(keep) clearTimeout(toastTimer); else toastFor($toast.querySelector(".act") ? OFFER_MS : TOAST_MS); });
 
 const trip = () => S.rec && S.rec.trip;
 // Each city of the trip gets a colour of the palette in css/app.css (--p0…--p7), in
@@ -1030,15 +1041,8 @@ function markStrip(){
   $days.classList.toggle("more-l", $days.scrollLeft > 2);
   $days.classList.toggle("more-r", $days.scrollLeft < max - 2);
 }
-// Paste at the bottom: with its word only at the top or at the end of the page; in
-// between only its icon, so it covers less of the stops.
-function markFabs(){
-  const y = scrollTop(), el = scroller || document.documentElement;
-  const atEnd = y + el.clientHeight >= el.scrollHeight - 24;
-  $fabs.classList.toggle("compact", y >= 40 && !atEnd);
-}
 let stripFrame = 0;
-const onScroll = () => { if(!stripFrame) stripFrame = requestAnimationFrame(() => { stripFrame = 0; markStrip(); markFabs(); }); };
+const onScroll = () => { if(!stripFrame) stripFrame = requestAnimationFrame(() => { stripFrame = 0; markStrip(); }); };
 (scroller || window).addEventListener("scroll", onScroll, {passive: true});
 window.addEventListener("resize", onScroll, {passive: true});
 $days.addEventListener("scroll", onScroll, {passive: true});
@@ -1065,15 +1069,35 @@ const aiMessage = () => t("aiPrompt", {url: llmsUrl()}) + "\n" + tripLine();
 // The long part first, the line to fill in last: pasted in a chat, the cursor is already there.
 const aiMessageFull = () => formatBrief() + "\n\n" + t("aiPromptFull") + "\n" + tripLine();
 
-function aiSection(folded){
-  const body = `<ol class="steps"><li>${esc(t("aiStep1"))}</li><li>${esc(t("aiStep2"))}</li></ol>
-    ${requestBox("ai-new", "new", t("aiTripLabel"), t("aiTripHint"))}
-    <div class="actions"><button type="button" class="btn small primary" data-act="copy-prompt">${esc(t("copyPrompt"))}</button><button type="button" class="btn small" data-act="clear-draft" data-key="new">${esc(t("clearDraft"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
-    <pre class="prompt" data-prompt>${esc(aiMessage())}</pre>
-    <p class="foot">${esc(t("aiNoLinks"))} <button type="button" class="linkbtn" data-act="copy-prompt-full">${esc(t("copyPromptFull"))}</button></p>`;
-  return folded
-    ? `<details class="aihow" data-keep="ai-new"${S.openDetails.has("ai-new") ? " open" : ""}><summary>${esc(t("aiTitle"))}</summary>${body}</details>`
-    : `<section class="sec aihow"><h2>${esc(t("aiTitle"))}</h2>${body}</section>`;
+// The row that opens it (Trips, Welcome: TR5), and the sheet: a new trip, or a change to
+// the one open. Two numbered actions, no paragraph of steps (R8); copying keeps the sheet
+// open (the person goes to the chat and comes back); Paste closes it.
+const assistantRow = () => `<nav class="me-list" aria-label="${esc(t("aiSheetTitle"))}"><button type="button" data-act="assistant">${esc(t("aiRow"))}</button></nav>`;
+function openAssistant(){
+  const canEdit = !!S.rec && !S.rec.public;
+  let mode = "new";
+  const dlg = openSheet({title: t("aiSheetTitle"), cls: "assistant", body: `<div data-ai></div>`});
+  const draw = () => {
+    const edit = mode === "edit", key = edit ? "edit:" + S.rec.id : "new";
+    dlg.querySelector("[data-ai]").innerHTML = (canEdit ? `<div class="seg" role="group" aria-label="${esc(t("aiSheetTitle"))}">` +
+        `<button type="button" data-ai-mode="new" aria-pressed="${!edit}">${esc(t("aiModeNew"))}</button>` +
+        `<button type="button" data-ai-mode="edit" aria-pressed="${edit}">${esc(t("aiModeEdit"))}</button></div>` : "") +
+      (edit ? requestBox("ai-edit", key, t("aiEditLabel"), t("aiEditHint")) : requestBox("ai-new", key, t("aiTripLabel"), t("aiTripHint"))) +
+      `<div class="steps2"><button type="button" class="btn primary" data-act="${edit ? "copy-edit" : "copy-prompt"}" data-stay><i>1</i>${esc(t("aiCopy"))}</button>` +
+      `<p class="foot">${esc(t("aiWhere"))}</p><button type="button" class="btn" data-act="paste-any"><i>2</i>${esc(t("aiPasteAnswer"))}</button></div>` +
+      `<p class="foot">${edit ? "" : `${esc(t("aiNoLinks"))} <button type="button" class="linkbtn" data-act="copy-prompt-full" data-stay>${esc(t("copyPromptFull"))}</button> · `}` +
+      `<button type="button" class="linkbtn" data-act="clear-draft" data-key="${esc(key)}" data-stay>${esc(t("clearDraft"))}</button></p>`;
+  };
+  draw();
+  dlg.addEventListener("input", e => { if(e.target.matches("[data-draft]")) setDraft(e.target.dataset.draft, e.target.value); });
+  dlg.addEventListener("click", e => {
+    const m = e.target.closest("[data-ai-mode]");
+    if(m){ mode = m.dataset.aiMode; draw(); return; }
+    const act = e.target.closest("[data-act]");
+    if(!act) return;
+    if(!act.hasAttribute("data-stay")) dlg.close();
+    runAct(act);
+  });
 }
 
 // How to have the open trip changed by an AI assistant: the message carries how to
@@ -1098,16 +1122,6 @@ function setDraft(key, value){
 // The box where the request is written: the hint shows while it is empty.
 const requestBox = (id, key, label, hint) => `<div class="field ask-box"><label for="${id}">${esc(label)}</label>` +
   `<textarea id="${id}" rows="3" data-draft="${esc(key)}" placeholder="${esc(hint)}">${esc(S.drafts[key] || "")}</textarea></div>`;
-
-function aiEditSection(){
-  const key = "edit:" + S.rec.id;
-  return `<details class="aihow" data-keep="ai-edit"${S.openDetails.has("ai-edit") ? " open" : ""}><summary>${esc(t("aiEditTitle"))}</summary>
-    <ol class="steps"><li>${esc(t("aiEdit1"))}</li><li>${esc(t("aiEdit2"))}</li><li>${esc(t("aiEdit3"))}</li></ol>
-    ${requestBox("ai-edit", key, t("aiEditLabel"), t("aiEditHint"))}
-    <div class="actions"><button type="button" class="btn small primary" data-act="copy-edit">${esc(t("copyEdit"))}</button><button type="button" class="btn small" data-act="clear-draft" data-key="${esc(key)}">${esc(t("clearDraft"))}</button><button type="button" class="btn small" data-act="paste">${esc(t("pasteTrip"))}</button></div>
-    <p class="foot">${esc(t("aiEditMore", {t: S.rec.trip.title}))}</p>
-  </details>`;
-}
 
 // Copies a message for an assistant. Without a clipboard a short one is shown to copy
 // by hand; a long one (a whole trip) cannot be, so the file is the way instead.
@@ -1208,7 +1222,7 @@ function renderWelcome(){
     <button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>
   </div>
   ${S.account ? syncLine() : accountSection()}
-  ${aiSection(false)}
+  ${assistantRow()}
   ${installSteps()}
   ${REPO_URL ? `<p class="foot"><a href="${esc(REPO_URL)}#create-your-own-trip" target="_blank" rel="noopener">${esc(t("makeYourOwn"))} ↗</a></p>` : ""}
   ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}`;
@@ -1547,26 +1561,61 @@ function dateRange(tr, lang){
   try{ return f.formatRange(a, b); }catch(e){ return f.format(a) + " – " + f.format(b); }
 }
 
-// What a trip's card says and lets do: the same for the active trip and a row opened.
-function tripDetails(r, cur, lang){
-  const when = new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", year: "numeric"}).format(new Date(r.importedAt));
-  return `
-      <div class="s">${esc(t("loadedOn", {d: when}))}</div>
-      <div class="s ver">${esc(t("versionLabel"))} <code data-version="${esc(r.trip.version.id)}">${esc(shortId(r.trip.version.id))}</code>${r.trip.version.date ? " · " + esc(new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date))) : ""}</div>
-      ${r.share ? `<div class="s where">${esc(t(r.share.gone ? "goneFromAccount" : r.share.role === "owner" ? "onAccount" : r.share.role === "edit" ? "sharedEdit" : "sharedRead"))}</div>` : ""}
-      ${r.public ? `<div class="s" data-public>${esc(t("publicWhere", {h: r.public.by}))}</div>` : ""}
-      ${r.trip.basedOn ? `<div class="s" data-based-on>${esc(t("basedOnLine", {t: r.trip.basedOn.title, h: r.trip.basedOn.by}))} <a href="${esc(r.trip.basedOn.url)}" target="_blank" rel="noopener">↗</a></div>` : ""}
-      ${S.syncErrors.has(r.id) ? `<div class="unsaved" role="status" data-sync-error>${esc(t("notSynced", {why: S.syncErrors.get(r.id)}))}</div>` : ""}
-      ${needsSaving(r) ? `<div class="unsaved" role="status">${esc(t("unsaved"))}</div>` : ""}
-      <div class="actions">${cur ? "" : `<button type="button" class="btn small primary" data-act="open" data-id="${esc(r.id)}">${esc(t("open"))}</button>`}<button type="button" class="btn small${needsSaving(r) ? " primary" : ""}" data-act="save" data-id="${esc(r.id)}">${esc(t("saveFile"))}</button><button type="button" class="btn small" data-act="history" data-id="${esc(r.id)}">${esc(t("history"))}</button>${r.share && r.share.id && !r.share.gone && r.share.role === "owner" && S.account ? `<button type="button" class="btn small" data-act="share-trip" data-id="${esc(r.id)}">${esc(t("share"))}</button>` : ""}${r.public ? `<button type="button" class="btn small primary" data-act="base-copy" data-id="${esc(r.id)}">${esc(t("useAsBase"))}</button>` : ""}${!r.public && (!r.share || r.share.gone || r.share.role === "owner") ? `<button type="button" class="btn small" data-act="lock" data-id="${esc(r.id)}">${esc(t(isLocked(r) ? "unlock" : "lock"))}</button>` : ""}${r.share && r.share.gone && S.account ? `<button type="button" class="btn small" data-act="reup" data-id="${esc(r.id)}">${esc(t("putOnAccount"))}</button>` : ""}<button type="button" class="btn small danger" data-act="remove" data-id="${esc(r.id)}">${esc(t("remove"))}</button></div>`;
+// A trip's card (TR1, TR2): a tap opens the trip; its state in signals, only what there
+// is to know; ⋯ opens its sheet, where everything else is.
+const sig = (level, svg, text, name) => `<span class="sig ${level}" data-${name}>${svg}<span>${esc(text)}</span></span>`;
+const tripSigns = r => [
+  S.syncErrors.has(r.id) && sig("err", SIG_ICON.warn, t("notSyncedBadge"), "sync-error"),
+  needsSaving(r) && sig("warn", SIG_ICON.warn, t("unsavedBadge"), "unsaved"),
+  r.share && !r.share.gone && r.share.role !== "owner" && sig("info", SIG_ICON.shared, t(r.share.role === "edit" ? "sharedEditBadge" : "sharedReadBadge"), "shared"),
+  r.share && !r.share.gone && r.share.publication && sig("ok", SIG_ICON.link, t("withLink"), "published"),
+  !r.public && isLocked(r) && sig("info", LOCK, t("locked"), "locked"),
+  r.share && r.share.gone && sig("info", SIG_ICON.warn, t("goneBadge"), "gone")
+].filter(Boolean).join("");
+
+function tripCard(r, current, lang){
+  // Someone else's published trip is not "in N days": it is theirs, read here.
+  const w = !r.public && tripWhen(r.trip);
+  const when = !w ? "" : w.phase === "now" ? t("phaseNow", {d: w.day, n: r.trip.days.length})
+    : w.phase === "next" ? (w.inDays === 1 ? t("phaseTomorrow") : t("phaseNext", {n: w.inDays})) : current ? t("phasePast") : "";
+  const signs = tripSigns(r);
+  return `<div class="tripcard${current ? " current" : ""}">
+    <button type="button" class="open" data-act="open" data-id="${esc(r.id)}">${when ? `<span class="when${w.phase === "now" ? "" : " later"}">${esc(when)}</span>` : ""}<b>${esc(r.trip.title)}</b>` +
+      `<span class="d">${esc(datesOf(r, lang))} · ${esc(t("daysCount", {n: r.trip.days.length}))}${r.public ? ` · <span data-public-badge>${esc(t("publicBadge", {h: r.public.by}))}</span>` : ""}</span>` +
+      (signs ? `<span class="sigline">${signs}</span>` : "") + `</button>
+    <button type="button" class="iconbtn more" data-act="trip-menu" data-id="${esc(r.id)}" aria-label="${esc(t("tripMore", {t: r.trip.title}))}">${DOTS}</button></div>`;
 }
 
-// Small signs on a trip's line: locked, shared, not synced.
-const tripSigns = r => (r.public ? `<span class="badge-pub" data-public-badge>${esc(t("publicBadge", {h: r.public.by}))}</span>`
-    : isLocked(r) ? `<span class="badge-lock" data-locked>${esc(t("locked"))}</span>` : "")
-  + (r.share && !r.share.gone && r.share.role !== "owner" ? `<span class="badge-lock">${esc(t("sharedBadge"))}</span>` : "")
-  + (r.share && !r.share.gone && r.share.publication ? `<span class="badge-pub" data-published>${esc(t("withLink"))}</span>` : "")
-  + (S.syncErrors.has(r.id) ? `<span class="badge-warn">${esc(t("notSyncedBadge"))}</span>` : "");
+// A trip's sheet (TR3): where it is and its version under the title; what can be done, a
+// row each with its value; Delete apart, last (it asks).
+function tripMenu(id){
+  const r = S.records.find(x => x.id === id);
+  if(!r) return;
+  const lang = getLang(), sh = r.share, onAcc = sh && sh.id && !sh.gone, owner = !sh || sh.gone || sh.role === "owner";
+  const where = r.public ? t("publicWhere", {h: r.public.by}) : sh ? t(sh.gone ? "goneFromAccount" : sh.role === "owner" ? "onAccount" : sh.role === "edit" ? "sharedEdit" : "sharedRead") : t("onThisPhone");
+  const ver = t("versionLabel") + " " + shortId(r.trip.version.id) + (r.trip.version.date ? ", " + new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(r.trip.version.date)) : "");
+  const n = 1 + r.trip.version.history.length;
+  const row = (act, label, value = "", cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} data-act="${act}" data-id="${esc(r.id)}">${esc(label)}${value ? `<span class="val">${esc(value)}</span>` : ""}</button>`;
+  const rows = [
+    r.public && row("base-copy", t("useAsBase")),
+    onAcc && sh.role === "owner" && S.account && row("share-trip", t("share")),
+    row("history", t("history"), n === 1 ? t("versionsOne") : t("versionsN", {n})),
+    row("save", t("saveFile")),
+    !r.public && owner && row("lock", t(isLocked(r) ? "unlock" : "lock")),
+    sh && sh.gone && S.account && row("reup", t("putOnAccount"))
+  ].filter(Boolean).join("");
+  const notes = [S.syncErrors.has(r.id) && t("notSynced", {why: S.syncErrors.get(r.id)}), needsSaving(r) && t("unsaved")].filter(Boolean);
+  const dlg = openSheet({title: r.trip.title, cls: "tripmenu", body: `
+    <p class="sub"><span class="where">${esc(where)}</span> · <span data-version="${esc(r.trip.version.id)}">${esc(ver)}</span></p>
+    ${r.trip.basedOn ? `<p class="sub" data-based-on>${esc(t("basedOnLine", {t: r.trip.basedOn.title, h: r.trip.basedOn.by}))} <a href="${esc(r.trip.basedOn.url)}" target="_blank" rel="noopener">↗</a></p>` : ""}
+    ${notes.map(x => `<p class="unsaved">${esc(x)}</p>`).join("")}
+    <nav class="me-list" aria-label="${esc(r.trip.title)}">${rows}</nav>
+    <nav class="me-list" aria-label="${esc(t("remove"))}">${row("remove", t("removeAsk"), "", "danger")}</nav>`});
+  dlg.addEventListener("click", e => {
+    const act = e.target.closest("[data-act]");
+    if(act){ dlg.close(); runAct(act); }
+  });
+}
 
 // The Trips page: the active trip on top, in full; the others below, a line each,
 // grouped (under way, coming, past by year) or in one list by name or by recent use,
@@ -1574,23 +1623,11 @@ const tripSigns = r => (r.public ? `<span class="badge-pub" data-public-badge>${
 function renderTrips(){
   const lang = getLang();
   const active = S.rec ? S.records.find(r => r.id === S.rec.id) || null : null;
-  // Someone else's published trip is not "in N days": it is theirs, read here.
-  const w = active && !active.public && tripWhen(active.trip);
-  const phase = !w ? "" : w.phase === "now" ? t("phaseNow", {d: w.day, n: active.trip.days.length}) : w.phase === "next" ? (w.inDays === 1 ? t("phaseTomorrow") : t("phaseNext", {n: w.inDays})) : t("phasePast");
-  const activeCard = !active ? "" : `<section class="active-trip" aria-label="${esc(t("activeTrip"))}">
-    <div class="tripcard current">
-      <div class="eyebrow">${esc(phase)}</div>
-      <div class="t"><span>${esc(active.trip.title)}</span>${tripSigns(active)}</div>
-      <div class="s">${esc(datesOf(active, lang))} · ${esc(t("daysCount", {n: active.trip.days.length}))}</div>
-      ${tripDetails(active, true, lang)}
-    </div></section>`;
+  const activeCard = !active ? "" : `<section class="active-trip" aria-label="${esc(t("activeTrip"))}">${tripCard(active, true, lang)}</section>`;
   const others = S.records.filter(r => r !== active);
   const q = (S.tripSearch || "").trim().toLowerCase();
   const found = !q ? others : others.filter(r => [r.trip.title, ...r.trip.days.map(d => d.city || "")].some(x => String(x).toLowerCase().includes(q)));
-  const row = r => `<details class="tripcard trip-row" data-keep="trip:${esc(r.id)}"${S.openDetails.has("trip:" + r.id) ? " open" : ""}>
-      <summary><span class="t"><span>${esc(r.trip.title)}</span>${tripSigns(r)}</span><span class="s">${esc(datesOf(r, lang))} · ${esc(t("daysCount", {n: r.trip.days.length}))}</span></summary>
-      ${tripDetails(r, false, lang)}
-    </details>`;
+  const row = r => tripCard(r, false, lang);
   const sort = S.ui.tripSort || "date";
   let list;
   if(sort === "name") list = found.slice().sort((a, b) => a.trip.title.localeCompare(b.trip.title, lang)).map(row).join("");
@@ -1621,16 +1658,13 @@ function renderTrips(){
   ${errorBox()}
   ${syncLine()}
   ${cards}
-  <section class="sec">
+  <section class="sec add-trip"><h2>${esc(t("addTrip"))}</h2>
     <div class="actions">
-      <button type="button" class="btn primary" data-act="pick">${esc(t("updateTrip"))}</button>
-      <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
+      <button type="button" class="btn primary" data-act="pick">${esc(t("loadTrip"))}</button>
+      <button type="button" class="btn" data-act="paste-any">${esc(t("paste"))}</button>
       ${S.records.some(r => r.fileName === "demo-trip.json") ? "" : `<button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>`}
     </div>
-  </section>
-  <section class="sec"><h2>${esc(t("aiTitleShort"))}</h2>
-    ${aiSection(true)}
-    ${S.rec ? aiEditSection() : ""}
+    ${assistantRow()}
   </section>`;
 }
 
@@ -2436,9 +2470,9 @@ function syncLive(wanted){
 const $fabs = document.createElement("div");
 $fabs.className = "fabs";
 $fabs.hidden = true;
-$fabs.innerHTML = `<button type="button" class="fab-paste">${CLIP}<span></span></button><button type="button" class="fab">${PLUS}</button>`;
+$fabs.innerHTML = `<button type="button" class="fab">${PLUS}</button>`;
 document.body.appendChild($fabs);
-const $fab = $fabs.querySelector(".fab"), $fabPaste = $fabs.querySelector(".fab-paste");
+const $fab = $fabs.querySelector(".fab");
 $fab.addEventListener("click", () => newStop());
 // List | Map in the top bar (M2): Map is pressed while the map shows.
 $strip.addEventListener("click", e => {
@@ -2451,7 +2485,6 @@ $strip.addEventListener("click", e => {
   if(S.ui.mapOpen !== map) keepReading(() => { S.ui.mapOpen = map; saveUi(); render(); });
   refocus(map || b.hasAttribute("data-map") ? "#view-toggle [data-map]" : "#view-toggle [data-view-list]");
 });
-$fabPaste.addEventListener("click", () => pasteAnything());
 
 // The next stop's bar (V3): at the bottom, within reach of a thumb, only while the next
 // stop's card is off the screen. A tap on it brings the card back.
@@ -2555,13 +2588,9 @@ function render(){
   // floats instead of + (R3, V2): one thing at a time.
   const isToday = r.name === "day" && r.i === todayIndex();
   $fab.hidden = r.name !== "day" || isLocked(S.rec) || isToday;
-  $fabPaste.hidden = r.name === "day";
   $fab.setAttribute("aria-label", t("addStop"));
   $fab.title = t("addStop");
-  $fabPaste.querySelector("span").textContent = t("paste");
-  $fabPaste.title = t("pasteAnyHelp");
-  $fabPaste.setAttribute("aria-label", t("paste"));
-  document.body.classList.toggle("has-fab", !$fabs.hidden);
+  document.body.classList.toggle("has-fab", !$fab.hidden);
   // While the page is rebuilt the interactive map is out of it, and the page is shorter
   // by its height: a browser that lays the page out in that moment pulls the scroll up
   // (a tap on ⋯ or Edit under an open map jumped by the map's height). The page keeps
@@ -2581,7 +2610,6 @@ function render(){
   markCut();
   $app.style.minHeight = "";
   if(scrollTop() !== y) scrollToY(y);
-  markFabs();
   askRates();
 }
 
@@ -2616,8 +2644,6 @@ $app.addEventListener("input", e => {
   const box = e.target.closest && e.target.closest("[data-draft]");
   if(!box) return;
   setDraft(box.dataset.draft, box.value);
-  const prompt = document.querySelector("[data-prompt]");
-  if(prompt && box.dataset.draft === "new") prompt.textContent = aiMessage();
 });
 // Folded sections the traveller opened stay open when the page is drawn again.
 $app.addEventListener("toggle", e => {
@@ -2800,10 +2826,17 @@ $app.addEventListener("click", e => {
     return;
   }
   const act = e.target.closest("[data-act]");
-  if(!act) return;
+  if(act) runAct(act);
+});
+
+// What a [data-act] button does, on the page or in a sheet (the trip's, the assistant's).
+function runAct(act){
   const a = act.dataset.act;
   if(a === "pick"){ $file.value = ""; $file.click(); }
   else if(a === "paste") pasteTrip();
+  else if(a === "paste-any") pasteAnything();
+  else if(a === "assistant") openAssistant();
+  else if(a === "trip-menu") tripMenu(act.dataset.id);
   else if(a === "copy-errors") copyErrors();
   else if(a === "copy-prompt") copyText(aiMessage(), t((S.drafts.new || "").trim() ? "copiedReady" : "copiedPrompt"));
   else if(a === "copy-prompt-full") copyText(aiMessageFull(), t((S.drafts.new || "").trim() ? "copiedReady" : "copiedPrompt"));
@@ -2812,8 +2845,6 @@ $app.addEventListener("click", e => {
     setDraft(act.dataset.key, "");
     const box = document.querySelector(`[data-draft="${CSS.escape(act.dataset.key)}"]`);
     if(box){ box.value = ""; box.focus(); }
-    const prompt = document.querySelector("[data-prompt]");
-    if(prompt && act.dataset.key === "new") prompt.textContent = aiMessage();
   }
   else if(a === "demo") loadDemo();
   else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn, onRecover: accountRecover});
@@ -2841,10 +2872,13 @@ $app.addEventListener("click", e => {
   else if(a === "save"){ const rec = S.records.find(r => r.id === act.dataset.id); if(rec) saveFile(rec); }
   else if(a === "history") showHistory(act.dataset.id);
   else if(a === "open"){
+    // The trip, on today if it is under way (TR1): the open one is only shown again.
     const rec = S.records.find(r => r.id === act.dataset.id);
-    if(rec) openRecord(rec).then(() => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); scrollToY(0); });
+    const show = () => { history.replaceState(null, "", location.pathname + location.search); if(applyMapSettings()) return; render(); scrollToY(0); };
+    if(rec && S.rec && S.rec.id === rec.id) show();
+    else if(rec) openRecord(rec).then(show);
   }
-});
+}
 
 // Holding a stop's number shows it on the day's map: the map opens if it is closed and
 // the pin comes to the middle, with its card. Only a hold: a tap or a scroll that

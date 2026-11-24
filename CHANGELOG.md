@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.6.0
+
+- **Trips, new**: a tap on a trip's card opens the trip (on today if it is under way);
+  ⋯ opens its sheet, with History, Save the file, Share, Lock and, apart, Delete.
+- **A trip's state in signals** on its card, only when there is something to know: not
+  synced, changes not in a file, shared with you, published, locked. Its version and
+  where it is kept are in its sheet; "loaded on" is gone.
+- **With an assistant**, one sheet for Trips and Welcome: a new trip or a change to the
+  open one; 1 Copy the message, 2 Paste its answer. The draft stays on the phone.
+- **One Paste**, in Trips: it takes anything (a trip, an assistant's changes, a place
+  from Google Maps). The floating Paste is gone.
+- **Messages at the bottom go by themselves**: four seconds; with an action (Undo, Save
+  the file) ten. A finger on one keeps it.
+
 ## 4.5.0
 
 - **Every sheet opens at once**, on the tap: what comes from far (the history, the

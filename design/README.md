@@ -173,6 +173,10 @@ moment (a message that passes, with Undo when there is one).
 - **W5** Several signals on one stop: closed, it shows the first (closed, booking
   needed, weather, choice, booking advised, label, booked) and "+N"; opened, all of
   them first, one per row, each with its action.
+- **W6** A passing message (at the bottom) goes by itself: four seconds; with an action
+  (Undo, Save the file) ten, with a ✕. A finger or the focus on it keeps it. What it
+  offered is never only there: the history undoes, the trip's card says what is not
+  saved.
 
 ## The weather
 
@@ -254,6 +258,24 @@ positions, sharing, the account. One for all (`js/sheet.js`).
   (no leaving the app). Far from them (over 30 km): unticked, and it says how far.
 - **SH4** One main action that says what it does: "Save 2 positions", or with none
   ticked "Leave as it is"; saved as one version.
+
+## Trips
+
+The list of trips (`#trips`): the open one first, larger; the others grouped by when.
+
+- **TR1** A trip's card, one action: a tap opens the trip, on today if it is under way.
+  ⋯ is its only other control: the trip's sheet.
+- **TR2** Its state in signals, one fact each, only when there is something to know: not
+  synced, changes not in a file (a trip only on this phone), shared with you, published,
+  locked, only on this phone. The version and where it is kept are in its sheet.
+- **TR3** The trip's sheet: where it is and its version under the title; what can be
+  done, a row each with its value (History · 14 versions); Delete apart, last, asking.
+- **TR4** Grouped by when (under way, coming, past by year, of others); sorted and found
+  when there are many.
+- **TR5** Adding: "Load a trip file" the main action, Paste beside it (anything: a trip,
+  an assistant's changes, a place); "Write it with an assistant" a row that opens its
+  sheet (a new trip, or a change to the open one), also on Welcome. Nothing floats on
+  Trips, Info or You.
 
 ## Accessibility
 

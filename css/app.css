@@ -82,7 +82,6 @@ h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
 .maplink{font:500 .8rem var(--f-body);text-decoration:none}
 .chev{flex:0 0 auto;display:none;color:var(--muted);margin-top:4px;transition:transform .15s}
 .chev svg{width:14px;height:14px;display:block}
-.eyebrow{display:block;font:600 .66rem/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--warn);margin-bottom:4px}
 .more{width:30px;height:30px;border-radius:50%;border:0;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
 .more svg{width:16px;height:16px}
 .more[aria-expanded="true"]{background:var(--line);color:var(--ink)}
@@ -235,12 +234,30 @@ span.costbtn{cursor:auto}
 .btn.danger{color:var(--err)}
 .steps{margin:0;padding-left:1.2rem;color:var(--muted);font-size:.9rem;display:grid;gap:4px}
 .steps b{color:var(--ink);font-weight:600}
-.tripcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
-.tripcard.current{border-color:var(--ink)}
 .active-trip{margin:0 0 18px}
-.active-trip .tripcard{padding:16px;gap:10px}
-.active-trip .t{font:700 1.25rem/1.2 var(--f-display)}
-.tripcard .eyebrow{font:600 .7rem var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ok)}
+/* a trip's card (TR1, TR2): the card opens the trip; ⋯ its sheet */
+.tripcard{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m)}
+.tripcard.current{border-color:var(--ink)}
+.tripcard .open{display:grid;gap:var(--sp-1);width:100%;text-align:start;background:none;border:0;padding:var(--sp-4) 52px var(--sp-4) var(--sp-4);color:var(--ink);font:inherit;cursor:pointer;border-radius:var(--r-m)}
+.tripcard .open b{font:650 var(--fs-l)/1.3 var(--f-display);overflow-wrap:anywhere}
+.tripcard.current .open b{font-size:var(--fs-xl)}
+.tripcard .when{font:600 var(--fs-xs) var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ok)}
+.tripcard .when.later{color:var(--muted)}
+.tripcard .d{color:var(--muted);font-size:var(--fs-m)}
+.tripcard .sigline{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);margin-top:var(--sp-2)}
+.tripcard .more{position:absolute;top:var(--sp-2);right:var(--sp-2)}
+.tripcard .more svg{width:20px;height:20px}
+/* a trip's sheet (TR3) and the assistant's (TR5) */
+.tripmenu .sub{color:var(--muted);font-size:var(--fs-m);margin:calc(-1 * var(--sp-3)) 0 0}
+.me-list .val{margin-left:auto;color:var(--muted);font-weight:400;font-size:var(--fs-base)}
+.add-trip{display:grid;gap:var(--sp-4)}
+.assistant [data-ai]{display:grid;gap:var(--sp-4)}
+.assistant .seg{display:flex}
+.assistant .seg button{flex:1 1 0}
+.steps2{display:grid;gap:var(--sp-3)}
+.steps2 .btn{justify-content:flex-start}
+.steps2 .btn i{font:600 var(--fs-s) var(--f-mono);font-style:normal;opacity:.7;margin-right:var(--sp-3)}
+.steps2 .foot{margin:0}
 .my-trips{display:grid;gap:8px}
 .my-trips .list-head h2{margin:0}
 .trip-tools{display:flex;gap:8px;flex-wrap:wrap}
@@ -248,19 +265,7 @@ span.costbtn{cursor:auto}
 .trip-tools input{flex:1 1 120px;min-width:0}
 .trip-tools select{flex:0 0 auto}
 .trip-group{font:600 .7rem var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 0}
-.trip-row{padding:0;gap:0}
-.trip-row>summary{list-style:none;cursor:pointer;display:grid;gap:2px;padding:12px 14px;border-radius:12px}
-.trip-row>summary::-webkit-details-marker{display:none}
-.trip-row>summary .t{font-weight:600}
-.trip-row[open]>summary{border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
-.trip-row>:not(summary){margin:0 14px}
-.trip-row>.actions{margin:8px 14px 14px}
-.trip-row>.s:first-of-type{margin-top:10px}
-.badge-warn{font:600 .68rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--err);border:1px solid currentColor;border-radius:999px;padding:1px 8px}
-.tripcard .t{font-weight:600;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
-.tripcard .s{color:var(--muted);font-size:.86rem}
 .badge-on{font:600 .68rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ok)}
-.badge-lock{font:600 .68rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
 .lock-note{font:500 .78rem var(--f-mono);color:var(--muted);margin:-4px 0 12px}
 .field{display:grid;gap:6px}
 .field label{font-weight:600;font-size:.9rem}
@@ -271,31 +276,14 @@ span.costbtn{cursor:auto}
 .errbox .actions{margin:0}
 #paste-text{min-height:180px;font:500 16px/1.45 var(--f-mono);resize:vertical}  /* 16px: iPhones zoom into smaller fields */
 /* how to have a trip written by an AI assistant */
-.prompt{margin:10px 0;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font:500 .82rem/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .linkbtn{border:0;background:none;padding:0;font:inherit;color:var(--link);text-decoration:underline;cursor:pointer}
-.aihow summary{cursor:pointer;font-weight:600;padding:8px 0}
-.aihow + .aihow{border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
-.aihow .foot{margin-top:10px}
-.aihow .steps{margin-top:8px}
-.aihow .ask-box{display:grid;gap:6px;margin:10px 0}
-.aihow .ask-box label{font-weight:600;font-size:.9rem}
-.aihow .ask-box textarea{width:100%;box-sizing:border-box;min-height:84px;resize:vertical;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:400 1rem/1.45 var(--f-body)}
-.aihow .ask-box textarea::placeholder{color:var(--muted)}
 .errbox b{font-weight:600}
 
-/* bottom right: Paste (what was copied: a place, a trip, changes) and + (a stop on the
-   day on screen). + is the one coloured button, in both themes. */
+/* bottom right: + (a stop on the day on screen), the one coloured button, in both themes */
 .fabs{position:fixed;right:calc(max(16px,env(safe-area-inset-right,0px)));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:15;display:flex;align-items:center;gap:10px}
 .fab{width:52px;height:52px;border-radius:50%;border:0;background:var(--accent);color:var(--bg);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px -2px rgba(0,0,0,.35);padding:0}
 .fab svg{width:24px;height:24px}
-.fab-paste{display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 16px 0 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .88rem var(--f-body);cursor:pointer;box-shadow:0 3px 12px -2px rgba(0,0,0,.22)}
-.fab-paste svg{width:18px;height:18px;flex:none}
-.fab-paste span{max-width:8em;overflow:hidden;white-space:nowrap;transition:max-width .2s,opacity .15s}
-/* while the page scrolls down: only the icon, a circle */
-.fab-paste{transition:padding .2s,gap .2s}
-.fabs.compact .fab-paste{padding:0 12px;gap:0}
-.fabs.compact .fab-paste span{max-width:0;opacity:0}
-.fab:active,.fab-paste:active{transform:scale(.96)}
+.fab:active{transform:scale(.96)}
 body.has-fab main.gutter{padding-bottom:96px}
 body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 
@@ -457,10 +445,8 @@ button.crow{cursor:pointer}
 .versions details[open] .chev{transform:rotate(180deg)}
 .versions .body{display:grid;gap:10px;justify-items:start;padding:0 0 14px;cursor:pointer}
 .what{list-style:none;margin:0;padding:0;font-size:.88rem;color:var(--ink);display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
-.tripcard .actions{flex-wrap:wrap}
 
 /* versions on the Trips page */
-.tripcard .ver code{font:500 .82rem var(--f-mono);color:var(--ink)}
 .unsaved{font-size:.86rem;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px}
 
 /* toast */
@@ -532,7 +518,6 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 .found-row input{width:20px;height:20px;margin:2px 0 0;flex:none;accent-color:var(--ink)}
 .found-row span{display:grid;gap:2px;min-width:0}
 .found-row small{font:500 .74rem var(--f-mono);color:var(--muted);overflow-wrap:anywhere}
-.badge-pub{display:inline-block;font:700 .62rem var(--f-mono);letter-spacing:.08em;text-transform:uppercase;border:1.5px solid var(--ok);color:var(--ok);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
 .codes{display:grid;gap:8px}
 .codes textarea{font:500 .95rem/1.6 var(--f-mono);letter-spacing:.04em;resize:none;text-align:center}
 .devices .sheet-h{margin:6px 0 0}
@@ -548,7 +533,7 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 }
 
 @media (max-width:380px){ .stop{grid-template-columns:3.4rem 1fr auto;gap:10px;padding-left:12px} .rows > div{grid-template-columns:1fr} }
-@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} :is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act){transition:none} .costs > summary .chev,.chev,.fab-paste,.fab-paste span{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }
+@media (prefers-reduced-motion: reduce){ #days{scroll-behavior:auto} :is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act){transition:none} .costs > summary .chev,.chev{transition:none} .mapsvg .badge.hit{animation:none;stroke:var(--ink);stroke-width:4} }
 
 /* ---------- The day (design/README.md: R1–R15, V, W, A). Tokens only. ---------- */
 main.gutter{gap:var(--sp-4)}
