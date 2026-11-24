@@ -94,10 +94,15 @@ export async function openHistory({trip, versions, onRestore, who, forAll = null
     const info = known && known.versions.get(id), by = madeBy(info, known && known.me);
     return by ? `<span class="by${info.via ? " via" : ""}">${esc(by)}</span>` : "";
   };
-  let known = null;
+  // In the rows still to be drawn again too, not only on screen: a later batch redraws
+  // the list from them.
+  let known = null, rows = [];
+  const EMPTY = /<span data-by="([^"]+)"><\/span>/;
   authors(who).then(k => {
     known = k;
-    if(k) for(const el of list.querySelectorAll("[data-by]")) el.outerHTML = byOf(el.dataset.by, k);
+    if(!k) return;
+    rows = rows.map(r => r.replace(EMPTY, (_, id) => byOf(id, k)));
+    for(const el of list.querySelectorAll("[data-by]")) el.outerHTML = byOf(el.dataset.by, k);
   });
 
   // Each row compares a version with the one it was made from. Rebuilding a version
@@ -105,7 +110,6 @@ export async function openHistory({trip, versions, onRestore, who, forAll = null
   const ids = [trip.version.id, ...trip.version.history];
   const here = new Set(await versions.ids(trip.id));
   const fmt = new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
-  const rows = [];
   let away = 0;
   const flush = () => { if(away){ rows.push(`<li class="away">${esc(t("historyAway", {n: away}))}</li>`); away = 0; } };
   const draw = (wait = true) => { if(dialog.open) list.innerHTML = rows.join("") + (wait ? `<li class="foot">${esc(t("mapLoading"))}</li>` : ""); };
