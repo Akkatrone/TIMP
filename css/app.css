@@ -251,9 +251,12 @@ span.costbtn{cursor:auto}
 .tripmenu .sub{color:var(--muted);font-size:var(--fs-m);margin:calc(-1 * var(--sp-3)) 0 0}
 .me-list .val{margin-left:auto;color:var(--muted);font-weight:400;font-size:var(--fs-base)}
 .add-trip{display:grid;gap:var(--sp-4)}
-.assistant [data-ai]{display:grid;gap:var(--sp-4)}
-.assistant .seg{display:flex}
+.assistant .ai-panes{display:grid}
+.assistant .ai-pane{grid-area:1 / 1;display:grid;gap:var(--sp-4);align-content:start}
+.assistant .ai-pane.off{visibility:hidden}
+.assistant .seg{display:flex;justify-self:stretch}
 .assistant .seg button{flex:1 1 0}
+.ask-box .lrow{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);min-height:32px}
 .steps2{display:grid;gap:var(--sp-3)}
 .steps2 .btn{justify-content:flex-start}
 .steps2 .btn i{font:600 var(--fs-s) var(--f-mono);font-style:normal;opacity:.7;margin-right:var(--sp-3)}

@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.6.2
+
+- With an assistant: switching between "A new trip" and "Change this trip" no longer
+  changes the sheet's height; the two fill its width. Clear is a button beside the field,
+  only when there is something to clear.
+
 ## 4.6.1
 
 - The history, on the account: who made each version ("ugo, in the app") could vanish

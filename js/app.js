@@ -1075,24 +1075,29 @@ const aiMessageFull = () => formatBrief() + "\n\n" + t("aiPromptFull") + "\n" + 
 const assistantRow = () => `<nav class="me-list" aria-label="${esc(t("aiSheetTitle"))}"><button type="button" data-act="assistant">${esc(t("aiRow"))}</button></nav>`;
 function openAssistant(){
   const canEdit = !!S.rec && !S.rec.public;
-  let mode = "new";
-  const dlg = openSheet({title: t("aiSheetTitle"), cls: "assistant", body: `<div data-ai></div>`});
-  const draw = () => {
-    const edit = mode === "edit", key = edit ? "edit:" + S.rec.id : "new";
-    dlg.querySelector("[data-ai]").innerHTML = (canEdit ? `<div class="seg" role="group" aria-label="${esc(t("aiSheetTitle"))}">` +
-        `<button type="button" data-ai-mode="new" aria-pressed="${!edit}">${esc(t("aiModeNew"))}</button>` +
-        `<button type="button" data-ai-mode="edit" aria-pressed="${edit}">${esc(t("aiModeEdit"))}</button></div>` : "") +
-      (edit ? requestBox("ai-edit", key, t("aiEditLabel"), t("aiEditHint")) : requestBox("ai-new", key, t("aiTripLabel"), t("aiTripHint"))) +
-      `<div class="steps2"><button type="button" class="btn primary" data-act="${edit ? "copy-edit" : "copy-prompt"}" data-stay><i>1</i>${esc(t("aiCopy"))}</button>` +
-      `<p class="foot">${esc(t("aiWhere"))}</p><button type="button" class="btn" data-act="paste-any"><i>2</i>${esc(t("aiPasteAnswer"))}</button></div>` +
-      `<p class="foot">${edit ? "" : `${esc(t("aiNoLinks"))} <button type="button" class="linkbtn" data-act="copy-prompt-full" data-stay>${esc(t("copyPromptFull"))}</button> · `}` +
-      `<button type="button" class="linkbtn" data-act="clear-draft" data-key="${esc(key)}" data-stay>${esc(t("clearDraft"))}</button></p>`;
-  };
-  draw();
-  dlg.addEventListener("input", e => { if(e.target.matches("[data-draft]")) setDraft(e.target.dataset.draft, e.target.value); });
+  // Both panes are in the sheet, one over the other, the other one unseen: the sheet keeps
+  // the taller's height and does not jump when one changes to the other.
+  const pane = (edit, key) => `<div class="ai-pane${edit ? " off" : ""}" data-pane="${edit ? "edit" : "new"}"${edit ? " inert" : ""}>` +
+    (edit ? requestBox("ai-edit", key, t("aiEditLabel"), t("aiEditHint")) : requestBox("ai-new", key, t("aiTripLabel"), t("aiTripHint"))) +
+    `<div class="steps2"><button type="button" class="btn primary" data-act="${edit ? "copy-edit" : "copy-prompt"}" data-stay><i>1</i>${esc(t("aiCopy"))}</button>` +
+    `<p class="foot">${esc(t("aiWhere"))}</p><button type="button" class="btn" data-act="paste-any"><i>2</i>${esc(t("aiPasteAnswer"))}</button></div>` +
+    `<p class="foot">${edit ? "" : `${esc(t("aiNoLinks"))} <button type="button" class="linkbtn" data-act="copy-prompt-full" data-stay>${esc(t("copyPromptFull"))}</button>`}</p></div>`;
+  const dlg = openSheet({title: t("aiSheetTitle"), cls: "assistant", body: (canEdit ? `<div class="seg" role="group" aria-label="${esc(t("aiSheetTitle"))}">` +
+      `<button type="button" data-ai-mode="new" aria-pressed="true">${esc(t("aiModeNew"))}</button>` +
+      `<button type="button" data-ai-mode="edit" aria-pressed="false">${esc(t("aiModeEdit"))}</button></div>` : "") +
+    `<div class="ai-panes">${pane(false, "new")}${canEdit ? pane(true, "edit:" + S.rec.id) : ""}</div>`});
+  dlg.addEventListener("input", e => {
+    if(!e.target.matches("[data-draft]")) return;
+    setDraft(e.target.dataset.draft, e.target.value);
+    e.target.closest(".ask-box").querySelector("[data-act='clear-draft']").hidden = !e.target.value;
+  });
   dlg.addEventListener("click", e => {
     const m = e.target.closest("[data-ai-mode]");
-    if(m){ mode = m.dataset.aiMode; draw(); return; }
+    if(m){
+      for(const b of dlg.querySelectorAll("[data-ai-mode]")) b.setAttribute("aria-pressed", String(b === m));
+      for(const x of dlg.querySelectorAll("[data-pane]")){ const off = x.dataset.pane !== m.dataset.aiMode; x.classList.toggle("off", off); x.inert = off; }
+      return;
+    }
     const act = e.target.closest("[data-act]");
     if(!act) return;
     if(!act.hasAttribute("data-stay")) dlg.close();
@@ -1119,8 +1124,10 @@ function setDraft(key, value){
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => store.setKV("drafts", S.drafts).catch(() => {}), 400);
 }
-// The box where the request is written: the hint shows while it is empty.
-const requestBox = (id, key, label, hint) => `<div class="field ask-box"><label for="${id}">${esc(label)}</label>` +
+// The box where the request is written: the hint shows while it is empty; Clear beside its
+// label, only when there is something to clear.
+const requestBox = (id, key, label, hint) => `<div class="field ask-box"><div class="lrow"><label for="${id}">${esc(label)}</label>` +
+  `<button type="button" class="btn small" data-act="clear-draft" data-key="${esc(key)}" data-stay${S.drafts[key] ? "" : " hidden"}>${esc(t("clearDraft"))}</button></div>` +
   `<textarea id="${id}" rows="3" data-draft="${esc(key)}" placeholder="${esc(hint)}">${esc(S.drafts[key] || "")}</textarea></div>`;
 
 // Copies a message for an assistant. Without a clipboard a short one is shown to copy
@@ -2845,6 +2852,7 @@ function runAct(act){
     setDraft(act.dataset.key, "");
     const box = document.querySelector(`[data-draft="${CSS.escape(act.dataset.key)}"]`);
     if(box){ box.value = ""; box.focus(); }
+    act.hidden = true;
   }
   else if(a === "demo") loadDemo();
   else if(a === "signup") openSignUp({onDone: user => { S.account = user; render(); toast(t("welcome", {h: user.handle})); syncNow(); }, onSignIn: accountSignIn, onRecover: accountRecover});

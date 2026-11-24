@@ -747,7 +747,8 @@ await withApp(async ({run, until, reload, blocked}) => {
     // With an assistant: one sheet (TR5), a new trip or a change to the open one.
     const assistant = () => run(`document.querySelector('[data-act="assistant"]').click();`);
     const mode = m => run(`document.querySelector('dialog.assistant[open] [data-ai-mode="${m}"]').click();`);
-    const tap = act => run(`document.querySelector("dialog.assistant[open] [data-act='${act}']").click(); await new Promise(r => setTimeout(r, 100));`);
+    const tap = act => run(`document.querySelector("dialog.assistant[open] .ai-pane:not(.off) [data-act='${act}']").click(); await new Promise(r => setTimeout(r, 100));`);
+    const height = () => run(`return Math.round(document.querySelector("dialog.assistant[open]").getBoundingClientRect().height);`);
     await assistant();
     await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; };`);
     await tap("copy-prompt");
@@ -765,8 +766,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.match(full, /TIMP trip file, format "travel-in-my-pocket\/2"/);
     assert.ok(!full.includes("llms.txt"));
     assert.match(last(full), /^My trip: \[where/);
-    // Changing the open trip: the message carries the trip itself.
+    // Changing the open trip: the message carries the trip itself. The sheet keeps its height.
+    const tall = await height();
     await mode("edit");
+    assert.equal(await height(), tall, "the same height for both");
     await tap("copy-edit");
     const edit = await run(`return window.__copied;`);
     assert.match(edit, /\[what to change\]/);

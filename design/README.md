@@ -274,7 +274,8 @@ The list of trips (`#trips`): the open one first, larger; the others grouped by 
   when there are many.
 - **TR5** Adding: "Load a trip file" the main action, Paste beside it (anything: a trip,
   an assistant's changes, a place); "Write it with an assistant" a row that opens its
-  sheet (a new trip, or a change to the open one), also on Welcome. Nothing floats on
+  sheet (a new trip, or a change to the open one: the sheet keeps its height between
+  them; Clear beside the field, only with something in it), also on Welcome. Nothing floats on
   Trips, Info or You.
 
 ## Accessibility
