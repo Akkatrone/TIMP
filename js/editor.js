@@ -11,6 +11,7 @@ import { newMap } from "./livemap.js";
 import { icon } from "./icons.js";
 import { TRAVEL, TYPES } from "./trip.js";
 import { clockMinutes, dayAfter } from "./edit.js";
+import { PARTS, partOf } from "./parts.js";
 import { ask } from "./ask.js";
 import { parseAmount, formatPlain, formatMoney, symbolOf, currencies, currencyName } from "./money.js";
 
@@ -99,11 +100,16 @@ export function openStopEditor(o){
     {kind: first, onKind: k => { money2.setKind(other(k)); addCost(); }});
   const money2 = moneyField("stop-cost2", o.money, both ? mine.cost : undefined, both ? own(mine.currency, true) : "", t("fCostHelp"),
     {kind: other(first), label: t("fCostOther"), hidden: !both, onKind: k => { money.setKind(other(k)); addCost(); }});
-  // The time: hour and minutes from two lists, or words ("Evening") for a time that is
-  // not a clock time. A stop that has words keeps them. Not <input type="time">: Chrome
-  // on Android opens its own clock, whose Set button falls off narrow screens.
+  // The time: hour and minutes from two lists, or a part of the day from a list of seven
+  // (design/README.md, T1). A word of before is shown as its part; one that names none
+  // stays as it was, the first in the list. Not <input type="time">: Chrome on Android
+  // opens its own clock, whose Set button falls off narrow screens.
   const time0 = s0.time || timeNow(o.timezone);
   const clock0 = clockMinutes(time0);
+  const part0 = clock0 === null ? partOf(time0) : null;
+  const keep0 = clock0 === null && !part0 ? time0 : "";
+  const partOpts = (keep0 ? `<option value="${esc(keep0)}" selected>${esc(keep0)}</option>` : "") +
+    PARTS.map(p => `<option value="${p}"${p === part0 ? " selected" : ""}>${esc(t("part_" + p))}</option>`).join("");
   const two = n => String(n).padStart(2, "0");
   const h0 = clock0 !== null ? Math.floor(clock0 / 60) : 12, m0 = clock0 !== null ? clock0 % 60 : 0;
   // Minutes in steps of five, plus the stop's own minute when it is not one of them.
@@ -171,7 +177,7 @@ export function openStopEditor(o){
       <div class="field">
         <label for="stop-hh" id="stop-time-label">${esc(t("fTime"))}</label>
         <span id="stop-time" class="clock" role="group" aria-labelledby="stop-time-label"${clock0 !== null ? "" : " hidden"}><select id="stop-hh" aria-label="${esc(t("fHour"))}">${opts([...Array(24).keys()], h0)}</select><span aria-hidden="true">:</span><select id="stop-mm" aria-label="${esc(t("fMinute"))}">${opts(minutes, m0)}</select></span>
-        <input id="stop-time-words" type="text" autocomplete="off" aria-label="${esc(t("fTime"))}" placeholder="${esc(t("timeWordsPh"))}" value="${clock0 === null ? esc(time0) : ""}"${clock0 === null ? "" : " hidden"}>
+        <select id="stop-time-words" aria-label="${esc(t("fTimePart"))}"${clock0 === null ? "" : " hidden"}>${partOpts}</select>
         <button type="button" class="linkbtn" data-time-mode>${esc(t(clock0 !== null ? "timeWords" : "timeClock"))}</button>
       </div>
     </div>

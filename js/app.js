@@ -6,7 +6,7 @@ import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
 import { daylight, partsOfDay, clockOf } from "./sun.js";
 import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
 import { clockMinutes } from "./edit.js";
-import { icon } from "./icons.js";
+import { icon, partSign } from "./icons.js";
 import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
 import { versionStore } from "./objects.js";
@@ -34,6 +34,7 @@ import { asBase } from "./publish.js";
 import { syncTrip, syncPrivate } from "./sync.js";
 import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
 import { searchTrip } from "./search.js";
+import { PARTS, partOf, minutesOf } from "./parts.js";
 import { openSearch, closeSearch, searching } from "./search-sheet.js";
 
 // Where the number of a stop with a position is: a sign, crossed, for one without.
@@ -67,6 +68,22 @@ const LOCATE = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d=
 const FRAME = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 const SHRINK = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 3v4H3M13 3v4h4M17 13h-4v4M3 13h4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CLOSE = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+// The parts of the day (design/README.md, T2): the sun on its arc, rising to setting;
+// after it, the moon. One family of signs, drawn here once.
+// A time in words (T2): a clock time as it is; a part of the day by its name, sunrise
+// and sunset with their real time where the day is; a word that names none, as written.
+function timeText(time, light = dayLight){
+  const p = partOf(time);
+  if(!p) return String(time ?? "");
+  const real = light && (p === "sunrise" || p === "sunset") ? " · " + hhmm(p === "sunrise" ? light.sunrise : light.sunset) : "";
+  return t("part_" + p) + real;
+}
+// The same, drawn: a part of the day with its sign.
+function timeHTML(time, light = dayLight){
+  const p = partOf(time);
+  return p ? `<span class="tm part">${partSign(p)}<span>${esc(timeText(time, light))}</span></span>` : `<span class="tm">${esc(time)}</span>`;
+}
+let dayLight = null;   // sunrise and sunset of the day drawn (renderDay)
 let uid = 0;   // ids for aria-controls, unique on the page
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -631,7 +648,7 @@ function mayChange(){
   return true;
 }
 
-const optionLabel = s => s ? [s.title, s.time].filter(Boolean).join(", ") : t("altNone");
+const optionLabel = s => s ? [s.title, s.time ? timeText(s.time) : ""].filter(Boolean).join(", ") : t("altNone");
 
 // "Choose this": the trip goes to this option of its group.
 async function chooseHere(id){
@@ -2048,9 +2065,9 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
       : s.lat === undefined && change && s.id ? `<button type="button" class="nopos-sign" data-find-pos="${esc(s.id)}" aria-label="${esc(t("noPosFind", {s: s.title}) + (kind ? ", " + kind : ""))}" title="${esc(t("noPosTag"))}">${NO_POS}</button>`
       : s.lat === undefined ? `<span class="nopos-sign" role="img" aria-label="${esc(t("noPosTag") + (kind ? ", " + kind : ""))}">${NO_POS}</span>` : `<span class="nb blank" aria-hidden="true"></span>`;
     // Above the name: when, after dark, how you get there, what it costs (R13).
-    const night = parts && i >= 0 && parts[i] === "night" ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
+    const night = parts && i >= 0 && parts[i] === "night" && !["sunset", "evening", "night"].includes(partOf(s.time)) ? `<span class="nightmark" role="img" aria-label="${esc(t("afterDark"))}" title="${esc(t("afterDark"))}">${icon("moon", 13)}</span>` : "";
     const when = s.time || night || s.travel || (hasCost && !compact)
-      ? `<p class="when">${s.time ? `<span class="tm">${esc(s.time)}</span>` : ""}${night}${chip("travel", s.travel)}${hasCost && !compact ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</p>` : "";
+      ? `<p class="when">${s.time ? timeHTML(s.time) : ""}${night}${chip("travel", s.travel)}${hasCost && !compact ? `<span class="cost">${esc(costShort(s, paid))}</span>` : ""}</p>` : "";
     const name = `<h2 class="tt"><button type="button" class="tap" data-open="${esc(id)}" aria-expanded="${open}" aria-controls="${mid}">${esc(s.title)}</button></h2>`;
     const lang = s.local ? localLang(s.local, regionOf(s, trip().timezone)) : "";
     const local = s.local && !compact ? `<p class="local"${lang ? ` lang="${lang}"` : ""}>${esc(s.local)}</p>` : "";
@@ -2088,7 +2105,7 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
   };
   // The mark of now, on the line, before the next stop (R14).
   const nowMark = () => {
-    const s = list[now.next], m = clockMinutes(s.time), hh = hhmm(now.min);
+    const s = list[now.next], m = minutesOf(s.time, dayLight), hh = hhmm(now.min);
     const text = m !== null && m >= now.min ? t("nowNext", {t: hh, s: s.title, m: m - now.min}) : t("nowNextNoTime", {t: hh, s: s.title});
     return `<li class="now"><span class="nrail" aria-hidden="true"><i></i></span><span class="nt">${esc(text)}</span></li>`;
   };
@@ -2113,14 +2130,14 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
     // Its options, a choice to make: one tap chooses (R1), asking first on a shared trip (A9).
     const options_ = `<div class="opts" id="${gid}" role="radiogroup" aria-label="${esc(g)}">` + options.map(o => {
       const line = [typeof o.cost === "number" ? costShort(o, []) : "", o.local || ""].filter(Boolean).join(" · ");
-      return `<button type="button" class="opt" role="radio" aria-checked="${o === chosen}" data-choose="${esc(o.id)}"${change ? "" : ` aria-disabled="true"`}><span class="rd" aria-hidden="true"></span><span class="ot"><b>${esc(o.title)}</b>${line ? `<small>${esc(line)}</small>` : ""}</span>${o.time ? `<span class="otm">${esc(o.time)}</span>` : ""}</button>`;
+      return `<button type="button" class="opt" role="radio" aria-checked="${o === chosen}" data-choose="${esc(o.id)}"${change ? "" : ` aria-disabled="true"`}><span class="rd" aria-hidden="true"></span><span class="ot"><b>${esc(o.title)}</b>${line ? `<small>${esc(line)}</small>` : ""}</span>${o.time ? `<span class="otm">${esc(timeText(o.time))}</span>` : ""}</button>`;
     }).join("") + `</div>` + (change ? `<button type="button" class="addopt" data-alt-add="${esc(options[0].id)}">${esc(t("altAdd"))}</button>` : "");
     if(chosen && slot === now.next) html += nowMark();
     if(!chosen){
       // No choice yet: dashed, like everything not there yet (R15); the route and the
       // costs leave it out until one is chosen.
       html += `<li class="group pending"><div class="ghead"><div class="rail"><span class="nb q" role="img" aria-label="${esc(t("altPendingSig"))}"></span></div><div class="body">` +
-        `${options[0].time ? `<p class="when"><span class="tm">${esc(options[0].time)}</span></p>` : ""}<h2 class="tt"><span class="gname">${esc(g)}</span></h2>` +
+        `${options[0].time ? `<p class="when">${timeHTML(options[0].time)}</p>` : ""}<h2 class="tt"><span class="gname">${esc(g)}</span></h2>` +
         `<p class="where">${esc(t("altOptions", {n: options.length}))}${groupRange(options)}</p><p class="sigline">${sigHTML({level: "warn", kind: "choice", text: t("altPendingSig")})}</p></div></div>${options_}</li>`;
     }else if(opened){
       html += `<li class="group open"><p class="gh"><b>${esc(g)}</b><span>${esc(t("altChooseOne"))}</span><button type="button" class="gclose" data-group="${esc(key)}" aria-expanded="true" aria-controls="${gid}">${esc(t("close"))}</button></p>${options_}</li>`;
@@ -2167,7 +2184,7 @@ function nowOf(day, planId, list){
   const ended = j => { const k = stopKey(day, planId, list[j], j); return !!(S.state.done[k] || S.state.skipped[k]); };
   let last = -1;
   list.forEach((s, j) => { if(ended(j)) last = j; });
-  const byClock = list.findIndex((s, j) => !ended(j) && j > last && (clockMinutes(s.time) ?? -1) >= min - 30);
+  const byClock = list.findIndex((s, j) => !ended(j) && j > last && (minutesOf(s.time, dayLight) ?? -1) >= min - 30);
   const next = byClock >= 0 ? byClock : list.findIndex((s, j) => j > last && !ended(j));
   return {today: true, next, min};
 }
@@ -2209,6 +2226,7 @@ function renderDay(i){
   const here = list.find(s => s.lat !== undefined);
   const light = here ? daylight(d.date, here.lat, here.lng, tr.timezone) : null;
   const parts = partsOfDay(list, light, clockMinutes);
+  dayLight = light;
   // The colours of this day's pins, lines and numbers (js/geo.js).
   const paint = painter(cityColor(d.city), parts);
   const dp = dateParts(d.date, lang), ti = todayIndex();
@@ -2253,9 +2271,9 @@ function renderDay(i){
   // where the traveller is (no origin: the phone's position).
   let bar = "";
   if(now.today && now.next >= 0){
-    const s = list[now.next], m = clockMinutes(s.time), q = placeQuery(s);
+    const s = list[now.next], m = minutesOf(s.time, dayLight), q = placeQuery(s);
     const when = m !== null && m >= now.min ? t("nextIn", {m: m - now.min}) : t("nextLabel");
-    bar = `<button type="button" class="nb-t" data-to-next><span class="nb" style="--pf:${paint.stop(s.type, now.next)}" aria-hidden="true">${s.lat !== undefined ? now.next + 1 : ""}</span><span class="nb-tx"><small>${esc(when)}</small><b>${esc(s.title)}</b>${s.time ? `<small>${esc(s.time)}</small>` : ""}</span></button>` +
+    bar = `<button type="button" class="nb-t" data-to-next><span class="nb" style="--pf:${paint.stop(s.type, now.next)}" aria-hidden="true">${s.lat !== undefined ? now.next + 1 : ""}</span><span class="nb-tx"><small>${esc(when)}</small><b>${esc(s.title)}</b>${s.time ? `<small>${esc(timeText(s.time))}</small>` : ""}</span></button>` +
       (q ? `<a class="nb-go" href="${esc(dirUrl(q, ""))}" target="_blank" rel="noopener">${ROUTE}${esc(t("routeShort"))}</a>` : "");
   }
   return {html, wanted, now, bar};
@@ -2366,7 +2384,7 @@ function openSearchHere(){
         const all = plan ? plan.stops : d.stops, s = all[r.index], i = programOf(all).indexOf(s);
         const colour = TYPE_COLORS[s.type] || cityColor(d.city);
         const sign = s.lat !== undefined && i >= 0 ? `<span class="nb" style="--pf:${colour}">${i + 1}</span>` : s.lat === undefined ? `<span class="nopos-sign">${NO_POS}</span>` : `<span class="nb q"></span>`;
-        const meta = [day, r.time, plan ? plan.name : "", r.choice && !s.chosen ? r.choice : ""].filter(Boolean).join(" · ");
+        const meta = [day, r.time ? timeText(r.time, null) : "", plan ? plan.name : "", r.choice && !s.chosen ? r.choice : ""].filter(Boolean).join(" · ");
         return {sign, meta, name: r.title, nameMark: r.name, where: r.where, label: [r.title, meta].join(", ")};
       });
     },

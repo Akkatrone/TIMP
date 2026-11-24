@@ -273,10 +273,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     // with the number; the eye sees it in the number's colour.
     assert.deepEqual(await run(`return [...document.querySelectorAll(".stop .rail [aria-label]")].map(e => e.getAttribute("aria-label").split(", ").pop());`), ["Sight", "Sight", "View", "Sight", "Food", "View"]);
     assert.equal(await run(`const n = [...document.querySelectorAll(".stop .nb")]; return n[0].style.getPropertyValue("--pf") !== n[2].style.getPropertyValue("--pf");`), true, "a sight and a view have different colours");
-    // Sunrise and sunset worked out for Lisbon, and the stop after dark marked.
+    // Sunrise and sunset worked out for Lisbon; the stop in the evening has the part's sign, not the moon too (T3).
     assert.match(await text(".dayhead .sun"), /^\d\d:\d\d–2\d:\d\d$/);
     assert.match(await run(`return document.querySelector(".dayhead .sun").getAttribute("aria-label");`), /^Sunrise \d\d:\d\d · sunset 2\d:\d\d$/);
-    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nightmark")).map(li => li.querySelector(".tt").textContent);`), ["Miradouro da Senhora do Monte"]);
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".stop")].filter(li => li.querySelector(".nightmark, .tm.part svg")).map(li => li.querySelector(".tt").textContent + (li.querySelector(".nightmark") ? " moon" : ""));`), ["Miradouro da Senhora do Monte"]);
     await mapOn();
     await until("the pins", `document.querySelectorAll(".live .pin").length === 5`);
     // Stations: the number in the colour of its kind, the same as in the list.
@@ -459,12 +459,17 @@ await withApp(async ({run, until, reload, blocked}) => {
     await fill("#stop-src", "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
     assert.match(await run(`return document.querySelector("[data-src-note]").textContent;`), /Short Google Maps link/);
     await fill("#stop-title", "Tram 28");
-    // A time in words instead of the clock.
+    // A part of the day instead of the clock (T1): seven, nothing in between.
     await run(`document.querySelector("[data-time-mode]").click();`);
     assert.equal(await run(`return document.getElementById("stop-time").hidden && !document.getElementById("stop-time-words").hidden;`), true);
-    await fill("#stop-time-words", "Evening");
+    assert.equal(await run(`return [...document.querySelectorAll("#stop-time-words option")].map(o => o.value).join();`), "sunrise,morning,midday,afternoon,sunset,evening,night");
+    await fill("#stop-time-words", "evening");
     await submit();
-    assert.equal(await run(`return [...document.querySelectorAll(".stop")].find(li => li.querySelector(".tt").textContent === "Tram 28").querySelector(".maplink").href;`), "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+    const tram = `[...document.querySelectorAll(".stop")].find(li => li.querySelector(".tt").textContent === "Tram 28")`;
+    assert.equal(await run(`return ${tram}.querySelector(".maplink").href;`), "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+    // Shown by its name, with its sign (T2, T3); a word of before (the example's "Evening") too.
+    assert.equal(await run(`const tm = ${tram}.querySelector(".when .tm.part"); return tm && tm.querySelector("svg") && tm.textContent;`), "Evening");
+    assert.equal(await run(`return [...document.querySelectorAll(".when .tm.part")].filter(tm => tm.textContent === "Evening").length;`), 2, "the example's \"Evening\" as a part too");
   });
 
   await step("an address shared on its own is searched around the trip; the pin can be put on a map", async () => {

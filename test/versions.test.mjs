@@ -148,7 +148,7 @@ test("a day's city, stay and plans merge field by field", async () => {
 
 /* ---------- edits ---------- */
 
-test("times order the stops; words for times keep their place", () => {
+test("times and parts of the day order the stops", () => {
   assert.equal(clockMinutes("9:30"), 570);
   assert.equal(clockMinutes("21.05"), 1265);
   assert.equal(clockMinutes("Evening"), null);
@@ -160,6 +160,14 @@ test("times order the stops; words for times keep their place", () => {
   assert.equal(insertIndex(list, "20:00"), 3);
   assert.equal(insertIndex(list, "Night"), 4);
   assert.equal(insertIndex([], "10:00"), 0);
+});
+
+test("a stop with no time is all day: at the top, after the other all-day ones", () => {
+  const trip = {format: "travel-in-my-pocket/2", title: "T", days: [{date: "2027-04-10", stops: [{id: "a", title: "Beach"}, {id: "b", time: "09:00", title: "B"}]}]};
+  const {trip: t1} = addStop(trip, {date: "2027-04-10"}, {title: "Park"}, "c");
+  assert.deepEqual(t1.days[0].stops.map(s => s.id), ["a", "c", "b"]);
+  const {trip: t2} = addStop(t1, {date: "2027-04-10"}, {title: "Dinner", time: "evening"}, "d");
+  assert.deepEqual(t2.days[0].stops.map(s => s.id), ["a", "c", "b", "d"]);
 });
 
 test("a new stop gets an id of its own and goes in time order", () => {

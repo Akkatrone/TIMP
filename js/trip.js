@@ -9,6 +9,8 @@
 // The file says what the trip is, nothing about how it looks. Colours, map zones,
 // labels and icons are the app's job, worked out from the content.
 
+import { PARTS, partOf, clockOfTime } from "./parts.js";
+
 export const FORMAT = "travel-in-my-pocket/2";
 export const FORMAT_1 = "travel-in-my-pocket/1";
 
@@ -106,7 +108,8 @@ export const FIELDS = {
   stop: {
     title: {type: "text", req: true, doc: "The name of the place or of the activity."},
     local: {type: "text", doc: "The name in the local script, as on the sign (\"一蘭 渋谷店\"): to show staff, and to search it."},
-    time: {type: "text", doc: "When: \"09:30\", or words like \"Evening\"."},
+    time: {type: "text", hint: "\"HH:MM\" or " + PARTS.join("|"), examples: ["09:30", ...PARTS], advise: t => clockOfTime(t) !== null || partOf(t) !== null,
+      doc: "When: a clock time, or a part of the day (sunrise and sunset at their real time where the day is). For all day, no time."},
     type: {type: "text", values: TYPES, soft: true, doc: "What kind of place it is; it gives the stop its icon and pin."},
     travel: {type: "text", values: TRAVEL, soft: true, doc: "How you get there from the stop before."},
     text: {type: "text", doc: "What to know: what to see, what to order, tickets. **bold** is allowed."},
@@ -182,6 +185,7 @@ export function validateTrip(trip){
           if(f.soft) warn(path, msg + "; shown as a plain one"); else err(path, msg);
         }
         if((f.pattern && !f.pattern.test(v)) || (f.test && !f.test(v))) err(path, `must be ${f.hint}`);
+        else if(f.advise && !f.advise(v)) warn(path, `should be ${f.hint}; shown as written`);
         return;
       case "list":
         if(!Array.isArray(v)){ err(path, "must be a list"); return; }
@@ -278,7 +282,7 @@ export function tripSchema(){
       case "yes": return {...doc, const: true};
       case "any": return doc;
       case "number": return {...doc, type: "number", minimum: f.min, maximum: f.max};
-      case "text": return {...doc, type: "string", minLength: 1, ...(f.values && !f.soft ? {enum: f.values} : {}), ...(f.values && f.soft ? {examples: f.values} : {}), ...(f.pattern ? {pattern: f.pattern.source} : {})};
+      case "text": return {...doc, type: "string", minLength: 1, ...(f.values && !f.soft ? {enum: f.values} : {}), ...(f.values && f.soft ? {examples: f.values} : {}), ...(f.pattern ? {pattern: f.pattern.source} : {}), ...(f.examples ? {examples: f.examples} : {})};
       case "list": return {...doc, type: "array", ...(f.min ? {minItems: f.min} : {}), items: f.of === "text" ? {type: "string", minLength: 1, ...(f.item && f.item.pattern ? {pattern: f.item.pattern.source} : {})} : {$ref: `#/$defs/${f.of}`}};
       case "stay": return {...doc, anyOf: [{type: "string", minLength: 1}, {$ref: "#/$defs/stay"}]};
       default: return {...doc, $ref: `#/$defs/${f.type}`};
@@ -307,7 +311,7 @@ const EXAMPLE = {
     notes: ["Colosseum tickets booked for 9:00"],
     stops: [
       {time: "09:00", title: "Colosseum", type: "sight", text: "Enter from the Via Sacra side.", address: "Piazza del Colosseo, Rome", lat: 41.8902, lng: 12.4922},
-      {time: "13:00", title: "Lunch in Monti", type: "food", travel: "metro"}
+      {time: "midday", title: "Lunch in Monti", type: "food", travel: "metro"}
     ]
   }],
   info: [{title: "In case of need", items: [{label: "Emergency", text: "112"}]}]

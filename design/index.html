@@ -33,7 +33,7 @@
     <a href="#principles">Principles</a><a href="#colour">Colour</a><a href="#type">Type</a>
     <a href="#space">Space, shape, motion</a><a href="#line">The line of the day</a>
     <a href="#stop">A stop</a><a href="#groups">Alternatives</a><a href="#day">The day</a>
-    <a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a>
+    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a>
     <a href="#a11y">Accessibility</a>
   </nav>
 
@@ -100,7 +100,7 @@
         <li class="stop done compact past"><div class="rail"><span class="nb" style="--pf:var(--t-sight)">1</span></div><div class="body"><p class="when"><span class="tm">09:30</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Rossio</button></h2></div><button class="tick" type="button" aria-pressed="true" aria-label="Mark as not done: Rossio"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></li>
         <li class="now"><span class="nrail" aria-hidden="true"><i></i></span><span class="nt">10:50 · Palácio Exemplo in 40 min</span></li>
         <li class="stop next"><div class="rail"><span class="nb" style="--pf:var(--t-sight)">2</span></div><div class="body"><p class="when"><span class="tm">11:30</span><span class="cost">€10</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Palácio Exemplo</button></h2><p class="desc clamp">Up the hill by bus, the gardens after.</p></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Palácio Exemplo"></button></li>
-        <li class="stop skipped"><div class="rail"><span class="nb" style="--pf:var(--t-walk)">3</span></div><div class="body"><p class="when"><span class="tm">Afternoon</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Sentiero Exemplo</button></h2></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Sentiero Exemplo"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></li>
+        <li class="stop skipped"><div class="rail"><span class="nb" style="--pf:var(--t-walk)">3</span></div><div class="body"><p class="when"><span class="tm part" data-ds-part="afternoon"><span>Afternoon</span></span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Sentiero Exemplo</button></h2></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Sentiero Exemplo"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></li>
         <li class="stop"><div class="rail"><button type="button" class="nopos-sign" aria-label="Cabo Exemplo: no position. Find it, View"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.6"/><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div><div class="body"><p class="when"><span class="tm">20:12</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Cabo Exemplo</button></h2></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Cabo Exemplo"></button></li>
       </ol></div>
       <div class="ds-notes">
@@ -169,6 +169,14 @@
         <div class="addrow"><button type="button">+ Add a stop</button><button type="button">Paste from a chat</button></div>
       </div>
     </div>
+  </section>
+
+  <section id="time">
+    <h2>Time</h2>
+    <p>A clock time, or one of seven parts of the day, each with its sign: the sun on its
+    arc over the horizon, then the moon. Sunrise and sunset carry their real time where
+    the day is. A stop with no time is all day, at the top of the day (T1–T5).</p>
+    <div class="ds-row"><div class="ds-phone"><ul class="ds-parts" data-ds-parts></ul></div></div>
   </section>
 
   <section id="today">

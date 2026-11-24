@@ -118,6 +118,22 @@ order, error. The accent belongs to none of the palettes.
 - **V8** A choice still to make that is the next stop shows time, cost and distance for
   each option.
 
+## Time and the parts of the day
+
+- **T1** A stop's time is a clock time ("09:30") or one of seven parts of the day:
+  sunrise, morning, midday, afternoon, sunset, evening, night. A form offers only these;
+  nothing in between, so a time never wraps.
+- **T2** A part is shown by its name in the app's language; sunrise and sunset add their
+  real time where the day is ("Sunset · 20:12"). A word written before ("Evening",
+  "Pranzo") is shown as its part; a word that names none, as written.
+- **T3** A part has its sign before the name: the sun on its arc over the horizon
+  (rising, morning, high, afternoon, setting), then the moon (evening, night). One
+  family, in ink. From sunset on, the sign takes the place of the moon after sunset:
+  never both.
+- **T4** For order and for now, a part counts from its start (`js/parts.js`): sunrise and
+  sunset from the real sun, the others from fixed hours around them.
+- **T5** All day is no time: the stop goes at the top of the day, before the timed ones.
+
 ## Signals and warnings
 
 Four levels: **error** (red; something failed or may be lost), **attention** (yellow;

@@ -9,7 +9,7 @@
 > look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
-**Version 4.1.7.** TIMP is under active development and this page changes with it.
+**Version 4.2.0.** TIMP is under active development and this page changes with it.
 Remember this version. Before you change a trip later in the conversation, or when a
 message from the app names a newer TIMP version, open this page again: if its version
 is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
@@ -66,7 +66,7 @@ plan:
 stop:
   title (required): text. The name of the place or of the activity.
   local: text. The name in the local script, as on the sign ("一蘭 渋谷店"): to show staff, and to search it.
-  time: text. When: "09:30", or words like "Evening".
+  time: "HH:MM" or sunrise|morning|midday|afternoon|sunset|evening|night. When: a clock time, or a part of the day (sunrise and sunset at their real time where the day is). For all day, no time.
   type: sight|museum|food|park|view|shop|walk|hotel. What kind of place it is; it gives the stop its icon and pin.
   travel: metro|bus|train|plane|boat. How you get there from the stop before.
   text: text. What to know: what to see, what to order, tickets. **bold** is allowed.
@@ -102,7 +102,7 @@ item:
 Rules: days in date order, one per date. A day has stops or plans (two or more), never both. Plans only when the whole day changes; for one meal, a choice. lat and lng go together. No colours, icons, ids or versions: the app adds them. Do not invent bookings, hotels or prices. A cost is what the traveller pays: their share if split. Give lat/lng only for places you are sure about; otherwise an address.
 
 Example:
-{"format":"travel-in-my-pocket/2","title":"Rome in three days","lang":"en","days":[{"date":"2027-04-10","city":"Rome","title":"The ancient city","stay":{"name":"Hotel Example","address":"Via Cavour 1, Rome"},"notes":["Colosseum tickets booked for 9:00"],"stops":[{"time":"09:00","title":"Colosseum","type":"sight","text":"Enter from the Via Sacra side.","address":"Piazza del Colosseo, Rome","lat":41.8902,"lng":12.4922},{"time":"13:00","title":"Lunch in Monti","type":"food","travel":"metro"}]}],"info":[{"title":"In case of need","items":[{"label":"Emergency","text":"112"}]}]}
+{"format":"travel-in-my-pocket/2","title":"Rome in three days","lang":"en","days":[{"date":"2027-04-10","city":"Rome","title":"The ancient city","stay":{"name":"Hotel Example","address":"Via Cavour 1, Rome"},"notes":["Colosseum tickets booked for 9:00"],"stops":[{"time":"09:00","title":"Colosseum","type":"sight","text":"Enter from the Via Sacra side.","address":"Piazza del Colosseo, Rome","lat":41.8902,"lng":12.4922},{"time":"midday","title":"Lunch in Monti","type":"food","travel":"metro"}]}],"info":[{"title":"In case of need","items":[{"label":"Emergency","text":"112"}]}]}
 ```
 
 ## Changing a trip that already exists
@@ -205,8 +205,9 @@ One entry per date, from the arrival day to the departure day, in date order.
 
 ## 3. Write the stops
 
-- `time`: a clock time when it matters ("09:30"), a word when it does not ("Evening",
-  "Dinner"). Leave it out when there is no time at all.
+- `time`: a clock time when it matters ("09:30"), a part of the day when it does not:
+  `sunrise`, `morning`, `midday`, `afternoon`, `sunset`, `evening`, `night`, in English
+  whatever the trip's language. Leave it out for all day.
 - `title`: the name of the place as written on maps and signs.
 - `local`: the same name in the local script, as on the sign ("一蘭 渋谷店", "명동교자"),
   wherever the country does not write in the Latin alphabet. Leave it out otherwise.

@@ -64,8 +64,9 @@ One entry per date, from the arrival day to the departure day, in date order.
 
 ## 3. Write the stops
 
-- `time`: a clock time when it matters ("09:30"), a word when it does not ("Evening",
-  "Dinner"). Leave it out when there is no time at all.
+- `time`: a clock time when it matters ("09:30"), a part of the day when it does not:
+  `sunrise`, `morning`, `midday`, `afternoon`, `sunset`, `evening`, `night`, in English
+  whatever the trip's language. Leave it out for all day.
 - `title`: the name of the place as written on maps and signs.
 - `local`: the same name in the local script, as on the sign ("一蘭 渋谷店", "명동교자"),
   wherever the country does not write in the Latin alphabet. Leave it out otherwise.

@@ -51,7 +51,7 @@ an `address` and its position (`lat`, `lng`):
         {"time": "09:00", "title": "Colosseum", "type": "sight", "tag": "Booked",
          "text": "Enter from the Via Sacra side.", "address": "Piazza del Colosseo, Rome",
          "lat": 41.8902, "lng": 12.4922},
-        {"time": "13:00", "title": "Lunch in Monti", "type": "food"},
+        {"time": "midday", "title": "Lunch in Monti", "type": "food"},
         {"time": "15:00", "title": "Capitoline Museums", "type": "museum", "travel": "bus",
          "address": "Piazza del Campidoglio 1, Rome", "lat": 41.8930, "lng": 12.4828}
       ]
@@ -99,7 +99,7 @@ an `address` and its position (`lat`, `lng`):
 |---|---|---|
 | `title` | yes | The name of the place or of the activity. |
 | `local` | no | The name in the local language and script, as on the sign: `"一蘭 渋谷店"`. Shown under the title, to recognise the place, show it to staff or a taxi driver, and search it: the review link uses it. |
-| `time` | no | `"09:30"`, or words like `"Evening"`. Clock times keep new stops in order. |
+| `time` | no | A clock time, `"09:30"`, or a part of the day: `sunrise`, `morning`, `midday`, `afternoon`, `sunset`, `evening`, `night`. Sunrise and sunset fall at their real time where the day is. No `time`: all day, at the top of the day. Words written before ("Evening", "Pranzo") are read as their part; others are shown as written, with a warning. |
 | `type` | no | What kind of place it is: `sight`, `museum`, `food`, `park`, `view`, `shop`, `walk`, `hotel`. It gives the stop its icon, in the list and on the map pin. |
 | `travel` | no | How you get there from the stop before: `metro`, `bus`, `train`, `plane`, `boat`. Drawn on the leg of the map that arrives at the stop. |
 | `text` | no | What to know: what to see, what to order, tickets. |
@@ -243,8 +243,8 @@ The file gives positions; the app does the rest.
 - Each pin has the colour of its `type`, the lines that of the day's `city`. Their
   shade follows the part of the day: lighter in the morning, darker after sunset.
 - Sunrise and sunset are worked out from the date and the first stop with a position,
-  on the clock of `timezone`. Stops after sunset get a moon in the list. A `time` in
-  words counts too: "Evening", "Dinner", "Sera", "Cena" are after dark.
+  on the clock of `timezone`. Stops after sunset get a moon in the list; a part of the
+  day shows its own sign instead, the sun on its arc.
 
 <!-- llms.txt: end -->
 <!-- llms.txt: skip -->

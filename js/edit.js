@@ -5,6 +5,7 @@
 // A stop is found by the day (its date), the plan (its id, or null) and its own id.
 // ref: {date, plan, id}
 
+import { minutesOf } from "./parts.js";
 import { FIELDS, slug, tripId } from "./trip.js";
 import { newStopId, uniqueStopIds } from "./ids.js";
 import { groupOf, choose, tidyGroups } from "./choices.js";
@@ -26,15 +27,16 @@ export function clockMinutes(time){
   return h < 24 && min < 60 ? h * 60 + min : null;
 }
 
-// Where a stop at `time` goes in a list: after the last stop with a clock time not
-// later than it. Stops with words for times ("Dinner") keep their place.
+// Where a stop at `time` goes in a list: after the last stop with a time not later than
+// it (a clock time, or the start of its part of the day: js/parts.js). Stops with words
+// that name no part keep their place.
 export function insertIndex(stops, time){
-  const t = clockMinutes(time);
+  const t = minutesOf(time);
   if(t === null) return stops.length;
   let at = -1;
-  stops.forEach((s, i) => { const c = clockMinutes(s.time); if(c !== null && c <= t) at = i; });
+  stops.forEach((s, i) => { const c = minutesOf(s.time); if(c !== null && c <= t) at = i; });
   if(at >= 0) return at + 1;
-  const firstLater = stops.findIndex(s => { const c = clockMinutes(s.time); return c !== null && c > t; });
+  const firstLater = stops.findIndex(s => { const c = minutesOf(s.time); return c !== null && c > t; });
   return firstLater >= 0 ? firstLater : stops.length;
 }
 
@@ -94,12 +96,15 @@ export function ensureIds(trip, base = null){
 }
 
 // Adds `stop` (without an id) to a day and plan, in time order, with a new id (`id`:
-// one made elsewhere, by the tests). Returns {trip, ref}.
+// one made elsewhere, by the tests). A stop with no time is all day: at the top of the
+// day, after the other all-day ones. Returns {trip, ref}.
 export function addStop(trip, {date, plan}, stop, id = newStopId()){
   const out = clone(trip);
   const list = listIn(out, date, plan);
   const s = {id, ...clean(stop)};
-  list.splice(insertIndex(list, s.time), 0, s);
+  const allDay = s.time === undefined || s.time === "";
+  const top = list.findIndex(x => x.time !== undefined && x.time !== "");
+  list.splice(allDay ? (top < 0 ? list.length : top) : insertIndex(list, s.time), 0, s);
   return {trip: out, ref: {date, plan: plan || null, id: s.id}};
 }
 

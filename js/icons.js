@@ -58,3 +58,19 @@ export function glyph(name, x, y, size = 12){
 
 /** Whether `name` has an icon: every value of TRAVEL and TYPES must. */
 export const hasIcon = known;
+
+// The parts of the day (js/parts.js; design/README.md, T3): the sun on its arc over the
+// horizon, rising, high, setting; then the moon. Drawn on a 52×20 grid, currentColor.
+const PART_SIGNS = (() => {
+  const cx = 26, cy = 15, r = 11;
+  const sky = `<path d="M${cx - r} ${cy}A${r} ${r} 0 0 1 ${cx + r} ${cy}" stroke="currentColor" stroke-width="1.5" opacity=".45"/>`;
+  const hz = `<path d="M${cx - r - 6} ${cy + .5}H${cx + r + 6}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`;
+  const svg = inner => `<svg class="sun" viewBox="0 0 52 20" fill="none" aria-hidden="true">${sky}${hz}${inner}</svg>`;
+  const sun = (pos, big) => { const a = Math.PI * (1 - pos); return `<circle cx="${(cx + r * Math.cos(a)).toFixed(1)}" cy="${(cy - r * Math.sin(a)).toFixed(1)}" r="${big ? 5 : 4}" fill="currentColor"/>`; };
+  const half = x => `<path d="M${x - 5.5} ${cy}a5.5 5.5 0 0 1 11 0z" fill="currentColor"/>`;
+  const moon = (x, y) => `<path d="M${x + 2} ${y - 4.5}a4.5 4.5 0 1 0 2.6 8a3.6 3.6 0 1 1 -2.6 -8z" fill="currentColor"/>`;
+  return {sunrise: svg(half(cx - r)), morning: svg(sun(.25)), midday: svg(sun(.5)), afternoon: svg(sun(.75)),
+    sunset: svg(half(cx + r)), evening: svg(moon(cx + 6, 10)), night: svg(moon(cx, 7) + `<circle cx="${cx - 9}" cy="6" r="1" fill="currentColor"/><circle cx="${cx - 4}" cy="3" r=".8" fill="currentColor"/>`)};
+})();
+/** The sign of a part of the day, as SVG text ("" for none). */
+export const partSign = part => PART_SIGNS[part] || "";

@@ -41,6 +41,7 @@ const FILES = [
   "js/merge.js",
   "js/money.js",
   "js/objects.js",
+  "js/parts.js",
   "js/places.js",
   "js/positions.js",
   "js/private.js",

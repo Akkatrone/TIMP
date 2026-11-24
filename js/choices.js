@@ -8,6 +8,7 @@
 // phones chose apart, and the join kept both): the first by time, then by title, the
 // same on every phone, until the next choice settles it. No DOM here.
 
+import { minutesOf } from "./parts.js";
 import { clockMinutes } from "./edit.js";
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -27,7 +28,7 @@ export function groupsIn(stops){
   return all;
 }
 
-const when = s => { const c = clockMinutes(s.time); return c === null ? 1e9 : c; };
+const when = s => { const c = minutesOf(s.time); return c === null ? 1e9 : c; };
 
 /** The option a group goes to, or null when it is still to choose. */
 export function chosenIn(options){
@@ -59,7 +60,7 @@ export function chosenPlan(day){
  * the list has already (a number after it).
  */
 export function groupName(stop, names, stops){
-  const c = clockMinutes(stop.time);
+  const c = minutesOf(stop.time);
   const base = stop.type === "food" && c !== null && c >= 11 * 60 && c < 16 * 60 ? names.lunch
     : stop.type === "food" && c !== null && c >= 18 * 60 ? names.dinner : names.other;
   const taken = new Set((stops || []).map(groupOf).filter(Boolean));

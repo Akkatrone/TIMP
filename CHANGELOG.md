@@ -4,6 +4,19 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.2.0
+
+- **Parts of the day**: a stop's time is a clock time or one of seven parts: sunrise,
+  morning, midday, afternoon, sunset, evening, night. The form offers only these, so a
+  time never wraps. In the list each part has its sign, the sun on its arc then the
+  moon; sunrise and sunset show their real time where the day is ("Sunset · 20:12").
+- Words written before ("Evening", "Pranzo", "Cena", in several languages) are shown as
+  their part and keep their place in the day; files are not rewritten. Another word is
+  shown as written, and the check warns.
+- **All day**: a stop with no time goes at the top of the day.
+- The format and the guide for chats (`llms.txt`) say it; the design system has rules
+  T1–T5 and a Time section.
+
 ## 4.1.7
 
 - **The map**: larger and smaller at once, without the lag, and the list is pushed down so

@@ -205,7 +205,7 @@ const old = () => ({
     {date: "2027-04-10", place: "rome", stay: "h", title: "Day one", reminders: ["Book"], note: "If it rains", zoneNames: ["Z"], mapSplitKm: 5,
       stops: [{id: "colosseo", time: "09:00", title: "Colosseum", query: "Colosseo, Roma", mapLabel: "C", lat: 41.89, lng: 12.49, tag: "Booked"}]},
     {date: "2027-04-11", place: "naples", from: "rome", stayText: "Night train", title: "Day two",
-      plans: [{id: "a", name: "A", stops: [{time: "1", title: "X", travel: "train"}]}, {id: "b", name: "B", stops: [{time: "2", title: "Y"}]}]}
+      plans: [{id: "a", name: "A", stops: [{time: "10:00", title: "X", travel: "train"}]}, {id: "b", name: "B", stops: [{time: "11:00", title: "Y"}]}]}
   ],
   info: [{title: "Help", rows: [{label: "Police", number: "112"}, {label: "Bus", text: "Tickets", number: "+39 06"}]}],
   infoNote: "Have fun"

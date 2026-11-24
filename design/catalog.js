@@ -3,6 +3,8 @@
 // the switch between the light and the dark theme. Nothing here is copied from the
 // tokens: change design/tokens.json and this page follows.
 
+import { partSign } from "../js/icons.js";
+
 const root = document.documentElement;
 const v = name => getComputedStyle(root).getPropertyValue(name).trim();
 
@@ -59,3 +61,8 @@ for(const b of document.querySelectorAll("[data-ds-theme]")){
 }
 if(matchMedia("(prefers-color-scheme: dark)").matches) document.querySelector('[data-ds-theme="dark"]').click();
 draw();
+
+// The parts of the day with their signs (T3), as a stop's time line draws them.
+const PARTS = [["sunrise", "Sunrise · 07:14"], ["morning", "Morning"], ["midday", "Midday"], ["afternoon", "Afternoon"], ["sunset", "Sunset · 20:12"], ["evening", "Evening"], ["night", "Night"]];
+document.querySelector("[data-ds-parts]").innerHTML = PARTS.map(([p, name]) => `<li><p class="when"><span class="tm part">${partSign(p)}<span>${esc(name)}</span></span></p></li>`).join("");
+for(const el of document.querySelectorAll("[data-ds-part]")) el.insertAdjacentHTML("afterbegin", partSign(el.dataset.dsPart));

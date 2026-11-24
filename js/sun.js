@@ -5,6 +5,8 @@
 // The app uses it to tell the stops of the day from those after dark: they get a
 // darker shade on the map and a moon in the list.
 
+import { partOf } from "./parts.js";
+
 const RAD = Math.PI / 180;
 const sin = d => Math.sin(d * RAD), cos = d => Math.cos(d * RAD);
 const J2000 = 2451545, UNIX_EPOCH_JD = 2440587.5, DAY_MS = 86400000;
@@ -49,12 +51,8 @@ export function daylight(date, lat, lng, timezone){
   catch(e){ return null; }   // a time zone the phone does not know
 }
 
-// Words used for times ("Evening", "Cena"), and the part of the day they mean.
-const WORDS = [
-  ["night", /evening|night|dinner|sunset|sera|notte|cena|tramonto|aperitivo/i],
-  ["afternoon", /afternoon|lunch|pomeriggio|pranzo/i],
-  ["morning", /morning|breakfast|sunrise|mattin|colazione|alba/i]
-];
+// The light of each part of the day (js/parts.js): morning, afternoon, or after dark.
+const LIGHT_OF = {sunrise: "morning", morning: "morning", midday: "afternoon", afternoon: "afternoon", sunset: "night", evening: "night", night: "night"};
 
 /**
  * The part of the day of each stop of a list: "morning", "afternoon" or "night" (after
@@ -71,8 +69,8 @@ export function partsOfDay(list, light, minutesOf){
     if(m !== null){
       last = m < rise || m >= set ? "night" : m < noon ? "morning" : "afternoon";
     }else if(s.time){
-      const word = WORDS.find(([, re]) => re.test(s.time));
-      if(word) last = word[0];
+      const part = partOf(s.time);
+      if(part) last = LIGHT_OF[part];
     }
     return last;
   });
