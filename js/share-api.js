@@ -89,6 +89,17 @@ export const SHAPES = {
     by: text("Handle of who sent it."),
     via: {type: "text", null: true, doc: "The chat app that made it for them (as it registered, \"Claude\"), or null when made in the app; absent when not known (made before the service kept it)."}
   },
+  group: {
+    where: {type: "bool", req: true, doc: "Mine shown (\"Where I go\"): the people on the trip see my options and plans chosen only for me."},
+    ticks: {type: "bool", req: true, doc: "Mine joined (\"Ticks for everyone\"): my ticks and skips are the group's."},
+    shown: {type: "list", of: "groupShown", req: true, doc: "The others on the trip who show where they go; never mine."},
+    marks: {type: "any", req: true, null: true, doc: "The group's ticks and skips, {done: {key: {by, at}}, skipped: {…}} by the stop keys of the personal set (`by` a handle, null for an account deleted), when `ticks` is on; null otherwise."}
+  },
+  groupShown: {
+    handle: text("Who."),
+    chosen: {type: "any", req: true, doc: "Their options chosen only for them, as the personal set's `marks.chosen`."},
+    plans: {type: "any", req: true, doc: "Their plans, as the personal set's `marks.plans`."}
+  },
   privateSet: {
     data: {type: "any", req: true, null: true, doc: "The private expenses, as the trip file's `private` section, or null."},
     rev: num("Revision: send it back with the next change; 0 when there are none.")
@@ -142,6 +153,7 @@ export const SHAPES = {
     user: {type: "user", req: true, doc: "The account."},
     trips: {type: "list", of: "any", req: true, doc: "Each trip the account owns or that is shared with it: {id, role, file} (file: the trip as it is now)."},
     privateExpenses: {type: "list", of: "any", req: true, doc: "The account's private expenses: {trip, data}, readable."},
+    shownToGroup: {type: "list", of: "any", req: true, doc: "What the account shows the people of each shared trip: {trip, where ({chosen, plans} or null), ticks}."},
     linkedApps: {type: "list", of: "linkedApp", req: true, doc: "The chat apps that can reach the trips."},
     passkeys: {type: "list", of: "passkey", doc: "The account's passkeys (their public half stays on the service)."},
     publications: {type: "list", of: "any", doc: "The account's published trips: {page, tripId, version, level, dates, publishedAt, updatedAt}."},
@@ -187,6 +199,15 @@ export const ROUTES = {
   version: {method: "GET", path: "/v1/trips/:id/versions/:version", auth: true, answer: "any", doc: "A version, as its trip file. Never changes."},
   push: {method: "POST", path: "/v1/trips/:id/push", auth: true, body: {trip: {type: "any", req: true, doc: "The trip as the phone has it."}}, answer: "pushResult", doc: "A version from a phone: taken, or joined."},
   getPrivate: {method: "GET", path: "/v1/trips/:id/private", auth: true, answer: "privateSet", doc: "The user's own private expenses of a trip."},
+  getGroup: {method: "GET", path: "/v1/trips/:id/group", auth: true, answer: "group", doc: "What the people on a shared trip show each other (alternatives, step 3): mine, the others' choices, the group's ticks. Never to a linked chat."},
+  putGroup: {method: "PUT", path: "/v1/trips/:id/group", auth: true, body: {
+    where: {type: "any", req: true, null: true, doc: "My choices to show, {chosen, plans} as the personal set's marks, or null: not shown (removed at once)."},
+    ticks: {type: "bool", req: true, doc: "Whether my ticks and skips are the group's."}
+  }, answer: "group", doc: "What I show the group of this trip; nothing at all removes my row."},
+  markGroup: {method: "POST", path: "/v1/trips/:id/group/marks", auth: true, body: {
+    done: {type: "any", req: true, doc: "Stop keys → true (ticked) or false (unticked)."},
+    skipped: {type: "any", req: true, doc: "The same, for skips."}
+  }, answer: "group", doc: "Changes the group's ticks, with who and when; only with my `ticks` on (403 otherwise). A key: the last one wins."},
   putPrivate: {method: "PUT", path: "/v1/trips/:id/private", auth: true, body: {data: {type: "any", req: true, null: true, doc: "The whole set, or null to remove it."}, rev: num("The revision it was made from.")}, answer: "privateSet", doc: "Replaces them, if `rev` is still the one here (409 otherwise, with `current`)."},
   invite: {method: "POST", path: "/v1/trips/:id/invites", auth: true, body: {role: text("read or edit.", {values: ["read", "edit"]})}, answer: "invite", doc: "The owner invites one person."},
   acceptInvite: {method: "POST", path: "/v1/invites/accept", auth: true, body: {token: text("The invite's token.")}, answer: "tripSummary", doc: "The trip joins the user's \"Shared with you\"."},

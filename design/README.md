@@ -157,6 +157,25 @@ plan, in the trip, and mine, only where I differ, on all my phones and nobody el
 - **P6** Ticks and skips are mine too, on all my phones; a linked chat and a published
   page see the group's plan only.
 
+## What the group sees
+
+On a shared trip, each person decides what the others see of their own choices (P1–P6).
+
+- **G1** Two boxes per trip, in the trip's sheet under its rows, on a trip shared with
+  others: "Where I go" and "Ticks for everyone". Unticked to start. Never a question at
+  each choice or tick.
+- **G2** Where I go: the options and plans I chose only for me are seen by the trip's
+  people: their circles beside each option and plan; mine says "You and ugo"; following
+  the group, a line says who goes elsewhere.
+- **G3** Ticks for everyone: a stop ticked or skipped is so for whoever ticked the box
+  too, with who made it under it (said to a screen reader). Who did not keeps their own.
+- **G4** Seen by the trip's people only: never a linked chat, a published page, a file.
+- **G5** Unticked or off the trip: my choices leave at once; ticks made for everyone stay
+  the group's.
+- **G6** Without an account, nothing of this.
+- **G7** Many people: three circles, then "+N"; two names, then "+N"; every name said, and
+  all of them in an opened option's line.
+
 ## Signals and warnings
 
 Four levels: **error** (red; something failed or may be lost), **attention** (yellow;
@@ -258,6 +277,8 @@ positions, sharing, the account. One for all (`js/sheet.js`).
   (no leaving the app). Far from them (over 30 km): unticked, and it says how far.
 - **SH4** One main action that says what it does: "Save 2 positions", or with none
   ticked "Leave as it is"; saved as one version.
+- **SH5** A choice in a sheet is a square box with its line (finding positions, publishing,
+  with the group); the circle is only a stop done, in the list. One shape, one meaning.
 
 ## Trips
 

@@ -54,7 +54,7 @@ export const emptySet = p => !p || (!(p.expenses || []).length && !MARKS.some(k 
 
 /** The set with the marks of `state`; null when nothing is left. Always with `marks`: without it, an app of before wrote the set (mergePrivate). */
 export function withMarks(priv, state){
-  const out = {...(priv || {expenses: []}), marks: Object.fromEntries(MARKS.filter(k => state[k] && Object.keys(state[k]).length).map(k => [k, state[k]]))};
+  const out = {...(priv || {expenses: []}), marks: Object.fromEntries(MARKS.filter(k => state[k] && Object.keys(state[k]).length).map(k => [k, {...state[k]}]))};
   return emptySet(out) ? null : out;
 }
 

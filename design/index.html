@@ -33,7 +33,7 @@
     <a href="#principles">Principles</a><a href="#colour">Colour</a><a href="#type">Type</a>
     <a href="#space">Space, shape, motion</a><a href="#line">The line of the day</a>
     <a href="#stop">A stop</a><a href="#groups">Alternatives</a><a href="#day">The day</a>
-    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a><a href="#sheets">Sheets</a><a href="#trips">Trips</a>
+    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a><a href="#sheets">Sheets</a><a href="#trips">Trips</a><a href="#group">The group</a>
     <a href="#a11y">Accessibility</a>
   </nav>
 
@@ -278,6 +278,21 @@
         <nav class="me-list" aria-label="Lisbon in my pocket"><button type="button">Share</button><button type="button">History<span class="val">14 versions</span></button><button type="button">Save the file</button><button type="button">Lock</button></nav>
         <nav class="me-list" aria-label="Delete"><button type="button" class="danger">Delete…</button></nav>
       </div></div>
+    </div></div>
+  </section>
+
+  <section id="group">
+    <h2>What the group sees</h2>
+    <p>On a shared trip, two boxes in the trip's sheet: where I go, ticks for everyone.
+    Who goes where is a circle each beside the option (three, then +N); mine says who is
+    with me; a stop ticked by someone else says who, under its name.</p>
+    <div class="ds-row"><div class="ds-phone">
+      <ol class="stops" style="list-style:none;margin:0;padding:0;display:grid;gap:8px">
+        <li class="group"><p class="gh"><b>Dinner</b><span class="you"><i aria-hidden="true">F</i>You and ugo</span></p><div class="stop in-group"><div class="rail"><span class="nb" style="--pf:var(--t-food)">5</span></div><div class="body"><p class="when"><span class="tm">20:30</span><span class="cost">~€15</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Pizzeria Exemplo</button></h2></div><button class="tick" type="button" aria-pressed="false" aria-label="Mark as done: Pizzeria Exemplo"></button></div><p class="theirs">The group: Rifugio Exemplo, 20:00 · ana, leo +1</p></li>
+        <li class="stop done compact"><div class="rail"><span class="nb" style="--pf:var(--t-sight)">2</span></div><div class="body"><p class="when"><span class="tm">11:00</span></p><h2 class="tt"><button type="button" class="tap" aria-expanded="false">Sé Exemplo</button></h2><p class="by">ugo</p></div><button class="tick" type="button" aria-pressed="true" aria-label="Mark as not done: Sé Exemplo, by ugo"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></li>
+      </ol>
+      <div class="opts" role="radiogroup" aria-label="Dinner"><button type="button" class="opt" role="radio" aria-checked="false"><span class="rd" aria-hidden="true"></span><span class="ot"><b>Rifugio Exemplo<span class="gtag">The group's</span><span class="who" role="img" aria-label="ana, leo, sara, gio"><i>A</i><i>L</i><i>S</i><i>+1</i></span></b><small>~€40 · ana, leo, sara, gio</small></span><span class="otm">20:00</span></button></div>
+      <label class="found-row"><input type="checkbox" checked><span><b>Where I go</b><small>The people on this trip see the options and plans I choose only for me</small></span></label>
     </div></div>
   </section>
 

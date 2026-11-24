@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { syncTrip, syncPrivate } from "../js/sync.js";
-import { mergePrivate, splitPrivate } from "../js/private.js";
+import { syncTrip, syncPrivate, syncGroup, withGroup, pendingTicks, whereOf } from "../js/sync.js";
+import { mergePrivate, splitPrivate, withMarks } from "../js/private.js";
 import { prepare } from "../js/trips.js";
 import { commit, relation, commonBase, commitMerge } from "../js/version.js";
 import { mergeTrips } from "../js/merge.js";
@@ -172,4 +172,44 @@ test("private expenses sync between two phones of the same person, and the secon
   assert.deepEqual(a.priv.expenses.map(x => [x.id, x.cost]), [["tea", 6]]);
   assert.deepEqual(b.priv, a.priv);
   assert.equal((await api.getPrivate(id)).rev, a.share.privRev);
+});
+
+test("the set takes a copy of the marks: a tick after it is a change (4.3–4.6 lost ticks after the first)", () => {
+  const state = {done: {"d||a": 1}, skipped: {}, plans: {}, chosen: {}};
+  const set = withMarks(null, state);
+  state.done["d||b"] = 1;
+  assert.deepEqual(Object.keys(set.marks.done), ["d||a"], "the set kept what it was given");
+  assert.notDeepEqual(withMarks(set, state), set, "so the next save sees the new tick");
+});
+
+test("the group (G1–G7): ticks waiting for it, its ticks become mine, my choices sent only when shown and changed", async () => {
+  // What changed since the set, added to what still waits; nothing changed: nothing.
+  assert.deepEqual(pendingTicks({done: {a: 1}}, {done: {b: 1}, skipped: {c: 1}}, {done: {z: true}}), {done: {z: true, a: false, b: true}, skipped: {c: true}});
+  assert.equal(pendingTicks({done: {a: 1}}, {done: {a: 1}, skipped: {}}, null), null);
+  // Joined: the group's ticks are the day's; not joined: mine stay.
+  const rec = {priv: {expenses: [], marks: {done: {mine: 1}, chosen: {casa: 1}}}};
+  const g = {where: false, ticks: true, shown: [], marks: {done: {k: {by: "ugo", at: "t"}}, skipped: {}}};
+  assert.deepEqual(withGroup(rec, g).priv.marks, {done: {k: 1}, skipped: {}, chosen: {casa: 1}});
+  assert.deepEqual(withGroup(rec, {...g, ticks: false, marks: null}).priv, rec.priv);
+  assert.deepEqual(whereOf(rec.priv), {chosen: {casa: 1}, plans: {}});
+  // A sync: waiting ticks sent first, my choices sent once, then not again.
+  const calls = [];
+  let server = {where: true, ticks: true, shown: [{handle: "ugo", chosen: {}, plans: {}}], marks: {done: {}, skipped: {}}};
+  const api = {
+    getGroup: async () => { calls.push("get"); return server; },
+    markGroup: async (id, done) => { calls.push("mark " + Object.keys(done)); return server = {...server, marks: {done: Object.fromEntries(Object.keys(done).map(k => [k, {by: "fra", at: "t"}])), skipped: {}}}; },
+    putGroup: async (id, where) => { calls.push("put " + Object.keys(where.chosen)); return server; }
+  };
+  const shared = {role: "read", visibility: "people"};
+  let r = {...rec, share: {id: "t", groupPending: {done: {x: true}, skipped: {}}}};
+  r = await syncGroup(r, shared, api);
+  assert.deepEqual(calls, ["get", "mark x", "put casa"]);
+  assert.deepEqual([r.share.groupPending, Object.keys(r.priv.marks.done)], [null, ["x"]]);
+  calls.length = 0;
+  assert.equal(await syncGroup(r, shared, api), r, "nothing new: the same record");
+  assert.deepEqual(calls, ["get"]);
+  // A trip of mine shared with nobody: nothing asked.
+  calls.length = 0;
+  await syncGroup(r, {role: "owner", visibility: "private"}, api);
+  assert.deepEqual(calls, []);
 });

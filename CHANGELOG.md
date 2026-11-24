@@ -4,6 +4,17 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.7.0
+
+- **What the group sees**, on a shared trip: two boxes in the trip's sheet (⋯), unticked
+  to start. **Where I go**: the people on the trip see the options and plans you choose
+  only for you; you see theirs, a circle each beside the option or plan ("You and ugo";
+  "Elsewhere: ugo" when you go with the group). **Ticks for everyone**: a stop ticked by
+  one is done for all who ticked the box, with who did it under it. Never seen by a
+  linked chat, a published page or a file. Needs TIMP-share 1.12.0.
+- Fixed: since 4.3.0, on a trip on the account, ticks after the first one reached your
+  other phones only once the trip was opened again.
+
 ## 4.6.2
 
 - With an assistant: switching between "A new trip" and "Change this trip" no longer

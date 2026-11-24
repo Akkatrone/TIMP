@@ -138,7 +138,10 @@ export function serviceApi(){
     push: (id, trip) => call("push", {params: {id}, body: {trip}}),
     version: (id, version) => call("version", {params: {id, version}}),
     getPrivate: id => call("getPrivate", {params: {id}}),
-    putPrivate: (id, data, rev) => call("putPrivate", {params: {id}, body: {data, rev}})
+    putPrivate: (id, data, rev) => call("putPrivate", {params: {id}, body: {data, rev}}),
+    getGroup: id => call("getGroup", {params: {id}}),
+    putGroup: (id, where, ticks) => call("putGroup", {params: {id}, body: {where, ticks}}),
+    markGroup: (id, done, skipped) => call("markGroup", {params: {id}, body: {done, skipped}})
   };
 }
 

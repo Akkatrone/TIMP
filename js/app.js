@@ -33,7 +33,7 @@ import { weatherOf, hasService, session as shareSession, signIn, signOut, servic
 import { openShareSheet } from "./sharing.js";
 import { chooseFirstDay } from "./publishing.js";
 import { asBase } from "./publish.js";
-import { syncTrip, syncPrivate } from "./sync.js";
+import { syncTrip, syncPrivate, syncGroup, withGroup, whereOf, pendingTicks } from "./sync.js";
 import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
 import { searchTrip } from "./search.js";
 import { PARTS, partOf, minutesOf } from "./parts.js";
@@ -239,7 +239,9 @@ function saveState(){
   if(!S.rec.share || S.rec.share.gone) return;
   const priv = withMarks(privOf(), S.state);
   if(canonical(priv) === canonical(privOf())) return;
-  S.rec = {...S.rec, priv};
+  // Ticks for everyone (G3): what changed waits to go to the group, at the next sync.
+  const g = S.rec.group, share = g && g.ticks ? {...S.rec.share, groupPending: pendingTicks((privOf() || {}).marks, S.state, S.rec.share.groupPending)} : S.rec.share;
+  S.rec = {...S.rec, priv, share};
   S.records = S.records.map(r => r.id === S.rec.id ? S.rec : r);
   store.putTrip(S.rec).catch(() => {});
   syncSoon();
@@ -711,7 +713,20 @@ function mayChange(){
   return true;
 }
 
-const youMark = () => `<span class="you">${S.account ? `<i aria-hidden="true">${esc(S.account.handle.slice(0, 1).toUpperCase())}</i>` : ""}${esc(t("altMine"))}</span>`;
+// Mine, with whoever goes there too among those who show it (G2): "You and ugo".
+const youMark = (with_ = []) => `<span class="you">${S.account ? `<i aria-hidden="true">${esc(S.account.handle.slice(0, 1).toUpperCase())}</i>` : ""}${esc(!with_.length ? t("altMine") : with_.length === 1 ? t("altMineWith", {h: with_[0]}) : t("altMineWithN", {n: with_.length}))}</span>`;
+// Names in a narrow place (G7): two, then "+N"; circles: three, then "+N"; all of them said.
+const namesShort = hs => hs.length <= 2 ? hs.join(", ") : `${hs.slice(0, 2).join(", ")} +${hs.length - 2}`;
+const whoCircles = hs => !hs.length ? "" : `<span class="who" role="img" aria-label="${esc(hs.join(", "))}">${hs.slice(0, 3).map(h => `<i>${esc(h.slice(0, 1).toUpperCase())}</i>`).join("")}${hs.length > 3 ? `<i class="more">+${hs.length - 3}</i>` : ""}</span>`;
+// Who goes to each option of a group, of those who show where they go: their own, or the group's.
+function goersIn(options, groups){
+  const out = new Map();
+  for(const p of (S.rec && S.rec.group && S.rec.group.shown) || []){
+    const o = options.find(x => x.id && p.chosen[x.id]) || groups;
+    if(o) out.set(o, [...(out.get(o) || []), p.handle]);
+  }
+  return out;
+}
 const optionLabel = s => s ? [s.title, s.time ? timeText(s.time) : ""].filter(Boolean).join(", ") : t("altNone");
 
 // "Choose this" (design/README.md, P1–P2). A trip of mine only: the trip goes to this
@@ -1294,6 +1309,9 @@ const syncSoon = (ms = 1500) => { clearTimeout(syncTimer); syncTimer = setTimeou
 async function keepSynced(next, from){
   // Marked here while it synced: joined with what came, and sent at the next sync.
   if(from && S.rec && S.rec.id === next.id && S.rec.priv !== from.priv){ next = {...next, priv: mergePrivate(from.priv, S.rec.priv, next.priv)}; syncSoon(); }
+  // Ticked for the group meanwhile: kept to send (sending one twice changes nothing).
+  const pend = S.rec && S.rec.id === next.id && S.rec.share && S.rec.share.groupPending;
+  if(from && pend && pend !== (from.share && from.share.groupPending)){ next = {...next, share: {...next.share, groupPending: pend}}; syncSoon(); }
   await store.putTrip(next);
   S.records = S.records.map(r => r.id === next.id ? next : r);
   if(S.rec && S.rec.id === next.id){ S.rec = next; S.state = marksInto(S.state, next.priv); followNewIds(); }
@@ -1311,7 +1329,10 @@ function syncNow(){
   if(syncing){ syncAgain = true; return syncing; }
   S.sync = "busy";
   syncing = (async () => {
-    const before = canonical(S.records.map(r => [r.id, r.trip.version.id, r.share && r.share.head]));
+    // What the screen shows of the trips: a new version, or ticks come from another phone or
+    // the group (their marks), redraws it.
+    const shownNow = () => canonical(S.records.map(r => [r.id, r.trip.version.id, r.share && r.share.head, r.priv && r.priv.marks || null, r.group || null]));
+    const before = shownNow();
     try{
       const api = serviceApi(), remote = await api.list();
       for(const r of remote){
@@ -1347,8 +1368,13 @@ function syncNow(){
               else if(x.kind !== "same") errors.set(rec.id, t("lockedWaiting"));
             }
           }else next = await syncTrip(versions, rec, remoteOf, api);
+          // The group first: its ticks become mine, which then go with the personal set.
+          next = await syncGroup(next, remoteOf, api);
           next = await syncPrivate(next, api);
           if(remoteOf && !!remoteOf.locked !== !!(next.share && next.share.locked)) next = {...next, share: {...next.share, locked: !!remoteOf.locked}};
+          // Shared with someone (theirs, or mine with people in it): the group's boxes (G1).
+          const shared = !!remoteOf && (remoteOf.role !== "owner" || remoteOf.visibility !== "private");
+          if(remoteOf && shared !== !!(next.share && next.share.shared)) next = {...next, share: {...next.share, shared}};
           // Its page, if its owner published it: said on the card, kept for the Share sheet.
           if(remoteOf && canonical(remoteOf.publication || null) !== canonical((next.share && next.share.publication) || null)) next = {...next, share: {...next.share, publication: remoteOf.publication || null}};
           if(next !== rec) await keepSynced(next, rec);
@@ -1366,7 +1392,7 @@ function syncNow(){
       if(e && e.status === 401){ S.account = null; }
     }finally{
       syncing = null;
-      const after = canonical(S.records.map(r => [r.id, r.trip.version.id, r.share && r.share.head]));
+      const after = shownNow();
       if(after !== before || route().name === "trips" || !document.querySelector(".stop, .tripcard")) renderKeepingFocus();
       if(syncAgain){ syncAgain = false; syncSoon(500); }
     }
@@ -1612,16 +1638,41 @@ function tripMenu(id){
     sh && sh.gone && S.account && row("reup", t("putOnAccount"))
   ].filter(Boolean).join("");
   const notes = [S.syncErrors.has(r.id) && t("notSynced", {why: S.syncErrors.get(r.id)}), needsSaving(r) && t("unsaved")].filter(Boolean);
+  // With the group (G1): two boxes, on a trip shared with someone, signed in.
+  const g = r.group || {where: false, ticks: false};
+  const box = (k, label, help) => `<label class="found-row"><input type="checkbox" data-group-box="${k}"${g[k] ? " checked" : ""}><span><b>${esc(label)}</b><small>${esc(help)}</small></span></label>`;
+  const group = onAcc && sh.shared && S.account ? `<section class="groupbox"><h3 class="sheet-h">${esc(t("groupTitle"))}</h3>${box("where", t("groupWhere"), t("groupWhereHelp"))}${box("ticks", t("groupTicks"), t("groupTicksHelp"))}</section>` : "";
   const dlg = openSheet({title: r.trip.title, cls: "tripmenu", body: `
     <p class="sub"><span class="where">${esc(where)}</span> · <span data-version="${esc(r.trip.version.id)}">${esc(ver)}</span></p>
     ${r.trip.basedOn ? `<p class="sub" data-based-on>${esc(t("basedOnLine", {t: r.trip.basedOn.title, h: r.trip.basedOn.by}))} <a href="${esc(r.trip.basedOn.url)}" target="_blank" rel="noopener">↗</a></p>` : ""}
     ${notes.map(x => `<p class="unsaved">${esc(x)}</p>`).join("")}
     <nav class="me-list" aria-label="${esc(r.trip.title)}">${rows}</nav>
+    ${group}
     <nav class="me-list" aria-label="${esc(t("remove"))}">${row("remove", t("removeAsk"), "", "danger")}</nav>`});
   dlg.addEventListener("click", e => {
     const act = e.target.closest("[data-act]");
     if(act){ dlg.close(); runAct(act); }
   });
+  dlg.addEventListener("change", e => { if(e.target.matches("[data-group-box]")) setGroupBox(r.id, e.target); });
+}
+
+// A box of "With the group" (G1): saved on the service at once; offline or refused, it
+// goes back as it was. Joining the ticks makes mine so far the group's too (G3).
+async function setGroupBox(id, input){
+  const rec = S.records.find(r => r.id === id);
+  if(!rec || !rec.share || !rec.share.id) return;
+  const was = rec.group || {where: false, ticks: false}, want = {...was, [input.dataset.groupBox]: input.checked};
+  input.disabled = true;
+  try{
+    const api = serviceApi(), sid = rec.share.id;
+    let g = await api.putGroup(sid, want.where ? whereOf(rec.priv) : null, want.ticks);
+    const m = (rec.priv && rec.priv.marks) || {}, all = k => Object.fromEntries(Object.keys(m[k] || {}).map(x => [x, true]));
+    if(want.ticks && !was.ticks && (Object.keys(all("done")).length || Object.keys(all("skipped")).length)) g = await api.markGroup(sid, all("done"), all("skipped"));
+    const now = S.records.find(r => r.id === id);
+    await keepSynced(withGroup({...now, share: {...now.share, groupSent: g.where ? canonical(whereOf(now.priv)) : null}}, g));
+    render();
+  }catch(e){ input.checked = !input.checked; toast(e && e.status === 0 ? t("groupOffline") : accountError(e)); }
+  finally{ input.disabled = false; }
 }
 
 // The Trips page: the active trip on top, in full; the others below, a line each,
@@ -2219,9 +2270,12 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
         (changes.length ? `<div class="chg" role="group" aria-label="${esc(t("changeZone"))}">${changes.join("")}</div>` : "") +
         `</div>`;
     }
-    const tick = `<button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}">${isSkipped ? DASH : CHECK}</button>`;
+    // Ticked for everyone by someone else: who, quietly (G3).
+    const gm = S.rec.group && S.rec.group.marks, gby = gm && (isDone ? gm.done[id] : isSkipped ? gm.skipped[id] : null);
+    const by = gby && gby.by && (!S.account || gby.by !== S.account.handle) ? gby.by : "";
+    const tick = `<button class="tick" type="button" data-tick="${esc(id)}" aria-pressed="${isDone}" aria-label="${esc(t(isDone ? "markUndone" : "markDone"))}: ${esc(s.title)}${by ? esc(t("tickBy", {h: by})) : ""}">${isSkipped ? DASH : CHECK}</button>`;
     const cls = ["stop", isDone && "done", isSkipped && "skipped", open && "open", isNext && "next", compact && "compact", past && "past", hasCost && "has-cost", opt.group && "in-group"].filter(Boolean).join(" ");
-    return `<${tag} class="${cls}"><div class="rail">${rail}</div><div class="body">${when}${name}${local}${closedPart}${more}</div>${tick}</${tag}>`;
+    return `<${tag} class="${cls}"><div class="rail">${rail}</div><div class="body">${when}${name}${by ? `<p class="by">${esc(by)}</p>` : ""}${local}${closedPart}${more}</div>${tick}</${tag}>`;
   };
   // The mark of now, on the line, before the next stop (R14).
   const nowMark = () => {
@@ -2245,15 +2299,18 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
     const options = groups.get(g), chosen = chosenIn(options), others = options.filter(o => o !== chosen);
     // Chosen only for me (P3): marked, the group's named.
     const theirs = options.find(o => o.theirs);
-    const mark = o => o.mine ? youMark() : o.theirs ? `<span class="gtag">${esc(t("altTheirs"))}</span>` : "";
+    // Who goes where, of those who show it (G2, G7).
+    const goers = goersIn(options, theirs || (chosen && !chosen.mine ? chosen : null)), at_ = o => goers.get(o) || [];
+    const mark = o => o.mine ? youMark(at_(o)) : o.theirs ? `<span class="gtag">${esc(t("altTheirs"))}</span>` : "";
+    const elsewhere = chosen && !chosen.mine ? options.filter(o => o !== chosen).flatMap(at_) : [];
     const key = `${day.date}|${planId || ""}|${g}`, opened = S.openGroups.has(key);
     // Where the group sits in the day: the chosen option's place, or the next stop's.
     const at = all.indexOf(s), nx = list.findIndex(x => all.indexOf(x) > at), slot = chosen ? list.indexOf(chosen) : nx < 0 ? list.length : nx;
     const gid = "grp-" + (++uid);
     // Its options, a choice to make: one tap chooses (R1), asking first on a shared trip (A9).
     const options_ = `<div class="opts" id="${gid}" role="radiogroup" aria-label="${esc(g)}">` + options.map(o => {
-      const line = [typeof o.cost === "number" ? costShort(o, []) : "", o.local || ""].filter(Boolean).join(" · ");
-      return `<button type="button" class="opt" role="radio" aria-checked="${o === chosen}" data-choose="${esc(o.id)}"><span class="rd" aria-hidden="true"></span><span class="ot"><b>${esc(o.title)}${mark(o)}</b>${line ? `<small>${esc(line)}</small>` : ""}</span>${o.time ? `<span class="otm">${esc(timeText(o.time))}</span>` : ""}</button>`;
+      const line = [typeof o.cost === "number" ? costShort(o, []) : "", o.local || "", at_(o).join(", ")].filter(Boolean).join(" · ");
+      return `<button type="button" class="opt" role="radio" aria-checked="${o === chosen}" data-choose="${esc(o.id)}"><span class="rd" aria-hidden="true"></span><span class="ot"><b>${esc(o.title)}${mark(o)}${o.mine ? "" : whoCircles(at_(o))}</b>${line ? `<small>${esc(line)}</small>` : ""}</span>${o.time ? `<span class="otm">${esc(timeText(o.time))}</span>` : ""}</button>`;
     }).join("") + `</div>` + (change ? `<button type="button" class="addopt" data-alt-add="${esc(options[0].id)}">${esc(t("altAdd"))}</button>` : "");
     if(chosen && slot === now.next) html += nowMark();
     if(!chosen){
@@ -2266,7 +2323,8 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
       html += `<li class="group open"><p class="gh"><b>${esc(g)}</b><span>${esc(t("altChooseOne"))}</span><button type="button" class="gclose" data-group="${esc(key)}" aria-expanded="true" aria-controls="${gid}">${esc(t("close"))}</button></p>${options_}</li>`;
     }else{
       html += `<li class="group${slot === now.next ? " next" : ""}"><p class="gh"><b>${esc(g)}</b>${mark(chosen)}</p>${stopEl(chosen, slot, {group: g, chosen: true}, "div")}` +
-        (chosen.mine ? `<p class="theirs">${esc(t("altTheirsLine", {s: theirs ? optionLabel(theirs) : t("altPendingSig")}))}</p>` : "") +
+        (chosen.mine ? `<p class="theirs">${esc(t("altTheirsLine", {s: theirs ? optionLabel(theirs) : t("altPendingSig")}))}${theirs && at_(theirs).length ? " · " + esc(namesShort(at_(theirs))) : ""}</p>` : "") +
+        (elsewhere.length ? `<p class="theirs">${esc(t("groupElsewhere", {who: namesShort(elsewhere)}))}</p>` : "") +
         `<button type="button" class="alts-line" data-group="${esc(key)}" aria-expanded="false" aria-label="${esc(t("altOthers", {s: others.map(o => o.title).join(", ")}))}"><span class="plus" aria-hidden="true">+${others.length}</span><span class="names" aria-hidden="true">${esc(others.map(o => o.title).join(" · "))}</span></button></li>`;
     }
   }
@@ -2392,11 +2450,13 @@ function renderDay(i){
   }
   if(!mapMode) html += dayLine(d, pid, list, all);
   if(d.plans){
+    // Who goes with each plan, of those who show it (G2): theirs, or the day's.
+    const goes = chosenPlan(d), shown = (S.rec.group && S.rec.group.shown) || [];
+    const on = p => shown.filter(x => (x.plans[d.date] || goes.id) === p.id).map(x => x.handle);
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
-      `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
+      `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}${whoCircles(on(p))}</button>`).join("") + `</div>`;
     // Another plan than the one the day goes with: mine, on all my phones (P4); it can be
     // chosen for everyone by who can edit.
-    const goes = chosenPlan(d);
     if(plan !== goes) html += `<p class="plan-note"><span>${esc(t("planGoesWith", {p: goes.name}))}</span>${canChange() ? `<button type="button" class="linkbtn" data-plan-choose="${esc(pid)}">${esc(t("planChooseAll", {p: plan.name}))}</button>` : ""}</p>`;
   }
   html += stopsHTML(d, pid, list, light ? parts : null, paint, all, now);

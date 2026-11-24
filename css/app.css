@@ -675,6 +675,10 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .you{display:inline-flex;align-items:center;gap:var(--sp-1);margin-left:var(--sp-2);padding:2px var(--sp-2) 2px 2px;border:1px solid var(--line-strong);border-radius:var(--r-full);font:600 var(--fs-xs)/1 var(--f-body);color:var(--ink);vertical-align:1px;white-space:nowrap}
 .group .gh .you{color:var(--ink);font-weight:600}
 .you i{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:var(--r-full);background:var(--ink);color:var(--bg);font-style:normal}
+/* who goes where, of those who show it (G2, G7); who ticked for everyone (G3) */
+.who{display:inline-flex;gap:2px;margin-left:var(--sp-2);vertical-align:middle}
+.who i{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 3px;border-radius:var(--r-full);border:1px solid var(--line-strong);background:var(--chip);color:var(--ink);font:600 var(--fs-xs)/1 var(--f-body);font-style:normal}
+.stop .by{margin:0;font-size:var(--fs-s);color:var(--muted)}
 .gtag{margin-left:var(--sp-2);font:600 var(--fs-xs) var(--f-body);color:var(--muted)}
 .group .theirs{margin:0;padding:0 var(--sp-4) var(--sp-3) calc(var(--sp-3) + var(--rail) + var(--sp-4));font-size:var(--fs-s);color:var(--muted)}
 .group.pending{border:1.5px dashed var(--line-strong)}

@@ -252,6 +252,40 @@
     "null": true
    }
   },
+  "group": {
+   "where": {
+    "type": "bool",
+    "req": true
+   },
+   "ticks": {
+    "type": "bool",
+    "req": true
+   },
+   "shown": {
+    "type": "list",
+    "of": "groupShown",
+    "req": true
+   },
+   "marks": {
+    "type": "any",
+    "req": true,
+    "null": true
+   }
+  },
+  "groupShown": {
+   "handle": {
+    "type": "text",
+    "req": true
+   },
+   "chosen": {
+    "type": "any",
+    "req": true
+   },
+   "plans": {
+    "type": "any",
+    "req": true
+   }
+  },
   "privateSet": {
    "data": {
     "type": "any",
@@ -416,6 +450,11 @@
     "req": true
    },
    "privateExpenses": {
+    "type": "list",
+    "of": "any",
+    "req": true
+   },
+   "shownToGroup": {
     "type": "list",
     "of": "any",
     "req": true
@@ -673,6 +712,45 @@
    "path": "/v1/trips/:id/private",
    "auth": true,
    "answer": "privateSet"
+  },
+  "getGroup": {
+   "method": "GET",
+   "path": "/v1/trips/:id/group",
+   "auth": true,
+   "answer": "group"
+  },
+  "putGroup": {
+   "method": "PUT",
+   "path": "/v1/trips/:id/group",
+   "auth": true,
+   "body": {
+    "where": {
+     "type": "any",
+     "req": true,
+     "null": true
+    },
+    "ticks": {
+     "type": "bool",
+     "req": true
+    }
+   },
+   "answer": "group"
+  },
+  "markGroup": {
+   "method": "POST",
+   "path": "/v1/trips/:id/group/marks",
+   "auth": true,
+   "body": {
+    "done": {
+     "type": "any",
+     "req": true
+    },
+    "skipped": {
+     "type": "any",
+     "req": true
+    }
+   },
+   "answer": "group"
   },
   "putPrivate": {
    "method": "PUT",

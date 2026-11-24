@@ -1404,6 +1404,7 @@ function fakeService(){
   const b64 = s => Buffer.from(s).toString("base64url");
   const users = new Map(), keys = new Map(), codes = new Set(["TEST-CODE-0000-0001"]), sessions = new Map(), challenges = new Map();
   const trips = new Map(), privs = new Map();   // the service's trips and private expenses
+  const groups = new Map();                     // trip → {people: who → {where, ticks}, marks} (G1–G7)
   const chat = {answered: "", unlinked: false}; // a chat app's request, then its link
   let n = 0;
   const clone = v => JSON.parse(JSON.stringify(v));
@@ -1514,7 +1515,7 @@ function fakeService(){
       if(what === "members" && method === "GET") return ok({members: [{handle: who, role: "owner"}, ...[...(members.get(id) || [])].map(([u, r]) => ({id: "u-" + u, handle: u, role: r}))]});
       return no(404, "not found");
     }
-    const m = path.match(/^\/v1\/trips(?:\/([^/]+)(?:\/(push|private|versions)(?:\/([^/]+))?)?)?$/);
+    const m = path.match(/^\/v1\/trips(?:\/([^/]+)(?:\/(push|private|versions|group)(?:\/([^/]+))?)?)?$/);
     if(m && !who) return no(401, "sign in first");
     if(m && method === "GET" && !m[1]) return ok({trips: [...trips.values()].filter(t => t.owner === who || (members.get(t.id) || new Map()).has(who))
       .map(t => t.owner === who ? summary(t) : {...summary(t), role: members.get(t.id).get(who)})});
@@ -1540,6 +1541,18 @@ function fakeService(){
       return ok({trip: t.id, kind, head: t.head, merged});
     }
     if(m && m[1] && m[2] === "versions") return ok(clone(trips.get(m[1]).versions.get(m[3])));
+    // What the people of a shared trip show each other (G1–G7), as the service keeps it.
+    if(m && m[1] && m[2] === "group"){
+      const g = groups.get(m[1]) || {people: new Map(), marks: {done: {}, skipped: {}}};
+      groups.set(m[1], g);
+      if(method === "PUT"){ if(body.where === null && !body.ticks) g.people.delete(who); else g.people.set(who, {where: body.where, ticks: body.ticks}); }
+      if(method === "POST"){
+        if(!(g.people.get(who) || {}).ticks) return {status: 403, body: {error: "group: ticks for everyone is off"}};
+        for(const k of ["done", "skipped"]) for(const [key, on] of Object.entries(body[k])){ if(on) g.marks[k][key] = {by: who, at: "2026-11-24T10:00:00.000Z"}; else delete g.marks[k][key]; }
+      }
+      const mine = g.people.get(who) || {where: null, ticks: false};
+      return ok({where: !!mine.where, ticks: !!mine.ticks, shown: [...g.people].filter(([h, x]) => h !== who && x.where).map(([h, x]) => ({handle: h, ...x.where})), marks: mine.ticks ? clone(g.marks) : null});
+    }
     if(m && m[1] && m[2] === "private"){
       const k = who + "|" + m[1], cur = privs.get(k) || {data: null, rev: 0};
       if(method === "GET") return ok(cur);
@@ -1594,7 +1607,7 @@ function fakeService(){
     if(path === "/v1/account/export" && method === "GET"){
       if(!who) return no(401, "sign in first");
       return ok({exportedAt: "2026-11-20T00:00:00.000Z", user: user(who), trips: [...trips.values()].filter(t => t.owner === who).map(t => ({id: t.id, role: "owner", file: t.versions.get(t.head)})),
-        privateExpenses: [], linkedApps: [], audit: [{at: "2026-11-19T00:00:00.000Z", kind: "signup", route: null, detail: ""}]});
+        privateExpenses: [], shownToGroup: [], linkedApps: [], audit: [{at: "2026-11-19T00:00:00.000Z", kind: "signup", route: null, detail: ""}]});
     }
     if(path === "/v1/account/delete" && method === "POST"){
       if(!who) return no(401, "sign in first");
@@ -1636,7 +1649,7 @@ function fakeService(){
     }
     return no(404, "not found");
   };
-  handler.state = {trips, privs, chat, calls, refuse, deleted, invites, members, flags, sessions, recovery, pubs};
+  handler.state = {trips, privs, groups, chat, calls, refuse, deleted, invites, members, flags, sessions, recovery, pubs};
   return handler;
 }
 
@@ -1982,6 +1995,49 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("for everyone", `/Lunch: Casa Exemplo chosen · version/.test(document.getElementById("toast").textContent)`);
     assert.equal(await run(`return document.querySelector(".you");`), null);
     service.members.delete(id);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("with the group: two boxes in a shared trip's sheet; where ugo goes and his tick seen, with his name; mine reach the group", async () => {
+    // Ugo's trip, shared with me: ugo shows he goes to Casa Exemplo, and ticked the first stop for everyone.
+    const u = service.trips.get("t-ugo"), v = u.versions.get(u.head), stops = v.days[0].stops;
+    const casa = stops.find(s => s.title === "Casa Exemplo").id, first = stops.find(s => !s.choice), second = stops.filter(s => !s.choice)[1];
+    const key = s => `2027-05-14||${s.id}`, sheet = `document.querySelector("dialog.tripmenu[open]")`;
+    service.groups.set("t-ugo", {people: new Map([["ugo", {where: {chosen: {[casa]: 1}, plans: {}}, ticks: true}]]), marks: {done: {[key(first)]: {by: "ugo", at: "2026-11-24T09:00:00.000Z"}}, skipped: {}}});
+    const ugoCard = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="from-ugo"]'))`;
+    await run(`location.hash = "#trips";`);
+    await until("synced", `document.querySelector('[data-act="sync"]') && ${ugoCard}`, 15000);
+    await run(`document.querySelector('[data-act="sync"]').click();`);
+    await until("synced", `document.querySelector('[data-sync="ok"]')`, 15000);
+    // In its sheet, two boxes, unticked (G1); not in a trip shared with nobody.
+    await run(`${ugoCard}.querySelector('[data-act="trip-menu"]').click();`);
+    assert.deepEqual(await run(`return [...${sheet}.querySelectorAll("[data-group-box]")].map(b => [b.dataset.groupBox, b.checked]);`), [["where", false], ["ticks", false]]);
+    await run(`${sheet}.close();`);
+    assert.equal(await run(`const d = ${tripSheet("demo-lisbon")}, n = d.querySelectorAll("[data-group-box]").length; d.close(); return n;`), 0, "my trip, shared with nobody: no boxes");
+    // Ticked: saved on the service at once; joining the ticks takes mine so far there (G3).
+    const box = k => run(`${ugoCard}.querySelector('[data-act="trip-menu"]').click(); const b = ${sheet}.querySelector('[data-group-box="${k}"]'); b.checked = true; b.dispatchEvent(new Event("change", {bubbles: true}));
+      for(let i = 0; i < 50 && b.disabled !== false; i++) await new Promise(r => setTimeout(r, 50)); await new Promise(r => setTimeout(r, 300)); ${sheet} && ${sheet}.close();`);
+    await box("where");
+    assert.deepEqual(service.groups.get("t-ugo").people.get("fra").where, {chosen: {}, plans: {}}, "my choices shown: none for now");
+    await box("ticks");
+    assert.equal(service.groups.get("t-ugo").people.get("fra").ticks, true);
+    // The day: ugo's tick done here too, his name under it; Lunch: ugo goes elsewhere.
+    await run(`${ugoCard}.querySelector('[data-act="open"]').click(); await new Promise(r => setTimeout(r, 300)); location.hash = "#day-1";`);
+    await until("ugo's tick", `document.querySelector('[data-tick="${key(first)}"]') && document.querySelector('[data-tick="${key(first)}"]').getAttribute("aria-pressed") === "true"`, 15000);
+    assert.equal(await run(`return document.querySelector('[data-tick="${key(first)}"]').closest(".stop").querySelector(".by").textContent;`), "ugo");
+    assert.match(await run(`return document.querySelector('[data-tick="${key(first)}"]').getAttribute("aria-label");`), /, by ugo$/);
+    // Opened: ugo's circle beside his option, his name in its line (G7); closed: where he goes.
+    if(!(await run(`return !!document.querySelector(".group.open");`))) await run(`document.querySelector(".alts-line").click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(await run(`return document.querySelector('[data-choose="${casa}"] .who').getAttribute("aria-label");`), "ugo");
+    assert.match(await run(`return document.querySelector('[data-choose="${casa}"] small').textContent;`), /ugo$/);
+    await run(`document.querySelector(".gclose").click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(await run(`return [...document.querySelectorAll(".group .theirs")].map(p => p.textContent).join();`), "Elsewhere: ugo", "where ugo goes (G2)");
+    // Mine: to the group, with my name (none under it, here).
+    await run(`document.querySelector('[data-tick="${key(second)}"]').click();`);
+    await new Promise(r => setTimeout(r, 200));
+    for(let i = 0; i < 50 && !service.groups.get("t-ugo").marks.done[key(second)]; i++){ await new Promise(r => setTimeout(r, 300)); if(i % 5 === 4) await run(`location.hash = "#trips"; await new Promise(r => setTimeout(r, 200)); document.querySelector('[data-act="sync"]').click(); location.hash = "#day-1";`); }
+    assert.equal(service.groups.get("t-ugo").marks.done[key(second)].by, "fra");
+    assert.equal(await run(`return !!document.querySelector('[data-tick="${key(second)}"]').closest(".stop").querySelector(".by");`), false);
     assert.deepEqual(blocked(), []);
   });
 
