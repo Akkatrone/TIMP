@@ -200,6 +200,7 @@ part of the shared trip. It goes in `private`:
 | `expenses` | yes | The private expenses, written like the trip's. |
 | `stop` | no | In a private expense only: the `id` of the stop where it was paid, on the day in its `date`, which it then needs. The stop shows it ("¥1,500 private"). If the stop is deleted, the expense stays, with its own title. |
 | `owner` | written by the app | Whose they are: a random code made by the traveller's phone. Keep it exactly as it is; never write or change it. |
+| `marks` | written by the app | On the account only, never in a file: what the traveller ticked, skipped and chose for themselves, so it reaches all their phones. |
 
 Private expenses are never part of a version: they take no part in merges, and a file
 with them or without them is the same version of the trip. The app writes them in a

@@ -18,10 +18,10 @@ import { tidyGroups } from "./choices.js";
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
 import { keptRates, fetchMonth } from "./rates.js";
 import { prepare, saveEdit, inspect, apply, restore, moveMarks, followIds, rejoin, fileName, fileText, separate, joinChanges } from "./trips.js";
-import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop, followIds as followIdsPrivate } from "./private.js";
+import { newOwner, splitPrivate, onLoad as privateOnLoad, join as joinPrivate, emptySet, withMarks, marksInto, mergePrivate, addPrivate, updatePrivate, removePrivate, atStop, setAtStop, followStops, unlinkStop, followIds as followIdsPrivate } from "./private.js";
 import { needsStopIds } from "./ids.js";
 import { openFindPositions } from "./positions.js";
-import { groupOf, groupsIn, chosenIn, programOf, chosenPlan, groupName } from "./choices.js";
+import { groupOf, groupsIn, chosenIn, programOf, chosenPlan, groupName, withMine } from "./choices.js";
 import { areaAround } from "./geocode.js";
 import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
@@ -183,7 +183,19 @@ function applyMapSettings(){
   if(googleNeedsReload(googleKey())){ location.reload(); return true; }
   return false;
 }
-const saveState = () => { if(S.rec) store.setKV("state:" + S.rec.id, S.state).catch(() => {}); };
+// Ticks, skips, a plan and options of my own: on this phone, and for a trip on the
+// account in the personal set too, so they reach all my phones (js/private.js).
+function saveState(){
+  if(!S.rec) return;
+  store.setKV("state:" + S.rec.id, S.state).catch(() => {});
+  if(!S.rec.share || S.rec.share.gone) return;
+  const priv = withMarks(privOf(), S.state);
+  if(canonical(priv) === canonical(privOf())) return;
+  S.rec = {...S.rec, priv};
+  S.records = S.records.map(r => r.id === S.rec.id ? S.rec : r);
+  store.putTrip(S.rec).catch(() => {});
+  syncSoon();
+}
 const saveUi = () => { store.setKV("ui", S.ui).catch(() => {}); };
 
 function todayIndex(){
@@ -251,7 +263,9 @@ async function openRecord(rec){
     const saved = await store.getKV("state:" + rec.id);
     if(saved && typeof saved === "object") S.state = {done: saved.done || {}, skipped: saved.skipped || {}, plans: saved.plans || {},
       ...(saved.notesOpen ? {notesOpen: true} : {}), ...(saved.found ? {found: saved.found} : {})};
+    S.state = marksInto(S.state, rec.priv);
     followNewIds();
+    saveState();   // the marks of before into the set, once
     await store.setKV("active", rec.id);
   }else{
     await store.delKV("active");
@@ -303,7 +317,7 @@ async function importChanges(data){
   if(S.rec !== rec) await openRecord(rec);
   if(!from) return applyEdit(() => ({trip: res.trip, marks: res.moves, priv: res.priv}), "changesApplied", res.counts);
   const trip = await joinChanges(versions, rec.trip, from, res.trip);
-  const priv = res.priv && res.priv.expenses.length ? res.priv : null;
+  const priv = emptySet(res.priv) ? null : res.priv;
   const privChanged = canonical(priv) !== canonical(rec.priv || null);
   if(trip === rec.trip && !privChanged) return;
   if(res.moves.length){ S.state = moveMarks(S.state, res.moves); saveState(); }
@@ -508,7 +522,7 @@ async function applyEdit(change, message, extra = {}, privMessage = "privSaved",
   const out = change(cur);
   if(isLocked(S.rec) && canonical(contentOf(out.trip)) !== canonical(contentOf(cur))){ toast(lockedText(S.rec, "lockedNoEdit")); return; }
   const {trip: next, changed} = await saveEdit(versions, cur, out.trip);
-  const priv = out.priv === undefined ? had : out.priv && out.priv.expenses.length ? out.priv : null;
+  const priv = out.priv === undefined ? had : emptySet(out.priv) ? null : out.priv;
   const privChanged = canonical(priv) !== canonical(had);
   if(!changed && !privChanged) return;
   if(out.marks && out.marks.length){ S.state = moveMarks(S.state, out.marks); saveState(); }
@@ -648,18 +662,45 @@ function mayChange(){
   return true;
 }
 
+const youMark = () => `<span class="you">${S.account ? `<i aria-hidden="true">${esc(S.account.handle.slice(0, 1).toUpperCase())}</i>` : ""}${esc(t("altMine"))}</span>`;
 const optionLabel = s => s ? [s.title, s.time ? timeText(s.time) : ""].filter(Boolean).join(", ") : t("altNone");
 
-// "Choose this": the trip goes to this option of its group.
+// "Choose this" (design/README.md, P1–P2). A trip of mine only: the trip goes to this
+// option. Shared: asked, for everyone or only for me; read only or locked, only for me
+// at once. The group's own option again: my choice goes.
 async function chooseHere(id){
-  if(!mayChange()) return;
   const {ref, list} = hereList();
   const s = list.find(x => x.id === id), g = groupOf(s);
   if(!g) return;
-  const was = chosenIn(groupsIn(list).get(g) || []);
-  if(was === s) return;
-  if(!(await sureForAll(t("altConfirmTitle", {g}), `${optionLabel(was)} → ${optionLabel(s)}`))) return;
-  await applyEdit(tr => ({trip: chooseOption(tr, {...ref, id})}), "altChosenMsg", {g, s: s.title});
+  const options = groupsIn(list).get(g) || [], was = chosenIn(options);
+  const mine = options.find(x => S.state.chosen && S.state.chosen[x.id] && x !== was) || null;
+  if(s === was){ if(mine) setMine(options, null); return; }
+  if(s === mine) return;
+  const others = await othersOnTrip();
+  if(others === null){
+    if(mayChange()) await applyEdit(tr => ({trip: chooseOption(tr, {...ref, id})}), "altChosenMsg", {g, s: s.title});
+    return;
+  }
+  const reach = !canChange() ? "me" : await ask({title: t("altConfirmTitle", {g, s: s.title}),
+    text: [`${optionLabel(was)} → ${optionLabel(s)}`, others.length ? t("altConfirmShared", {who: others.join(", ")}) : t("altConfirmSharedAnyone"), t("altOnlyMeSays")],
+    actions: [{id: "no", label: t("cancel")}, {id: "me", label: t("altOnlyMe")}, {id: "all", label: t("altForAll"), kind: "primary"}]});
+  if(reach === "all"){
+    setMine(options, null);
+    await applyEdit(tr => ({trip: chooseOption(tr, {...ref, id})}), "altChosenMsg", {g, s: s.title});
+  }else if(reach === "me"){
+    setMine(options, s);
+    toast(t(canChange() ? "altMineMsg" : "altMineReadOnly", {g, s: s.title}), {label: t("undo"), run: () => setMine(options, mine)});
+  }
+}
+
+// My option of a group, or none (the group's): in my marks, never in the trip.
+function setMine(options, s){
+  const chosen = {...S.state.chosen};
+  for(const o of options) delete chosen[o.id];
+  if(s) chosen[s.id] = 1;
+  S.state = {...S.state, chosen};
+  saveState();
+  render();
 }
 
 // "Add an alternative" to a stop: the stop form, with its day, time and kind, in its
@@ -1202,10 +1243,12 @@ function renderMe(){
 let syncing = null, syncAgain = false, syncTimer = 0;
 const syncSoon = (ms = 1500) => { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms); };
 
-async function keepSynced(next){
+async function keepSynced(next, from){
+  // Marked here while it synced: joined with what came, and sent at the next sync.
+  if(from && S.rec && S.rec.id === next.id && S.rec.priv !== from.priv){ next = {...next, priv: mergePrivate(from.priv, S.rec.priv, next.priv)}; syncSoon(); }
   await store.putTrip(next);
   S.records = S.records.map(r => r.id === next.id ? next : r);
-  if(S.rec && S.rec.id === next.id){ S.rec = next; followNewIds(); }
+  if(S.rec && S.rec.id === next.id){ S.rec = next; S.state = marksInto(S.state, next.priv); followNewIds(); }
 }
 
 // The open trip came with its stops' ids of their own (converted on another phone, or on
@@ -1260,7 +1303,7 @@ function syncNow(){
           if(remoteOf && !!remoteOf.locked !== !!(next.share && next.share.locked)) next = {...next, share: {...next.share, locked: !!remoteOf.locked}};
           // Its page, if its owner published it: said on the card, kept for the Share sheet.
           if(remoteOf && canonical(remoteOf.publication || null) !== canonical((next.share && next.share.publication) || null)) next = {...next, share: {...next.share, publication: remoteOf.publication || null}};
-          if(next !== rec) await keepSynced(next);
+          if(next !== rec) await keepSynced(next, rec);
         }catch(e){
           if(!e || e.status === 0 || e.status === 401) throw e;   // offline, or signed out: all of it waits
           errors.set(rec.id, String(e.message || e).slice(0, 160));
@@ -1858,7 +1901,7 @@ function comingFrom(dayIndex, list, k, skipped){
   if(!prev) return "";
   if(prev.stay && typeof prev.stay === "object") return prev.stay.address || prev.stay.name;
   const plan = planShown(prev);
-  const before = programOf(plan ? plan.stops : prev.stops);
+  const before = programOf(mineIn(plan ? plan.stops : prev.stops));
   for(let j = before.length - 1; j >= 0; j--){
     const key = stopKey(prev, plan ? plan.id : null, before[j], j);
     if(!S.state.done[key] && S.state.skipped[key]) continue;
@@ -1946,7 +1989,7 @@ function costItems(tr){
   tr.days.forEach((d, i) => {
     const plan = planShown(d);
     // What the day goes through: the chosen option of each group (js/choices.js).
-    programOf(plan ? plan.stops : d.stops).forEach((s, k) => {
+    programOf(mineIn(plan ? plan.stops : d.stops)).forEach((s, k) => {
       const key = stopKey(d, plan ? plan.id : null, s, k);
       const done = !!S.state.done[key];
       ticked.set(d.date + "|" + s.id, done);
@@ -2035,6 +2078,8 @@ function dayTotal(items){
 
 // The plan a day is shown with: the one looked at on this phone, else the trip's chosen one.
 const planShown = d => d.plans ? (d.plans.find(p => p.id === S.state.plans[d.date]) || chosenPlan(d)) : null;
+// A list of the day as I see it: with the options I chose only for me (js/choices.js).
+const mineIn = stops => withMine(stops, new Set(Object.keys(S.state.chosen || {})));
 
 // Whether the open trip can be changed here: not locked, not someone else's page, not
 // shared with this account to read only.
@@ -2130,6 +2175,9 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
     if(drawn.has(g)) continue;
     drawn.add(g);
     const options = groups.get(g), chosen = chosenIn(options), others = options.filter(o => o !== chosen);
+    // Chosen only for me (P3): marked, the group's named.
+    const theirs = options.find(o => o.theirs);
+    const mark = o => o.mine ? youMark() : o.theirs ? `<span class="gtag">${esc(t("altTheirs"))}</span>` : "";
     const key = `${day.date}|${planId || ""}|${g}`, opened = S.openGroups.has(key);
     // Where the group sits in the day: the chosen option's place, or the next stop's.
     const at = all.indexOf(s), nx = list.findIndex(x => all.indexOf(x) > at), slot = chosen ? list.indexOf(chosen) : nx < 0 ? list.length : nx;
@@ -2137,7 +2185,7 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
     // Its options, a choice to make: one tap chooses (R1), asking first on a shared trip (A9).
     const options_ = `<div class="opts" id="${gid}" role="radiogroup" aria-label="${esc(g)}">` + options.map(o => {
       const line = [typeof o.cost === "number" ? costShort(o, []) : "", o.local || ""].filter(Boolean).join(" · ");
-      return `<button type="button" class="opt" role="radio" aria-checked="${o === chosen}" data-choose="${esc(o.id)}"${change ? "" : ` aria-disabled="true"`}><span class="rd" aria-hidden="true"></span><span class="ot"><b>${esc(o.title)}</b>${line ? `<small>${esc(line)}</small>` : ""}</span>${o.time ? `<span class="otm">${esc(timeText(o.time))}</span>` : ""}</button>`;
+      return `<button type="button" class="opt" role="radio" aria-checked="${o === chosen}" data-choose="${esc(o.id)}"><span class="rd" aria-hidden="true"></span><span class="ot"><b>${esc(o.title)}${mark(o)}</b>${line ? `<small>${esc(line)}</small>` : ""}</span>${o.time ? `<span class="otm">${esc(timeText(o.time))}</span>` : ""}</button>`;
     }).join("") + `</div>` + (change ? `<button type="button" class="addopt" data-alt-add="${esc(options[0].id)}">${esc(t("altAdd"))}</button>` : "");
     if(chosen && slot === now.next) html += nowMark();
     if(!chosen){
@@ -2149,7 +2197,8 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
     }else if(opened){
       html += `<li class="group open"><p class="gh"><b>${esc(g)}</b><span>${esc(t("altChooseOne"))}</span><button type="button" class="gclose" data-group="${esc(key)}" aria-expanded="true" aria-controls="${gid}">${esc(t("close"))}</button></p>${options_}</li>`;
     }else{
-      html += `<li class="group${slot === now.next ? " next" : ""}"><p class="gh"><b>${esc(g)}</b></p>${stopEl(chosen, slot, {group: g, chosen: true}, "div")}` +
+      html += `<li class="group${slot === now.next ? " next" : ""}"><p class="gh"><b>${esc(g)}</b>${mark(chosen)}</p>${stopEl(chosen, slot, {group: g, chosen: true}, "div")}` +
+        (chosen.mine ? `<p class="theirs">${esc(t("altTheirsLine", {s: theirs ? optionLabel(theirs) : t("altPendingSig")}))}</p>` : "") +
         `<button type="button" class="alts-line" data-group="${esc(key)}" aria-expanded="false" aria-label="${esc(t("altOthers", {s: others.map(o => o.title).join(", ")}))}"><span class="plus" aria-hidden="true">+${others.length}</span><span class="names" aria-hidden="true">${esc(others.map(o => o.title).join(" · "))}</span></button></li>`;
     }
   }
@@ -2207,7 +2256,7 @@ function renderDay(i){
   const prev = tr.days[i - 1], next = tr.days[i + 1];
   const plan = planShown(d);
   // Every stop of the list (options too), and what the day goes through (js/choices.js).
-  const all = plan ? plan.stops : d.stops, list = programOf(all);
+  const all = mineIn(plan ? plan.stops : d.stops), list = programOf(all);
   const pid = plan ? plan.id : null;
   const keys = list.map((s, k) => stopKey(d, pid, s, k));
   const doneCount = keys.filter(k => S.state.done[k]).length;
@@ -2265,9 +2314,10 @@ function renderDay(i){
   if(d.plans){
     html += `<div class="seg" role="group" aria-label="${esc(t("choosePlan"))}">` + d.plans.map(p =>
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join("") + `</div>`;
-    // Looking at another plan than the one the day goes with: it can be chosen for everyone.
+    // Another plan than the one the day goes with: mine, on all my phones (P4); it can be
+    // chosen for everyone by who can edit.
     const goes = chosenPlan(d);
-    if(plan !== goes && canChange()) html += `<p class="plan-note"><span>${esc(t("planGoesWith", {p: goes.name}))}</span><button type="button" class="linkbtn" data-plan-choose="${esc(pid)}">${esc(t("planChooseAll", {p: plan.name}))}</button></p>`;
+    if(plan !== goes) html += `<p class="plan-note"><span>${esc(t("planGoesWith", {p: goes.name}))}</span>${canChange() ? `<button type="button" class="linkbtn" data-plan-choose="${esc(pid)}">${esc(t("planChooseAll", {p: plan.name}))}</button>` : ""}</p>`;
   }
   html += stopsHTML(d, pid, list, light ? parts : null, paint, all, now);
   // Adding is always the last row (R3, V2): a new stop, or what a chat wrote.
@@ -2388,7 +2438,7 @@ function openSearchHere(){
         if(r.kind === "note") return {sign: `<span class="nb blank">${INFO}</span>`, meta: day, name: t("searchNote"), nameMark: null, where: r.where, label: `${t("searchNote")}, ${day}`};
         // The stop's sign: its number in the day the day goes through, in its kind's colour.
         const plan = r.planId ? (d.plans || []).find(p => p.id === r.planId) : null;
-        const all = plan ? plan.stops : d.stops, s = all[r.index], i = programOf(all).indexOf(s);
+        const all = mineIn(plan ? plan.stops : d.stops), s = all[r.index], i = programOf(all).indexOf(s);
         const colour = TYPE_COLORS[s.type] || cityColor(d.city);
         const sign = s.lat !== undefined && i >= 0 ? `<span class="nb" style="--pf:${colour}">${i + 1}</span>` : s.lat === undefined ? `<span class="nopos-sign">${NO_POS}</span>` : `<span class="nb q"></span>`;
         const meta = [day, r.time ? timeText(r.time, null) : "", plan ? plan.name : "", r.choice && !s.chosen ? r.choice : ""].filter(Boolean).join(" · ");
@@ -2410,7 +2460,7 @@ function goToResult(r){
     revealing = ".dayline";
   }else{
     const plan = r.planId ? (d.plans || []).find(p => p.id === r.planId) : null;
-    const all = plan ? plan.stops : d.stops, s = all[r.index], list = programOf(all), i = list.indexOf(s);
+    const all = mineIn(plan ? plan.stops : d.stops), s = all[r.index], list = programOf(all), i = list.indexOf(s);
     if(i < 0 && s.choice){
       // An option not chosen: its group opened, the option in view.
       S.openGroups.add(`${d.date}|${r.planId || ""}|${s.choice}`);

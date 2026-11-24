@@ -131,7 +131,7 @@ test("private expenses: the traveller's own, with the stop they were paid at and
   assert.deepEqual(ok, []);
   assert.deepEqual(errorsAfter(t => { t.private = {expenses: [{title: "Gelato", cost: 4.5}]}; }), [], "no owner yet: an assistant wrote it");
   assert.ok(hasError(errorsAfter(t => { t.private = {owner: "p-1"}; }), "private.expenses: is required"));
-  assert.ok(hasError(errorsAfter(t => { t.private = {expenses: []}; }), "private.expenses: must not be empty"));
+  assert.deepEqual(errorsAfter(t => { t.private = {expenses: [], marks: {done: {"2027-04-10||colosseum": 1}}}; }), [], "on the account: marks only");
   assert.ok(hasError(errorsAfter(t => { t.private = {owner: "Mario Rossi", expenses: [{title: "A", cost: 1}]}; }), "private.owner: must be a code written by the app"));
   assert.ok(hasError(errorsAfter(t => { t.private = {expenses: [{id: "a", title: "A", cost: 1}, {id: "a", title: "B", cost: 2}]}; }), "private.expenses[1].id"));
   // a stop goes with its day; and only private expenses have one: the trip's cost at a stop is the stop's

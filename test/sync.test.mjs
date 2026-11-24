@@ -139,6 +139,18 @@ test("private expenses: three ways, by id; what changed wins, deletions travel",
   assert.equal(mergePrivate(null, {expenses: [exp("a", 1)]}, {expenses: [exp("b", 2)]}).expenses.length, 2);
 });
 
+test("marks join three ways, key by key; a set from an app of before keeps them", () => {
+  const set = marks => ({expenses: [], marks});
+  const base = set({done: {"d||a": 1, "d||b": 1}, plans: {d: "sun"}});
+  const local = set({done: {"d||a": 1, "d||c": 1}, plans: {d: "rain"}, chosen: {x: 1}});   // b unticked, c ticked, rain, x mine
+  const server = set({done: {"d||a": 1, "d||b": 1, "d||e": 1}, plans: {d: "sun"}});        // e ticked on the other phone
+  assert.deepEqual(mergePrivate(base, local, server).marks, {done: {"d||a": 1, "d||c": 1, "d||e": 1}, plans: {d: "rain"}, chosen: {x: 1}});
+  // Written by an app of before (expenses only): the marks are not taken as all removed.
+  assert.deepEqual(mergePrivate(base, base, {expenses: [exp("hat", 1)]}).marks, base.marks);
+  // Everything unticked: nothing left.
+  assert.equal(mergePrivate(base, set({}), base), null);
+});
+
 test("private expenses sync between two phones of the same person, and the second waits its turn", async () => {
   const s = service();
   const api = s.as("fra");

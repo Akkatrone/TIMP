@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupsIn, chosenIn, programOf, chosenPlan, groupName } from "../js/choices.js";
+import { groupsIn, chosenIn, programOf, chosenPlan, groupName, withMine } from "../js/choices.js";
 import { oldStopId } from "../js/ids.js";
 import { addAlternative, chooseOption, removeStop, moveGroup, choosePlan, updateStop, leaveGroup } from "../js/edit.js";
 import { applyChanges, outline, CHANGES } from "../js/changes.js";
@@ -105,4 +105,18 @@ test("the history says choices in words", () => {
   assert.deepEqual(lines, ["Lunch: Mercado Exemplo chosen"]);
   const fresh = describe(diffTrips(demo(), withLunch()));
   assert.ok(fresh.includes("Lunch: 2 alternatives"), fresh.join(" | "));
+});
+
+test("only for me: my option chosen and marked, the group's marked; the trip never changed", () => {
+  const t = withLunch(), stops = stopsOf(t, D1), before = JSON.stringify(stops);
+  assert.equal(withMine(stops, new Set()), stops, "none of mine: the same list");
+  assert.equal(withMine(stops, new Set([ID("lunch")])), stops, "mine is the group's: nothing to show");
+  const mine = withMine(stops, new Set([n(2)]));
+  const lunch = mine.filter(s => s.choice === "Lunch");
+  assert.deepEqual(lunch.map(s => [s.title, !!s.chosen, !!s.mine, !!s.theirs]).sort(),
+    [["Casa Exemplo", false, false, false], ["Lunch in Alfama", false, false, true], ["Mercado Exemplo", true, true, false]]);
+  assert.ok(programOf(mine).some(s => s.title === "Mercado Exemplo") && !programOf(mine).some(s => s.title === "Lunch in Alfama"), "the day goes through mine");
+  assert.equal(JSON.stringify(stops), before);
+  // My option deleted: its id names nothing, the group's shows.
+  assert.equal(withMine(stops, new Set(["gone"])), stops);
 });

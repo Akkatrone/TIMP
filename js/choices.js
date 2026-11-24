@@ -94,3 +94,23 @@ export function tidyGroups(stops){
 export function startGroup(stops, id, name){
   return stops.map(x => x.id === id ? {...x, choice: name, chosen: true} : x);
 }
+
+/**
+ * The stops as I see them: in a group where I chose another option only for me (`mine`,
+ * a set of stop ids: js/private.js), mine is the one chosen, marked `mine`, and the
+ * group's is marked `theirs`. The trip's own stops are never changed.
+ */
+export function withMine(stops, mine){
+  const pick = new Map();
+  if(mine.size) for(const [g, xs] of groupsIn(stops)){
+    const m = xs.find(x => mine.has(x.id)), theirs = chosenIn(xs);
+    if(m && m !== theirs) pick.set(g, {m, theirs});
+  }
+  if(!pick.size) return stops;
+  return stops.map(s => {
+    const p = pick.get(groupOf(s));
+    if(!p) return s;
+    if(s === p.m) return {...s, chosen: true, mine: true};
+    return s.chosen === true ? {...without(s, "chosen"), ...(s === p.theirs ? {theirs: true} : {})} : s;
+  });
+}

@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.3.0
+
+- **Only for me**, on a shared trip: choosing an option asks "Only for me" or "For
+  everyone". Only for me: nobody else sees it, and the trip gets no new version. Your
+  choice is marked "Only you", with the group's named under it; the numbers, the route,
+  the map and the costs follow yours. Choosing the group's option again takes you back.
+- Shared to read only: an option is chosen only for you at once, with Undo.
+- **Ticks, skips, the plan you look at and your own choices** now reach all your phones
+  on the account (until now they stayed on one phone). They stay yours: never in the
+  trip, never seen by the people it is shared with, nor by a linked chat.
+- Needs TIMP-share 1.10.0 (the service keeps a personal set without expenses).
+
 ## 4.2.2
 
 - **List | Map while scrolling** keeps your place, like a larger or smaller map: the

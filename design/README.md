@@ -134,6 +134,28 @@ order, error. The accent belongs to none of the palettes.
   sunset from the real sun, the others from fixed hours around them.
 - **T5** All day is no time: the stop goes at the top of the day, before the timed ones.
 
+## Alternatives: for everyone or only for me
+
+A group of alternatives is one card: the option chosen, "+N" and the others' names;
+opened, the options as a choice. A shared trip has two layers, never more: the group's
+plan, in the trip, and mine, only where I differ, on all my phones and nobody else's.
+
+- **P1** The option is the action; a question gives its reach. On a shared trip a tap
+  asks: Cancel · Only for me · For everyone, the safe answer first. No second row of
+  buttons on every option.
+- **P2** No question when there is one answer: a trip of mine only, the trip changes;
+  read only or locked, only for me at once, said with Undo; the group's own option
+  again, back to it; my own again, nothing.
+- **P3** Mine is marked: the circle of you and "Only you" (never the circle alone, A8);
+  under it, quietly, "The group: …". Opened, the group's option says "The group's". The
+  number, the line, the map, the next stop and the costs follow mine.
+- **P4** A plan the same way: the one I look at is mine, on all my phones; the day's line
+  says which the day goes with, and who can edit chooses it for everyone.
+- **P5** The group moves after me: mine stays; if the group comes to mine, or mine is
+  deleted, the difference goes by itself.
+- **P6** Ticks and skips are mine too, on all my phones; a linked chat and a published
+  page see the group's plan only.
+
 ## Signals and warnings
 
 Four levels: **error** (red; something failed or may be lost), **attention** (yellow;

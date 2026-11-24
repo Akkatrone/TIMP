@@ -10,7 +10,7 @@ import { withApp } from "./lib/browser.mjs";
 import { prepare } from "../js/trips.js";
 import { commit, relation, commonBase, commitMerge } from "../js/version.js";
 import { mergeTrips } from "../js/merge.js";
-import { addStop } from "../js/edit.js";
+import { addStop, addAlternative } from "../js/edit.js";
 import { splitPrivate } from "../js/private.js";
 import { publishable } from "../js/publish.js";
 import { oldStopId } from "../js/ids.js";
@@ -1821,7 +1821,10 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.ok([...service.invites.values()].every(i => i.revoked));
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
     // A trip of someone else's, and an invite to it, received as a link.
-    const {trip: theirs} = await prepare({...splitPrivate(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"))).trip, id: "from-ugo", title: "Ugo's trip"});
+    const {trip: ugo} = await prepare({...splitPrivate(JSON.parse(readFileSync(new URL("../examples/demo-trip.json", import.meta.url), "utf8"))).trip, id: "from-ugo", title: "Ugo's trip"});
+    // With a lunch to choose, for the next step: the group's is Lunch in Alfama.
+    const alfama = ugo.days[0].stops.find(s => s.title === "Lunch in Alfama").id;
+    const theirs = await commit(addAlternative(ugo, {date: "2027-05-14", plan: null, id: alfama}, {title: "Casa Exemplo", time: "13:00", type: "food"}, "Lunch").trip, ugo);
     service.trips.set("t-ugo", {id: "t-ugo", owner: "ugo", localId: "from-ugo", head: theirs.version.id, versions: new Map([[theirs.version.id, theirs]])});
     service.invites.set("for-fra-from-ugo-0001", {trip: "t-ugo", role: "read"});
     await run(`location.hash = "#invite=for-fra-from-ugo-0001";`);
@@ -1872,6 +1875,69 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await until("a way to publish again", `document.querySelector("dialog.sheet[open] [data-pub-make]")`);
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
     await until("no sign on its card", `${card} && !${card}.querySelector("[data-published]")`, 15000);
+    assert.deepEqual(blocked(), []);
+  });
+
+  await step("only for me: read only, an option is chosen for me at once, marked, the group's named; ticks too reach my set, never the trip", async () => {
+    await run(`location.hash = "#day-1";`);
+    await until("Ugo's lunch", `document.title === "Ugo's trip" && document.querySelector(".alts-line")`);
+    const head = service.trips.get("t-ugo").head, mine = () => (service.privs.get("fra|t-ugo") || {data: null}).data;
+    await run(`document.querySelector(".alts-line").click();`);
+    await until("the options", `document.querySelector('.opts [role="radio"]')`);
+    const casa = await run(`return [...document.querySelectorAll('.opts [role="radio"]')].find(b => b.textContent.includes("Casa Exemplo")).dataset.choose;`);
+    await run(`document.querySelector('[data-choose="${casa}"]').click();`);
+    await until("chosen for me", `/Lunch: Casa Exemplo, only for you/.test(document.getElementById("toast").textContent)`);
+    assert.equal(await run(`return document.querySelector("dialog.ask[open]");`), null, "nothing asked: read only has one answer");
+    assert.deepEqual(await run(`return [...document.querySelectorAll('.opts [role="radio"]')].map(b => [b.querySelector("b").textContent, b.getAttribute("aria-checked")]).sort();`),
+      [["Casa ExemploFOnly you", "true"], ["Lunch in AlfamaThe group's", "false"]]);
+    await run(`document.querySelector(".gclose").click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.equal(await text(".group .gh"), "LunchFOnly you");
+    assert.equal(await text(".group .theirs"), "The group: Lunch in Alfama, 14:00");
+    // Ticked, then on the account: in my set, with my lunch; the trip has no new version.
+    await run(`document.querySelector(".group [data-tick]").click();`);
+    for(let i = 0; i < 50 && !(mine() && mine().marks && mine().marks.done); i++) await new Promise(r => setTimeout(r, 200));
+    assert.deepEqual(Object.keys(mine().marks.chosen), [casa]);
+    assert.deepEqual(Object.keys(mine().marks.done), [`2027-05-14||${casa}`]);
+    assert.equal(service.trips.get("t-ugo").head, head, "the trip unchanged");
+    // The group's own again, opened: my choice goes, without a question.
+    await run(`document.querySelector(".alts-line").click();`);
+    await until("the options", `document.querySelector('.opts [role="radio"]')`);
+    await run(`[...document.querySelectorAll('.opts [role="radio"]')].find(b => b.textContent.includes("Alfama")).click(); await new Promise(r => setTimeout(r, 200));`);
+    assert.equal(await run(`return document.querySelector(".you");`), null);
+    // My own trip, shared with ugo who can edit: asked, for everyone or only for me.
+    const [id, t] = [...service.trips].find(([, x]) => x.localId === "demo-lisbon");
+    service.members.set(id, new Map([["ugo", "edit"]]));
+    const v = t.versions.get(t.head), lunch = v.days[0].stops.find(s => s.title === "Lunch in Alfama").id;
+    const next = await commit(addAlternative(v, {date: "2027-05-14", plan: null, id: lunch}, {title: "Casa Exemplo", time: "13:00", type: "food"}, "Lunch").trip, v);
+    t.versions.set(next.version.id, next); t.head = next.version.id;
+    await run(`location.hash = "#trips";`);
+    const card = `[...document.querySelectorAll(".tripcard")].find(c => c.querySelector('[data-id="demo-lisbon"]'))`;
+    await until("the trip", `${card}`, 15000);
+    await run(`const b = ${card}.querySelector('[data-act="open"]'); if(b) b.click(); await new Promise(r => setTimeout(r, 400));`);
+    await run(`location.hash = "#trips";`);
+    await until("synced", `document.querySelector('[data-act="sync"]')`, 15000);
+    await run(`document.querySelector('[data-act="sync"]').click();`);
+    await run(`location.hash = "#day-1";`);
+    // Its lunch, open as Ugo's was (the same day and group).
+    await until("its lunch", `document.title.includes("Lisbon") && [...document.querySelectorAll('.opts [role="radio"]')].some(b => b.textContent.includes("Casa"))`, 15000);
+    await run(`[...document.querySelectorAll('.opts [role="radio"]')].find(b => b.textContent.includes("Casa")).click();`);
+    await until("asked", `document.querySelector("dialog.ask[open]")`);
+    assert.equal(await text("dialog.ask[open] h2"), "Lunch: Casa Exemplo?");
+    assert.deepEqual(await run(`return [...document.querySelectorAll("dialog.ask[open] [data-answer]")].map(b => b.textContent);`), ["Cancel", "Only for me", "For everyone"]);
+    assert.equal(await run(`return document.activeElement.dataset.answer;`), "no", "the safe answer has the focus");
+    await run(`document.querySelector('dialog.ask[open] [data-answer="me"]').click();`);
+    await until("mine", `/Lunch: Casa Exemplo, only for you/.test(document.getElementById("toast").textContent)`);
+    assert.equal(t.head, next.version.id, "no new version");
+    // Then for everyone: a new version, and my difference gone.
+    await run(`[...document.querySelectorAll('.opts [role="radio"]')].find(b => b.textContent.includes("Casa")).click(); await new Promise(r => setTimeout(r, 300));`);
+    assert.equal(await run(`return document.querySelector("dialog.ask[open]");`), null, "mine already: nothing to choose");
+    await run(`[...document.querySelectorAll('.opts [role="radio"]')].find(b => b.textContent.includes("Alfama")).click(); await new Promise(r => setTimeout(r, 200));`);
+    await run(`[...document.querySelectorAll('.opts [role="radio"]')].find(b => b.textContent.includes("Casa")).click();`);
+    await until("asked", `document.querySelector("dialog.ask[open]")`);
+    await run(`document.querySelector('dialog.ask[open] [data-answer="all"]').click();`);
+    await until("for everyone", `/Lunch: Casa Exemplo chosen · version/.test(document.getElementById("toast").textContent)`);
+    assert.equal(await run(`return document.querySelector(".you");`), null);
+    service.members.delete(id);
     assert.deepEqual(blocked(), []);
   });
 

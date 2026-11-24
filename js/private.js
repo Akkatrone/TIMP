@@ -1,10 +1,14 @@
-// Private expenses: what the traveller spends only for themselves (shopping, a meal
-// alone). They are in the trip file, in its "private" section, and kept on the phone
-// next to the trip, but never in its versions: they take no part in a merge, and a
-// phone that receives the trip without them, or skips them, has the same trip with
-// the same version. No DOM here.
+// The traveller's personal set of a trip: private expenses, what they spend only for
+// themselves (shopping, a meal alone), and on the account their marks. Kept on the
+// phone next to the trip, never in its versions: it takes no part in a merge, and a
+// phone that receives the trip without it has the same trip with the same version.
+// The expenses go in a saved file too, in its "private" section; the marks never do.
+// No DOM here.
 //
-//   "private": {"owner": "p-…", "expenses": [{id, title, cost, currency?, date?, stop?}]}
+//   "private": {"owner": "p-…", "expenses": [{id, title, cost, currency?, date?, stop?}], "marks": {…}}
+//
+// marks: as the app keeps them (S.state): done, skipped {"date|plan|id": 1}; plans
+//   {date: plan id}; chosen {stop id: 1}, the options chosen only for me (js/choices.js).
 //
 // owner: a random code, made by the phone of the person they belong to. A phone that
 //   loads a file with its own code takes them without asking; any other phone asks.
@@ -41,6 +45,22 @@ export function splitPrivate(file){
   return {trip, priv: expenses.length ? {...(p.owner ? {owner: p.owner} : {}), expenses} : null};
 }
 
+/* ---------- marks: ticks, skips, a plan and options of my own ---------- */
+
+const MARKS = ["done", "skipped", "plans", "chosen"];
+
+/** A set with nothing in it: no expenses, no marks. */
+export const emptySet = p => !p || (!(p.expenses || []).length && !MARKS.some(k => p.marks && p.marks[k] && Object.keys(p.marks[k]).length));
+
+/** The set with the marks of `state`; null when nothing is left. Always with `marks`: without it, an app of before wrote the set (mergePrivate). */
+export function withMarks(priv, state){
+  const out = {...(priv || {expenses: []}), marks: Object.fromEntries(MARKS.filter(k => state[k] && Object.keys(state[k]).length).map(k => [k, state[k]]))};
+  return emptySet(out) ? null : out;
+}
+
+/** The state with the set's marks, when it has any. */
+export const marksInto = (state, priv) => priv && priv.marks ? {...state, ...Object.fromEntries(MARKS.map(k => [k, {...priv.marks[k]}]))} : state;
+
 /** The trip as a file, with the private expenses when there are any. */
 export function withPrivate(trip, priv){
   if(!priv || !priv.expenses.length) return trip;
@@ -74,14 +94,14 @@ export function join(local, incoming, owner){
   const byId = new Map((local ? local.expenses : []).map(x => [x.id, x]));
   for(const x of incoming.expenses) byId.set(x.id, x);
   const expenses = [...byId.values()].sort((a, b) => (a.date || "") < (b.date || "") ? -1 : (a.date || "") > (b.date || "") ? 1 : 0);
-  return {owner: (local && local.owner) || incoming.owner || owner, expenses};
+  return {...(local && local.marks ? {marks: local.marks} : {}), owner: (local && local.owner) || incoming.owner || owner, expenses};
 }
 
 /* ---------- changes, as for the trip's own expenses (js/edit.js) ---------- */
 
 // The expense functions work on anything with days and expenses.
 const asTrip = (priv, trip) => ({days: trip.days, expenses: priv ? priv.expenses : []});
-const back = (priv, owner, out) => ({owner: (priv && priv.owner) || owner, expenses: out.expenses || []});
+const back = (priv, owner, out) => ({...priv, owner: (priv && priv.owner) || owner, expenses: out.expenses || []});
 
 /** Adds a private expense. Returns {priv, id}. */
 export function addPrivate(priv, trip, owner, expense){
@@ -157,33 +177,41 @@ export function unlinkStop(priv, date, id){
 /* ---------- with the sharing service (js/sync.js) ---------- */
 
 // The same content, whatever the order of the fields.
-const sameExpense = (a, b) => {
+const same = (a, b) => {
   const c = v => v && typeof v === "object" ? JSON.stringify(Object.keys(v).sort().reduce((o, k) => (o[k] = v[k], o), {})) : JSON.stringify(v);
   return c(a) === c(b);
 };
 
+// Entry by entry, as two copies of a trip are joined: changed on one side only, that
+// side; on both, this phone's; gone on one side and untouched on the other, gone; gone
+// on one, changed on the other, kept; new on either side, kept.
+function join3(B, L, S){
+  const out = new Map();
+  for(const k of new Set([...L.keys(), ...S.keys()])){
+    const b = B.get(k), l = L.get(k), s = S.get(k);
+    if(l !== undefined && s !== undefined) out.set(k, same(l, b) ? s : l);
+    else if(l !== undefined){ if(b === undefined || !same(l, b)) out.set(k, l); }
+    else if(b === undefined || !same(s, b)) out.set(k, s);
+  }
+  return out;
+}
+
 /**
- * The private expenses changed on this phone and on the service since the last sync
- * (`base`), joined by id, as two copies of a trip are:
- *   changed on one side only: that side;  on both: this phone's;
- *   gone on one side and untouched on the other: gone;  gone on one, changed on the other: kept;
- *   new on either side: kept.
- * @returns {owner, expenses} or null when none are left
+ * The personal set changed on this phone and on the service since the last sync
+ * (`base`), joined three ways: the expenses by id, each mark by its key. A set from the
+ * service without marks was written by an app of before, which knows none: its marks
+ * are taken as unchanged, never as all removed.
+ * @returns the set, or null when nothing is left
  */
 export function mergePrivate(base, local, server){
-  const map = s => new Map((s ? s.expenses : []).map(x => [x.id, x]));
-  const B = map(base), L = map(local), S = map(server);
-  const out = [];
-  for(const id of new Set([...L.keys(), ...S.keys()])){
-    const b = B.get(id), l = L.get(id), s = S.get(id);
-    if(l && s) out.push(sameExpense(l, b) ? s : l);
-    else if(l){ if(!b || !sameExpense(l, b)) out.push(l); }
-    else if(s){ if(!b || !sameExpense(s, b)) out.push(s); }
-  }
-  if(!out.length) return null;
+  const byId = s => new Map((s ? s.expenses || [] : []).map(x => [x.id, x]));
   // The same order on every phone: by date, then by id.
   const key = x => (x.date || "") + "\u0000" + x.id;
-  out.sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+  const expenses = [...join3(byId(base), byId(local), byId(server)).values()].sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+  const marksOf = s => (s && s.marks) || {};
+  const theirs = server && server.marks ? server.marks : marksOf(base);
+  const marks = Object.fromEntries(MARKS.map(k => [k, Object.fromEntries(join3(...[marksOf(base), marksOf(local), theirs].map(m => new Map(Object.entries(m[k] || {})))))]).filter(([, v]) => Object.keys(v).length));
   const owner = (local && local.owner) || (server && server.owner) || (base && base.owner);
-  return {...(owner ? {owner} : {}), expenses: out};
+  const out = {...(owner ? {owner} : {}), expenses, marks};
+  return emptySet(out) ? null : out;
 }

@@ -680,6 +680,12 @@ ol.stops{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
 .opt[aria-disabled="true"]{cursor:default}
 .addopt{display:block;width:100%;min-height:var(--touch);padding:0 var(--sp-4) 0 calc(var(--sp-3) + var(--rail) + var(--sp-4));border:0;border-top:1px solid var(--line);background:none;color:var(--accent);font:600 var(--fs-m) var(--f-body);text-align:left;cursor:pointer}
 .group.open .gh{padding-bottom:var(--sp-3)}
+/* chosen only for me (design/README.md, P3): the circle of you and the words; the group's named */
+.you{display:inline-flex;align-items:center;gap:var(--sp-1);margin-left:var(--sp-2);padding:2px var(--sp-2) 2px 2px;border:1px solid var(--line-strong);border-radius:var(--r-full);font:600 var(--fs-xs)/1 var(--f-body);color:var(--ink);vertical-align:1px;white-space:nowrap}
+.group .gh .you{color:var(--ink);font-weight:600}
+.you i{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:var(--r-full);background:var(--ink);color:var(--bg);font-style:normal}
+.gtag{margin-left:var(--sp-2);font:600 var(--fs-xs) var(--f-body);color:var(--muted)}
+.group .theirs{margin:0;padding:0 var(--sp-4) var(--sp-3) calc(var(--sp-3) + var(--rail) + var(--sp-4));font-size:var(--fs-s);color:var(--muted)}
 .group.pending{border:1.5px dashed var(--line-strong)}
 .group.pending::before{background:repeating-linear-gradient(to bottom,var(--c) 0 6px,transparent 6px 11px);opacity:.6}
 .ghead{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);column-gap:var(--sp-4);padding:var(--sp-4) var(--sp-4) var(--sp-3) var(--sp-3)}

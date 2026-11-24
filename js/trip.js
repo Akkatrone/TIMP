@@ -140,7 +140,8 @@ export const FIELDS = {
     by: {type: "text", req: true, doc: "The handle of whoever published it."}
   },
   private: {
-    expenses: {type: "list", of: "expense", min: 1, req: true, doc: "Shopping, a meal alone."},
+    expenses: {type: "list", of: "expense", req: true, doc: "Shopping, a meal alone."},
+    marks: {type: "any", byApp: true, inBrief: false, doc: "Written by the app, on the account only: what the traveller ticked, skipped and chose for themselves."},
     owner: {type: "text", pattern: ID, hint: "a code written by the app", byApp: true, doc: "Written by the app: whose they are. Keep it, never invent it."}
   },
   stay: {
