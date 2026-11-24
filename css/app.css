@@ -761,7 +761,7 @@ mark{background:var(--warn-bg);background:color-mix(in srgb,var(--accent) 22%,tr
 
 /* The day as a map (M2–M7): the stage under the bar, the list scrolling under it. Always
    light (R11): the map's own tokens. */
-.mapstage{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--strip-h,0px));z-index:4;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-top:calc(-1 * var(--sp-5));height:min(38dvh,360px);transition:height var(--dur-expand) var(--ease);background:var(--map-bg);color-scheme:light;box-shadow:0 8px 16px -12px color-mix(in srgb,var(--map-ink) 45%,transparent)}
+.mapstage{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--strip-h,0px));z-index:4;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-top:calc(-1 * var(--sp-5));height:min(38dvh,360px);background:var(--map-bg);color-scheme:light;box-shadow:0 8px 16px -12px color-mix(in srgb,var(--map-ink) 45%,transparent)}
 .mapstage #live-slot,.mapstage .live{height:100%;border-radius:var(--r-none)}
 .mapstage.sketch{position:static;height:auto;margin-inline:0;margin-top:0;padding:var(--sp-4);border-radius:var(--r-m);display:grid;gap:var(--sp-4);background:var(--surface);color-scheme:normal;box-shadow:none}
 .mctl{position:absolute;right:var(--sp-4);top:var(--sp-4);z-index:2;display:grid;gap:var(--sp-3)}
@@ -779,11 +779,11 @@ mark{background:var(--warn-bg);background:color-mix(in srgb,var(--accent) 22%,tr
 .live .pin.station:focus-visible{outline:2px solid var(--map-ink);outline-offset:2px}
 .me-dot{display:block;width:16px;height:16px;border-radius:var(--r-full);background:var(--map-me);border:3px solid var(--map-card);box-shadow:0 0 0 6px color-mix(in srgb,var(--map-me) 22%,transparent)}
 
-/* The row of days, and at its end List | Map (M2): there on every page of a trip, unseen
-   away from a day, so the bar keeps one size. */
+/* The row of days, and at its end List | Map (M2), on a day only: elsewhere the days run
+   to the end of the row. The toggle is no taller than the days: the bar keeps one size. */
 .drow{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
 .drow #days{flex:1 1 auto;min-width:0}
-.vt.off{visibility:hidden}
+.vt.off{display:none}
 .mapstage.big{height:min(72dvh,720px)}
 
 /* Search in the bar (S1–S6): the field in the title's place, ✕ for the lens, the circle
@@ -798,3 +798,17 @@ html.searching body{overflow:hidden}
 html.searching :is(.fabs,.nextbar){display:none}
 /* One ✕ only: the lens's. The browser's own "clear" in the field goes. */
 .search-q::-webkit-search-cancel-button,.search-q::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
+
+/* The app does not zoom with two fingers: only the map does. Text grows with the phone's
+   text size (rem). */
+html{touch-action:pan-x pan-y}
+.live,.live *{touch-action:none}
+/* A day with one stop has no line to draw. */
+.stops > li:only-child .rail::before,.stops > .group:only-child::before{display:none}
+/* The day's notes in its form: one field each, with ✕. */
+.notes-f{border:0;padding:0;margin:0;display:grid;gap:var(--sp-3)}
+.notes-f legend{padding:0;margin-bottom:var(--sp-2);font-weight:600}
+.notes-l{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
+.notes-l li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-2);align-items:start}
+.notes-f [data-note-add]{justify-self:start}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

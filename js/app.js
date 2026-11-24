@@ -1788,10 +1788,14 @@ function resizeMap(b){
   b.setAttribute("aria-pressed", String(S.ui.mapBig));
   b.title = t(S.ui.mapBig ? "mapSmaller" : "mapLarger");
   b.innerHTML = S.ui.mapBig ? SHRINK : FRAME;
-  let done = false;
-  const settle = () => { if(done) return; done = true; if(live){ live.handle.refresh(); live.handle.fit(null); } };
-  stage.addEventListener("transitionend", settle, {once: true});
-  setTimeout(settle, 400);
+  // At once, not animated: growing the stage every frame made the page lag. The stop
+  // looked at, just under the map, stays just under it: the list is pushed down.
+  const under = () => stage.getBoundingClientRect().bottom;
+  const anchor = [...$app.querySelectorAll(".stops > li")].find(li => li.getBoundingClientRect().bottom > under() + 1);
+  const gap = anchor ? anchor.getBoundingClientRect().top - under() : 0;
+  stage.classList.toggle("big", S.ui.mapBig);
+  if(anchor) scrollToY(Math.max(0, scrollTop() + anchor.getBoundingClientRect().top - under() - gap));
+  if(live){ live.handle.refresh(); live.handle.fit(null); }
 }
 
 // A stop chosen on the map (M3): its card, just under the map, marked.
@@ -2736,17 +2740,26 @@ function endHold(){
   clearTimeout(hold.timer);
   const fired = hold.fired;
   hold = null;
+  // Only the click that comes as the finger lifts is the hold's: not a later one.
+  if(fired) setTimeout(() => { held = false; }, 350);
   // The phone may still select or open its menu as the finger lifts: wait a moment.
   setTimeout(() => { $root.classList.remove("holding"); if(fired) clearSelection(); }, fired ? 400 : 0);
 }
 $app.addEventListener("pointerdown", e => {
-  const nb = e.target.closest("[data-pin]");
+  // The number, or the stop's name: held, the stop on the map.
+  const title = e.target.closest(".stops .tt .tap");
+  const nb = e.target.closest("[data-pin]") || (title && title.closest(".stop").querySelector(".nb[data-pin]"));
   endHold();
   if(!nb || (e.pointerType === "mouse" && e.button !== 0)) return;
   $root.classList.add("holding");
   hold = {x: e.clientX, y: e.clientY, fired: false};
-  hold.timer = setTimeout(() => { if(!hold) return; hold.fired = true; clearSelection(); showOnMap(+nb.dataset.pin); }, 450);
+  hold.timer = setTimeout(() => { if(!hold) return; hold.fired = true; held = true; clearSelection(); showOnMap(+nb.dataset.pin); }, 450);
 });
+// The tap that ends a hold does not also open or close the stop.
+let held = false;
+$app.addEventListener("click", e => { if(held){ held = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+// Safari's own pinch: the app does not zoom, the map does (it handles its touches itself).
+document.addEventListener("gesturestart", e => e.preventDefault());
 document.addEventListener("pointermove", e => { if(hold && !hold.fired && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 10) endHold(); });
 for(const type of ["pointerup", "pointercancel"]) document.addEventListener(type, endHold);
 // The phone's own menu for a long press (copy, select) would open on top of the map.

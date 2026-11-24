@@ -487,6 +487,14 @@ export function openStopEditor(o){
  *   onSave(set)          the fields as filled in; an empty one is removed
  *   onDelete()           remove the day and its stops
  */
+// A note of the day in the form: its text, and ✕ to take it away.
+let noteN = 0;
+function noteRow(text){
+  const id = "note-" + (++noteN);
+  return `<li><label class="sr" for="${id}">${esc(t("fNote"))}</label><textarea id="${id}" rows="2">${esc(text)}</textarea>` +
+    `<button type="button" class="iconbtn" data-note-remove aria-label="${esc(t("fNoteRemove"))}" title="${esc(t("fNoteRemove"))}">×</button></li>`;
+}
+
 export function openDayEditor(o){
   const dlg = ensureDialog();
   const d = o.day, lang = getLang();
@@ -516,11 +524,11 @@ export function openDayEditor(o){
       <label for="day-stay-address">${esc(t("fStayAddress"))}</label>
       <input id="day-stay-address" type="text" autocomplete="off" value="${esc(stay.address || "")}">
     </div>
-    <div class="field">
-      <label for="day-notes">${esc(t("fNotes"))}</label>
-      <textarea id="day-notes" rows="3">${esc((d.notes || []).join("\n"))}</textarea>
-      <p class="foot">${esc(t("fNotesHelp"))}</p>
-    </div>
+    <fieldset class="field notes-f">
+      <legend>${esc(t("fNotes"))}</legend>
+      <ol class="notes-l" id="day-notes">${(d.notes || []).map(noteRow).join("")}</ol>
+      <button type="button" class="btn small" data-note-add>${esc(t("fNoteAdd"))}</button>
+    </fieldset>
     <div class="sheet-actions">
       ${o.canDelete ? `<button type="button" class="btn small danger" data-delete>${esc(t("deleteDay"))}</button>` : ""}
       <span class="grow"></span>
@@ -532,6 +540,19 @@ export function openDayEditor(o){
   dlg.onclick = async e => {
     if(e.target === dlg) return;
     if(e.target.closest("[data-close]")){ dlg.close(); return; }
+    // A note taken away, or one more: each note is a field of its own.
+    const gone = e.target.closest("[data-note-remove]");
+    if(gone){
+      const li = gone.closest("li"), next = li.nextElementSibling || li.previousElementSibling;
+      li.remove();
+      (next ? next.querySelector("textarea") : $("[data-note-add]")).focus();
+      return;
+    }
+    if(e.target.closest("[data-note-add]")){
+      $("#day-notes").insertAdjacentHTML("beforeend", noteRow(""));
+      $("#day-notes li:last-child textarea").focus();
+      return;
+    }
     if(e.target.closest("[data-delete]")){
       const answer = await ask({title: t("deleteDayTitle"), text: t("deleteDayText", {n: o.number, d: p.long}),
         actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("deleteDay"), kind: "danger"}]});
@@ -556,7 +577,7 @@ export function openDayEditor(o){
       city: $("#day-city").value.trim(),
       title: $("#day-title").value.trim(),
       ...(same ? {} : {stay: nextStay}),
-      notes: $("#day-notes").value.split("\n").map(s => s.trim()).filter(Boolean)
+      notes: [...dlg.querySelectorAll("#day-notes textarea")].map(x => x.value.trim()).filter(Boolean)
     });
   });
   dlg.showModal();

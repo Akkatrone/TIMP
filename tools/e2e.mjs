@@ -339,6 +339,12 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed");`), "false", "a tap leaves the map closed");
     await press(700);
     assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed");`), "true", "a hold opens it");
+    // Held, the stop's name does it too; the tap that ends the hold does not open the stop.
+    await click("[data-map]");
+    const open0 = await count(".stop.open");
+    await run(`const b = document.querySelectorAll(".stop .tt .tap")[2]; const r = b.getBoundingClientRect(); const o = {bubbles: true, clientX: r.x + 4, clientY: r.y + 4, pointerType: "touch"}; b.dispatchEvent(new PointerEvent("pointerdown", o)); await new Promise(res => setTimeout(res, 700)); b.dispatchEvent(new PointerEvent("pointerup", o)); b.click(); await new Promise(res => setTimeout(res, 200));`);
+    assert.equal(await run(`return document.querySelector("[data-map]").getAttribute("aria-pressed");`), "true", "held, the name opens the map");
+    assert.equal(await count(".stop.open"), open0, "and does not open the stop");
     await press(700);
     await until("the pin of the third stop", `document.querySelector(".live .pin.sel") && document.querySelector(".live .pin.sel").getAttribute("aria-label") === "Miradouro de Santa Luzia"`);
     // The sketch: the badge of that stop pulses.
@@ -882,10 +888,17 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-day-edit]").click();`);
     await until("the day form", `document.querySelector("dialog.sheet[open] #day-title")`);
     assert.equal(await run(`return document.getElementById("day-city").value;`), "Lisboa");
-    await run(`document.getElementById("day-title").value = "Belém slowly"; document.getElementById("day-notes").value = "Pastéis before ten\\n\\nTram 15 from Praça da Figueira"; document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+    // A note is a field of its own: two added, each with its ✕.
+    await run(`document.getElementById("day-title").value = "Belém slowly"; for(const n of ["Pastéis before ten", "Tram 15 from Praça da Figueira"]){ document.querySelector("[data-note-add]").click(); document.querySelector("#day-notes li:last-child textarea").value = n; } document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
     assert.equal(await text(".dayhead h1"), "Belém slowly");
     assert.deepEqual(await run(`const h = document.querySelector(".dayline [data-notes]"); if(h && h.getAttribute("aria-expanded") === "false") h.click(); await new Promise(r => setTimeout(r, 100)); return [...document.querySelectorAll(".dayline li .tx")].map(d => d.textContent).slice(-2);`), ["Pastéis before ten", "Tram 15 from Praça da Figueira"]);
     assert.match(await run(`return document.getElementById("toast").textContent;`), /Day saved · version [0-9a-f]{7}/);
+    // One of them taken away with its ✕: the other stays.
+    await run(`document.querySelector("[data-day-edit]").click();`);
+    await until("the day form", `document.querySelectorAll("dialog.sheet[open] #day-notes textarea").length === 2`);
+    await run(`document.querySelector("#day-notes [data-note-remove]").click(); document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
+    assert.deepEqual(await run(`const h = document.querySelector(".dayline [data-notes]"); if(h && h.getAttribute("aria-expanded") === "false") h.click(); await new Promise(r => setTimeout(r, 100)); return [...document.querySelectorAll(".dayline li .tx")].map(d => d.textContent).slice(-1);`), ["Tram 15 from Praça da Figueira"]);
+    assert.equal(await run(`return [...document.querySelectorAll(".dayline li .tx")].some(d => d.textContent === "Pastéis before ten");`), false, "taken away");
     // Add a day: the stop form, on a new day after the last.
     await run(`document.querySelector("[data-day-add]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-day")`);

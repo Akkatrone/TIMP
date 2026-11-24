@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.1.7
+
+- **The map**: larger and smaller at once, without the lag, and the list is pushed down so
+  the stop you were looking at stays under the map. Holding a stop's name shows it on the
+  map, like its number.
+- **Zoom**: the app no longer zooms with two fingers; the map does, also when a pinch
+  starts on the names of a day's places. Text still grows with the phone's text size.
+- **The row of days** runs to the end of the bar on Info, Trips and You.
+- **A day's notes** in its form: one field each, with ✕ to take one away and "+ Add a
+  note". They used to be one box where notes ran together.
+- **A day with one stop** draws no line.
+
 ## 4.1.6
 
 - **The app is now checked in WebKit**, Safari's engine, on every change
