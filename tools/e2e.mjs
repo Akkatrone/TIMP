@@ -305,9 +305,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await count(".live .maplibregl-ctrl-zoom-in"), 0, "zoom is with the fingers");
     // Scrolled down the list: larger and smaller push the list, the stop read first stays
     // just under the map at the same line, never covered (M10).
-    const read = `const m = document.querySelector(".mapstage").getBoundingClientRect().bottom, li = [...document.querySelectorAll(".stops > li")].find(l => l.getBoundingClientRect().bottom > m + 1); return li && [li.querySelector(".tt").textContent, Math.round(li.getBoundingClientRect().top - m)];`;
+    const read = `const st = document.querySelector(".mapstage:not(.sketch)"), m = (st || document.querySelector(".strip")).getBoundingClientRect().bottom, li = [...document.querySelectorAll(".stops > li")].find(l => l.getBoundingClientRect().bottom > m + 1); return li && [li.querySelector(".tt").textContent, Math.round(li.getBoundingClientRect().top - m)];`;
     // Room to scroll, as a long day on a phone has.
-    await run(`document.querySelector(".stops").style.paddingBottom = "150vh";`);
+    await run(`document.head.insertAdjacentHTML("beforeend", '<style id="room">.stops{padding-bottom:150vh}</style>');`);
     await run(`window.scrollTo(0, 0); const li = document.querySelectorAll(".stops > li")[1], m = document.querySelector(".mapstage").getBoundingClientRect().bottom; window.scrollBy(0, li.getBoundingClientRect().top - m + 10); await new Promise(r => setTimeout(r, 200));`);
     const before = await run(read);
     assert.equal(before[0], await run(`return document.querySelectorAll(".stops > li")[1].querySelector(".tt").textContent;`), "scrolled to the second stop");
@@ -317,7 +317,14 @@ await withApp(async ({run, until, reload, blocked}) => {
       assert.equal(after[0], before[0], `${size}: the same stop first under the map`);
       assert.ok(Math.abs(after[1] - before[1]) <= 1, `${size}: at the same line (${before[1]} → ${after[1]})`);
     }
-    await run(`window.scrollTo(0, 0); document.querySelector(".stops").style.paddingBottom = "";`);
+    // List | Map the same: the stop read first stays at its line, under the bar or the map.
+    for(const view of ["list", "map"]){
+      await run(`document.querySelector("#view-toggle [data-${view === "list" ? "view-list" : "map"}]").click(); await new Promise(r => setTimeout(r, 300));`);
+      const after = await run(read);
+      assert.equal(after[0], before[0], `${view}: the same stop first`);
+      assert.ok(Math.abs(after[1] - before[1]) <= 1, `${view}: at the same line (${before[1]} → ${after[1]})`);
+    }
+    await run(`window.scrollTo(0, 0); document.getElementById("room").remove();`);
     // A pin: no card on the map; its stop comes up under the map, marked, and the pin is chosen.
     await run(`document.querySelector('.live .pin[aria-label="Miradouro de Santa Luzia"]').click(); await new Promise(r => setTimeout(r, 300));`);
     assert.equal(await count(".live .maplibregl-popup"), 0);

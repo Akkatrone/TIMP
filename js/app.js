@@ -1804,15 +1804,22 @@ function resizeMap(b){
   b.setAttribute("aria-pressed", String(S.ui.mapBig));
   b.title = t(S.ui.mapBig ? "mapSmaller" : "mapLarger");
   b.innerHTML = S.ui.mapBig ? SHRINK : FRAME;
-  // At once, not animated: growing the stage every frame made the page lag. The stop
-  // read first, just under the map, stays just under it, at the same line: the list is
-  // pushed down, never covered (M10). Measured before the stage changes size.
-  const under = () => stage.getBoundingClientRect().bottom;
-  const anchor = [...$app.querySelectorAll(".stops > li")].find(li => li.getBoundingClientRect().bottom > under() + 1);
-  const gap = anchor ? anchor.getBoundingClientRect().top - under() : 0;
-  stage.classList.toggle("big", S.ui.mapBig);
-  if(anchor) scrollToY(Math.max(0, scrollTop() + anchor.getBoundingClientRect().top - under() - gap));
+  // At once, not animated: growing the stage every frame made the page lag.
+  keepReading(() => stage.classList.toggle("big", S.ui.mapBig));
   if(live){ live.handle.refresh(); live.handle.fit(null); }
+}
+
+// The stop read first stays at its line while what is above the list changes: the map
+// larger or smaller, List | Map (M10). Read first is the first stop not hidden under the
+// map, or under the bar without it; measured before `change`, put back after it.
+function keepReading(change){
+  const line = () => { const st = $app.querySelector(".mapstage:not(.sketch)"); return st ? st.getBoundingClientRect().bottom : barBottom(); };
+  const stops = () => [...$app.querySelectorAll(".stops > li")];
+  const from = line(), i = scrollTop() > 0 ? stops().findIndex(li => li.getBoundingClientRect().bottom > from + 1) : -1;
+  const gap = i >= 0 ? stops()[i].getBoundingClientRect().top - from : 0;
+  change();
+  const li = i >= 0 && stops()[i];
+  if(li) scrollToY(Math.max(0, scrollTop() + li.getBoundingClientRect().top - line() - gap));
 }
 
 // A stop chosen on the map (M3): its card, just under the map, marked.
@@ -2345,7 +2352,7 @@ $strip.addEventListener("click", e => {
   const b = e.target.closest("#view-toggle button");
   if(!b) return;
   const map = b.hasAttribute("data-map") ? !S.ui.mapOpen : false;
-  if(S.ui.mapOpen !== map){ S.ui.mapOpen = map; saveUi(); render(); }
+  if(S.ui.mapOpen !== map) keepReading(() => { S.ui.mapOpen = map; saveUi(); render(); });
   refocus(map || b.hasAttribute("data-map") ? "#view-toggle [data-map]" : "#view-toggle [data-view-list]");
 });
 $fabPaste.addEventListener("click", () => pasteAnything());
@@ -2653,9 +2660,7 @@ $app.addEventListener("click", e => {
   const findPos = e.target.closest("[data-find-pos]");
   if(findPos){ findPositions(findPos.dataset.findPos || null); return; }
   if(e.target.closest("[data-map]")){
-    S.ui.mapOpen = !S.ui.mapOpen;
-    saveUi();
-    render();
+    keepReading(() => { S.ui.mapOpen = !S.ui.mapOpen; saveUi(); render(); });
     refocus("[data-map]");
     return;
   }

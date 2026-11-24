@@ -4,6 +4,11 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.2.2
+
+- **List | Map while scrolling** keeps your place, like a larger or smaller map: the
+  stop you were reading stays at its line, just under the map or the bar.
+
 ## 4.2.1
 
 - **The map** has an edge and a shadow at its bottom: the stops slide under it, clearly.
