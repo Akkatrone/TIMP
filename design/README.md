@@ -173,6 +173,27 @@ moment (a message that passes, with Undo when there is one).
   needed, weather, choice, booking advised, label, booked) and "+N"; opened, all of
   them first, one per row, each with its action.
 
+## The weather
+
+A signal like the others (W1–W5), from MET Norway through TIMP's service (`js/weather.js`).
+
+- **WX1** The day's head says the day's weather next to sunrise and sunset: the sign of the
+  worst sky from 8:00 to 20:00 and the lowest and highest temperature, in °C ("14–19°");
+  words for a screen reader. Nothing to tap.
+- **WX2** A warning only where it changes something: a park, a view or a walk, at its time
+  (a clock time and the hour after; a part of the day, its window; all day, 9:00 to
+  19:00). Storm, rain (1 mm in an hour), strong wind (10 m/s): attention; heat (35°) and
+  cold (−5°): to know, with what to do. A museum in the rain says nothing.
+- **WX3** The day's line says the first and how many stops, after closures and bookings;
+  with another plan, its action is that plan.
+- **WX4** Only today and the next 3 days. Further away, nothing, not an empty place.
+- **WX5** A forecast is asked again after an hour and trusted 12 hours; older, nothing.
+  MET Norway is named under You, About.
+- **WX6** A day gone keeps the last forecast it had, quiet in its head ("was 21°, sun"):
+  a memory, on this phone, never a warning.
+- **WX7** Only a place rounded to about 10 km leaves the phone, through the service, which
+  asks MET at most once every 3 hours per place: never the trip, the account or who asks.
+
 ## Search
 
 - **S1** One field, the whole trip: a stop's name, its local name, description,

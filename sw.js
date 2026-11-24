@@ -61,6 +61,7 @@ const FILES = [
   "js/trips.js",
   "js/util.js",
   "js/version.js",
+  "js/weather.js",
   "icons/apple-touch-icon.png",
   "icons/icon-192.png",
   "icons/icon-512.png",

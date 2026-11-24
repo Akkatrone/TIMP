@@ -301,6 +301,9 @@ export const publishTrip = (id, {version, dates, remove}) => call("publishTrip",
 /** A published trip, for anyone: {trip, by, dates, publishedAt, updatedAt}. */
 export const publicTrip = page => call("publicTrip", {params: {page}});
 
+/** The forecast of a place, "38.7,-9.1" (js/weather.js): nothing about who asks. */
+export const weatherOf = place => { const [lat, lng] = place.split(","); return call("weather", {params: {lat, lng}}); };
+
 /** A page's way into the app: "#public=<page>" (open it, read only) or "#base=<page>" (a copy). */
 export function publicLink(hash){
   const m = /^#(public|base)=([a-z2-9]{14})$/.exec(String(hash || ""));

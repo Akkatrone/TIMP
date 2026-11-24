@@ -562,6 +562,9 @@ main.gutter{gap:var(--sp-4)}
 .dayhead h1{font:650 var(--fs-xxl)/1.15 var(--f-display);letter-spacing:-.02em}
 .dayhead .dsub{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2) var(--sp-4);font:500 var(--fs-m)/1.4 var(--f-body);color:var(--muted)}
 .dayhead .dsub:empty{display:none}
+/* the weather of the day (design/README.md, WX1) */
+.dayhead .wx{display:inline-flex;align-items:center;gap:var(--sp-1)}
+.dayhead .wx svg{width:15px;height:15px;flex:none}
 .dayhead .dsub b{color:var(--ink);font-weight:600}
 .cityp{display:inline-flex;align-items:center;gap:var(--sp-2);font-weight:600;color:var(--ink)}
 .cityp::before{content:"";width:14px;height:var(--line-w);border-radius:var(--r-full);background:var(--c)}

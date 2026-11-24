@@ -7,6 +7,7 @@ import { daylight, partsOfDay, clockOf } from "./sun.js";
 import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
 import { clockMinutes } from "./edit.js";
 import { icon, partSign } from "./icons.js";
+import { AHEAD, placeOf, localHours, dayWeather, stopWeather } from "./weather.js";
 import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
 import { versionStore } from "./objects.js";
@@ -27,7 +28,7 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical, contentOf } from "./version.js";
-import { hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl, tripHistory, tripMembers } from "./share.js";
+import { weatherOf, hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl, tripHistory, tripMembers } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { chooseFirstDay } from "./publishing.js";
 import { asBase } from "./publish.js";
@@ -51,7 +52,17 @@ const LOCK = '<svg class="lock" viewBox="0 0 16 16" fill="none" aria-hidden="tru
 const EDIT = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
 const SKIP = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h8M8 4.5L11.5 8 8 11.5M13.5 3.5v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const DASH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+// The sky of a day (WX1), and the weather as a signal: a cloud with its rain.
+const RAIN = '<path d="M4.5 10.5a3 3 0 01.4-6 4 4 0 017.6 1.2 2.4 2.4 0 01-.5 4.8z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>';
+const WX_ICON = Object.fromEntries(Object.entries({
+  sun: '<circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M3.4 12.6l1.3-1.3M11.3 4.7l1.3-1.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  cloud: RAIN, fog: RAIN + '<path d="M3 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  rain: RAIN + '<path d="M6 12.5l-.7 1.6M9 12.5l-.7 1.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  snow: RAIN + '<path d="M6 13h.01M9 13h.01M7.5 14.6h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  storm: RAIN + '<path d="M8.6 11l-1.4 2.2h1.6l-1.2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>'
+}).map(([k, v]) => [k, `<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">${v}</svg>`]));
 const SIG_ICON = {
+  weather: WX_ICON.rain,
   closed: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3M6.3 9.2l3.4 3.1M9.7 9.2l-3.4 3.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   ticket: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 5a1 1 0 011-1h10a1 1 0 011 1v1.5a1.5 1.5 0 000 3V11a1 1 0 01-1 1H3a1 1 0 01-1-1V9.5a1.5 1.5 0 000-3z" stroke="currentColor" stroke-width="1.4"/></svg>',
   choice: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 14.5V9M8 9L3.8 3.8M8 9l4.2-5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="3.5" cy="3.2" r="1.5" fill="currentColor"/><circle cx="12.5" cy="3.2" r="1.5" fill="currentColor"/></svg>',
@@ -84,6 +95,30 @@ function timeHTML(time, light = dayLight){
   return p ? `<span class="tm part">${partSign(p)}<span>${esc(timeText(time, light))}</span></span>` : `<span class="tm">${esc(time)}</span>`;
 }
 let dayLight = null;   // sunrise and sunset of the day drawn (renderDay)
+
+// The weather (design/README.md, WX1–WX7), kept on the phone by place: asked again after
+// an hour, trusted 12 hours (WX5). When it arrives, the day is drawn again.
+const wx = new Map(), wxAsked = new Set();   // place → {at, forecast}
+let dayWx = null;                            // the hours of the day drawn, on the trip's clock
+async function wantWeather(place){
+  if(!wx.has(place)){ const kept = await store.getKV("wx:" + place).catch(() => null); if(kept){ wx.set(place, kept); renderKeepingFocus(); } }
+  const k = wx.get(place);
+  if((k && Date.now() - k.at < 3600_000) || wxAsked.has(place) || !hasService() || !S.online) return;
+  wxAsked.add(place);
+  try{
+    const v = {at: Date.now(), forecast: await weatherOf(place)};
+    wx.set(place, v);
+    store.setKV("wx:" + place, v).catch(() => {});
+    renderKeepingFocus();
+  }catch(e){}
+  setTimeout(() => wxAsked.delete(place), 600_000);
+}
+// The last forecast of each day, kept for the days gone (WX6).
+function keepWeather(date, w){
+  if(canonical(S.wxLog[date] || null) === canonical(w)) return;
+  S.wxLog = {...S.wxLog, [date]: w};
+  store.setKV("wxlog:" + S.rec.id, S.wxLog).catch(() => {});
+}
 let uid = 0;   // ids for aria-controls, unique on the page
 const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -103,6 +138,7 @@ const S = {
   useGoogle: true,        // false: always OpenStreetMap, even with a key (saves Google map loads)
   importError: null,      // {title, items, all}: items shown, all copied for an assistant
   online: navigator.onLine !== false,
+  wxLog: {},              // the last forecast of each day of the open trip (WX6)
   version: "",
   home: homeOf(navigator.language),   // the traveller's own currency
   rates: {},              // exchange rates of the days the trip needs (js/money.js)
@@ -264,6 +300,7 @@ async function openRecord(rec){
     if(saved && typeof saved === "object") S.state = {done: saved.done || {}, skipped: saved.skipped || {}, plans: saved.plans || {},
       ...(saved.notesOpen ? {notesOpen: true} : {}), ...(saved.found ? {found: saved.found} : {})};
     S.state = marksInto(S.state, rec.priv);
+    S.wxLog = (await store.getKV("wxlog:" + rec.id).catch(() => null)) || {};
     followNewIds();
     saveState();   // the marks of before into the set, once
     await store.setKV("active", rec.id);
@@ -1231,6 +1268,7 @@ function renderMe(){
   ${installSteps()}
   <section class="sec"><h2>${esc(t("about"))}</h2>
     <p class="foot">TIMP · Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
+    <p class="foot">${esc(t("wxCredit"))}</p>
     ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}
   </section>`;
 }
@@ -2206,7 +2244,7 @@ function stopsHTML(day, planId, list, parts, paint, all = list, now = {today: fa
 }
 
 // What a stop has to say, the most important first (W5): closed that day, booking
-// needed, booking advised, the trip's own label (W4), booked. Nothing once it is done or
+// needed, the weather outdoors (WX2), booking advised, the trip's own label (W4), booked. Nothing once it is done or
 // skipped (W3).
 function signalsOf(s, day, ended){
   if(ended) return [];
@@ -2215,6 +2253,8 @@ function signalsOf(s, day, ended){
   if(closed) out.push({level: "warn", kind: "closed", text: closed.date ? t("closedDate") : t("closedWeekday", {d: weekdayName(closed.weekday, getLang())}),
     act: s.id && canChange() ? `<button type="button" class="sigact" data-edit="${esc(s.id)}">${esc(t("sigMove"))}</button>` : ""});
   if(s.booking === "required") out.push({level: "warn", kind: "ticket", text: t("bookingRequired")});
+  const w = dayWx && dayWx.date === day.date && stopWeather(dayWx.hours, day.date, s, dayLight);
+  if(w) out.push({level: w.kind === "heat" || w.kind === "cold" ? "info" : "warn", kind: "weather", text: t("wx_" + w.kind + "At", {t: hhmm(w.at)})});
   if(s.booking === "advised") out.push({level: "info", kind: "ticket", text: t("bookingAdvised")});
   if(s.tag) out.push({level: "info", kind: "note", text: s.tag});
   if(s.booking === "booked") out.push({level: "ok", kind: "ticket", text: t("booked")});
@@ -2283,6 +2323,16 @@ function renderDay(i){
   const light = here ? daylight(d.date, here.lat, here.lng, tr.timezone) : null;
   const parts = partsOfDay(list, light, clockMinutes);
   dayLight = light;
+  // The weather (WX1, WX4, WX6): today to 3 days ahead, the forecast of the day's place;
+  // a day gone, the last one it had.
+  const ahead = (Date.parse(d.date) - Date.parse(tripToday())) / 864e5;
+  const place = here && placeOf(here.lat, here.lng), kept = place && wx.get(place);
+  if(place && ahead >= 0 && ahead <= AHEAD) wantWeather(place);
+  dayWx = kept && ahead >= 0 && ahead <= AHEAD && Date.now() - kept.at < 12 * 3600_000 ? {date: d.date, hours: localHours(kept.forecast, tr.timezone)} : null;
+  const w = dayWx && dayWeather(dayWx.hours, d.date), was = ahead < 0 && S.wxLog[d.date];
+  if(w) keepWeather(d.date, w);
+  const wxHead = w ? `<span class="wx" role="img" aria-label="${esc(t("wxHead", {k: t("wx_" + w.kind), a: w.min, b: w.max}))}">${WX_ICON[w.kind]}${w.min}–${w.max}°</span>`
+    : was ? `<span class="wx">${esc(t("wxWas", {b: was.max, k: t("wx_" + was.kind).toLowerCase()}))}</span>` : "";
   // The colours of this day's pins, lines and numbers (js/geo.js).
   const paint = painter(cityColor(d.city), parts);
   const dp = dateParts(d.date, lang), ti = todayIndex();
@@ -2296,7 +2346,7 @@ function renderDay(i){
   <header class="dayhead" style="--c:${color}">
     <p class="dmeta">${esc(t("day"))} ${i + 1}${i === ti ? " · " + esc(t("today")) : ""} · ${esc(dp.long)}</p>
     <h1>${esc(d.title || city || dp.long)}</h1>
-    <p class="dsub">${cityLine}${light ? `<span class="sun" role="img" aria-label="${esc(t("sunTimes", {r: hhmm(light.sunrise), s: hhmm(light.sunset)}))}">${icon("sun", 13)}${hhmm(light.sunrise)}–${hhmm(light.sunset)}</span>` : ""}</p>
+    <p class="dsub">${cityLine}${light ? `<span class="sun" role="img" aria-label="${esc(t("sunTimes", {r: hhmm(light.sunrise), s: hhmm(light.sunset)}))}">${icon("sun", 13)}${hhmm(light.sunrise)}–${hhmm(light.sunset)}</span>` : ""}${wxHead}</p>
     <p class="dsub">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b>${typeof d.stay === "object" ? ` <a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}</span>` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}</span></p>
   </header>`;
 
@@ -2348,6 +2398,13 @@ function dayLine(d, pid, list, all){
     if(closed) items.push({level: "warn", kind: "closed", text: t("lineClosed", {s: s.title, d: closed.date ? t("closedDate").toLowerCase() : t("closedWeekday", {d: weekdayName(closed.weekday, getLang())}).toLowerCase()}),
       act: s.id && canChange() ? `<button type="button" class="sigact" data-edit="${esc(s.id)}">${esc(t("sigMove"))}</button>` : ""});
     if(s.booking === "required") items.push({level: "warn", kind: "ticket", text: t("lineBooking", {s: s.title})});
+  }
+  // The weather on the stops outdoors (WX3): the first, how many, and the day's other plan.
+  const wet = dayWx && dayWx.date === d.date ? list.filter(s => !ended(s)).map(s => [s, stopWeather(dayWx.hours, d.date, s, dayLight)]).filter(([, w]) => w) : [];
+  if(wet.length){
+    const [[s, w]] = wet, what = t("wx_" + w.kind + "At", {t: hhmm(w.at)}), other = d.plans && d.plans.find(p => p.id !== pid);
+    items.push({level: "warn", kind: "weather", text: wet.length === 1 ? t("wxLineOne", {w: what, s: s.title}) : t("wxLineMany", {w: what, n: wet.length}),
+      act: other ? `<button type="button" class="sigact" data-plan="${esc(other.id)}">${esc(t("wxPlan", {p: other.name}))}</button>` : ""});
   }
   for(const [g, xs] of groupsIn(all)) if(!chosenIn(xs)) items.push({level: "warn", kind: "choice", text: t("lineChoose", {g})});
   const missing = canChange() ? all.filter(s => s.lat === undefined && s.id).length : 0;

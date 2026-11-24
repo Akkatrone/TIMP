@@ -4,6 +4,17 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.4.0
+
+- **The weather**, from today to 3 days ahead: the day's sky and its lowest and highest
+  temperature next to sunrise and sunset.
+- **A warning only where it matters**: on a park, a view or a walk, at its time: storm,
+  rain, strong wind; heat and cold with what to do. In the day's line: the first and how
+  many stops, and the day's other plan as its action. A museum in the rain says nothing.
+- A day gone keeps the last forecast it had ("was 21°, sun"), on this phone.
+- From MET Norway (CC BY 4.0, named under You, About), through TIMP's service: only a
+  place rounded to about 10 km leaves the phone. Needs TIMP-share 1.11.0.
+
 ## 4.3.0
 
 - **Only for me**, on a shared trip: choosing an option asks "Only for me" or "For

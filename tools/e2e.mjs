@@ -11,6 +11,7 @@ import { prepare } from "../js/trips.js";
 import { commit, relation, commonBase, commitMerge } from "../js/version.js";
 import { mergeTrips } from "../js/merge.js";
 import { addStop, addAlternative } from "../js/edit.js";
+import { placeOf } from "../js/weather.js";
 import { splitPrivate } from "../js/private.js";
 import { publishable } from "../js/publish.js";
 import { oldStopId } from "../js/ids.js";
@@ -1309,6 +1310,18 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.match(await run(`return document.querySelector(".nextbar .nb-go").href;`), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=/, "Directions from where the traveller is");
     await run(`document.querySelector(".nextbar [data-to-next]").click();`);
     await until("back to the next stop", `(() => { const r = document.querySelector(".stop.next").getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight; })()`);
+    // The weather of today, as the service would answer it, kept on the phone: rain from
+    // three hours ago to five hours ahead (WX1–WX3).
+    const place = placeOf(places[0].lat, places[0].lng), h0 = Math.floor(Date.now() / 3600_000) * 3600_000;
+    const forecast = {place, at: new Date().toISOString(), source: "MET Norway", hours: [-3, -2, -1, 0, 1, 2, 3, 4, 5].map(k => ({t: new Date(h0 + k * 3600_000).toISOString(), h: 1, temp: 16, wind: 3, rain: 2, sky: "rain"}))};
+    await run(`const store = await import(new URL("js/store.js", location.href)); await store.setKV("wx:${place}", {at: Date.now(), forecast: ${JSON.stringify(forecast)}}); location.hash = "#trips";`);
+    await until("the trips", `document.querySelector(".active-trip")`);
+    await run(`location.hash = "#day-1";`);
+    await until("the day's weather", `document.querySelector(".dayhead .wx")`);
+    assert.equal(await run(`return document.querySelector(".dayhead .wx").getAttribute("aria-label");`), "Rain, 16 to 16 degrees");
+    const outdoors = places.filter(x => ["park", "view", "walk"].includes(x.type)).length;
+    assert.ok(outdoors > 0 && await run(`return [...document.querySelectorAll(".stop .sig")].filter(x => /^Rain at \\d\\d:\\d\\d$/.test(x.textContent)).length;`) > 0, "a stop outdoors, rain at its time");
+    assert.match(await text(".dayline"), /Rain at \d\d:\d\d/);
     // Away from the app for a while, back on another day: no jump, the day starts at the top.
     await run(`location.hash = "#trips";`);
   });
