@@ -1801,12 +1801,12 @@ function resizeMap(b){
   S.ui.mapBig = !S.ui.mapBig;
   saveUi();
   const stage = b.closest(".mapstage");
-  stage.classList.toggle("big", S.ui.mapBig);
   b.setAttribute("aria-pressed", String(S.ui.mapBig));
   b.title = t(S.ui.mapBig ? "mapSmaller" : "mapLarger");
   b.innerHTML = S.ui.mapBig ? SHRINK : FRAME;
   // At once, not animated: growing the stage every frame made the page lag. The stop
-  // looked at, just under the map, stays just under it: the list is pushed down.
+  // read first, just under the map, stays just under it, at the same line: the list is
+  // pushed down, never covered (M10). Measured before the stage changes size.
   const under = () => stage.getBoundingClientRect().bottom;
   const anchor = [...$app.querySelectorAll(".stops > li")].find(li => li.getBoundingClientRect().bottom > under() + 1);
   const gap = anchor ? anchor.getBoundingClientRect().top - under() : 0;

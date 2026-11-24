@@ -4,6 +4,13 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.2.1
+
+- **The map** has an edge and a shadow at its bottom: the stops slide under it, clearly.
+- **Larger and smaller map while scrolling** push the list down instead of covering it:
+  the stop you were reading stays just under the map, at the same line. (4.1.7 measured
+  it after the map had already grown.) Checked in Chrome and in WebKit.
+
 ## 4.2.0
 
 - **Parts of the day**: a stop's time is a clock time or one of seven parts: sunrise,

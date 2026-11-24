@@ -761,9 +761,9 @@ mark{background:var(--warn-bg);background:color-mix(in srgb,var(--accent) 22%,tr
 
 /* The day as a map (M2–M7): the stage under the bar, the list scrolling under it. Always
    light (R11): the map's own tokens. */
-.mapstage{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--strip-h,0px));z-index:4;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-top:calc(-1 * var(--sp-5));height:min(38dvh,360px);background:var(--map-bg);color-scheme:light;box-shadow:0 8px 16px -12px color-mix(in srgb,var(--map-ink) 45%,transparent)}
+.mapstage{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--strip-h,0px));z-index:4;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-top:calc(-1 * var(--sp-5));height:min(38dvh,360px);background:var(--map-bg);color-scheme:light;border-bottom:1px solid var(--line-strong);box-shadow:0 10px 18px -10px color-mix(in srgb,var(--map-ink) 70%,transparent)}
 .mapstage #live-slot,.mapstage .live{height:100%;border-radius:var(--r-none)}
-.mapstage.sketch{position:static;height:auto;margin-inline:0;margin-top:0;padding:var(--sp-4);border-radius:var(--r-m);display:grid;gap:var(--sp-4);background:var(--surface);color-scheme:normal;box-shadow:none}
+.mapstage.sketch{position:static;height:auto;margin-inline:0;margin-top:0;padding:var(--sp-4);border-radius:var(--r-m);display:grid;gap:var(--sp-4);background:var(--surface);color-scheme:normal;border-bottom:0;box-shadow:none}
 .mctl{position:absolute;right:var(--sp-4);top:var(--sp-4);z-index:2;display:grid;gap:var(--sp-3)}
 .mbtn{display:grid;place-items:center;width:var(--touch);height:var(--touch);padding:0;border:0;border-radius:var(--r-m);background:var(--map-card);color:var(--map-ink);box-shadow:0 2px 8px -2px color-mix(in srgb,var(--map-ink) 40%,transparent);cursor:pointer}
 .mbtn svg{width:19px;height:19px}

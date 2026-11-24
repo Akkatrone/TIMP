@@ -124,6 +124,21 @@ try{
     await run(`window.scrollTo(0, 0); document.querySelector("#view-toggle [data-view-list]").click();`);
   });
 
+  await check("a larger or smaller map pushes the list: the stop read first stays at its line", async () => {
+    await run(`location.hash = "#day-2"; await new Promise(r => setTimeout(r, 300)); document.querySelector("#view-toggle [data-map]").click(); await new Promise(r => setTimeout(r, 600));
+      document.querySelector(".stops").style.paddingBottom = "150vh";
+      const li = document.querySelectorAll(".stops > li")[1], m = document.querySelector(".mapstage").getBoundingClientRect().bottom;
+      window.scrollBy(0, li.getBoundingClientRect().top - m + 10); await new Promise(r => setTimeout(r, 200));`);
+    const read = `const m = document.querySelector(".mapstage").getBoundingClientRect().bottom, li = [...document.querySelectorAll(".stops > li")].find(l => l.getBoundingClientRect().bottom > m + 1); return li && [li.querySelector(".tt").textContent, Math.round(li.getBoundingClientRect().top - m)];`;
+    const before = await run(read);
+    for(const size of ["larger", "smaller"]){
+      await run(`document.querySelector("[data-map-size]").click(); await new Promise(r => setTimeout(r, 300));`);
+      const after = await run(read);
+      ok(after[0] === before[0] && Math.abs(after[1] - before[1]) <= 1, `${size}: ${before.join(" ")} → ${after.join(" ")}`);
+    }
+    await run(`window.scrollTo(0, 0); document.querySelector(".stops").style.paddingBottom = ""; document.querySelector("#view-toggle [data-view-list]").click();`);
+  });
+
   await check("search: a field Safari does not zoom into, results fixed under the bar", async () => {
     await run(`document.getElementById("search-btn").click(); await new Promise(r => setTimeout(r, 300));`);
     const size = await run(`return parseFloat(getComputedStyle(document.getElementById("search-q")).fontSize);`);

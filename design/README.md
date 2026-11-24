@@ -189,6 +189,9 @@ moment (a message that passes, with Undo when there is one).
 - **M7** Always light (R11), with its attribution.
 - **M8** At once (R6): the stage has its size before the tiles come.
 - **M9** Choosing a point (the stop form): the sign stays in the middle, the map moves.
+- **M10** Under the bar, the map has an edge and a shadow: the list slides under it.
+  Larger or smaller, the list is pushed, never covered: the stop read first stays just
+  under the map, at the same line.
 
 ## Accessibility
 
