@@ -99,6 +99,51 @@
     "type": "publication"
    }
   },
+  "weather": {
+   "place": {
+    "type": "text",
+    "req": true
+   },
+   "at": {
+    "type": "text",
+    "req": true
+   },
+   "source": {
+    "type": "text",
+    "req": true
+   },
+   "hours": {
+    "type": "list",
+    "of": "weatherHour",
+    "req": true
+   }
+  },
+  "weatherHour": {
+   "t": {
+    "type": "text",
+    "req": true
+   },
+   "h": {
+    "type": "number",
+    "req": true
+   },
+   "temp": {
+    "type": "number",
+    "req": true
+   },
+   "wind": {
+    "type": "number",
+    "req": true
+   },
+   "rain": {
+    "type": "number",
+    "req": true
+   },
+   "sky": {
+    "type": "text",
+    "req": true
+   }
+  },
   "publication": {
    "page": {
     "type": "text",
@@ -796,6 +841,12 @@
    "path": "/v1/trips/:id/publication",
    "auth": true,
    "answer": "ok"
+  },
+  "weather": {
+   "method": "GET",
+   "path": "/v1/weather/:lat/:lng",
+   "auth": false,
+   "answer": "weather"
   },
   "publicTrip": {
    "method": "GET",

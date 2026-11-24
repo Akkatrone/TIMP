@@ -47,6 +47,20 @@ export const SHAPES = {
     locked: {type: "bool", doc: "Locked by its owner: it stays at its version; nobody sends changes or deletes it until it is unlocked."},
     publication: {type: "publication", doc: "Its page, if its owner published it (to its owner only)."}
   },
+  weather: {
+    place: text("The place asked, rounded to two decimals (about a kilometre): \"38.80,-9.39\"."),
+    at: text("When the forecast was made (ISO date)."),
+    source: text("Where it comes from, to be named where it is shown: \"MET Norway\"."),
+    hours: {type: "list", of: "weatherHour", req: true, doc: "From now to 4 days ahead, in time order: hour by hour where the source has hours, then by 6 hours."}
+  },
+  weatherHour: {
+    t: text("Its start (ISO date, UTC)."),
+    h: num("How many hours it covers: 1 or 6."),
+    temp: num("Air temperature at its start, °C."),
+    wind: num("Wind at its start, m/s."),
+    rain: num("Rain in its hours, mm."),
+    sky: text("The sky, as MET Norway's symbol code (\"rain\", \"partlycloudy_day\", \"heavyrainandthunder\"…).")
+  },
   publication: {
     page: text("The page's id: the page is at /t/<page> on the service, its trip at /v1/public/<page>."),
     version: text("The version published: changes made after it are not on the page."),
@@ -193,6 +207,7 @@ export const ROUTES = {
     remove: {type: "any", req: true, doc: "What found in it is taken out: {codes, phones, emails, stays}, each true or false (true if not said)."}
   }, answer: "publication", doc: "Owner only. The service makes the copy (js/publish.js) from the version it holds, and the page: the same page if published before. Readable by anyone with its address."},
   unpublishTrip: {method: "DELETE", path: "/v1/trips/:id/publication", auth: true, answer: "ok", doc: "Owner only. The page answers 410 from now on; copies already made by others stay theirs."},
+  weather: {method: "GET", path: "/v1/weather/:lat/:lng", auth: false, answer: "weather", doc: "The forecast of a place (decimal degrees, rounded by the service to two decimals), for anyone: nothing about who asks or why is sent or kept. 503 when the source does not answer."},
   publicTrip: {method: "GET", path: "/v1/public/:page", auth: false, answer: "publicTrip", doc: "A published trip, for anyone with its address: 404 if unknown, 410 if withdrawn."},
   lockTrip: {method: "PUT", path: "/v1/trips/:id/lock", auth: true, body: {locked: {type: "bool", req: true, doc: "true to lock, false to unlock."}}, answer: "tripSummary",
     doc: "The owner locks a trip at its version (no changes, from anyone, no deleting), or unlocks it."},
