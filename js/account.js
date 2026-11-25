@@ -4,7 +4,7 @@
 
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
-import { openSheet } from "./sheet.js";
+import { openSheet, row, rowValue } from "./sheet.js";
 import { ask } from "./ask.js";
 import { signUp, ShareError, linkedApps, unlinkApp, passkeys, openSessions, endOtherSessions, removePasskey, addPasskey, needsSignIn, signInAgain,
   recoveryState, makeRecoveryCodes, recoverAccount, connectorAddress } from "./share.js";
@@ -81,57 +81,70 @@ export function openSignUp(o){
  * @param toast  says something short over the page
  */
 export async function openLinkedApps(toast){
+  // Linking, for the chat app chosen (AI2): its steps, the address, what to ask it.
+  const APPS = [["claude", "Claude"], ["chatgpt", "ChatGPT"], ["other", t("otherApp")]];
+  const steps = app => [t({claude: "linkStepClaude", chatgpt: "linkStepChatgpt", other: "linkStepOther"}[app]), t("linkStepPaste")];
   const dlg = openSheet({id: "chats-title", title: t("chatsTitle"), cls: "tall", body: `
-    <p class="foot">${esc(t("chatsHelp"))}</p>
-    <div class="chats" data-chats aria-busy="true"><p class="foot">…</p></div>
-    <section class="connect" aria-labelledby="connect-title">
-      <h3 id="connect-title">${esc(t("connectTitle"))}</h3>
-      <p class="foot">${esc(t("connectHelp"))}</p>
-      <div class="invite-link">
-        <code class="addr" data-connector aria-label="${esc(t("connectAddress"))}">${esc(connectorAddress())}</code>
-        <div class="actions"><button type="button" class="btn small" data-copy-connector>${esc(t("copyLink"))}</button></div>
-      </div>
-      <ul class="foot steps"><li>${esc(t("connectClaude"))}</li><li>${esc(t("connectChatgpt"))}</li></ul>
-      <p class="foot">${esc(t("connectAfter"))}</p>
+    <p class="foot">${esc(t("aiHelp"))}</p>
+    <div class="srows" data-chats aria-busy="true"><p class="foot">…</p></div>
+    <button type="button" class="tbtn" data-link-another hidden>${esc(t("linkAnother"))}</button>
+    <section class="connect" data-connect hidden>
+      <div class="seg" role="group" aria-label="${esc(t("linkApp"))}">${APPS.map(([id, name], i) => `<button type="button" data-link-app="${id}" aria-pressed="${i === 0}">${esc(name)}</button>`).join("")}</div>
+      <ol class="steps" data-link-steps>${steps("claude").map(x => `<li>${esc(x)}</li>`).join("")}</ol>
+      <code class="addr" data-connector aria-label="${esc(t("connectAddress"))}">${esc(connectorAddress())}</code>
+      <button type="button" class="btn primary" data-copy-connector>${esc(t("copyAddress"))}</button>
+      <p class="foot">${esc(t("linkAsk"))}</p>
+      <p class="say-this">${esc(t("linkAskExample"))}</p>
     </section>`});
-  const $list = dlg.querySelector("[data-chats]");
+  const $ = sel => dlg.querySelector(sel), $list = $("[data-chats]");
   const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(d));
+  const day = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short"}).format(new Date(d));
   const can = scopes => t(scopes.includes("trips:write") ? (scopes.includes("trips:read") ? "chatsReadWrite" : "chatsWrite") : "chatsRead")
     + (scopes.some(s => s.startsWith("private:")) ? t("chatsPrivate") : "");
   let apps = [];
+  // A row per chat linked, Unlink inside it; none, the way to link one, open.
   const draw = () => {
     $list.removeAttribute("aria-busy");
-    $list.innerHTML = !apps.length ? `<p class="foot">${esc(t("chatsNone"))}</p>` : apps.map(a => `
-      <div class="chat" data-chat="${esc(a.id)}">
-        <span class="who"><b>${esc(a.client)}</b><small>${esc(can(a.scopes))}</small><small>${esc(t("chatsSince", {d: when(a.since)}))}</small><small>${esc(t("chatsUsed", {d: when(a.lastUsed)}))}</small></span>
-        <button type="button" class="btn small danger" data-unlink="${esc(a.id)}">${esc(t("chatUnlink"))}</button>
-      </div>`).join("");
+    $list.hidden = !apps.length;
+    $list.innerHTML = apps.map((a, i) => `<div class="srow" data-chat="${esc(a.id)}"><button type="button" class="dhead set" aria-expanded="false" aria-controls="row-chat-${i}"><span>${esc(a.client)}</span><span class="v">${esc(t("chatsUsed", {d: day(a.lastUsed)}))}</span></button>` +
+      `<div class="dbody" id="row-chat-${i}" hidden><p class="foot">${esc([can(a.scopes), t("chatsSince", {d: when(a.since)}), t("chatsUsed", {d: when(a.lastUsed)})].join(" · "))}</p>` +
+      `<button type="button" class="tbtn danger" data-unlink="${esc(a.id)}">${esc(t("chatUnlinkNamed", {app: a.client}))}</button></div></div>`).join("");
+    $("[data-link-another]").hidden = !apps.length || !$("[data-connect]").hidden;
+    if(!apps.length) $("[data-connect]").hidden = false;
   };
   const failed = e => { $list.removeAttribute("aria-busy"); $list.innerHTML = `<p class="errbox" role="alert">${esc(accountError(e))}</p>`; };
   dlg.addEventListener("click", async e => {
     if(e.target.closest("[data-close]")) return;
+    const app = e.target.closest("[data-link-app]");
+    if(app){
+      dlg.querySelectorAll("[data-link-app]").forEach(b => b.setAttribute("aria-pressed", String(b === app)));
+      $("[data-link-steps]").innerHTML = steps(app.dataset.linkApp).map(x => `<li>${esc(x)}</li>`).join("");
+      return;
+    }
+    if(e.target.closest("[data-link-another]")){ $("[data-connect]").hidden = false; $("[data-link-another]").hidden = true; return; }
     if(e.target.closest("[data-copy-connector]")){
-      const field = dlg.querySelector("[data-connector]");
+      const field = $("[data-connector]");
       await navigator.clipboard.writeText(field.textContent).then(() => toast(t("connectCopied")), () => getSelection().selectAllChildren(field));
       return;
     }
     const b = e.target.closest("[data-unlink]");
     if(!b) return;
-    const app = apps.find(a => a.id === b.dataset.unlink);
-    if(!app) return;
-    const yes = await ask({title: t("chatUnlinkQ", {app: app.client}), text: t("chatUnlinkText"),
+    const one = apps.find(a => a.id === b.dataset.unlink);
+    if(!one) return;
+    const yes = await ask({title: t("chatUnlinkQ", {app: one.client}), text: t("chatUnlinkText"),
       actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("chatUnlink"), kind: "danger"}]});
     if(yes !== "yes") return;
     b.disabled = true;
     try{
-      await unlinkApp(app.id);
-      apps = apps.filter(a => a.id !== app.id);
+      await unlinkApp(one.id);
+      apps = apps.filter(a => a.id !== one.id);
       draw();
-      toast(t("chatUnlinked", {app: app.client}));
+      toast(t("chatUnlinked", {app: one.client}));
     }catch(err){ b.disabled = false; toast(accountError(err)); }
   });
   // The sheet is open and tall already (SH2): the list arrives inside it.
   await linkedApps().then(list => { apps = list; draw(); }, failed);
+  return dlg;
 }
 
 /** A browser's User-Agent in a few words, "iPhone · Safari", "" if nothing is recognised. */
@@ -170,28 +183,20 @@ export async function recently(fn, again){
  * @param o.handle the account's handle, for the codes' file
  */
 export async function openDevices({toast, save, handle}){
-  const dlg = openSheet({id: "devices-title", title: t("devicesTitle"), cls: "devices tall", body: `
-    <section>
-      <h3 class="sheet-h">${esc(t("passkeysTitle"))}</h3>
-      <p class="foot">${esc(t("passkeysHelp"))}</p>
+  const dlg = openSheet({id: "devices-title", title: t("devicesTitle"), cls: "devices tall", body: `<div class="srows">
+    ${row("keys", t("passkeysTitle"), `<p class="foot">${esc(t("passkeysHelp"))}</p>
       <div class="chats" data-keys aria-busy="true"><p class="foot">…</p></div>
-      <button type="button" class="btn" data-add-key>${FINGER}${esc(t("addPasskey"))}</button>
-    </section>
-    <section>
-      <h3 class="sheet-h">${esc(t("recoveryTitle"))}</h3>
-      <p class="foot" data-recovery>…</p>
-      <button type="button" class="btn" data-make-codes hidden></button>
+      <button type="button" class="tbtn" data-add-key>${FINGER}${esc(t("addPasskey"))}</button>`)}
+    ${row("codes", t("recoveryTitle"), `<p class="foot" data-recovery>…</p>
+      <button type="button" class="tbtn" data-make-codes hidden></button>
       <div class="codes" data-codes hidden>
         <textarea readonly rows="10" spellcheck="false" aria-label="${esc(t("recoveryTitle"))}"></textarea>
         <p class="foot">${esc(t("recoveryKeep"))}</p>
         <div class="sheet-actions"><button type="button" class="btn" data-copy-codes>${esc(t("copyLink"))}</button><button type="button" class="btn primary" data-save-codes>${esc(t("recoverySave"))}</button></div>
-      </div>
-    </section>
-    <section>
-      <h3 class="sheet-h">${esc(t("sessionsTitle"))}</h3>
-      <div class="chats" data-sessions aria-busy="true"><p class="foot">…</p></div>
-      <button type="button" class="btn danger" data-end-others hidden>${esc(t("endOthers"))}</button>
-    </section>`});
+      </div>`)}
+    ${row("sessions", t("sessionsTitle"), `<div class="chats" data-sessions aria-busy="true"><p class="foot">…</p></div>
+      <button type="button" class="tbtn danger" data-end-others hidden>${esc(t("endOthers"))}</button>`)}
+    </div>`});
   const $ = sel => dlg.querySelector(sel);
   // The year only when it is not this one.
   const when = d => new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
@@ -202,13 +207,17 @@ export async function openDevices({toast, save, handle}){
     $("[data-keys]").innerHTML = keys.map((k, i) => `
       <div class="chat" data-key="${esc(k.id)}">
         <span class="who"><b>${esc(deviceName(k.device) || t("passkeyN", {n: i + 1}))}</b><small>${esc(t("passkeyAdded", {d: when(k.added)}))}</small><small>${esc(k.lastUsed ? t("chatsUsed", {d: when(k.lastUsed)}) : t("passkeyUnused"))}</small></span>
-        ${keys.length > 1 ? `<button type="button" class="btn small danger" data-remove-key="${esc(k.id)}">${esc(t("passkeyRemove"))}</button>` : ""}
+        ${keys.length > 1 ? `<button type="button" class="tbtn danger" data-remove-key="${esc(k.id)}">${esc(t("passkeyRemove"))}</button>` : ""}
       </div>`).join("") + (keys.length === 1 ? `<p class="foot">${esc(t("passkeyLast"))}</p>` : "");
     $("[data-sessions]").innerHTML = devices.map(d => `
       <div class="chat" data-session="${esc(d.id)}"${d.current ? " data-current" : ""}>
         <span class="who"><b>${esc(deviceName(d.device) || t("deviceUnknown"))}</b><small>${esc(d.current ? t("deviceThis") : t("deviceSince", {d: when(d.since)}))}</small></span>
       </div>`).join("");
     $("[data-end-others]").hidden = devices.length < 2;
+    // Each row says what it holds (DV1).
+    rowValue(dlg, "keys", keys.length === 1 ? t("passkeysOne") : t("passkeysMany", {n: keys.length}));
+    rowValue(dlg, "sessions", devices.length === 1 ? t("devicesOne") : t("devicesMany", {n: devices.length}));
+    if(recovery) rowValue(dlg, "codes", recovery.made ? t("codesLeft", {n: recovery.left}) : "");
     if(recovery){
       $("[data-recovery]").textContent = recovery.made ? t("recoveryLeft", {n: recovery.left, d: when(recovery.made)}) : t("recoveryNone");
       $("[data-make-codes]").textContent = t(recovery.made ? "recoveryAgain" : "recoveryMake");
@@ -268,6 +277,7 @@ export async function openDevices({toast, save, handle}){
     }
   });
   await load();
+  return dlg;
 }
 
 /**

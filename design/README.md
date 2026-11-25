@@ -374,6 +374,25 @@ phone's settings (`renderMe`). TIMP's business: your travel agent is your AI.
 - **YO3** Keep it on your Home Screen as a row, only when not installed.
 - **YO4** About last, small.
 
+## Costs, your AI, devices
+
+Info's costs (`costsSection`) and the account's sheets (`js/account.js`).
+
+- **CO1** Closed, the costs say the real total: "…" while the rates are on their way, never a
+  sum short of them ("≈ $0").
+- **CO2** Grouped lists: day by day, by kind of place, the expenses; one card each, a row
+  each with a line between, its amount at the right, one line of title.
+- **CO3** One list of expenses, the trip's and mine together by date, a lock and "Only mine"
+  on mine; "+ Add an expense" its last row (R3).
+- **AI1** Your AI first among the account's rows, its value the chats linked.
+- **AI2** Your AI's sheet: a row per chat (when it was used; opened, what it can do, since
+  when, Unlink red and asked); none linked, how to link one, open: your app chosen (Claude,
+  ChatGPT, Other), its two steps, the address with Copy, what to ask it.
+- **DV1** Passkeys and devices as three rows with their value (passkeys, recovery codes
+  left, devices signed in), opened in place; actions as text buttons, red when they cannot
+  be undone, always asked.
+- A sheet opens and closes its rows itself (`js/sheet.js`): one open at a time.
+
 ## Sheets
 
 A sheet comes up over the page for what is done apart: a form, the history, finding

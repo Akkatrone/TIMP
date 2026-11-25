@@ -29,7 +29,7 @@ import { isChanges, applyChanges, outline, changesBrief } from "./changes.js";
 import { diffTrips, counts } from "./diff.js";
 import { describe, openHistory } from "./history.js";
 import { shortId, canonical, contentOf } from "./version.js";
-import { weatherOf, hasService, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl, tripHistory, tripMembers } from "./share.js";
+import { weatherOf, hasService, linkedApps, passkeys, session as shareSession, signIn, signOut, serviceApi, deleteFromAccount, leaveTrip, chatRequestId, chatRequest, answerChat, onThisComputer, exportAccount, deleteAccount, lockOnAccount, inviteToken, acceptInvite, publicTrip, publicLink, pageUrl, tripHistory, tripMembers } from "./share.js";
 import { openShareSheet } from "./sharing.js";
 import { chooseFirstDay } from "./publishing.js";
 import { asBase } from "./publish.js";
@@ -1330,11 +1330,18 @@ function accountSection(){
     `<span class="who"><b>${esc(t("account"))}</b><small>${esc(t("accountShort"))}</small></span>` +
     `<span class="acts"><button type="button" class="btn small" data-act="signin">${esc(t("signIn"))}</button><button type="button" class="btn small primary" data-act="signup">${esc(t("signUp"))}</button></span></section>`;
   const since = new Intl.DateTimeFormat(getLang(), {day: "numeric", month: "long", year: "numeric"}).format(new Date(u.since));
+  // Your AI first, with the chats linked; the passkeys counted (AI1): asked once, again
+  // after their sheets close.
+  const v = S.acctValues, val = x => x ? `<span class="val">${esc(x)}</span>` : "";
+  if(v === undefined){
+    S.acctValues = null;
+    Promise.all([linkedApps(), passkeys()]).then(([apps, keys]) => { S.acctValues = {ai: apps.map(a => a.client), keys: keys.length}; if(route().name === "me") render(); }, () => {});
+  }
   return `<section class="acct me" aria-label="${esc(t("account"))}"><span class="av" aria-hidden="true">${esc(u.handle.slice(0, 1).toUpperCase())}</span>` +
     `<span class="who"><b>@${esc(u.handle)}</b><small>${esc(t("accountSince", {d: since}))}</small></span></section>` +
     `<nav class="me-list" aria-label="${esc(t("account"))}">
-      <button type="button" data-me="devices">${esc(t("devicesTitle"))}</button>
-      <button type="button" data-me="chats">${esc(t("chatsTitle"))}</button>
+      <button type="button" data-me="chats">${esc(t("chatsTitle"))}${val(v && v.ai.join(", "))}</button>
+      <button type="button" data-me="devices">${esc(t("devicesTitle"))}${val(v && (v.keys === 1 ? t("passkeysOne") : t("passkeysMany", {n: v.keys})))}</button>
       <button type="button" data-me="export">${esc(t("exportData"))}</button>
       <button type="button" data-me="signout">${esc(t("signOut"))}</button>
       <button type="button" class="danger" data-me="delete">${esc(t("deleteAccount"))}</button>
@@ -1479,8 +1486,9 @@ function syncNow(){
 // What the account's buttons on You lead to.
 async function accountActions(what){
   if(!S.account) return;
-  if(what === "devices") await openDevices({toast, save: handOver, handle: S.account.handle});
-  else if(what === "chats") await openLinkedApps(toast);
+  const again = dlg => dlg && dlg.addEventListener("close", () => { S.acctValues = undefined; if(route().name === "me") render(); });
+  if(what === "devices") again(await openDevices({toast, save: handOver, handle: S.account.handle}));
+  else if(what === "chats") again(await openLinkedApps(toast));
   else if(what === "export") exportMyData();
   else if(what === "signout"){ await signOut(); S.account = null; S.sync = ""; render(); toast(t("signedOut")); }
   else if(what === "delete") removeAccount();
@@ -1879,14 +1887,15 @@ function costsSection(){
   const to = choices.includes(S.ui.costCur) ? S.ui.costCur : S.home;
   const all = sumIn(items, to);
   const approx = all.estimate || all.missing.length ? "≈ " : "";
-  const head = items.length ? `<span class="tot">${esc(approx + money(all.value, to, {round: true}))}</span>` : "";
+  // Closed, the total (CO1): "…" while rates are on their way, never a sum short of them.
+  const head = !items.length || (all.missing.length && !S.online) ? "" : `<span class="tot">${esc(all.missing.length ? "…" : approx + money(all.value, to, {round: true}))}</span>`;
   let body = "";
   if(S.ui.costsOpen){
     const view = S.ui.costView === "receipt" ? "receipt" : "sum";
     const seg = (attr, list, cur, label) => `<div class="seg" role="group" aria-label="${esc(label)}">${list.map(([id, name]) => `<button type="button" ${attr}="${esc(id)}" aria-pressed="${id === cur}">${esc(name)}</button>`).join("")}</div>`;
     body = `<div class="costtools">${seg("data-cost-view", [["sum", t("costSummary")], ["receipt", t("costReceipt")]], view, t("costView"))}${seg("data-cost-cur", choices.map(c => [c, c]), to, t("fCurrency"))}</div>` +
       (!items.length ? `<p class="foot">${esc(t("costNone"))}</p>` : view === "sum" ? costSummary(items, to, all) : costReceipt(items, to, all)) +
-      `<button type="button" class="btn small" data-expense-add>${esc(t("addExpense"))}</button>` +
+      (items.length && view === "sum" ? "" : `<button type="button" class="btn small" data-expense-add>${esc(t("addExpense"))}</button>`) +
       (all.missing.length ? `<p class="foot warnline">${esc(t(S.online ? "costMissingOnline" : "costMissing", {a: all.missing.map(x => money(x.amount, x.currency)).join(" + ")}))}</p>` : "") +
       `<p class="foot">${esc(t("costNote"))}</p>`;
   }
@@ -1928,15 +1937,15 @@ function costSummary(items, to, all){
   const kindsHTML = kindRows.map(x => `<div class="crow" style="--c:${x.k && TYPE_COLORS[x.k] ? TYPE_COLORS[x.k] : "var(--muted)"}"><span class="n ic">${kindIcon(x)}</span>` +
     `<span class="w"><b>${esc(kindName(x.k))}<small>${esc(x.list.length === 1 ? t("stopsOne") : t("stopsCount", {n: x.list.length}))}</small></b></span>` +
     `<span class="a">${esc(approxMoney(x.sum, to, {round: true}))}<small>${inStops.value ? Math.round(x.sum.value / inStops.value * 100) : 0}%</small></span></div>`).join("");
-  // Outside the stops, and the private ones: a tap changes one.
-  const rows = (list, attr, mark) => list.map(x => {
-    const c = conv(x.amount, x.currency, to, x.date);
-    const sub = [x.expense.date ? dateParts(x.expense.date, lang).short : "", x.currency !== to ? money(x.amount, x.currency) : ""].filter(Boolean).join(" · ");
-    return `<button type="button" class="crow" ${attr}="${esc(x.expense.id)}" style="--c:var(--muted)"><span class="n ic">${mark || esc(symbolOf(x.currency, lang))}</span>` +
-      `<span class="w"><b>${esc(mark ? privateTitle(x.expense) : x.expense.title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>` +
+  // The expenses outside the stops, the trip's and mine in one list by date, a lock on
+  // mine (CO3); a tap changes one; adding is the last row (R3).
+  const expenseRows = [...outside, ...privs].sort((a, b) => (a.expense.date || "9999").localeCompare(b.expense.date || "9999")).map(x => {
+    const mine = x.kind === "private", c = conv(x.amount, x.currency, to, x.date);
+    const sub = [x.expense.date ? dateParts(x.expense.date, lang).short : "", x.currency !== to ? money(x.amount, x.currency) : "", mine ? t("kindPrivate") : ""].filter(Boolean).join(" · ");
+    return `<button type="button" class="crow" ${mine ? "data-private-expense" : "data-expense"}="${esc(x.expense.id)}" style="--c:var(--muted)"><span class="n ic">${mine ? LOCK : esc(symbolOf(x.currency, lang))}</span>` +
+      `<span class="w"><b>${esc(mine ? privateTitle(x.expense) : x.expense.title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>` +
       `<span class="a">${c ? esc(approxMoney(c, to, {round: true})) : esc(money(x.amount, x.currency))}</span></button>`;
-  }).join("");
-  const outsideHTML = rows(outside, "data-expense"), privHTML = rows(privs, "data-private-expense", LOCK);
+  }).join("") + `<button type="button" class="crow add" data-expense-add>+ ${esc(t("addExpense"))}</button>`;
   const total = all.value || 1;
   // Under the total: in the stops and outside them; with private expenses, the trip's and those.
   const round = r => money(r.value, to, {round: true});
@@ -1951,8 +1960,7 @@ function costSummary(items, to, all){
     </div>` +
     (days ? `<h3 class="ch">${esc(t("costByDay"))}</h3><div class="clist">${days}</div>` : "") +
     (kindsHTML ? `<h3 class="ch">${esc(t("costByKind"))}</h3><div class="clist">${kindsHTML}</div>` : "") +
-    (outsideHTML ? `<h3 class="ch">${esc(t("costOutsideTitle"))}</h3><div class="clist">${outsideHTML}</div>` : "") +
-    (privHTML ? `<h3 class="ch">${esc(t("costPrivateTitle"))}</h3><div class="clist">${privHTML}</div>` : "");
+    `<h3 class="ch">${esc(t("costExpensesTitle"))}</h3><div class="clist">${expenseRows}</div>`;
 }
 
 // The receipt: every cost in a column, day by day, with the rate of the day. Private

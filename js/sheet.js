@@ -21,11 +21,29 @@ export function openSheet({title, body, id = "sheet-" + (++n), form = false, cls
   dlg.innerHTML = `<${open} class="sheet-form"><div class="sheet-head"><h2 id="${esc(id)}">${esc(title)}</h2>` +
     `<button type="button" class="iconbtn" data-close aria-label="${esc(t(form ? "cancel" : "close"))}">×</button></div>${body}</${close}>`;
   document.body.appendChild(dlg);
-  dlg.addEventListener("click", e => { if(e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+  dlg.addEventListener("click", e => {
+    if(e.target === dlg || e.target.closest("[data-close]")) return dlg.close();
+    const head = e.target.closest(".dhead[aria-controls]");
+    if(head) openRow(dlg, head.getAttribute("aria-expanded") === "true" ? null : head);
+  });
   dlg.addEventListener("close", () => dlg.remove());
   dlg.showModal();
   // A row of chips wider than the sheet fades at the edge it goes on past (ST2).
   const edges = el => { el.classList.toggle("edge-r", el.scrollLeft + el.clientWidth < el.scrollWidth - 1); el.classList.toggle("edge-l", el.scrollLeft > 1); };
   for(const el of dlg.querySelectorAll(".daychips")){ edges(el); el.addEventListener("scroll", () => edges(el), {passive: true}); }
   return dlg;
+}
+
+// A sheet's rows (ST3, DV1, AI2): a label, its value at the right ("+" when empty), its
+// content opened in place, one row at a time (the sheet opens and closes them); Delete
+// last, red.
+export const row = (k, label, body, value = "") => `<div class="srow" data-row="${k}"><button type="button" class="dhead${value ? " set" : ""}" aria-expanded="false" aria-controls="row-${k}"><span>${esc(label)}</span><span class="v" data-v="${k}">${esc(value)}</span></button><div class="dbody" id="row-${k}" hidden>${body}</div></div>`;
+export const dangerRow = label => `<div class="srow"><button type="button" class="dhead danger" data-delete><span>${esc(label)}</span></button></div>`;
+export function openRow(dlg, head){
+  dlg.querySelectorAll(".dhead[aria-controls]").forEach(h => { const on = h === head; h.setAttribute("aria-expanded", String(on)); dlg.querySelector("#" + h.getAttribute("aria-controls")).hidden = !on; });
+}
+export function rowValue(dlg, k, text){
+  const el = dlg.querySelector(`[data-v="${k}"]`);
+  el.textContent = text || "";
+  el.closest(".dhead").classList.toggle("set", !!text);
 }

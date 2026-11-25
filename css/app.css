@@ -354,15 +354,17 @@ html:has(dialog[open]){overflow:hidden}
 .chero .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--ok)}
 .chero .legend i.todo{background:none;border:1.5px solid var(--muted)}
 .costsbody .ch{font:500 .7rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 0 0}
-.clist{display:grid;gap:3px}
+/* the costs' lists (CO2): one card each, a row each, a line between them */
+.clist{display:grid;border-radius:var(--r-m);background:var(--card);overflow:hidden}
 .crow{background:var(--card);border-radius:6px;padding:11px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;color:var(--ink);text-decoration:none;border:0;font:inherit;text-align:left;width:100%;min-height:52px}
 button.crow{cursor:pointer}
-.clist .crow:first-child{border-top-left-radius:18px;border-top-right-radius:18px}
-.clist .crow:last-child{border-bottom-left-radius:18px;border-bottom-right-radius:18px}
+.clist .crow{border-radius:0}
+.clist .crow + .crow{border-top:1px solid var(--line)}
+.crow.add{grid-template-columns:1fr;font-weight:600;font-size:var(--fs-m)}
 .crow .n{font:600 .8rem var(--f-mono);width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,var(--card));color:var(--c)}
 .crow .n svg{display:block}
 .crow .w{min-width:0;display:grid;gap:5px}
-.crow .w b{font-weight:600;font-size:.92rem;overflow-wrap:anywhere}
+.crow .w b{font-weight:600;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crow .w b small,.crow .w > small{font:500 .74rem var(--f-mono);color:var(--muted);margin-left:6px}
 .crow .w > small{margin-left:0}
 .crow .bar{height:5px;border-radius:999px;background:var(--bg);overflow:hidden}
@@ -578,7 +580,9 @@ h2.part{font:700 1.35rem var(--f-display);color:var(--ink);margin:14px 0 -6px}
 .invite-new select{flex:1 1 140px}
 .invite-link{display:grid;gap:8px}
 .invite-link input{font:500 .85rem var(--f-mono)}
-.connect{display:grid;gap:8px;margin-top:8px;padding-top:14px;border-top:1px solid var(--line)}
+.connect{display:grid;gap:var(--gap-related)}
+.tbtn.danger{color:var(--err)}
+.say-this{margin:0;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-m);background:var(--card)}
 .connect h3{margin:0;font-size:1rem}
 .connect .addr{font:500 .85rem var(--f-mono);overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .connect .steps{margin:0;padding-left:18px;display:grid;gap:2px}

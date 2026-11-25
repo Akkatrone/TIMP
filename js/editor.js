@@ -14,7 +14,7 @@ import { clockMinutes, dayAfter, moveWarnings } from "./edit.js";
 import { PARTS, partOf, atTime } from "./parts.js";
 import { ask } from "./ask.js";
 import { CHECK, EDIT } from "./icons.js";
-import { openSheet } from "./sheet.js";
+import { openSheet, row, dangerRow, openRow, rowValue } from "./sheet.js";
 import { km, middleOf } from "./positions.js";
 import { closedOn } from "./places.js";
 import { parseAmount, formatPlain, formatMoney, symbolOf, currencies, currencyName } from "./money.js";
@@ -32,18 +32,6 @@ function timeNow(timezone){
 // The days of the week on the buttons for closing days, Monday first.
 const WEEK = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
-// A form's rows (ST3): a label, its value at the right ("+" when empty), its fields
-// opened in place, one row at a time; Delete last, red.
-const row = (k, label, body) => `<div class="srow" data-row="${k}"><button type="button" class="dhead" aria-expanded="false" aria-controls="row-${k}"><span>${esc(label)}</span><span class="v" data-v="${k}"></span></button><div class="dbody" id="row-${k}" hidden>${body}</div></div>`;
-const dangerRow = label => `<div class="srow"><button type="button" class="dhead danger" data-delete><span>${esc(label)}</span></button></div>`;
-function openRow(dlg, head){
-  dlg.querySelectorAll(".dhead[aria-controls]").forEach(h => { const on = h === head; h.setAttribute("aria-expanded", String(on)); dlg.querySelector("#" + h.getAttribute("aria-controls")).hidden = !on; });
-}
-function rowValue(dlg, k, text){
-  const el = dlg.querySelector(`[data-v="${k}"]`);
-  el.textContent = text || "";
-  el.closest(".dhead").classList.toggle("set", !!text);
-}
 // The actions at the bottom of a form (ST4): Cancel, and the main one saying what it does.
 const formActions = go => `<div class="sheet-actions fixed"><span class="grow"></span><button type="button" class="btn" data-close>${esc(t("cancel"))}</button><button type="submit" class="btn primary" data-go>${esc(go)}</button></div>`;
 
@@ -475,7 +463,7 @@ export function openStopEditor(o){
     const look = e.target.closest("[data-hit-show]");
     if(look){ if(chosen < 0) showHit(+look.dataset.hitShow); return; }
     const head = e.target.closest(".dhead[aria-controls]");
-    if(head){ openRow(dlg, head.getAttribute("aria-expanded") === "true" ? null : head); return; }
+    if(head) return;   // opened or closed by the sheet
     const day = e.target.closest("[data-closed]");
     if(day){ day.setAttribute("aria-pressed", String(day.getAttribute("aria-pressed") !== "true")); refresh(); return; }
     if(money.click(e) || money2.click(e)) return;
@@ -735,7 +723,7 @@ export function openDayEditor(o){
     if(e.target === dlg) return;
     if(e.target.closest("[data-close]")) return;
     const head = e.target.closest(".dhead[aria-controls]");
-    if(head){ openRow(dlg, head.getAttribute("aria-expanded") === "true" ? null : head); return; }
+    if(head) return;   // opened or closed by the sheet
     const city = e.target.closest("[data-city]");
     if(city){ $("#day-city").value = city.dataset.city; refresh(); return; }
     // The night of the day before, in one tap (DY3).

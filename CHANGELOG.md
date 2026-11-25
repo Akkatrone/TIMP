@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.12.0
+
+- **Your AI**: "Linked chats" is now **Your AI**, first among the account's rows, saying which
+  chats are linked. Its sheet lists them, a row each (opened: what it can do, since when,
+  Unlink); with none, it shows how to link one for your app only (Claude, ChatGPT or
+  another), the address to copy and what to ask it.
+- **Passkeys and devices** as three rows with their value: passkeys, recovery codes left,
+  devices signed in; opened in place; actions as text buttons.
+- **The trip's costs, shorter**: day by day, by kind of place and the expenses are lists, a
+  row each; the trip's expenses and your own are one list by date, the lock on yours, with
+  "+ Add an expense" as its last row.
+- **Closed, the costs no longer say "≈ $0"** while the rates are on their way: "…" until
+  they come.
+
 ## 4.11.0
 
 - **Welcome, for whoever comes first**: "Your AI is your travel agent.", on one line in every

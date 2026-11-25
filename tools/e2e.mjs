@@ -1917,20 +1917,27 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     assert.deepEqual(blocked(), []);
   });
 
-  await step("linked chats: what each can do and since when; unlinking asks first, then stops it", async () => {
+  await step("your AI: the chats linked, what each can do and since when; unlinking asks first, then stops it; linking, your app's steps", async () => {
     await run(`location.hash = "#me";`);
     await until("the account", `document.querySelector("#app [data-me='chats']")`);
     // Open at once and tall (SH2): the list arrives inside it.
-    await atOnce(run, `document.querySelector("#app [data-me='chats']").click()`, "linked chats");
+    // Your AI first among the account's rows, with the chat linked (AI1).
+    await until("its value", `document.querySelector("#app [data-me='chats'] .val")`);
+    assert.equal(await run(`const b = document.querySelector("#app .me-list button"); return [b.dataset.me, b.querySelector(".val").textContent];`).then(x => x.join(":")), "chats:Claude");
+    await atOnce(run, `document.querySelector("#app [data-me='chats']").click()`, "your AI");
     await until("the list", `document.querySelector("dialog.sheet[open] [data-chat]") && !document.querySelector("dialog.sheet[open] [aria-busy]")`);
-    assert.equal(await text("dialog.sheet[open] h2"), "Linked chats");
-    assert.equal(await text("dialog.sheet[open] [data-chat] b"), "Claude");
-    assert.equal(await text("dialog.sheet[open] [data-chat] small"), "reads and changes your trips");
-    assert.match(await run(`return document.querySelectorAll("dialog.sheet[open] [data-chat] small")[1].textContent;`), /^linked .+$/);
-    assert.match(await run(`return document.querySelectorAll("dialog.sheet[open] [data-chat] small")[2].textContent;`), /^last used .+$/);
-    // How to link one: the connector's address, ready to copy, and the steps.
+    assert.equal(await text("dialog.sheet[open] h2"), "Your AI");
+    // A row per chat (AI2): its name, when it was used; opened, what it can do and since when.
+    assert.equal(await text("dialog.sheet[open] [data-chat] .dhead span"), "Claude");
+    await run(`document.querySelector("dialog.sheet[open] [data-chat] .dhead").click();`);
+    assert.match(await text("dialog.sheet[open] [data-chat] .dbody .foot"), /^reads and changes your trips · linked .+ · last used .+$/);
+    // Linking another: your app's steps, the connector's address ready to copy.
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-connect]").hidden;`), true);
+    await run(`document.querySelector("dialog.sheet[open] [data-link-another]").click();`);
     assert.match(await run(`return document.querySelector("dialog.sheet[open] [data-connector]").textContent;`), /^https?:\/\/.+\/mcp$/);
-    assert.match(await text("dialog.sheet[open] .connect"), /Claude: Settings → Connectors/);
+    assert.match(await text("dialog.sheet[open] [data-link-steps]"), /^In Claude: Settings → Connectors/);
+    await run(`document.querySelector('dialog.sheet[open] [data-link-app="chatgpt"]').click();`);
+    assert.match(await text("dialog.sheet[open] [data-link-steps]"), /^In ChatGPT: Settings → Apps & Connectors/);
     // Cancel keeps it.
     await run(`document.querySelector("dialog.sheet[open] [data-unlink]").click();`);
     await until("the question", `document.querySelector("dialog.ask[open]")`);
@@ -1942,7 +1949,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     await run(`document.querySelector('dialog.ask [data-answer="yes"]').click();`);
     await until("gone from the list", `!document.querySelector("dialog.sheet[open] [data-chat]")`);
     assert.equal(service.chat.unlinked, true);
-    assert.match(await text("dialog.sheet[open] [data-chats]"), /No chat app is linked yet/);
+    assert.deepEqual(await run(`return [document.querySelector("dialog.sheet[open] [data-chats]").hidden, document.querySelector("dialog.sheet[open] [data-connect]").hidden];`), [true, false], "none left: how to link one");
     await until("said", `/Unlinked: Claude\./.test(document.getElementById("toast").textContent)`);
     await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
     // The sheet goes on its "close" event, a moment after the tap (later on a slow machine).
@@ -2312,7 +2319,8 @@ async function accountSteps({run, until, reload, page, blocked, service}){
 
   await step("the account: a copy of its data; deleted for good with the handle and the passkey, the trips staying on the phone", async () => {
     await openMe();
-    assert.deepEqual(await run(`return [...document.querySelectorAll("#app [data-me]")].map(b => b.textContent);`), ["Passkeys and devices", "Linked chats", "Export my data", "Sign out", "Delete account"]);
+    // Your AI first (AI1); a row's value comes after its name, once the service answers.
+    assert.deepEqual(await run(`return [...document.querySelectorAll("#app [data-me]")].map(b => b.firstChild.textContent);`), ["Your AI", "Passkeys and devices", "Export my data", "Sign out", "Delete account"]);
     service.calls.length = 0;
     await run(`document.querySelector("#app [data-me='export']").click();`);
     await until("the copy made", `/Your data is in the file/.test(document.getElementById("toast").textContent)`, 15000);
