@@ -46,7 +46,7 @@ export function openSignUp(o){
     </div>
     <div class="passkey">${FINGER}<span>${esc(t("passkeyHelp"))}</span></div>
     <p class="errbox" data-error role="alert" hidden></p>
-    <p class="foot"><button type="button" class="linkbtn" data-recover>${esc(t("lostPasskey"))}</button></p>
+    <p class="foot"><button type="button" class="tbtn" data-recover>${esc(t("lostPasskey"))}</button></p>
     <div class="sheet-actions">
       <button type="button" class="btn" data-signin>${esc(t("haveAccount"))}</button>
       <span class="grow"></span>

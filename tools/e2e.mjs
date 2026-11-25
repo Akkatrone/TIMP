@@ -446,7 +446,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     const before = await versionOnPhone();
     await run(`document.querySelector(".fab").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open]")`);
-    await fill("#stop-src", PLACE);
+    await fill("#stop-title", PLACE);
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
     assert.match(await run(`return document.querySelector("[data-pos]").textContent;`), /38\.71012, -9\.13751/);
     // The time from two lists, hour and minutes (no clock of the phone's own).
@@ -493,11 +493,11 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
     await run(`document.querySelector(".fab").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open]")`);
-    await fill("#stop-src", "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+    await fill("#stop-title", "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
     assert.match(await run(`return document.querySelector("[data-src-note]").textContent;`), /Short Google Maps link/);
     await fill("#stop-title", "Tram 28");
     // A part of the day instead of the clock (T1): seven, nothing in between.
-    await run(`document.querySelector("[data-time-mode]").click();`);
+    await run(`document.querySelector('[data-time-mode="words"]').click();`);
     assert.equal(await run(`return document.getElementById("stop-time").hidden && !document.getElementById("stop-time-words").hidden;`), true);
     assert.equal(await run(`return [...document.querySelectorAll("#stop-time-words option")].map(o => o.value).join();`), "sunrise,morning,midday,afternoon,sunset,evening,night");
     await fill("#stop-time-words", "evening");
@@ -509,6 +509,44 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return [...document.querySelectorAll(".when .tm.part")].filter(tm => tm.textContent === "Evening").length;`), 2, "the example's \"Evening\" as a part too");
   });
 
+  await step("the stop form: a name searched, places around the day, the first taken; the day as chips; moving says what to know first (ST1–ST6)", async () => {
+    await run(`location.hash = "#day-1";`);
+    await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
+    await run(`window.__geo2 = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo2.push(String(u)), Promise.resolve(new Response(JSON.stringify([
+      {lat: "38.6975", lon: "-9.2032", category: "amenity", type: "cafe", name: "Pastéis de Belém", display_name: "Pastéis de Belém, Rua de Belém 84, Lisboa"},
+      {lat: "41.15", lon: "-8.61", category: "shop", type: "bakery", name: "Pastelaria Belém", display_name: "Pastelaria Belém, Rua Exemplo, Porto"}])))) : real(u, o);`);
+    await run(`document.querySelector(".fab").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] [data-search]")`);
+    // The name as on the sign: small, and only if asked (ST1).
+    assert.equal(await run(`return document.querySelector("[data-local-field]").hidden && !document.querySelector("[data-local-add]").hidden;`), true);
+    // Nothing leaves while typing; Search asks once, for three places, around the day.
+    await run(`const f = document.getElementById("stop-title"); f.value = "pasteis de belem"; f.dispatchEvent(new Event("input", {bubbles: true}));`);
+    assert.equal(await run(`return window.__geo2.length;`), 0, "not while typing");
+    await run(`document.querySelector("[data-search]").click();`);
+    await until("the places", `document.querySelectorAll("dialog.sheet[open] [data-hit]").length === 2`, 10000);
+    assert.equal(new URL(await run(`return window.__geo2[0];`)).searchParams.get("limit"), "3");
+    assert.deepEqual(await run(`return [...document.querySelectorAll("[data-hit]")].map(b => [b.querySelector("b").textContent, b.getAttribute("aria-pressed")]);`), [["Pastéis de Belém", "true"], ["Pastelaria Belém", "false"]]);
+    assert.match(await run(`return document.querySelectorAll("[data-hit] .km")[1].textContent;`), /^\d+ km$/, "how far, for the one in another town");
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastéis de Belém", "the first taken: its name");
+    assert.equal(await run(`return document.querySelector('[data-v="type"]').textContent;`), "Food", "and its kind, shown in its row");
+    // The day as chips; the button says where it goes; a new day says so (ST2, ST4, ST6).
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-go]").textContent;`), "Add to day 1");
+    await run(`document.querySelector('[data-day-chip="4"]').click();`);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-go]").textContent;`), "Add to a new day 5");
+    assert.match(await run(`return document.querySelector("[data-new-day]").textContent;`), /a new day after the last/);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click(); await new Promise(r => setTimeout(r, 200));`);
+    // Moving a stop closed on Sundays and booked, to Sunday: said before, nothing blocks (ST5).
+    await run(`const li = document.querySelectorAll(".stop")[0]; li.querySelector(".tap").click(); await new Promise(r => setTimeout(r, 200)); document.querySelector(".stop.open [data-edit]").click();`);
+    await until("its form", `document.querySelector("dialog.sheet[open] [data-day-chip]")`);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-warns]").hidden;`), true, "nothing to know where it is");
+    await run(`document.querySelector('[data-closed="sun"]').click(); document.querySelector('[data-booking="booked"]').click(); document.querySelector('[data-day-chip="2"]').click();`);
+    assert.deepEqual(await run(`return [...document.querySelectorAll("[data-warns] p")].map(p => p.textContent);`),
+      ["Moving to Sunday, May 16, day 3", "Closed on Sunday.", "Booked: check the booking is for this day."]);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-go]").textContent;`), "Move to day 3");
+    assert.equal(await run(`return document.querySelector('[data-v="booking"]').textContent;`), "Done", "the row says its value");
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click(); await new Promise(r => setTimeout(r, 200));`);
+  });
+
   await step("an address shared on its own is searched around the trip; the pin can be put on a map", async () => {
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
@@ -517,7 +555,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector(".fab").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open]")`);
     assert.equal(await run(`return getComputedStyle(document.documentElement).overflow;`), "hidden", "the page under the form does not scroll");
-    await fill("#stop-src", "Rua Augusta, 24https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
+    await fill("#stop-title", "Rua Augusta, 24https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Rua Augusta, 24");
     await until("the position", `/38\.71000, -9\.13660 · OpenStreetMap/.test(document.querySelector("[data-pos]").textContent)`);
     assert.equal(await run(`return document.querySelector('[data-type][aria-checked="true"]').dataset.type;`), "museum", "the kind of place OpenStreetMap gave");
@@ -973,7 +1011,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-day-add]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-day")`);
     assert.match(await run(`const s = document.getElementById("stop-day"); return s.options[s.selectedIndex].textContent;`), /^New day · Tue May 18/);
-    await fill("#stop-src", PLACE);
+    await fill("#stop-title", PLACE);
     await submit();
     await until("day 5", `location.hash === "#day-5"`);
     assert.deepEqual(await stopTitles(), ["Pastelaria Exemplo"]);

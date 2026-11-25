@@ -23,7 +23,7 @@ html{-webkit-tap-highlight-color:transparent}
 button,.btn,.seg,summary,.dchip{-webkit-user-select:none;user-select:none}
 :is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act):active{transform:scale(.96)}
 :is(.btn,.seg button,.chipbtn,.zchip,.tick,.more,.iconbtn,.menu button,#toast .act){transition:transform .1s,background-color .15s,color .15s}
-:is(.tap,.costbtn,.linkbtn,.maplink,.costs > summary):active{opacity:.6}
+:is(.tap,.costbtn,.tbtn,.maplink,.costs > summary):active{opacity:.6}
 .gutter{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* day strip */
@@ -77,7 +77,7 @@ h1{font:700 1.4rem/1.25 var(--f-display);margin:0;text-wrap:balance}
 .seg button{flex:1 1 auto;min-width:0;border:0;background:none;color:var(--muted);font:600 .8rem var(--f-body);padding:6px 16px;border-radius:999px;cursor:pointer;min-height:34px}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 
-.plan-note{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0;font-size:.85rem;color:var(--muted)}
+.plan-note{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:0;font-size:.85rem;color:var(--muted)}
 .tag{font:600 .7rem var(--f-body);letter-spacing:.02em;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn)}
 .maplink{font:500 .8rem var(--f-body);text-decoration:none}
 .chev{flex:0 0 auto;display:none;color:var(--muted);margin-top:4px;transition:transform .15s}
@@ -279,7 +279,6 @@ span.costbtn{cursor:auto}
 .errbox .actions{margin:0}
 #paste-text{min-height:180px;font:500 16px/1.45 var(--f-mono);resize:vertical}  /* 16px: iPhones zoom into smaller fields */
 /* how to have a trip written by an AI assistant */
-.linkbtn{border:0;background:none;padding:0;font:inherit;color:var(--link);text-decoration:underline;cursor:pointer}
 .errbox b{font-weight:600}
 
 /* bottom right: + (a stop on the day on screen), the one coloured button, in both themes */
@@ -314,7 +313,7 @@ body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 .sheet .clock{display:flex;align-items:center;gap:4px;min-width:0}
 .sheet .clock select{flex:1 1 0;padding:10px 22px 10px 10px;background-position:right 5px center;background-size:12px;font:500 1rem var(--f-mono);font-variant-numeric:tabular-nums}
 .sheet .clock > span{font:600 1rem var(--f-mono);color:var(--muted)}
-.sheet #stop-src{resize:none;min-height:44px;line-height:1.4;overflow-y:auto}
+.sheet #stop-title{resize:none;min-height:44px;line-height:1.4;overflow-y:auto}
 /* the map in the stop form, to put the pin by hand */
 .pickwrap{display:grid;gap:8px;min-width:0}
 .pickwrap .foot{margin:0}
@@ -402,6 +401,44 @@ button.crow{cursor:pointer}
 .sheet .money .seg.kind{display:inline-flex;border-radius:999px}
 .sheet .money .seg.kind button{border-radius:999px;padding:6px 16px}
 .sheet .money .seg.kind button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+/* the stop form (ST1–ST8): what, found; when, at a glance; the rest a row each, opened in
+   place; what to know before it goes there; the actions always at the bottom */
+.tbtn{display:inline-flex;align-items:center;gap:var(--sp-2);justify-self:start;min-height:var(--touch);padding:0 var(--sp-1);border:0;background:none;color:var(--ink);font:600 var(--fs-m) var(--f-body);cursor:pointer}
+.tbtn.quiet{color:var(--muted);font-weight:500}
+.sheet .local{justify-self:start;display:flex;align-items:center;min-height:var(--touch);padding:0;border:0;background:none;color:var(--muted);font:400 var(--fs-m) var(--f-body);text-align:start;cursor:pointer}
+.hits{display:grid;gap:var(--sp-2)}
+.hit{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);align-items:center;width:100%;text-align:start;padding:var(--sp-3);border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);color:var(--ink);font:inherit;cursor:pointer}
+.hit[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.hit b{font-weight:600;overflow-wrap:anywhere}
+.hit small{grid-column:2;color:var(--muted);font-size:var(--fs-s);overflow-wrap:anywhere}
+.hit .km{grid-row:1 / span 2;grid-column:3;color:var(--muted);font-size:var(--fs-s)}
+.hit .ty{grid-row:1 / span 2;width:var(--sp-5);height:var(--sp-5);border-radius:var(--r-full);background:var(--pc)}
+.daychips{display:flex;gap:var(--sp-2);overflow-x:auto;scrollbar-width:none;padding-bottom:var(--sp-1)}
+.daychips::-webkit-scrollbar{display:none}
+.daychips button{flex:0 0 auto;display:grid;justify-items:center;gap:var(--sp-1);min-width:var(--touch);min-height:var(--touch);padding:var(--sp-2) var(--sp-3);border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);color:var(--ink);font:600 var(--fs-base) var(--f-body);cursor:pointer}
+.daychips small{font:500 var(--fs-xs) var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.daychips [aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.daychips [aria-pressed="true"] small{color:inherit}
+.daychips .new{border-style:dashed}
+.sheet .timeway{display:inline-flex;justify-self:start}
+.srows{display:grid;border-radius:var(--r-m);background:var(--card);overflow:hidden}
+.srow{display:grid;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.dhead{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:48px;padding:var(--sp-3) var(--sp-4);border:0;background:none;color:var(--ink);font:600 var(--fs-base) var(--f-body);text-align:start;cursor:pointer}
+.dhead .v{margin-left:auto;min-width:0;max-width:60%;color:var(--muted);font-weight:400;font-size:var(--fs-m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dhead::after{content:"+";flex:none;color:var(--muted);font-weight:400}
+.dhead.set::after{content:"›"}
+.dhead[aria-expanded="true"]::after{content:"−"}
+.dhead.danger{color:var(--err)}
+.dhead.danger::after{content:none}
+.dbody{display:grid;gap:var(--sp-3);padding:0 var(--sp-4) var(--sp-4)}
+.dbody .field > .label{display:none}
+.warns{display:grid;gap:var(--sp-2);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-m);background:var(--warn-bg)}
+.warns p{margin:0;display:flex;gap:var(--sp-3);align-items:flex-start;font-size:var(--fs-m);color:var(--ink)}
+.warns p::before{content:"!";flex:none;width:18px;height:18px;border-radius:var(--r-full);background:var(--warn);color:var(--bg);font:700 var(--fs-xs)/18px var(--f-body);text-align:center}
+.warns p.h{font-weight:600;color:var(--warn)}
+.warns p.h::before{content:none}
+.sheet-actions.fixed{position:sticky;bottom:0;z-index:1;margin:0 calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5) - env(safe-area-inset-bottom,0px));padding:var(--sp-4) var(--sp-5) calc(var(--sp-4) + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line)}
 .sheet .addcost{margin:-6px 0 4px}
 .crow .n .lock{width:13px;height:13px}
 .receipt .ln .t .lock{margin-right:5px;color:var(--muted)}

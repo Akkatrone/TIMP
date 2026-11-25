@@ -52,3 +52,21 @@ test("the language of a local name, for its glyphs", () => {
   assert.equal(localLang("一蘭", ""), "zh");
   assert.equal(localLang("Café", "eu"), "");
 });
+
+test("before a stop goes to a day: closed there, booked for another day, its time taken, a choice of the same name (ST5)", async () => {
+  const { moveWarnings } = await import("../js/edit.js");
+  const trip = {days: [
+    {date: "2027-05-14", stops: [{id: "a", title: "Castle", time: "14:00", closed: ["sun"], booking: "booked"}]},
+    {date: "2027-05-16", stops: [{id: "b", title: "Lunch in Cascais", time: "14:00"}, {id: "c", title: "Rifugio", time: "20:00", choice: "Dinner"}, {id: "d", title: "Osteria", time: "20:00", choice: "Dinner"}]}
+  ]};
+  const castle = trip.days[0].stops[0];
+  // To Sunday 16 at 14:00: closed on Sundays, booked (for the 14th), the time taken.
+  assert.deepEqual(moveWarnings(trip, castle, {date: "2027-05-16", plan: null}, {date: "2027-05-14", plan: null, id: "a"}),
+    [{kind: "closed", weekday: "sun"}, {kind: "booked"}, {kind: "time", time: "14:00", title: "Lunch in Cascais"}]);
+  // Staying on its day: nothing (itself is not "another stop at 14:00").
+  assert.deepEqual(moveWarnings(trip, castle, {date: "2027-05-14", plan: null}, {date: "2027-05-14", plan: null, id: "a"}), []);
+  // A new stop: no booking to move; its time against the day's.
+  assert.deepEqual(moveWarnings(trip, {title: "Bar", time: "14:00"}, {date: "2027-05-16", plan: null}), [{kind: "time", time: "14:00", title: "Lunch in Cascais"}]);
+  // An option of "Dinner" taken to a day that has a "Dinner" too.
+  assert.deepEqual(moveWarnings(trip, {title: "Pizza", time: "21:00", choice: "Dinner"}, {date: "2027-05-16", plan: null}, {date: "2027-05-14", plan: null, id: "z"}), [{kind: "group", name: "Dinner"}]);
+});

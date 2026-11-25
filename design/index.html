@@ -33,7 +33,7 @@
     <a href="#principles">Principles</a><a href="#colour">Colour</a><a href="#type">Type</a>
     <a href="#space">Space, shape, motion</a><a href="#line">The line of the day</a>
     <a href="#stop">A stop</a><a href="#groups">Alternatives</a><a href="#day">The day</a>
-    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a><a href="#sheets">Sheets</a><a href="#trips">Trips</a><a href="#group">The group</a>
+    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a><a href="#stopform">A stop's form</a><a href="#sheets">Sheets</a><a href="#trips">Trips</a><a href="#group">The group</a>
     <a href="#a11y">Accessibility</a>
   </nav>
 
@@ -240,6 +240,30 @@
         <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">4</span></span><span class="rt"><small>Day 1 · Fri May 14 · 12:30</small><b>Castelo de <mark>São</mark> Jorge</b></span></button></li>
         <li><button type="button" class="res"><span class="rsign" aria-hidden="true"><span class="nb" style="--pf:var(--t-sight)">2</span></span><span class="rt"><small>Day 1 · Fri May 14 · 11:00</small><b>Lisbon Cathedral</b><small class="rw">…the castle of <mark>São</mark> Jorge is ten minutes up the hill.</small></span></button></li>
       </ol>
+    </div></div>
+  </section>
+
+  <section id="stopform">
+    <h2>A stop's form</h2>
+    <p>What, found: one field, searched on Search, the places around the day. When: the
+    days as chips. The rest a row each, with its value, opened in place. Before it goes to
+    another day, what to know there. The actions always at the bottom, saying what they do.</p>
+    <div class="ds-row"><div class="ds-phone">
+      <div class="sheet ds-sheet stopform"><div class="sheet-form">
+        <div class="sheet-head"><h2>Edit stop</h2><button type="button" class="iconbtn" aria-label="Cancel">×</button></div>
+        <div class="field"><span class="label">When</span>
+          <div class="daychips" role="group" aria-label="When"><button type="button" aria-pressed="false"><small>Fri</small>1</button><button type="button" aria-pressed="false"><small>Sat</small>2</button><button type="button" aria-pressed="true"><small>Sun</small>3</button><button type="button" aria-pressed="false"><small>Mon</small>4</button><button type="button" class="new" aria-pressed="false"><small>Tue</small>+</button></div>
+          <div class="seg timeway" role="group" aria-label="Time"><button type="button" aria-pressed="true">Time</button><button type="button" aria-pressed="false">Part of the day</button></div>
+        </div>
+        <div class="warns" role="status"><p class="h">Moving to Sunday, May 16, day 3</p><p>Closed on Sunday.</p><p>Booked: check the booking is for this day.</p></div>
+        <div class="srows">
+          <div class="srow"><button type="button" class="dhead set" aria-expanded="false"><span>What it is</span><span class="v">Sight</span></button></div>
+          <div class="srow"><button type="button" class="dhead" aria-expanded="false"><span>How you get there</span><span class="v"></span></button></div>
+          <div class="srow"><button type="button" class="dhead set" aria-expanded="false"><span>Booking</span><span class="v">Done</span></button></div>
+        </div>
+        <button type="button" class="tbtn quiet">+ As on the sign</button>
+        <div class="sheet-actions"><span class="grow"></span><button type="button" class="btn">Cancel</button><button type="button" class="btn primary">Move to day 3</button></div>
+      </div></div>
     </div></div>
   </section>
 

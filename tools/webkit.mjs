@@ -160,6 +160,18 @@ try{
     ok(await run(`return !document.querySelector("dialog.sheet");`), "closed, it is still on the page");
   });
 
+  await check("a stop's form: its buttons at the bottom of the sheet, as wide as the screen at most (ST4)", async () => {
+    await run(`location.hash = "#day-2"; await new Promise(r => setTimeout(r, 300)); document.querySelector("[data-add-stop]").click(); await new Promise(r => setTimeout(r, 400));`);
+    const out = await run(`const d = document.querySelector("dialog.sheet[open]"), bar = d && d.querySelector(".sheet-actions.fixed"); if(!bar) return null;
+      const db = d.getBoundingClientRect(), bb = bar.getBoundingClientRect();
+      return {gap: Math.round(db.bottom - bb.bottom), wide: Math.round(Math.max(db.right, ...[...d.querySelectorAll(".daychips, .srows, .field")].map(e => e.getBoundingClientRect().right))), w: innerWidth, title: getComputedStyle(document.getElementById("stop-title")).fontSize};`);
+    ok(out, "no stop form");
+    ok(Math.abs(out.gap) <= 2, `the buttons ${out.gap}px from the sheet's bottom`);
+    ok(out.wide <= out.w + 1, `something ends at ${out.wide}, the screen is ${out.w}`);
+    ok(parseFloat(out.title) >= 16, `the What field's text is ${out.title}: Safari zooms into less than 16`);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+  });
+
   await check("search: a field Safari does not zoom into, results fixed under the bar", async () => {
     await run(`document.getElementById("search-btn").click(); await new Promise(r => setTimeout(r, 300));`);
     const size = await run(`return parseFloat(getComputedStyle(document.getElementById("search-q")).fontSize);`);

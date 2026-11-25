@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.8.0
+
+- **Adding a stop, rethought.** One field, "Name, address or link": a link or a place
+  from Google Maps is read at once; a name is searched (Search, or Enter) around the day,
+  up to three places with their kind and how far, the first taken and shown on a small
+  map. The day is a row of chips, "+" for a new day. The rest is a row each, with its
+  value, opened in place: kind, how you get there, booking, cost, closed on,
+  description, position. The name as on the sign is small and only if you want it. The
+  buttons stay at the bottom and say what they do: "Add to day 2", "Move to day 3".
+- **Moving a stop says what to know first**: closed that day, already booked, the time
+  already taken there, a choice of the same name there. Nothing is blocked.
+- **No more blue underlined links for actions**: the time is "Time | Part of the day";
+  "Choose for everyone" is a button; the others are plain text buttons (R16).
+
 ## 4.7.2
 
 - **The assistant says when the trip is ready**: after the JSON (one line, which a chat

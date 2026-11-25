@@ -9,6 +9,7 @@ import { minutesOf } from "./parts.js";
 import { FIELDS, slug, tripId } from "./trip.js";
 import { newStopId, uniqueStopIds } from "./ids.js";
 import { groupOf, choose, tidyGroups } from "./choices.js";
+import { closedOn } from "./places.js";
 
 // An id made from the title, unique among `taken`: for plans and expenses, unique in
 // their list. Stops have ids of their own kind (js/ids.js).
@@ -352,4 +353,31 @@ const DAY_ORDER = Object.keys(FIELDS.day);
 function orderLike(old, next, order = ORDER){
   const keys = [...new Set([...Object.keys(old), ...order, ...Object.keys(next)])].filter(k => k in next);
   return Object.fromEntries(keys.map(k => [k, next[k]]));
+}
+
+/**
+ * What to know before a stop goes to a day (design/README.md, ST5), said in the form
+ * that moves it, in the day's moves and with an assistant's changes: closed that day,
+ * booked for the day it leaves, its time already taken there, a choice of the same name
+ * there. Nothing here blocks.
+ * @param trip
+ * @param stop {title, time, closed, booking, choice}: as it will be
+ * @param to {date, plan}: where it goes
+ * @param from {date, plan, id}: where it is now; null for a new stop
+ * @returns [{kind: "closed", weekday?, date?} | {kind: "booked"} | {kind: "time", time, title} | {kind: "group", name}]
+ */
+export function moveWarnings(trip, stop, to, from = null){
+  const day = trip.days.find(d => d.date === to.date);
+  const list = !day ? [] : day.plans ? ((day.plans.find(p => p.id === to.plan) || {stops: []}).stops) : (day.stops || []);
+  const others = list.filter(s => !from || s.id !== from.id);
+  const moved = !!from && from.date !== to.date, out = [];
+  const closed = closedOn(stop, to.date);
+  if(closed) out.push({kind: "closed", ...closed});
+  if(moved && stop.booking === "booked") out.push({kind: "booked"});
+  // The same time: the same minute, or the same part of the day.
+  const at = clockMinutes(stop.time);
+  const same = stop.time && others.find(s => s.time && (at !== null ? clockMinutes(s.time) === at : s.time === stop.time));
+  if(same) out.push({kind: "time", time: stop.time, title: same.title});
+  if(moved && stop.choice && others.some(s => s.choice === stop.choice)) out.push({kind: "group", name: stop.choice});
+  return out;
 }

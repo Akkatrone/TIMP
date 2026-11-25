@@ -15,8 +15,8 @@ import { queryOf } from "./gmaps.js";
 
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 
-function nominatimUrl(address, lang, near){
-  const q = new URLSearchParams({q: address, format: "jsonv2", limit: "1", "accept-language": lang || "en"});
+function nominatimUrl(address, lang, near, limit = 1){
+  const q = new URLSearchParams({q: address, format: "jsonv2", limit: String(limit), "accept-language": lang || "en"});
   if(near){
     q.set("viewbox", [near.west, near.north, near.east, near.south].join(","));
     q.set("bounded", "1");
@@ -24,13 +24,14 @@ function nominatimUrl(address, lang, near){
   return NOMINATIM + "?" + q.toString();
 }
 
-// The first result of a Nominatim search, or null.
+// The results of a Nominatim search, with their names (the place's own, or the label's first part).
 function readNominatim(results){
-  const r = Array.isArray(results) ? results[0] : null;
-  if(!r) return null;
-  const lat = +r.lat, lng = +r.lon;
-  if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return {lat: round(lat), lng: round(lng), source: "osm", type: typeFrom([r.category, r.type]), ...(r.display_name ? {label: String(r.display_name).slice(0, 200)} : {})};
+  return (Array.isArray(results) ? results : []).map(r => {
+    const lat = +r.lat, lng = +r.lon;
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const label = r.display_name ? String(r.display_name).slice(0, 200) : "";
+    return {lat: round(lat), lng: round(lng), source: "osm", type: typeFrom([r.category, r.type]), name: String(r.name || label.split(",")[0] || "").trim(), ...(label ? {label} : {})};
+  }).filter(Boolean);
 }
 
 const round = v => Math.round(v * 1e5) / 1e5;
@@ -45,18 +46,17 @@ async function viaGoogle(address, key, near){
   const gm = await loadGoogle(key);
   const {Geocoder} = await gm.importLibrary("geocoding");
   const {results} = await new Geocoder().geocode(near ? {address, bounds: near} : {address});
-  const hit = (results || []).map(r => ({lat: round(r.geometry.location.lat()), lng: round(r.geometry.location.lng()), source: "google", type: typeFrom(r.types || []),
-    ...(r.formatted_address ? {label: String(r.formatted_address).slice(0, 200)} : {})})).find(h => inside(h, near));
-  return hit || null;
+  return (results || []).map(r => ({lat: round(r.geometry.location.lat()), lng: round(r.geometry.location.lng()), source: "google", type: typeFrom(r.types || []),
+    name: String(r.formatted_address || "").split(",")[0].trim(), ...(r.formatted_address ? {label: String(r.formatted_address).slice(0, 200)} : {})})).filter(h => inside(h, near));
 }
 
 // Nominatim's rules: at most one request a second.
 let lastOsm = 0;
-async function viaOsm(address, lang, near){
+async function viaOsm(address, lang, near, limit){
   const wait = lastOsm + 1100 - Date.now();
   if(wait > 0) await new Promise(r => setTimeout(r, wait));
   lastOsm = Date.now();
-  const res = await fetch(nominatimUrl(address, lang, near), {headers: {"Accept": "application/json"}});
+  const res = await fetch(nominatimUrl(address, lang, near, limit), {headers: {"Accept": "application/json"}});
   if(!res.ok) throw new Error("osm " + res.status);
   return readNominatim(await res.json());
 }
@@ -85,25 +85,34 @@ export function areaAround(points, km = 15){
  *   label: the place found, in the service's words ("Sé de Lisboa, Largo da Sé…"), to check it.
  *   null when no service found the address, or the device is offline.
  */
-export async function geocode(address, {googleKey = "", lang = "en", near = null} = {}){
-  const text = String(address || "").trim();
-  if(!text || (typeof navigator !== "undefined" && navigator.onLine === false)) return null;
+export async function geocode(address, o = {}){
+  return (await searchPlaces(address, {...o, limit: 1}))[0] || null;
+}
+
+/**
+ * Up to `limit` places for what was typed (the stop form's search, ST1): around the trip
+ * first, then anywhere when nothing is there. Each as geocode answers, with `name`.
+ * Asked once per search, never while typing (OpenStreetMap's rules).
+ */
+export async function searchPlaces(text, {googleKey = "", lang = "en", near = null, limit = 3} = {}){
+  const q = String(text || "").trim();
+  if(!q || (typeof navigator !== "undefined" && navigator.onLine === false)) return [];
   for(const area of near ? [near, null] : [null]){
     if(googleKey && !googleGeocodingOff){
       try{
-        const hit = await viaGoogle(text, googleKey, area);
-        if(hit) return hit;
+        const hits = await viaGoogle(q, googleKey, area);
+        if(hits.length) return hits.slice(0, limit);
       }catch(e){
         // REQUEST_DENIED: the Geocoding API is not enabled on this key. Stop asking Google.
         if(/DENIED|not authorized|not activated/i.test(String(e && (e.code || e.message)))) googleGeocodingOff = true;
       }
     }
     try{
-      const hit = await viaOsm(text, lang, area);
-      if(hit) return hit;
-    }catch(e){ return null; }
+      const hits = await viaOsm(q, lang, area, limit);
+      if(hits.length) return hits.slice(0, limit);
+    }catch(e){ return []; }
   }
-  return null;
+  return [];
 }
 
 /**

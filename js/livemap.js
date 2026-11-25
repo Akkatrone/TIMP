@@ -95,6 +95,28 @@ export async function newMap(canvas, {zoomButtons = true, ...options} = {}){
   return {ml, map};
 }
 
+/**
+ * A small map in `box` (".live.mini"): a point found, the day's stops around it (SH3, ST1).
+ * The box shows "loading" until it is drawn. @returns the map, to remove when done.
+ */
+export async function miniMap(box, point, around = []){
+  const at = [point.lng, point.lat];
+  const {ml, map} = await newMap(box, {zoomButtons: false, center: at, zoom: 15});
+  const msg = box.querySelector(".msg");
+  if(msg) msg.remove();
+  const mark = (cls, ll, type) => {
+    const el = document.createElement("span");
+    el.className = cls;
+    if(type) el.style.setProperty("--pc", `var(--t-${type})`);
+    new ml.Marker({element: el}).setLngLat(ll).addTo(map);
+  };
+  const bounds = new ml.LngLatBounds(at, at);
+  for(const s of around){ mark("mini-dot", [s.lng, s.lat], s.type); bounds.extend([s.lng, s.lat]); }
+  mark("mini-here", at);
+  map.fitBounds(bounds, {padding: 32, maxZoom: 16, duration: 0});
+  return map;
+}
+
 // A marker MapLibre places by its corner: an empty box at the point, the pin centred on it by CSS.
 const at = el => {
   const box = document.createElement("div");

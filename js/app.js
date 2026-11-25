@@ -1101,7 +1101,7 @@ function openAssistant(){
     (edit ? requestBox("ai-edit", key, t("aiEditLabel"), t("aiEditHint")) : requestBox("ai-new", key, t("aiTripLabel"), t("aiTripHint"))) +
     `<div class="steps2"><button type="button" class="btn primary" data-act="${edit ? "copy-edit" : "copy-prompt"}" data-stay><i>1</i>${esc(t("aiCopy"))}</button>` +
     `<p class="foot">${esc(t("aiWhere"))}</p><button type="button" class="btn" data-act="paste-any"><i>2</i>${esc(t("aiPasteAnswer"))}</button></div>` +
-    `<p class="foot">${edit ? "" : `${esc(t("aiNoLinks"))} <button type="button" class="linkbtn" data-act="copy-prompt-full" data-stay>${esc(t("copyPromptFull"))}</button>`}</p></div>`;
+    `<p class="foot">${edit ? "" : `${esc(t("aiNoLinks"))} <button type="button" class="tbtn" data-act="copy-prompt-full" data-stay>${esc(t("copyPromptFull"))}</button>`}</p></div>`;
   const dlg = openSheet({title: t("aiSheetTitle"), cls: "assistant", body: (canEdit ? `<div class="seg" role="group" aria-label="${esc(t("aiSheetTitle"))}">` +
       `<button type="button" data-ai-mode="new" aria-pressed="true">${esc(t("aiModeNew"))}</button>` +
       `<button type="button" data-ai-mode="edit" aria-pressed="false">${esc(t("aiModeEdit"))}</button></div>` : "") +
@@ -2463,7 +2463,7 @@ function renderDay(i){
       `<button type="button" data-plan="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}${whoCircles(on(p))}</button>`).join("") + `</div>`;
     // Another plan than the one the day goes with: mine, on all my phones (P4); it can be
     // chosen for everyone by who can edit.
-    if(plan !== goes) html += `<p class="plan-note"><span>${esc(t("planGoesWith", {p: goes.name}))}</span>${canChange() ? `<button type="button" class="linkbtn" data-plan-choose="${esc(pid)}">${esc(t("planChooseAll", {p: plan.name}))}</button>` : ""}</p>`;
+    if(plan !== goes) html += `<p class="plan-note"><span>${esc(t("planGoesWith", {p: goes.name}))}</span>${canChange() ? `<button type="button" class="btn small" data-plan-choose="${esc(pid)}">${esc(t("planChooseAll", {p: plan.name}))}</button>` : ""}</p>`;
   }
   html += stopsHTML(d, pid, list, light ? parts : null, paint, all, now);
   // Adding is always the last row (R3, V2): a new stop, or what a chat wrote.

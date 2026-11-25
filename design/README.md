@@ -84,6 +84,12 @@ the same shape.
 Full: what is there and ahead. Dots: where you have already been. Dashes: what is not
 there yet (a choice to make, an option not chosen, "+ Add a stop").
 
+**R16. No links for actions.** Blue and underlined is a link inside a text, and only
+that; what leaves the app keeps its ↗. An action is a button: the text weight (R4) is the
+text's colour, semibold, no underline, 44 points, "+" before it when it adds. A choice of
+two is a choice (a segment); an action that changes the trip for everyone is outlined; a
+line that can be changed is itself the button.
+
 ## The line of the day
 
 Every city is a line, every stop a station, as on a metro map. The line takes the
@@ -259,6 +265,31 @@ A signal like the others (W1–W5), from MET Norway through TIMP's service (`js/
 - **M10** Under the bar, the map has an edge and a shadow: the list slides under it.
   Larger or smaller, List or Map: the list is pushed, never covered, and the stop read
   first stays at its line, just under the map or the bar.
+
+## A stop's form
+
+Adding a stop and changing one: the same sheet (`js/editor.js`).
+
+- **ST1** What, found: one field for a name, an address or a link. A link or coordinates
+  pasted are read at once; a name is searched with Search or Enter, never while typing
+  (OpenStreetMap's rules), around the day first: up to three places, with their kind and
+  how far, the first taken (name, address, position, kind) and shown on a small map. The
+  name as on the sign is small and optional, under the field.
+- **ST2** When: the trip's days as chips, "+" last for a new day; the time as hours and
+  minutes or a part of the day (a choice of two, T1); a day with plans, its plan.
+- **ST3** The rest, a row each with its value ("+" when empty), opened in place, one at a
+  time: kind, how you get there, booking, cost, closed on, description, position; Delete
+  last, red, asking.
+- **ST4** The actions always at the bottom; the main one says what it does: "Add to day
+  2", "Add to a new day 5", "Save", "Move to day 3".
+- **ST5** Before a stop goes to a day, what to know, once, under When: closed that day,
+  booked (for the day it leaves), the time taken there, a choice of the same name there
+  (`moveWarnings`, `js/edit.js`). Nothing blocks.
+- **ST6** A new day is the next after the last, in its city, said in a line.
+- **ST7** Opened on a stop, the field shows its name; searching again changes name and
+  position only through a place taken.
+- **ST8** R16 in the form: no links; "+ A private cost" and "+ As on the sign" are text
+  buttons.
 
 ## Sheets
 

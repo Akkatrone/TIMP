@@ -112,28 +112,17 @@ export function openFindPositions(o){
     const again = mini && mini.id === id;
     hide();
     if(again) return;
-    const hit = results.find(x => x.id === id).hit, at = [hit.lng, hit.lat], row = rowOf(id);
+    const hit = results.find(x => x.id === id).hit, row = rowOf(id);
     const m = mini = {id, box: document.createElement("div"), map: null};
     m.box.className = "live mini";
     m.box.innerHTML = `<div class="msg">${esc(t("mapLoading"))}</div>`;
     row.after(m.box);
     row.querySelector("[data-show]").setAttribute("aria-expanded", "true");
     try{
-      const {newMap} = await import("./livemap.js");
-      const {ml, map} = await newMap(m.box, {zoomButtons: false, center: at, zoom: 15});
+      const {miniMap} = await import("./livemap.js");
+      const map = await miniMap(m.box, hit, o.around);
       if(mini !== m){ map.remove(); return; }
       m.map = map;
-      m.box.querySelector(".msg").remove();
-      const mark = (cls, ll, type) => {
-        const el = document.createElement("span");
-        el.className = cls;
-        if(type) el.style.setProperty("--pc", `var(--t-${type})`);
-        new ml.Marker({element: el}).setLngLat(ll).addTo(map);
-      };
-      const bounds = new ml.LngLatBounds(at, at);
-      for(const s of o.around){ mark("mini-dot", [s.lng, s.lat], s.type); bounds.extend([s.lng, s.lat]); }
-      mark("mini-here", at);
-      map.fitBounds(bounds, {padding: 32, maxZoom: 16, duration: 0});
     }catch(e){
       if(mini === m) m.box.innerHTML = `<div class="msg">${esc(t("mapFailed"))}</div>`;
     }
