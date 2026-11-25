@@ -12,10 +12,10 @@ import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
 import { versionStore } from "./objects.js";
 import { REPO_URL } from "./config.js";
-import { openStopEditor, openDayEditor, openExpenseEditor } from "./editor.js";
+import { openStopEditor, openDayEditor, openExpenseEditor, openMoveDay } from "./editor.js";
 import { ask } from "./ask.js";
 import { openSheet } from "./sheet.js";
-import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, addExpense, updateExpense, removeExpense, ensureIds, chooseOption, addAlternative, moveGroup, leaveGroup, choosePlan } from "./edit.js";
+import { addStop, updateStop, removeStop, addDay, updateDay, removeDay, swapDays, moveDayStops, moveWarnings, addExpense, updateExpense, removeExpense, ensureIds, chooseOption, addAlternative, moveGroup, leaveGroup, choosePlan } from "./edit.js";
 import { tidyGroups } from "./choices.js";
 import { convert, monthsFor, formatMoney, formatRate, symbolOf, homeOf, currencies, currencyName } from "./money.js";
 import { keptRates, fetchMonth } from "./rates.js";
@@ -51,6 +51,7 @@ const LOCK = '<svg class="lock" viewBox="0 0 16 16" fill="none" aria-hidden="tru
 // Icons of the opened stop's actions, and of the signals: the level gives the colour,
 // the kind the icon (design/README.md, W5).
 const EDIT = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+const SWAP = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 5h9.5M10 2.5L12.5 5 10 7.5M13 11H3.5M6 8.5L3.5 11 6 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const SKIP = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h8M8 4.5L11.5 8 8 11.5M13.5 3.5v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const DASH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 // The sky of a day (WX1), and the weather as a signal: a cloud with its rain.
@@ -368,7 +369,12 @@ async function importChanges(data){
   if(res.priv && !res.priv.owner) res.priv.owner = ownerNow();
   S.importError = null;
   if(S.rec !== rec) await openRecord(rec);
-  if(!from) return applyEdit(() => ({trip: res.trip, marks: res.moves, priv: res.priv}), "changesApplied", res.counts);
+  if(!from){
+    const before = rec.trip;
+    await applyEdit(() => ({trip: res.trip, marks: res.moves, priv: res.priv}), "changesApplied", res.counts);
+    knowAfterChanges(before, res);
+    return;
+  }
   const trip = await joinChanges(versions, rec.trip, from, res.trip);
   const priv = emptySet(res.priv) ? null : res.priv;
   const privChanged = canonical(priv) !== canonical(rec.priv || null);
@@ -378,6 +384,25 @@ async function importChanges(data){
   await keepRecord(next);
   render();
   offerSave(next, trip === rec.trip ? t("privSaved") : t("changesJoined", {...res.counts, f: shortId(data.from), v: shortId(trip.version.id)}));
+}
+
+// An assistant's changes that moved stops to other days (MV6): what to know there, said
+// once they are applied, with Undo.
+function knowAfterChanges(before, res){
+  const lines = [];
+  for(const m of res.moves || []){
+    if(!m.toDate || m.toDate === m.date) continue;
+    const d = res.trip.days.find(x => x.date === m.toDate);
+    const list = d ? (d.plans ? (d.plans.find(p => p.id === m.toPlan) || {stops: []}).stops : d.stops) : [];
+    const s = list.find(x => x.id === m.to);
+    if(!s) continue;
+    for(const w of moveWarnings(before, s, {date: m.toDate, plan: m.toPlan || null}, {date: m.date, plan: m.plan || null, id: m.from}))
+      lines.push(w.kind === "closed" ? t("mwClosed", {s: s.title, d: w.date ? m.toDate : weekdayName(w.weekday, getLang())})
+        : w.kind === "booked" ? t("mwBooked", {s: s.title, d: m.date}) : w.kind === "time" ? t("mwTime", {s: s.title, time: w.time, x: w.title}) : t("mwGroup", {s: s.title, g: w.name}));
+  }
+  if(!lines.length || !S.rec || S.rec.trip === before) return;
+  const after = S.rec.trip;
+  toast(t("changesKnow", {k: lines.slice(0, 2).join(" ") + (lines.length > 2 ? " +" + (lines.length - 2) : "")}), {label: t("undo"), run: () => undoEdit(before, after, res.moves)});
 }
 
 // demo: the example's private expenses are taken without asking.
@@ -587,15 +612,17 @@ async function applyEdit(change, message, extra = {}, privMessage = "privSaved",
   offerSave(rec, changed ? t(message, {v: shortId(next.version.id), ...extra}) : t(privMessage));
   if(form && changed) othersOnTrip().then(others => {
     if(others === null || S.rec.trip !== next) return;
-    toast(others.length ? t("savedForAll", {who: others.join(", ")}) : t("savedForAllAnyone"), {label: t("undo"), run: () => undoEdit(cur, next)});
+    toast(others.length ? t("savedForAll", {who: others.join(", ")}) : t("savedForAllAnyone"), {label: t("undo"), run: () => undoEdit(cur, next, out.marks)});
   });
 }
 
 // Undo, right after a change saved for everyone: a new version with the content from
-// before (as History → Restore), while nothing else changed since.
-async function undoEdit(before, after){
+// before (as History → Restore), while nothing else changed since. The ticks and the
+// private expenses that followed moved stops go back with them.
+async function undoEdit(before, after, moves = []){
   if(!S.rec || S.rec.trip.version.id !== after.version.id){ toast(t("undoLate")); return; }
-  await applyEdit(() => ({trip: JSON.parse(JSON.stringify(contentOf(before)))}), "undone");
+  const back = moves.map(m => ({date: m.toDate || m.date, plan: m.toDate ? m.toPlan : m.plan, from: m.to, to: m.from, toDate: m.date, toPlan: m.plan}));
+  await applyEdit(() => ({trip: JSON.parse(JSON.stringify(contentOf(before))), marks: back, priv: followStops(privOf(), back)}), "undone");
 }
 
 function currentPlace(){
@@ -638,6 +665,33 @@ function editDay(){
     onDelete: () => applyEdit(tr => ({trip: removeDay(tr, d.date)}), "dayDeleted")
       .then(() => { location.hash = "#day-" + Math.max(1, Math.min(i + 1, trip().days.length)); })
       .catch(err => toast(String(err.message || err)))});
+}
+
+// The day on screen moved (MV1–MV5): swapped with another, or its stops joined to another.
+// One version; ticks, skips, private expenses and the plan looked at follow; on a shared
+// trip, asked first, saying who will see it (A9).
+function moveDay(){
+  if(!mayChange()) return;
+  const i = currentPlace().dayIndex;
+  openMoveDay({trip: trip(), dayIndex: i, onSave: async ({how, to}) => {
+    const from = trip().days[i].date, j = trip().days.findIndex(d => d.date === to);
+    const swap = how === "swap", n = {a: Math.min(i, j) + 1, b: Math.max(i, j) + 1, m: i + 1, k: j + 1};
+    if(!(await sureForAll(t(swap ? "swapAsk" : "joinAsk", n), t("moveDayChange")))) return;
+    await applyEdit(tr => {
+      const out = swap ? swapDays(tr, from, to) : moveDayStops(tr, from, to);
+      return {...out, priv: followStops(privOf(), out.marks)};
+    }, swap ? "daysSwapped" : "dayJoined", n);
+    if(swap){
+      const p = {...S.state.plans}, a = p[from], b = p[to];
+      delete p[from]; delete p[to];
+      if(b) p[from] = b;
+      if(a) p[to] = a;
+      S.state = {...S.state, plans: p};
+      saveState();
+    }
+    const k = trip().days.findIndex(d => d.date === to);
+    location.hash = "#day-" + (k + 1);
+  }});
 }
 
 // The stops of the open day without a position, found all at once (js/positions.js),
@@ -2379,8 +2433,17 @@ function nowOf(day, planId, list){
 }
 const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
 
-// One line of a description, cut with "…" (R12): nothing else to mark.
-function markCut(){}
+// The day's line ends at the last stop's sign (R15): a group last in the day ends it at
+// its last option's circle, or at its chosen stop's number, measured once drawn.
+function markTail(){
+  for(const g of document.querySelectorAll(".stops > .group:last-child")){
+    const signs = g.querySelectorAll(".ghead .nb, .stop .nb, .stop .nopos-sign, .opt .rd");
+    const last = signs[signs.length - 1];
+    if(!last) continue;
+    const box = g.getBoundingClientRect(), r = last.getBoundingClientRect();
+    g.style.setProperty("--tail", Math.max(0, Math.round(box.bottom - (r.top + r.height / 2))) + "px");
+  }
+}
 
 // Returns the page and, when the interactive map is showing, what it must display.
 function renderDay(i){
@@ -2468,7 +2531,7 @@ function renderDay(i){
   // Adding is always the last row (R3, V2): a new stop, or what a chat wrote.
   if(!isLocked(S.rec)) html += `<div class="addrow"><button type="button" data-add-stop>${PLUS}${esc(t("addStop"))}</button><button type="button" data-add-paste>${CLIP}${esc(t("addPaste"))}</button></div>`;
   // Changing the day itself: quiet, at the end (R2).
-  if(!mapMode) html += `<div class="chg dayfoot" role="group" aria-label="${esc(t("dayActions"))}">${isLocked(S.rec) ? "" : `<button type="button" data-day-edit>${EDIT}${esc(t("editDay"))}</button><button type="button" data-day-add>${PLUS}${esc(t("addDay"))}</button>`}${anyText ? `<button type="button" data-expand aria-pressed="${S.ui.expandAll}">${S.ui.expandAll ? FOLD : UNFOLD}${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}</button>` : ""}</div>`;
+  if(!mapMode) html += `<div class="chg dayfoot" role="group" aria-label="${esc(t("dayActions"))}">${isLocked(S.rec) ? "" : `<button type="button" data-day-edit>${EDIT}${esc(t("editDay"))}</button><button type="button" data-day-move>${SWAP}${esc(t("moveDay"))}</button>`}${anyText ? `<button type="button" data-expand aria-pressed="${S.ui.expandAll}">${S.ui.expandAll ? FOLD : UNFOLD}${esc(t(S.ui.expandAll ? "collapseAll" : "expandAll"))}</button>` : ""}</div>`;
   // The next stop's bar (V3): its number, its name, how long until it, Directions from
   // where the traveller is (no origin: the phone's position).
   let bar = "";
@@ -2663,7 +2726,7 @@ function render(){
   $next.innerHTML = bar;
   watchNext();
   syncLive(wanted);
-  markCut();
+  markTail();
   $app.style.minHeight = "";
   if(scrollTop() !== y) scrollToY(y);
   askRates();
@@ -2760,7 +2823,7 @@ $app.addEventListener("click", e => {
   const edit = e.target.closest("[data-edit]");
   if(edit){ S.menuFor = null; render(); editStop(edit.dataset.edit); return; }
   if(e.target.closest("[data-day-edit]")){ S.menuFor = null; render(); editDay(); return; }
-  if(e.target.closest("[data-day-add]")){ S.menuFor = null; render(); newStop(undefined, true); return; }
+  if(e.target.closest("[data-day-move]")){ S.menuFor = null; moveDay(); return; }
   const rate = e.target.closest("[data-cost-rate]");
   if(rate){
     const id = rate.dataset.costRate;
@@ -3089,7 +3152,7 @@ window.addEventListener("hashchange", () => {
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
 // The path is the one at the time of the tap: the page may have been redrawn since.
 document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().includes($app)) closeMenu(); });
-window.addEventListener("resize", markCut);
+window.addEventListener("resize", markTail);
 window.addEventListener("online", () => { S.online = true; retryRates(); render(); syncSoon(200); });
 // Back in the app after a while, on the day itself: the list goes to now again (R14).
 let hiddenAt = 0;

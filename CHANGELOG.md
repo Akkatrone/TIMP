@@ -4,6 +4,25 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.9.0
+
+- **Moving days.** At the bottom of a day, "Move this day" (no more "+ Day": a new day
+  comes from the stop form's day chips). Two ways, one sheet:
+  - **Swap with another day**: the two programmes trade dates (stops, plans, notes,
+    title, city); each date keeps its own place to sleep and its weather.
+  - **Join into another day**: its stops go to the end of the other day and the day goes
+    away. A day with plans moves whole (swap only); it says why.
+  - What to know is said before saving, by stop: closed that day, already booked, a time
+    that falls on another stop, a group you are leaving. Done and skipped ticks and
+    private expenses follow the stops.
+- **An assistant's changes that move stops** say what to know there once applied (closed
+  that day, already booked), with Undo.
+- **Undo moves things back too**: after a change that moved stops (the form, an
+  assistant's changes), Undo also brings their ticks and private expenses back.
+- **Alternatives**: the line on their left stops at the last option, also at the end of a day.
+- **Spacing has names** in the design system (R17): tight, related, group, section. The
+  share and devices sheets use them (the button sat too close to the link and the text).
+
 ## 4.8.1
 
 From the owner's tries of 4.8.0:

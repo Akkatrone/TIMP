@@ -44,6 +44,8 @@ export function tokensCss(t = readTokens()){
     ...Object.entries(values(t.map)).map(([k, v]) => `--map-${k}:${v};`),
     ...Object.entries(text).map(([k, v]) => `--fs-${k}:${v};`),
     ...Object.entries(space).map(([k, v]) => `--sp-${k}:${v};`),
+    // R17: named by what they separate, on the scale above.
+    ...Object.entries(values(t.gap)).map(([k, v]) => `--gap-${k}:${String(v).replace(/^\{space\.(\d+)\}$/, "var(--sp-$1)")};`),
     ...Object.entries(radius).map(([k, v]) => `--r-${k}:${v};`),
     `--line-w:${t.stroke.line.$value};`,
     ...Object.entries(size).map(([k, v]) => `--${k}:${v};`),

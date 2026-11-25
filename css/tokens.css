@@ -39,6 +39,10 @@
   --sp-5:16px;
   --sp-6:24px;
   --sp-7:32px;
+  --gap-tight:var(--sp-2);
+  --gap-related:var(--sp-3);
+  --gap-group:var(--sp-5);
+  --gap-section:var(--sp-6);
   --r-none:0px;
   --r-s:7px;
   --r-m:12px;

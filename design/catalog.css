@@ -55,3 +55,5 @@ body.ds{margin:0;background:var(--bg);color:var(--ink);font:400 var(--fs-base)/1
 .ds-map .mbtns{position:absolute;right:var(--sp-3);top:var(--sp-3);display:grid;gap:var(--sp-2);z-index:2}
 .ds-parts{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-2)}
 .ds-parts .when{margin:0}
+.ds-gapdemo{display:grid;gap:var(--gap-related);margin-top:var(--gap-group)}
+.ds-gapdemo .foot{margin:0}

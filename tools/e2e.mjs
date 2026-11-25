@@ -913,6 +913,13 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.href = location.pathname + "?text=" + encodeURIComponent("Done! " + ${JSON.stringify(JSON.stringify(shared))}) + "#day-1";`);
     await until("the stop removed", `document.querySelectorAll(".stop").length > 0 && ![...document.querySelectorAll(".stop .tt")].some(h => h.textContent.includes("Ginjinha bar"))`);
     assert.equal(await run(`return location.search;`), "");
+    // A change that moves a stop to a day it is closed: what to know, said once applied,
+    // with Undo (MV6).
+    const se = await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip.days[0].stops.find(s => s.title === "Lisbon Cathedral").id); }; });`);
+    await paste(JSON.stringify({format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: se, set: {closed: ["mon"]}, to: {day: "2027-05-17"}}}]}));
+    await until("said", `/To know: Lisbon Cathedral: closed on Monday\./.test(document.getElementById("toast").textContent)`);
+    assert.equal(await run(`return document.querySelector("#toast .act").textContent;`), "Undo");
+    await run(`document.querySelector("#toast .act").click(); await new Promise(r => setTimeout(r, 500));`);
   });
 
   await step("changes for an earlier version are joined with what changed since; a trip with the same id and no shared version is kept apart", async () => {
@@ -1017,9 +1024,11 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("#day-notes [data-note-remove]").click(); document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
     assert.deepEqual(await run(`const h = document.querySelector(".dayline [data-notes]"); if(h && h.getAttribute("aria-expanded") === "false") h.click(); await new Promise(r => setTimeout(r, 100)); return [...document.querySelectorAll(".dayline li .tx")].map(d => d.textContent).slice(-1);`), ["Tram 15 from Praça da Figueira"]);
     assert.equal(await run(`return [...document.querySelectorAll(".dayline li .tx")].some(d => d.textContent === "Pastéis before ten");`), false, "taken away");
-    // Add a day: the stop form, on a new day after the last.
-    await run(`document.querySelector("[data-day-add]").click();`);
-    await until("the form", `document.querySelector("dialog.sheet[open] #stop-day")`);
+    // Add a day: no "+ Day" (MV1); the stop form's "+" chip, a new day after the last (ST6).
+    assert.equal(await count("[data-day-add]"), 0);
+    await run(`document.querySelector("[data-add-stop]").click();`);
+    await until("the form", `document.querySelector("dialog.sheet[open] [data-day-chip]")`);
+    await run(`[...document.querySelectorAll("[data-day-chip]")].pop().click();`);
     assert.match(await run(`const s = document.getElementById("stop-day"); return s.options[s.selectedIndex].textContent;`), /^New day · Tue May 18/);
     await fill("#stop-title", PLACE);
     await submit();
@@ -1036,6 +1045,42 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector('dialog.ask [data-answer="yes"]').click(); await new Promise(r => setTimeout(r, 500));`);
     assert.equal(await count(".dchip:not(.info)"), 4);
     assert.equal(await run(`return location.hash;`), "#day-4");
+  });
+
+  await step("moving days: two swapped, a day's stops joined to another, what to know first; ticks follow; a day with plans only swaps (MV1–MV5)", async () => {
+    const days = () => run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip.days.map(d => [d.date, d.title, (d.stops || []).length, !!d.plans])); }; });`);
+    const before = await days();
+    await run(`location.hash = "#day-2";`);
+    await until("day 2", `document.querySelector("[data-day-move]")`);
+    await click("[data-tick]", 0);   // the first stop of day 2, ticked: it goes with its day
+    const ticked = await run(`return document.querySelector("[data-tick]").dataset.tick.split("|")[2];`);
+    await atOnce(run, `document.querySelector("[data-day-move]").click()`, "moving a day");
+    // Swap with day 4: what changes where, what to know, the button saying it.
+    await run(`document.querySelector('[data-to="3"]').click();`);
+    assert.match(await run(`return document.querySelector("[data-sum]").textContent;`), /The nights stay with their dates/);
+    assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-go]").textContent;`), "Swap days 2 and 4");
+    assert.equal(await run(`return document.querySelector('[data-to="1"]').disabled;`), true, "not with itself");
+    await run(`document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 500));`);
+    await until("swapped", `/Days 2 and 4 swapped · version/.test(document.getElementById("toast").textContent)`);
+    const after = await days();
+    assert.deepEqual([after[1][0], after[1][1], after[3][0], after[3][1]], [before[1][0], before[3][1], before[3][0], before[1][1]], "programmes swapped, dates kept");
+    assert.equal(await run(`return location.hash;`), "#day-4", "shown where it went");
+    assert.equal(await run(`return document.querySelector('[data-tick$="|${ticked}"]').getAttribute("aria-pressed");`), "true", "its tick followed it");
+    // Swap back, then join day 1's stops to day 2: the day left empty goes.
+    await run(`document.querySelector("[data-day-move]").click(); document.querySelector('[data-to="1"]').click(); document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 500));`);
+    assert.deepEqual((await days()).map(d => d[1]), before.map(d => d[1]));
+    await run(`location.hash = "#day-1"; await new Promise(r => setTimeout(r, 300)); document.querySelector("[data-day-move]").click();`);
+    await run(`document.querySelector('[data-how="join"]').click();`);
+    assert.equal(await run(`return document.querySelector('[data-to="2"]').disabled;`), true, "day 3 has plans: not joined");
+    await run(`document.querySelector('[data-to="1"]').click();`);
+    assert.match(await run(`return document.querySelector("[data-why]").textContent;`), /join day 2, in time order\. Day 1 goes/);
+    assert.match(await run(`return document.querySelector("dialog.sheet[open] [data-go]").textContent;`), /^Move \d+ stops to day 2$/);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click(); await new Promise(r => setTimeout(r, 200));`);
+    // Day 3 has plans: it moves whole, said why.
+    await run(`location.hash = "#day-3"; await new Promise(r => setTimeout(r, 300)); document.querySelector("[data-day-move]").click();`);
+    assert.equal(await run(`return document.querySelector('[data-how="join"]').getAttribute("aria-disabled");`), "true");
+    assert.match(await run(`return document.querySelector("[data-why]").textContent;`), /moves whole: it can be swapped, not joined/);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click(); await new Promise(r => setTimeout(r, 200));`);
   });
 
   await step("places to eat: review link, local name, booking and closing-day warnings that follow the stop", async () => {

@@ -247,6 +247,48 @@ export function removeDay(trip, date){
   return out;
 }
 
+/* ---------- moving days (design/README.md, MV1–MV6) ---------- */
+
+// The stops of a day as moves to `toDate` (the same ids, the same plans): what ticks,
+// skips and private expenses follow (moveMarks, followStops).
+const movesOf = (day, toDate) => (day.plans ? day.plans.flatMap(p => p.stops.map(s => [p.id, s])) : (day.stops || []).map(s => [null, s]))
+  .map(([plan, s]) => ({date: day.date, plan, from: s.id, to: s.id, toDate, toPlan: plan}));
+
+/**
+ * Two days exchange their programme (MV2): title, city, stops or plans, notes. The dates
+ * stay, and so do the nights (where one sleeps is booked for a date).
+ * @returns {trip, marks}
+ */
+export function swapDays(trip, a, b){
+  const out = clone(trip), da = dayAt(out, a), db = dayAt(out, b);
+  const KEYS = ["title", "city", "stops", "plans", "notes"];
+  const take = d => Object.fromEntries(KEYS.filter(k => d[k] !== undefined).map(k => [k, d[k]]));
+  // In the format's order of fields, as a day is written.
+  const as = (d, programme) => Object.fromEntries(Object.keys(FIELDS.day).map(k => [k, KEYS.includes(k) ? programme[k] : d[k]]).filter(([, v]) => v !== undefined));
+  const pa = take(da), pb = take(db);
+  out.days[out.days.indexOf(da)] = as(da, pb);
+  out.days[out.days.indexOf(db)] = as(db, pa);
+  return {trip: out, marks: [...movesOf(dayAt(trip, a), b), ...movesOf(dayAt(trip, b), a)]};
+}
+
+/**
+ * A day's stops join another day in time order (MV3); the day left without stops goes (a
+ * day always has stops), the dates after it stay. Not for a day with plans, or to one.
+ * @returns {trip, marks}
+ */
+export function moveDayStops(trip, from, to){
+  const src = dayAt(trip, from), dst = dayAt(trip, to);
+  if(src.plans || dst.plans) throw new Error("a day with plans moves whole: swap it");
+  let out = trip;
+  const marks = [];
+  for(const s of src.stops){
+    const r = updateStop(out, {date: from, plan: null, id: s.id}, s, {date: to, plan: null});
+    out = r.trip;
+    marks.push({date: from, plan: null, from: s.id, to: r.ref.id, toDate: to, toPlan: null});
+  }
+  return {trip: removeDay(out, from), marks};
+}
+
 /* ---------- plans ---------- */
 
 // Adds an alternative plan ({name, stops}, an id if it has a free one) to a day. A day

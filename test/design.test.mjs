@@ -65,13 +65,15 @@ test("colours are defined only in the tokens", () => {
 
 // R10: only token values. The styles written before the design system still have their
 // own; these numbers may only go down, release after release, to zero.
-const LEFT = {hex: 40, font: 139, radius: 67, rgba: 14};
+const LEFT = {hex: 40, font: 139, radius: 67, rgba: 14, space: 198};
 test("the styles use tokens, and fewer values of their own than before (R10)", () => {
   const count = {
     hex: (css.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length,
     font: (css.match(/font(-size)?:[^;}]+/g) || []).filter(x => !/var\(--fs-/.test(x)).length,
     radius: (css.match(/border-radius:[^;}]+/g) || []).filter(x => !/var\(--r-/.test(x)).length,
-    rgba: (css.match(/rgba?\([^)]*\)/g) || []).length
+    rgba: (css.match(/rgba?\([^)]*\)/g) || []).length,
+    // R17: margins, paddings and gaps in px or rem of their own, not the scale's tokens.
+    space: [...css.matchAll(/(?:^|[;{\s])(?:margin|padding|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left|inline|block))?\s*:\s*([^;}]+)/g)].filter(m => /(^|[^\w-])(?!0(px|rem)\b)\d*\.?\d+(px|rem)\b/.test(m[1])).length
   };
   for(const k of Object.keys(LEFT)) assert.ok(count[k] <= LEFT[k], `css/app.css: ${count[k]} ${k} values of its own, at most ${LEFT[k]}: use the tokens`);
 });

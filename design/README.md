@@ -91,6 +91,13 @@ text's colour, semibold, no underline, 44 points, "+" before it when it adds. A 
 two is a choice (a segment); an action that changes the trip for everyone is outlined; a
 line that can be changed is itself the button.
 
+**R17. What belongs together is closer.** Four spaces, by what they separate (tokens
+`--gap-*`, on the scale): tight, 4, an icon and its label, a title and its line; related, 8,
+within a group (buttons in a row, a label and its field, a text and its action); group,
+16, between the groups of a sheet or a card; section, 24, between sections. Nothing that
+can be told apart touches. `test/design.test.mjs` counts the spacings written by hand:
+they may only go down (198 on 25 November).
+
 ## The line of the day
 
 Every city is a line, every stop a station, as on a metro map. The line takes the
@@ -294,6 +301,26 @@ Adding a stop and changing one: the same sheet (`js/editor.js`).
   position only through a place taken.
 - **ST8** R16 in the form: no links; "+ A private cost" and "+ As on the sign" are text
   buttons.
+
+## Moving days
+
+A day's programme moves whole (`js/edit.js`, `swapDays`, `moveDayStops`).
+
+- **MV1** "Move day" among the day's own actions, at its end, with Edit day. One sheet,
+  two ways (a choice of two): swap with another day, or move its stops to another day.
+  There is no "+ Day": a new day is the stop form's "+" chip (ST6).
+- **MV2** Swapping: the two days exchange title, city, stops or plans, notes; the dates
+  and the nights (where one sleeps is booked for a date) stay. Said in a line.
+- **MV3** Moving its stops: they join the other day in time order; the day left without
+  stops goes, said before; the dates after it stay. A day with plans, or to one, swaps only;
+  the other way is off, with why.
+- **MV4** Before, what to know, a line per stop that has something (`moveWarnings`):
+  closed on its new day, booked for the day it leaves; joining, a time taken there.
+- **MV5** One version; the button says what it does ("Swap days 2 and 4", "Move 6 stops
+  to day 2"); ticks, skips, private expenses and the plan looked at follow; on a shared
+  trip, asked first (A9).
+- **MV6** An assistant's changes that move stops: what to know, said once applied, with
+  Undo.
 
 ## Sheets
 

@@ -46,6 +46,9 @@ document.querySelector("[data-ds-type]").innerHTML = TYPE.map(([k, what, w]) =>
 document.querySelector("[data-ds-space]").classList.add("ds-space");
 document.querySelector("[data-ds-space]").innerHTML = [1, 2, 3, 4, 5, 6, 7].map(i =>
   `<div><span style="width:var(--sp-${i})"></span>--sp-${i} · ${esc(v("--sp-" + i))}</div>`).join("");
+// R17: the space to use, by what it separates; each on the scale above.
+document.querySelector("[data-ds-gaps]").innerHTML = [["tight", "an icon and its label"], ["related", "within a group: a text and its action"], ["group", "between groups"], ["section", "between sections"]].map(([k, what]) =>
+  `<div class="ds-gap"><span style="width:var(--gap-${k})"></span><b>--gap-${k}</b> · ${esc(v("--gap-" + k).replace(/var\(--sp-(\d)\)/, (_, n) => v("--sp-" + n)))} · ${esc(what)}</div>`).join("");
 document.querySelector("[data-ds-radii]").innerHTML = ["s", "m", "l", "full"].map(k =>
   `<div style="border-radius:var(--r-${k})">${k}</div>`).join("");
 document.querySelector("[data-ds-motion]").innerHTML = [["state", "A change of state"], ["expand", "Opening in place"], ["enter", "Coming in (a sheet)"]].map(([k, what]) =>

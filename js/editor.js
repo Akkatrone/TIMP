@@ -577,6 +577,88 @@ export function openStopEditor(o){
 }
 
 /**
+ * Moving a day (design/README.md, MV1–MV5): swapped with another (its programme; the date
+ * and the night stay), or its stops joined to another in time order (the day left empty
+ * goes). A day with plans, or to one: swapping only. What to know about each stop that
+ * changes date, before (moveWarnings). Nothing here changes the trip:
+ * @param {object} o  trip, dayIndex, onSave({how: "swap"|"join", to: date})
+ */
+export function openMoveDay(o){
+  const lang = getLang(), days = o.trip.days, from = days[o.dayIndex];
+  const stopsOf = d => d.plans ? d.plans.flatMap(p => p.stops.map(s => [p.id, s])) : d.stops.map(s => [null, s]);
+  const dayShort = d => { const p = dateParts(d.date, lang); return `${p.dow} ${p.long.split(" ").slice(1).join(" ")}`; };
+  let how = "swap", to = -1;
+  const dlg = openSheet({title: t("moveDayTitle", {n: o.dayIndex + 1}), form: true, cls: "stopform", body: `
+    <div class="seg timeway" role="group" aria-label="${esc(t("moveHow"))}"><button type="button" data-how="swap" aria-pressed="true">${esc(t("moveSwap"))}</button><button type="button" data-how="join" aria-pressed="false">${esc(t("moveJoin"))}</button></div>
+    <p class="foot" data-why hidden></p>
+    <div class="daychips" role="group" aria-label="${esc(t("moveTo"))}">${days.map((d, i) => {
+      const p = dateParts(d.date, lang);
+      return `<button type="button" data-to="${i}" aria-pressed="false" aria-label="${esc(`${t("day")} ${i + 1}, ${p.long}`)}"><small>${esc(p.dow)}</small>${i + 1}</button>`;
+    }).join("")}</div>
+    <div class="swapsum" data-sum hidden></div>
+    <div class="warns" data-warns role="status" hidden></div>
+    <div class="sheet-actions fixed"><span class="grow"></span><button type="button" class="btn" data-close>${esc(t("cancel"))}</button><button type="submit" class="btn primary" data-go disabled>${esc(t("moveDayGo"))}</button></div>`});
+  const $ = sel => dlg.querySelector(sel);
+  // A stop and what to know where it goes, in a line: "Castle: closed on Monday."
+  const line = (s, w, leaving) => {
+    if(w.kind === "closed") return t("mwClosed", {s: s.title, d: w.date ? dayShort(days[to]) : weekdayName(w.weekday, lang)});
+    if(w.kind === "booked") return t("mwBooked", {s: s.title, d: dayShort(leaving)});
+    if(w.kind === "time") return t("mwTime", {s: s.title, time: w.time, x: w.title});
+    return t("mwGroup", {s: s.title, g: w.name});
+  };
+  function refresh(){
+    const plans = !!from.plans, dest = days[to];
+    if(plans && how === "join") how = "swap";
+    const joinOff = plans || (dest && dest.plans);
+    dlg.querySelectorAll("[data-how]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.how === how)));
+    $('[data-how="join"]').setAttribute("aria-disabled", String(!!plans));
+    dlg.querySelectorAll("[data-to]").forEach(b => {
+      const i = +b.dataset.to;
+      b.disabled = i === o.dayIndex || (how === "join" && !!days[i].plans);
+      b.setAttribute("aria-pressed", String(i === to));
+    });
+    if(to >= 0 && (to === o.dayIndex || (how === "join" && joinOff))) to = -1;
+    const why = $("[data-why]");
+    why.hidden = !(plans || (how === "join" && to >= 0));
+    why.textContent = plans ? t("moveWhyPlans", {p: from.plans.map(p => p.name).join(", ")})
+      : to >= 0 ? t("moveJoinNote", {k: from.stops.length, n: to + 1, m: o.dayIndex + 1}) : "";
+    const sum = $("[data-sum]");
+    sum.hidden = how !== "swap" || to < 0;
+    if(!sum.hidden) sum.innerHTML = `<div><b>${esc(from.title || from.city || "")}</b><small>${esc(dayShort(from))} → ${esc(dayShort(days[to]))}</small></div><span class="arrow" aria-hidden="true">⇄</span>` +
+      `<div><b>${esc(days[to].title || days[to].city || "")}</b><small>${esc(dayShort(days[to]))} → ${esc(dayShort(from))}</small></div><p class="foot">${esc(t("moveNights"))}</p>`;
+    // What to know, a line per stop that has something: the swap's both ways (closed,
+    // booked: their programmes go whole, no time is taken); a join, the time too.
+    const lines = [];
+    if(to >= 0){
+      const pairs = how === "swap" ? [[from, days[to]], [days[to], from]] : [[from, days[to]]];
+      for(const [a, b] of pairs) for(const [plan, s] of stopsOf(a)){
+        const ws = moveWarnings(o.trip, s, {date: b.date, plan: how === "swap" ? plan : null}, {date: a.date, plan, id: s.id}).filter(w => how === "join" || w.kind === "closed" || w.kind === "booked");
+        for(const w of ws) lines.push(line(s, w, a));
+      }
+    }
+    const box = $("[data-warns]");
+    box.hidden = !lines.length;
+    box.innerHTML = !lines.length ? "" : `<p class="h">${esc(t("toKnow"))}</p>` + lines.map(l => `<p>${esc(l)}</p>`).join("");
+    const go = $("[data-go]");
+    go.disabled = to < 0;
+    go.textContent = to < 0 ? t("moveDayGo") : how === "swap" ? t("swapDaysGo", {a: Math.min(o.dayIndex, to) + 1, b: Math.max(o.dayIndex, to) + 1}) : t("joinDayGo", {k: from.stops.length, n: to + 1});
+  }
+  dlg.addEventListener("click", e => {
+    const h = e.target.closest("[data-how]");
+    if(h){ if(h.getAttribute("aria-disabled") !== "true") how = h.dataset.how; refresh(); return; }
+    const c = e.target.closest("[data-to]");
+    if(c && !c.disabled){ to = +c.dataset.to; refresh(); }
+  });
+  $("form").addEventListener("submit", e => {
+    e.preventDefault();
+    if(to < 0) return;
+    dlg.close();
+    o.onSave({how, to: days[to].date});
+  });
+  refresh();
+}
+
+/**
  * The form to change a day: its city, title, where the night is spent, notes. The
  * date and the stops stay: stops are changed one by one, with their own form.
  * @param {object} o
