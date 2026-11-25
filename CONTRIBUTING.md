@@ -84,7 +84,7 @@ taps, add a check to `tools/e2e.mjs`.
 | `js/util.js` | Escaping, links, dates. No DOM. |
 | `js/icons.js` | Icons for the kinds of places (`TYPES`) and the ways of travelling (`TRAVEL`). No DOM. |
 | `js/theme.js` | Applies the chosen theme before the page is drawn. Plain script. |
-| `icons/` | `icon.svg` and `icon-maskable.svg` are the sources; the PNGs are made from them with `rsvg-convert` (192, 512, the maskable 512, and 180 for the iPhone, on a square without rounded corners). |
+| `icons/` | `icon.svg`, `icon-maskable.svg` and `apple-touch-icon.svg` are the sources; the PNGs are made from them with `rsvg-convert` (192, 512, the maskable 512, and 180 for the iPhone). The iPhone icon has an opaque, full-bleed ivory background and square corners; iOS applies its own mask. Regenerate with `rsvg-convert -w 180 -h 180 icons/apple-touch-icon.svg -o icons/apple-touch-icon.png`. |
 | `sw.js` | Service worker: keeps the app available offline. |
 | `worker/` | The link resolver, a separate and optional service on Cloudflare Workers: a Google Maps link in, name, address, position and kind of place out. It keeps nothing. How to put it online: `worker/README.md`. |
 | `tools/` | Command-line checks, the build used for publishing, the browser check and the screenshots; `tools/lib/llms.mjs` builds `llms.txt`. |
