@@ -1153,7 +1153,7 @@ const aiMessageFull = () => formatBrief() + "\n\n" + t("aiPromptFull") + "\n" + 
 // The row that opens it (Trips, Welcome: TR5), and the sheet: a new trip, or a change to
 // the one open. Two numbered actions, no paragraph of steps (R8); copying keeps the sheet
 // open (the person goes to the chat and comes back); Paste closes it.
-const assistantRow = () => `<nav class="me-list" aria-label="${esc(t("aiSheetTitle"))}"><button type="button" data-act="assistant">${esc(t("aiRow"))}</button></nav>`;
+const assistantRow = () => `<nav class="me-list" aria-label="${esc(t("aiSheetTitle"))}"><button type="button" data-act="assistant">${esc(t("planWithAi"))}</button></nav>`;
 function openAssistant(){
   const canEdit = !!S.rec && !S.rec.public;
   // Both panes are in the sheet, one over the other, the other one unseen: the sheet keeps
@@ -1802,7 +1802,7 @@ function renderTrips(){
   ${cards}
   <section class="sec add-trip"><h2>${esc(t("addTrip"))}</h2>
     <div class="actions">
-      <button type="button" class="btn primary" data-act="pick">${esc(t("loadTrip"))}</button>
+      <button type="button" class="btn primary" data-act="pick">${esc(t("loadFile"))}</button>
       <button type="button" class="btn" data-act="paste-any">${esc(t("paste"))}</button>
       ${S.records.some(r => r.fileName === "demo-trip.json") ? "" : `<button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>`}
     </div>

@@ -1,42 +1,42 @@
-# TIMP (Travel in my pocket): how to write a trip file
+# TIMP (Travel in my pocket): how to write a trip
 
-> For AI assistants asked to make or change a trip for TIMP, a web app (https://frafal.github.io/TIMP/)
-> that shows a day-by-day travel guide on a phone, offline. A trip is ONE JSON file that
-> says what the trip is: days, stops, where to sleep, what to remember. Never how it
-> looks: the app picks colours, draws maps and chooses icons. The app refuses the whole
-> file if one rule is broken, so follow the format below exactly and invent no fields.
-> This page is complete: the format, the guide and a full example are all here. Do not
-> look for other files.
-> The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
+> For AI assistants asked to plan a trip for TIMP, the app that shows it on the
+> traveller's phone day by day, even offline (https://frafal.github.io/TIMP/). A trip is ONE JSON object in the
+> format below; the app refuses it whole if one rule is broken, so follow it exactly and
+> invent no fields. This page is complete: do not look for other files. The same format
+> as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
-**Version 4.12.0.** TIMP is under active development and this page changes with it.
-Remember this version. Before you change a trip later in the conversation, or when a
-message from the app names a newer TIMP version, open this page again: if its version
-is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
-the message the app copies (Trips → Have an AI assistant change this trip): it always
-carries the current format.
+**Version 4.13.0.** Remember it: when a message from TIMP names a newer version,
+open this page again.
 
-## When TIMP is linked to this chat
+**Linked to TIMP?** If you have TIMP's tools (`list_trips`, `get_trip`, `create_trip`,
+`change_trip`…), use them, not JSON in the chat: they work on the trips of the
+traveller's account. Without them, the traveller can link you: in TIMP, You → Your AI.
 
-If you have TIMP's tools (`list_trips`, `get_trip`, `change_trip`…), the traveller
-linked their TIMP account to this chat: use the tools, not files. They read and change
-the trips on the account directly, and say how. Without them, a traveller with a TIMP
-account can link you: in TIMP, You → Linked chats → Link a chat.
+Write for someone standing in a street abroad, phone in one hand, often offline:
+everything in the trip should help them decide what to do next.
 
-## What's new
+## Steps
 
-Only what a trip file, or a list of changes, can say differently. Files written for an
-older version still load.
+1. **Read everything you were given**, then ask only for what is missing and changes the
+   result: the dates, where they sleep each night, fixed bookings (flights, trains, timed
+   tickets). Only a rough idea ("5 days in Lisbon")? Agree on the programme first, then
+   write.
+2. **Write the trip** in the format, with the advice below it. Never invent bookings,
+   hotels, times or prices: leave out what is not decided, or offer it as an option
+   (`"tag": "Optional"`, a note, a `choice`).
+3. **Check it.** TIMP lists every problem with its position
+   (`days[2].stops[0].lat: must be a number between -90 and 90`), and "Copy for the
+   assistant" sends that list back to be fixed. Then look at each day's map for a pin in
+   the wrong place.
+4. **Hand it over**, saying in a few lines what you could not verify (positions,
+   prices, opening hours). The traveller opens TIMP from its Home Screen icon (on an
+   iPhone not from Safari, which keeps another storage) and taps **Paste trip**, or
+   **Load a file** for a `.json` file.
 
-- **3.26**: `basedOn` on the trip, written by the app on a copy of a published trip
-  (`url`, `title`, `by`). Optional.
-- **3.9**: changes say the version they were written for: `from`, from the outline.
-- **3.8**: a `cost` is what the traveller pays, their share of what is split; in 3.7
-  it was the total for everyone. Private expenses: `private`, with its `expenses` (a
-  private one can name the `stop` where it was paid) and `owner`, outside versions and
-  merges. Changes reach them with `"private": true`.
+A trip holds hotels and dates: it is private, for the traveller only.
 
-## The format, in short
+## The format
 
 ```text
 TIMP trip file, format "travel-in-my-pocket/2". Answer with ONE JSON object in one code block, minified on one line, then a short line: it is complete, paste it into TIMP. Double quotes, no comments, no trailing commas; only these fields, invent none.
@@ -105,11 +105,82 @@ Example:
 {"format":"travel-in-my-pocket/2","title":"Rome in three days","lang":"en","days":[{"date":"2027-04-10","city":"Rome","title":"The ancient city","stay":{"name":"Hotel Example","address":"Via Cavour 1, Rome"},"notes":["Colosseum tickets booked for 9:00"],"stops":[{"time":"09:00","title":"Colosseum","type":"sight","text":"Enter from the Via Sacra side.","address":"Piazza del Colosseo, Rome","lat":41.8902,"lng":12.4922},{"time":"midday","title":"Lunch in Monti","type":"food","travel":"metro"}]}],"info":[{"title":"In case of need","items":[{"label":"Emergency","text":"112"}]}]}
 ```
 
-## Changing a trip that already exists
+## Days
 
-When the traveller gives you an outline of their trip (lines like
-`[colosseum] 09:00 Colosseum (sight)`), do not write the whole file again: answer
-with the changes only.
+- `city` written the same way every day: days in one city share a colour, and a change
+  of city shows ("Lisbon → Porto").
+- `stay` in full (name, address, a `note` with check-in and booking details) on every
+  night in that hotel; a plain name for a night that is not one ("Night train").
+- `notes`: only what would spoil the day if forgotten, and the way round it ("The last
+  ferry back leaves at 17:30"). Zero to three.
+- Stops in the order they happen, the practical ones too: arrival, check-in, the train
+  to the next city, the way back to the hotel.
+- Options for one moment (three places for lunch): two to four stops with the same
+  `choice`, `"chosen": true` on the one you suggest, or on none. `plans` only when the
+  whole day changes (a rainy day).
+
+## Stops
+
+- `time`: a clock time when it matters, a part of the day when it does not, none for
+  all day.
+- `text`: one to three sentences, the most useful first: how to get there from the stop
+  before (line, minutes), price and hours, what to see, one tip. The app shows two lines
+  until tapped. In the travellers' language and tone.
+- `tag`: what to know at a glance: "Ticket needed", "Booked 19:30 · 2 people",
+  "Cash only".
+- `travel` whenever the way there is by metro, bus, train, plane or boat. A journey that
+  is a stop of its own ("Train to Kyoto") has `travel` and no position.
+- `booking: "booked"` only when the traveller says it is done.
+- `local` wherever the sign is not in the Latin alphabet: staff and taxi drivers read
+  it, and the app searches the reviews with it.
+- Positions with four decimals, looked up whenever you can; from memory only for places
+  you are sure of (major landmarks, main stations). Otherwise a good `address`, as typed
+  into Google Maps: Map and Directions still work. No position for what is not a place
+  ("free afternoon").
+
+### Places to eat
+
+- `text`: what to order, how it works (queue, ticket machine, counter seats, cash only),
+  the price per person, one tip.
+- `closed` days; where a place closes on irregular days, "check the closing days" in
+  `text`. `booking` where a place takes only bookings.
+- For a meal that matters (a famous place, a long queue), a second stop nearby tagged
+  "Alternative".
+- No links to review sites: the app links each place to the ones used in its country.
+
+### Costs
+
+Every amount is what this traveller pays, their share of what is split: a ¥1,200 ticket
+is `1200`; a ¥12,000 dinner split in two, `6000`; a €200 double room for two, `100` a
+night.
+
+- `currency` on the trip: the destination's money; on a stop only when paid in another.
+- Only prices you know. A free sight is `0`; an unsure price stays out, or goes in `text`
+  as something to check.
+- `expenses`: what is paid outside the stops (flights, hotels, passes), with the `date`
+  it was paid. `private`: only when the traveller asks; keep `private.owner` as it is.
+
+## Facts that go out of date
+
+Prices, hours, closing days and timetables change. Verify them when you can; otherwise
+leave them out or word them as something to check ("check the timetable on the day").
+Never state an unverified time or price as certain.
+
+## The Info page
+
+What someone needs in a hurry: emergency numbers, how to pay and get cash, how luggage
+moves between hotels, booking codes, five or six phrases. The app lists the stays itself.
+
+## Updating a trip
+
+- **In a chat**: the traveller sends an outline (TIMP → Plan it with your AI → Change
+  this trip). Answer with the changes only, never the whole file again, with the
+  outline's version in `from`.
+- **With the whole file**: start from the latest one; keep the trip `id`, the `version`
+  block, every stop's `id`, `private` and its `owner` exactly as they are (a new stop has
+  no `id`); change only what was asked.
+
+The changes, in their format:
 
 ```text
 To change an existing trip, answer with ONE JSON object in one code block, minified on a single line, then one short line saying it is complete and ready to paste into TIMP; format "travel-in-my-pocket/changes", listing only what changes:
@@ -139,234 +210,22 @@ Options for one moment (a meal): stops with the same "choice" ("Lunch"), 2 to 4;
 On days with plans, add "plan": "<plan id>" next to "day". Use the ids in square brackets from the outline, copied exactly; new stops have none. Give lat and lng for new places when you know them. A cost is what the traveller pays (their share of what is split), in the trip's currency unless the stop says another; write only prices you know.
 ```
 
-## How the traveller loads it
+## A Google Maps key
 
-They copy your answer and tap Paste in the app (or save it as a .json file and load
-it). If the app refuses it, it lists each problem with its position, like
-`days[0].stops[2].title: is required`, and a button copies that list to send back to
-you. Fix every problem and send your answer again.
-
----
-
-# Creating a trip file
-
-How to turn a trip plan into a file for TIMP (Travel in my pocket). This guide is for whoever
-writes the file: a person, or an AI assistant working for one. It says how to write a
-*good* file; the list of fields and what is valid is in the format reference (further down this page).
-
-The reader of the result is someone standing in a street abroad with a phone in one
-hand, often without a connection. Everything in the file should help that person
-decide what to do next.
-
-## What you produce
-
-One JSON file in the format `travel-in-my-pocket/2`. It says what the trip is: days,
-stops, stays, things to remember. Never how it looks: the app picks colours, draws the
-maps and chooses the icons from the content.
-
-A trip file contains hotels and dates. Treat it as private: give it to the traveller and
-nobody else, and never publish it.
-
-## 1. Collect the trip
-
-You need: the dates, the places, where the travellers sleep each night, and what they
-do each day. Read everything you were given before asking anything. Then ask only for
-what is missing and changes the result: travel dates, hotel names, fixed bookings
-(flights, trains, timed tickets).
-
-Do not invent bookings, hotels, flight times or reservations. If something is not
-decided, leave it out or present it as an option (`"tag": "Optional"`, a line in
-`notes`, or alternative `plans`).
-
-If there is only a rough idea ("5 days in Lisbon"), agree on a programme first and
-write the file afterwards. A file is a bad place to negotiate an itinerary.
-
-## 2. Write the days
-
-One entry per date, from the arrival day to the departure day, in date order.
-
-- `city`: where the day is spent ("Lisbon", "Sintra"). Days in the same city share a
-  colour, and a change of city shows on the day ("Lisbon → Porto"). Write it the same
-  way every day.
-- `title`: what the day is about, in a few words ("Baixa and Alfama on foot").
-- `stay`: where the night is spent. The full object (`name`, `address`, `note` with
-  check-in and booking details) on every night in that hotel; a plain name for nights
-  that are not a hotel ("Night train").
-- `notes`: only what would spoil the day if forgotten, and the alternative. "The last
-  ferry back leaves at 17:30." "If it rains, swap with day 4." Zero to three per day.
-- `stops`: in the order they happen. Include the practical ones too: arrival,
-  check-in, the train to the next city, the way back to the hotel.
-- `plans` instead of `stops` only when the travellers will choose on the spot between
-  two or three different days (a rainy day, a lazy one). Each plan has a `name` and its
-  `stops`.
-- For options at one moment (three places for lunch, one museum or another), not plans:
-  two to four stops with the same `choice` (`"Lunch"`), side by side in the day, and
-  `"chosen": true` on the one you suggest, or on none to leave it to the travellers.
-
-## 3. Write the stops
-
-- `time`: a clock time when it matters ("09:30"), a part of the day when it does not:
-  `sunrise`, `morning`, `midday`, `afternoon`, `sunset`, `evening`, `night`, in English
-  whatever the trip's language. Leave it out for all day.
-- `title`: the name of the place as written on maps and signs.
-- `local`: the same name in the local script, as on the sign ("一蘭 渋谷店", "명동교자"),
-  wherever the country does not write in the Latin alphabet. Leave it out otherwise.
-- `type`: what kind of place it is. One of `sight` (monuments, churches, squares),
-  `museum`, `food` (restaurants, cafés, markets to eat at), `park` (parks, gardens,
-  beaches), `view` (viewpoints), `shop`, `walk` (a stroll through a quarter), `hotel`.
-  Leave it out for anything else (a station, a journey).
-- `travel`: how the travellers reach this stop, when it is by `metro`, `bus`, `train`,
-  `plane` or `boat`. Set it every time the description says so ("bus 7 from the
-  station"). Leave it out for walking and anything else. A journey that is a stop of
-  its own ("Train to Kyoto", "Flight to Rome") gets `travel` and no position.
-- `text`: one to three sentences, in this order of usefulness: how to get there from
-  the previous stop (line, direction, minutes), price and opening hours, what to look
-  at, one tip. The app shows the first two lines until the traveller taps, so put what
-  matters most first. Write in the travellers' language and tone.
-- `tag`: what to know at a glance, in the trip's language: "Ticket needed",
-  "Booked 19:30 · 2 people", "Cash only", "Optional".
-- `booking`: `required` when there is no way in without booking, `advised` when going
-  without is a gamble, `booked` only when the traveller says it is done. Never write
-  `booked` on your own. Museums and shows can need it too.
-- `closed`: the regular closing days ("mon") and closures on the dates of the trip
-  ("2027-05-03"), when you know them. The app warns if the stop falls on one.
-- `address`: where it is, as someone would type it into Google Maps: a street address,
-  or the name and the town ("Pantheon, Rome"). It drives the Map and Directions links.
-- `lat`, `lng`: the position, four decimal places. Look it up on a map or on the web
-  whenever you can. From memory, give it only for places you are sure about (major
-  landmarks, main stations). For a small restaurant you cannot verify, leave the
-  position out and write a good `address`: the stop still gets working links.
-- `link`: a Google Maps link to the exact place, when the traveller gave you one.
-- No position for stops that are not a place: a train ride, "free afternoon".
-
-Tell the traveller which positions were not verified.
-
-### Places to eat
-
-Meals are what travellers remember, and what goes wrong most easily: a closed door, a
-two-hour queue, a counter that only takes bookings. For every place to eat:
-
-- `type`: `food`, and `local` wherever the sign is not in the Latin alphabet. In Japan
-  many places have a sign only in Japanese; the app also searches the reviews by it.
-- `booking` and `closed` as above. Many restaurants in Japan close one fixed day a
-  week, and some on irregular days: then write "check the closing days" in `text`.
-- `text`: what to order, how it works (queue, ticket machine at the door, counter
-  seats, cash only), the price per person, then one tip.
-- No links to review sites (Tabelog, Yelp, TheFork, Tripadvisor): their addresses carry
-  numbers you cannot know. The app links each place to the reviews used in that
-  country by itself.
-- For a meal that matters (a famous place, a long queue), add a fallback nearby: a
-  second food stop with the tag "Alternative".
-
-Tell the traveller which closing days and booking rules were not verified.
-
-### Costs
-
-The app adds up what the trip costs the traveller who holds it, at the exchange rate of
-each day. Every amount is **what that traveller pays**: their own share of what is split
-with others. You know from the conversation who shares what; the app does not need to
-know how many people travel. Give it what you know, and nothing you do not:
-
-- `currency` on the trip: the money of the destination (`"JPY"` in Japan).
-- `cost` on a stop, as a number: what the traveller pays there. A museum ticket at
-  ¥1,200 is `1200`, whoever comes along; a dinner for two at ¥12,000 split in half is
-  `6000`. Only prices you know: tickets, trains, a booked menu. A free sight is `0`; a
-  price you are not sure of stays out, or goes in `text` as something to check.
-- `currency` on a stop only when it is paid in another money (a ticket bought from home).
-- `expenses` for what is paid outside the stops, often before leaving: flights,
-  hotels, rail passes, insurance, each with `title`, `cost` and the `date` it was paid.
-  A double room for two at €200 a night is `100` a night for the traveller. Only the
-  ones the traveller told you about.
-- `private` for what the traveller spends only for themselves and does not want in the
-  shared trip: shopping, a meal alone. `{"expenses": [...]}`, written like the trip's
-  expenses. Only when the traveller asks for it. In a file the app saved, keep
-  `private.owner` exactly as it is; never write one yourself.
-
-## 4. Facts that go out of date
-
-Prices, opening hours, closing days, timetables and seasonal closures change.
-Verify them when you can. When you cannot, either leave the detail out or word it as
-something to check ("check the timetable on the day"), and tell the traveller which
-facts were not verified. Never state an unverified price or time as certain.
-
-## 5. The Info page
-
-Keep it to what someone needs in a hurry: emergency numbers, how to pay and get cash,
-how luggage moves between hotels, booking codes, five or six phrases in the local
-language. Each section has a `title` and `items` of `label` and `text`; a text that is
-only a phone number can be tapped to call. The stays are listed there by the app.
-
-## 6. Check the file
-
-**Without Node:** load the file in the app (or paste it: Trips → Paste a trip). It
-runs the same checks and lists every problem with its position in the file, for
-example `days[2].stops[0].lat: must be a number between -90 and 90`. Fix them and load
-it again. When an assistant wrote the file, "Copy for the assistant" copies the list
-with a request to fix it, ready to paste into the chat. Then open the map of each day
-and look for a pin in the wrong place.
-
-## 7. Hand it over
-
-Tell the travellers, briefly:
-
-1. Send the file to each phone (chat, AirDrop, Drive), or the JSON to copy.
-2. Open the app **from its Home Screen icon** and choose "Load a trip file", or
-   "Paste a trip". On an iPhone, loading it in Safari instead puts it in a different
-   storage.
-3. Open the app once with a connection before leaving.
-4. What could not be verified: positions, prices, hours.
-
-## Updating a file later
-
-**An AI assistant in a chat:** the traveller sends an outline of the trip (from Trips →
-Have an AI assistant change this trip). Answer with the changes only, in the format
-`travel-in-my-pocket/changes` described in the format reference: never the whole file
-again. Put the version named at the top of the outline in `from`.
-
-**With the whole file:**
-
-- Start from the latest file: travellers change trips in the app too, and save them
-  from Trips → Save the file. An older copy loses nothing, because the app merges, but
-  starting from the latest one avoids surprises.
-- Keep the trip `id` and the `version` block exactly as they are, if the file has
-  them: the app then updates the trip, keeps what was ticked, and makes a new version.
-  Never write or change `version` yourself.
-- Keep the `id` of every stop that still exists, even if it is renamed or moved. A new
-  stop has no `id`; one copied from another stop leaves the copy's out.
-- Keep `private` and its `owner` as they are, unless the traveller asked to change
-  their private expenses.
-- Change only what was asked. Do not rewrite texts nobody mentioned.
-- Check the file again.
-
-## The Google Maps key
-
-Optional. Without it the interactive map uses OpenStreetMap. If the traveller has a
-key and wants Google Maps, add `"googleMapsKey": "..."` at the top level.
-
-- Only use a key the traveller gives you. Never invent one, never reuse one from
-  another file.
-- The key must be restricted to the app's address and to the Maps JavaScript API, with
-  a daily quota. Google Maps explains how.
-- A file with a key must not be published.
+Optional: without it the map is OpenStreetMap's. Only a key the traveller gives you, as
+`"googleMapsKey"` at the top level; a file with a key is never published.
 
 ## Mistakes to avoid
 
-- `"name"` for a stop: it is `"title"`. And `"format": "travel-in-my-pocket/2"` first.
-- Positions swapped (`lat` is north-south, between -90 and 90).
-- Two entries for the same date. Use `plans` for alternative days, `choice` for options
-  at one moment.
-- A day with both `stops` and `plans`, or with neither.
-- Colours, icons or map settings: the file has none.
-- Long paragraphs in `text`. The traveller reads this standing up.
+- `"name"` for a stop (it is `"title"`); `lat` and `lng` swapped.
+- Two entries for one date; a day with both `stops` and `plans`, or with neither.
+- Colours, icons, map settings: the app chooses them.
+- Long paragraphs, or HTML: only `**bold**` is formatting.
+- Guessed prices, or the total for everyone in `cost`.
 - Links to review or booking pages you did not get from the traveller.
-- Prices you guessed, or the total for everyone in `cost`: it is the traveller's share.
 - Comments or trailing commas in the JSON.
-- HTML in the texts. Only `**bold**` is formatting; everything else is shown as written.
 
-
----
-
-# A complete example
+## A complete example
 
 ```json
 {"format": "travel-in-my-pocket/2", "title": "Lisbon in my pocket (example)", "lang": "en", "timezone": "Europe/Lisbon", "currency": "EUR", "expenses": [{"title":"Flights to Lisbon and back (invented)","date":"2026-10-05","cost":280},{"title":"Casa do Exemplo, 3 nights (invented)","date":"2026-11-02","cost":390}], "private": {"expenses":[{"title":"Azulejo tiles to take home (invented)","date":"2027-05-15","cost":24},{"title":"Port wine, a bottle for home (invented)","date":"2027-05-17","cost":18}]},

@@ -92,10 +92,12 @@ export function outline(trip, priv = null){
 }
 
 /** How to write a changes file, for an assistant: the counterpart of formatBrief. */
-export function changesBrief(){
+export function changesBrief(o = {}){
   const stopFields = Object.keys(FIELDS.stop).filter(n => !FIELDS.stop[n].byApp).join(", ");
   return [
-    `To change an existing trip, answer with ONE JSON object in one code block, minified on a single line, then one short line saying it is complete and ready to paste into TIMP; format "${CHANGES}", listing only what changes:`,
+    // A chat linked through the service (MCP, o.tool) gives the changes to a tool.
+    o.tool ? `To change an existing trip, give change_trip (or remove_from_trip, to take anything away) ONE JSON object in format "${CHANGES}", listing only what changes:`
+      : `To change an existing trip, answer with ONE JSON object in one code block, minified on a single line, then one short line saying it is complete and ready to paste into TIMP; format "${CHANGES}", listing only what changes:`,
     "",
     `{"format": "${CHANGES}", "trip": "<the trip id>", "from": "<the version in the outline>", "changes": [ … ]}`,
     "",

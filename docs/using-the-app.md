@@ -9,8 +9,8 @@ changing a trip on the way, versions and files.
 2. Install it on the Home Screen:
    - **iPhone**: open the page in Safari (or Chrome), tap Share, then "Add to Home Screen".
    - **Android**: open the browser menu, tap "Install app" or "Add to Home screen".
-3. Open it from the new icon and tap **Load a trip file**. Pick the `.json` file you
-   received (from Files, Drive, a chat).
+3. Open it from the new icon. No trip yet: **Plan it with your AI**. A `.json` file you
+   received (from Files, Drive, a chat): **Load a file**.
 4. Done. From now on it also opens in airplane mode.
 
 Good to know:
@@ -27,15 +27,20 @@ Good to know:
 
 ## Changing the trip on the way
 
-Tap **+** at the bottom right of a day to add a stop. Each stop has a **⋯** button under
-its tick: **Edit** changes it, moves it to another day or deletes it; **Skip** marks a
-stop you leave out. On the map a skipped stop keeps its pin, greyed, and the route goes
-from the stop before it straight to the one after.
+**+ Add a stop** is the last row of every day. The form takes a name, an address or a
+link (a name is searched around the day), the day as a chip ("+" for a new day after the
+last) and the time; the rest is a row each, opened in place. A stop opened shows **Edit**
+(change it, move it to another day, delete it), **Skip** (a stop you leave out) and
+**+ Alternative**. On the map a skipped stop keeps its pin, greyed, and the route goes
+from the stop before it straight to the one after. Moving a stop says first what to know
+there: closed that day, already booked, a time already taken.
 
-The day has its own **⋯**, next to Map of the day: **Edit day** changes its city, title,
-where you sleep and its notes, or deletes it; **Add a day** opens the stop form on a new
-day after the last. The day's notes are one line at the top ("3 notes · …"): a tap opens
-them all, another closes them; the app remembers which, for each trip.
+At the end of a day: **Edit day** changes what it is about, its city (the trip's cities
+are chips), where you sleep (with its note, and the night before in one tap) and its
+notes, or deletes it; **Move day** swaps it with another day (each date keeps its night)
+or moves its stops into another, saying first what to know. The day's notes are one line
+at the top ("3 notes · …"): a tap opens them all, another closes them; the app remembers
+which, for each trip.
 
 **Stops without a position** (an AI assistant often leaves them out) have no pin and no
 route: a crossed sign where their number would be (a tap finds that one). A line above
@@ -62,7 +67,7 @@ option in full, **Choose this** on the others, and **+ Alternative**. A group wi
 chosen says "to choose", and the day's costs say "1 choice to make", with what it may
 cost.
 
-**Add an alternative**, in any stop's **⋯**, opens the stop form with its day, time and
+**+ Alternative**, in a stop opened, opens the stop form with its day, time and
 kind, and the group's name: from the time and the kind for a new group (Lunch, Dinner,
 Alternatives), which you can change. A tick on an option not chosen asks whether you
 went there: yes makes it the choice. Moving an option to another day asks whether it goes
@@ -113,9 +118,10 @@ a day to learn that TIMP accepts files; removing the app and installing it again
 immediate.)
 
 **iPhone:** iOS does not let web apps receive shared content. Copy instead, then tap
-**Paste** at the bottom of the app and **Paste** in the sheet that opens; **Continue**
-does the same as the Share menu on Android. In Maps, Share → Copy; from an AI assistant,
-copy the answer. A `.json` file: save it in Files and use **Load a trip file**.
+**Paste** on Trips (**Paste trip** on the first screen) and **Paste** in the sheet that
+opens; **Continue** does the same as the Share menu on Android. In Maps, Share → Copy;
+from an AI assistant, copy the answer. A `.json` file: save it in Files and use **Load a
+file**.
 
 When a position has to be looked up, the app asks Google (with a key that has the
 Geocoding API enabled, see [Google Maps](google-maps.md)) or OpenStreetMap otherwise. It
@@ -165,8 +171,8 @@ Ticked and skipped stops are never part of the file: they stay on each phone.
 
 ## Changing a trip with an AI assistant, without an account
 
-Small changes are quicker in the app (+ and Edit). For bigger ones, at the bottom of
-**Trips** open **Have an AI assistant change this trip**: one button copies a message
+Small changes are quicker in the app (+ Add a stop, Edit). For bigger ones, on
+**Trips** open **Plan it with your AI** → **Change this trip**: one button copies a message
 with an outline of the trip, you write what to change, and the assistant answers with
 the changes only, a few lines instead of the whole file. Copy them and tap **Paste** (on
 Android, share the answer to TIMP): the app applies them as a new version, and Undo is

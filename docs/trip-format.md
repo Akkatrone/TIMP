@@ -297,8 +297,8 @@ under a new id (`…-2`), or join the two if it is the same trip written again.
 ## Changes
 
 To change a trip that already exists, an AI assistant does not need to write the whole
-file again. The app gives it an outline of the trip (Trips → Have an AI assistant change
-this trip), and the assistant answers with a short list of changes, which the app applies
+file again. The app gives it an outline of the trip (Trips → Plan it with your AI →
+Change this trip), and the assistant answers with a short list of changes, which the app applies
 as one new version (Paste, at the bottom of the app):
 
 ```json

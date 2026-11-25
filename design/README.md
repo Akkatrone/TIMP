@@ -426,11 +426,11 @@ The list of trips (`#trips`): the open one first, larger; the others grouped by 
   done, a row each with its value (History · 14 versions); Delete apart, last, asking.
 - **TR4** Grouped by when (under way, coming, past by year, of others); sorted and found
   when there are many.
-- **TR5** Adding: "Load a trip file" the main action, Paste beside it (anything: a trip,
-  an assistant's changes, a place); "Write it with an assistant" a row that opens its
-  sheet (a new trip, or a change to the open one: the sheet keeps its height between
-  them; Clear beside the field, only with something in it), also on Welcome. Nothing floats on
-  Trips, Info or You.
+- **TR5** Adding: "Load a file" the main action, Paste beside it (anything: a trip,
+  an assistant's changes, a place); "Plan it with your AI" a row that opens its sheet (a
+  new trip, or a change to the open one: the sheet keeps its height between them; Clear
+  beside the field, only with something in it), Welcome's main action (WL2). The same
+  words everywhere. Nothing floats on Trips, Info or You.
 
 ## Accessibility
 

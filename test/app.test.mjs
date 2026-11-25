@@ -223,19 +223,24 @@ test("the build publishes only the app, stamped with a version", () => {
 
 test("llms.txt gives a chat assistant the whole format in one page, with valid examples", () => {
   const text = llmsText();
-  // The guide, whole; the field reference stays for people: the format in short already
+  // What to do first (the guide's steps), then the format, then the guide's advice with the
+  // format of changes; the field reference stays for people: the format in short already
   // has every field, and every line here is paid for by every assistant that reads it.
-  assert.ok(text.includes(readFileSync(join(ROOT, "docs/creating-a-trip.md"), "utf8").split("\n")[0]), "the guide");
+  const at = h => text.indexOf(h);
+  assert.ok(at("## Steps") > 0 && at("## Steps") < at("## The format") && at("## The format") < at("## Days") && at("## Updating a trip") < at(changesBrief()), "steps, format, advice, changes");
+  assert.ok(at(changesBrief()) < at("## Mistakes to avoid") && at("## Mistakes to avoid") < at("## A complete example"), "the example last");
   assert.ok(!text.includes(readFileSync(join(ROOT, "docs/trip-format.md"), "utf8").split("\n")[0]), "the reference is not pasted again");
   assert.ok(!/\]\((?!https?:)[^)]+\)/.test(text), "no links to files of the repository");
   // It is one complete page: nothing sends the assistant to look for another file.
   assert.ok(!/trip-format\.md|creating-a-trip\.md|demo-trip\.json|ask for it/.test(text), "no pointer to a file the page already contains");
   assert.match(text, /This page is complete/);
-  // Its version, and what is new first: an assistant that reads it again sees it at once.
+  // Its version at the top: an assistant asked again opens the page again when TIMP names a newer one.
   const version = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
   assert.ok(text.includes(`**Version ${version}.**`), "the version at the top");
-  assert.ok(text.indexOf("## What's new") < text.indexOf("## The format, in short"), "what is new before the format");
-  assert.equal((text.match(/## What changed, version by version/g) || []).length, 0, "not twice");
+  assert.ok(!/## What's new|## What changed, version by version/.test(text), "no history of the format: it is in the reference");
+  // Nothing written twice: each heading once.
+  const heads = text.match(/^#+ .+$/gm);
+  assert.deepEqual(heads, [...new Set(heads)], "each heading once");
   // Only what a chat assistant needs: nothing about the repository, no ids in the example.
   assert.ok(!/llms\.txt: skip|validate-trip|js\/trip\.js|js\/changes\.js|## The old format|## Versions/.test(text), "parts for the repository left out");
   const example = text.slice(text.indexOf("# A complete example"));

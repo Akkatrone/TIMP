@@ -44,7 +44,7 @@ sends, to whom, and what stays on your phone.
   your account: the app shows who asks, what it will be able to do and where the answer
   goes, and you allow or deny it there, with your passkey (asked again if you did not
   just sign in). The chat app gets a key of its own, never your passkey or your session;
-  your private expenses only if you tick them. You → Linked chats shows which chats can
+  your private expenses only if you tick them. You → Your AI shows which chats can
   reach your trips, and unlinks one at once.
 - **Who can get in** is up to you: You → Passkeys and devices lists your passkeys and
   the devices signed in. Add a passkey on each phone you use, take one off (never the

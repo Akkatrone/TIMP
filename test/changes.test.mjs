@@ -164,3 +164,12 @@ test("changes can set what things cost: a stop's cost, the trip's currency, expe
   assert.match(applyChanges(trip, changes([{update: {day: D1, stop: "se", set: {cost: "12 €"}}}])).errors[0], /cost: must be a number/);
   assert.match(changesBrief(), /addExpense/);
 });
+
+test("for a chat linked through the service, the briefs say which tool takes the JSON, never to paste it", async () => {
+  const {formatBrief} = await import("../js/trip.js");
+  for(const [brief, tool] of [[changesBrief({tool: true}), "change_trip"], [formatBrief({tool: true}), "create_trip"]]){
+    assert.match(brief.split("\n")[0], new RegExp(tool));
+    assert.doesNotMatch(brief, /paste|code block/i);
+  }
+  assert.match(changesBrief().split("\n")[0], /paste into TIMP/);
+});

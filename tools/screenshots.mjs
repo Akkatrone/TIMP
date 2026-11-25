@@ -13,6 +13,21 @@ import { withApp } from "./lib/browser.mjs";
 
 const OUT = join(ROOT, "docs", "screenshots");
 
+console.log("Writing:");
+const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+
+// 0. Welcome, as a first visit on an iPhone sees it, with an account to make (a service
+//    named, never called: nobody signs in here).
+await withApp(async ({run, until, capture, page, reload}) => {
+  await page("Emulation.setUserAgentOverride", {userAgent: IPHONE});
+  await reload();
+  await until("the welcome screen", `document.querySelector(".welcome [data-act='signup']")`);
+  await run(`document.getElementById("toast").hidden = true; if(document.activeElement) document.activeElement.blur(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));`);
+  await mkdir(OUT, {recursive: true});
+  await writeFile(join(OUT, "welcome.png"), await capture());
+  console.log("  docs/screenshots/welcome.png");
+}, {share: "http://127.0.0.1:9"}).catch(e => { console.error(e.message); process.exit(1); });
+
 await withApp(async ({run, until, theme, capture}) => {
   const shoot = async name => {
     // No message bubble and no focus ring left over from the clicks.
@@ -23,8 +38,6 @@ await withApp(async ({run, until, theme, capture}) => {
   // Puts the title of the day just under the strip of days, as after a short scroll.
   const scrollToTitle = `scrollTo(0, document.querySelector(".dayhead h1").getBoundingClientRect().top + scrollY - document.querySelector(".strip").offsetHeight - 14);`;
 
-  await mkdir(OUT, {recursive: true});
-  console.log("Writing:");
 
   // 1. The programme of a day: one stop done, one skipped, one opened with its zones.
   await run(`document.querySelector('[data-act="demo"]').click();`);
@@ -86,9 +99,4 @@ await withApp(async ({run, until, theme, capture}) => {
   await run(`scrollTo(0, 0);`);
   await shoot("plans-dark.png");
 
-  // 8. Trips, in the dark theme: the open trip's card, with the sign that it changed since saved.
-  await run(`location.hash = "#trips";`);
-  await until("the trips page", `document.querySelector(".tripcard [data-unsaved]")`);
-  await run(`scrollTo(0, 0);`);
-  await shoot("trips-dark.png");
 }).catch(e => { console.error(e.message); process.exit(1); });

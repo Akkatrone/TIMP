@@ -322,7 +322,11 @@ const EXAMPLE = {
  * The whole format in about forty lines of plain text, made from FIELDS: what a
  * person pastes into any chat, so the assistant needs no link and no browsing.
  */
-export function formatBrief(){
+/**
+ * The format in short, for an assistant. o.tool: for a chat linked through the service
+ * (MCP), which hands the trip to a tool instead of answering with it to paste.
+ */
+export function formatBrief(o = {}){
   const kind = (k, name) => {
     const f = FIELDS[k][name];
     if(f.type === "fixed") return `  ${name} (required): ${JSON.stringify(f.value)}`;
@@ -336,7 +340,8 @@ export function formatBrief(){
   const kinds = new Set(["trip"]);
   for(const k of Object.keys(FIELDS)) for(const e of Object.entries(FIELDS[k]).filter(shown)) for(const x of [e[1].type, e[1].of]) if(FIELDS[x]) kinds.add(x);
   return [
-    `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block, minified on one line, then a short line: it is complete, paste it into TIMP. Double quotes, no comments, no trailing commas; only these fields, invent none.`,
+    o.tool ? `TIMP trip file, format "${FORMAT}". Give it to create_trip as ONE JSON object: double quotes, no comments, no trailing commas; only these fields, invent none.`
+      : `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block, minified on one line, then a short line: it is complete, paste it into TIMP. Double quotes, no comments, no trailing commas; only these fields, invent none.`,
     "",
     ...Object.keys(FIELDS).filter(k => kinds.has(k)).map(block),
     "",

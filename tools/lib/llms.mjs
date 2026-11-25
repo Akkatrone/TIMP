@@ -1,15 +1,16 @@
-// llms.txt: everything an AI assistant needs to write a trip file, in one plain text
-// page published with the app (https://frafal.github.io/TIMP/llms.txt).
+// llms.txt: everything an AI assistant needs to write a trip, in one plain text page
+// published with the app (https://frafal.github.io/TIMP/llms.txt). Without an account it
+// is how a chat (Claude, ChatGPT, Gemini…) plans a trip for TIMP: it must work at the
+// first read.
 //
-// Chat assistants (Gemini, ChatGPT…) read one page when given a link; they do not
-// clone the repository and open docs/. This page is made by the build: the version and
-// the latest changes to the format, the format in short (formatBrief in js/trip.js, made
-// from FIELDS, the same text the app copies for an assistant: every field), how to write
-// changes, the guide (docs/creating-a-trip.md) without what only matters inside the
-// repository (between <!-- llms.txt: skip --> and <!-- llms.txt: end -->), the example,
-// compact. The field reference (docs/trip-format.md) stays for people: the format in
-// short says the same in a fifth of the length. Nothing here is written twice: every
-// line is read, and paid for, by every assistant that writes a trip.
+// Chat assistants read one page when given a link; they do not clone the repository. The
+// page, made by the build: what to do and what to hand over (the guide's steps), the
+// format in short (formatBrief in js/trip.js: every field, the same text the app copies),
+// the guide's advice (docs/creating-a-trip.md, without what only matters inside the
+// repository: between <!-- llms.txt: skip --> and <!-- llms.txt: end -->) with the format
+// of changes where it says how to update a trip, and a complete example, compact. The
+// field reference (docs/trip-format.md) stays for people. Nothing is written twice:
+// every line is read, and paid for, by every assistant that writes a trip.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -22,10 +23,6 @@ const read = (root, f) => readFileSync(join(root, f), "utf8").trim();
 // Parts of the documents for people working in the repository: the checker, the code,
 // how versions and the map work inside the app.
 const SKIP = /<!-- llms\.txt: skip -->[\s\S]*?<!-- llms\.txt: end -->\n?/g;
-// What changed in the format, version by version: at the top of the page, so an
-// assistant that reads it again sees first what is new.
-const NEWS = /\n## What changed, version by version\n([\s\S]*?)(?=\n## |$)/;
-
 // The example as a chat assistant should write it: no ids or version (the app adds
 // them), one stop per line. A third of the length of the file as the app saves it.
 function compactExample(trip){
@@ -48,7 +45,6 @@ const ELSEWHERE = /\*\*If you are an AI assistant:\*\*[\s\S]*?\n\n/;
 function forOnePage(md){
   return md
     .replace(SKIP, "")
-    .replace(NEWS, "")
     .replace(ELSEWHERE, "")
     .replace(/\[([^\]]+)\]\((?!https?:)[^)]+\)/g, "$1")
     .replace(/\btrip-format\.md\b/g, "the format reference (further down this page)")
@@ -59,10 +55,13 @@ function forOnePage(md){
 
 export function llmsText({root = ROOT, site = "https://frafal.github.io/TIMP/", resolver = ""} = {}){
   const version = JSON.parse(read(root, "package.json")).version;
-  const reference = read(root, "docs/trip-format.md");
-  // The latest three: what an assistant that read an older page needs. All of them are
-  // in docs/trip-format.md.
-  const news = (NEWS.exec(reference) || ["", ""])[1].trim().split(/\n(?=- )/).slice(0, 4).join("\n");
+  const guide = forOnePage(read(root, "docs/creating-a-trip.md"));
+  // The guide's steps first, then the format, then its advice; the format of changes goes
+  // where the advice says how to update a trip.
+  const steps = guide.slice(guide.indexOf("Write for someone"), guide.indexOf("\n## Days")).trim();
+  let advice = guide.slice(guide.indexOf("\n## Days")).trim();
+  const key = advice.indexOf("\n## A Google Maps key");
+  advice = advice.slice(0, key).trim() + "\n\nThe changes, in their format:\n\n```text\n" + changesBrief() + "\n```\n" + advice.slice(key);
   const links = resolver ? `
 ## Google Maps links
 
@@ -74,65 +73,32 @@ open web addresses, ask the link resolver of this site, one link at a time:
 It answers with JSON: \`title\`, \`address\`, \`lat\`, \`lng\`, \`type\` (each only when
 known) and \`link\`. Put them in the stop as they are. It keeps nothing.
 ` : "";
-  return `# TIMP (Travel in my pocket): how to write a trip file
+  return `# TIMP (Travel in my pocket): how to write a trip
 
-> For AI assistants asked to make or change a trip for TIMP, a web app (${site})
-> that shows a day-by-day travel guide on a phone, offline. A trip is ONE JSON file that
-> says what the trip is: days, stops, where to sleep, what to remember. Never how it
-> looks: the app picks colours, draws maps and chooses icons. The app refuses the whole
-> file if one rule is broken, so follow the format below exactly and invent no fields.
-> This page is complete: the format, the guide and a full example are all here. Do not
-> look for other files.
-> The format as a JSON Schema: ${site}trip.schema.json
+> For AI assistants asked to plan a trip for TIMP, the app that shows it on the
+> traveller's phone day by day, even offline (${site}). A trip is ONE JSON object in the
+> format below; the app refuses it whole if one rule is broken, so follow it exactly and
+> invent no fields. This page is complete: do not look for other files. The same format
+> as a JSON Schema: ${site}trip.schema.json
 
-**Version ${version}.** TIMP is under active development and this page changes with it.
-Remember this version. Before you change a trip later in the conversation, or when a
-message from the app names a newer TIMP version, open this page again: if its version
-is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
-the message the app copies (Trips → Have an AI assistant change this trip): it always
-carries the current format.
+**Version ${version}.** Remember it: when a message from TIMP names a newer version,
+open this page again.
 
-## When TIMP is linked to this chat
+**Linked to TIMP?** If you have TIMP's tools (\`list_trips\`, \`get_trip\`, \`create_trip\`,
+\`change_trip\`…), use them, not JSON in the chat: they work on the trips of the
+traveller's account. Without them, the traveller can link you: in TIMP, You → Your AI.
 
-If you have TIMP's tools (\`list_trips\`, \`get_trip\`, \`change_trip\`…), the traveller
-linked their TIMP account to this chat: use the tools, not files. They read and change
-the trips on the account directly, and say how. Without them, a traveller with a TIMP
-account can link you: in TIMP, You → Linked chats → Link a chat.
+${steps}
 
-## What's new
-
-${news}
-
-## The format, in short
+## The format
 
 \`\`\`text
 ${formatBrief()}
 \`\`\`
-
-## Changing a trip that already exists
-
-When the traveller gives you an outline of their trip (lines like
-\`[colosseum] 09:00 Colosseum (sight)\`), do not write the whole file again: answer
-with the changes only.
-
-\`\`\`text
-${changesBrief()}
-\`\`\`
-
-## How the traveller loads it
-
-They copy your answer and tap Paste in the app (or save it as a .json file and load
-it). If the app refuses it, it lists each problem with its position, like
-\`days[0].stops[2].title: is required\`, and a button copies that list to send back to
-you. Fix every problem and send your answer again.
 ${links}
----
+${advice}
 
-${forOnePage(read(root, "docs/creating-a-trip.md"))}
-
----
-
-# A complete example
+## A complete example
 
 \`\`\`json
 ${compactExample(JSON.parse(read(root, "examples/demo-trip.json")))}

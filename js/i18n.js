@@ -6,7 +6,6 @@ export const LANGS = {en: "English", it: "Italiano"};
 
 export const STRINGS = {
   en: {
-    loadTrip: "Load a trip file",
     tryDemo: "Try the example trip",
     installTitle: "Keep it on your Home Screen", otherPhones: "Other phones",
     welcomeHead: "Your AI is your travel agent.", welcomeLine: "TIMP keeps the trip in your pocket, day by day, even offline.",
@@ -295,7 +294,7 @@ fWhat: "Name", fWhatPh: "Name, address or link", fLocalAdd: "Name on the sign", 
     aiPromptFull: "Write a trip file for the TIMP app, following the format above exactly.",
     unsavedBadge: "Changes not in a file", sharedEditBadge: "Shared with you", sharedReadBadge: "Shared with you, read only", goneBadge: "Only on this phone",
     tripMore: "{t}: more", onThisPhone: "On this phone", versionsOne: "1 version", versionsN: "{n} versions", removeAsk: "Delete…", addTrip: "Add a trip",
-    aiRow: "Write it with an assistant", aiSheetTitle: "With an assistant", aiModeNew: "A new trip", aiModeEdit: "Change this trip",
+    aiSheetTitle: "With your AI", aiModeNew: "A new trip", aiModeEdit: "Change this trip",
     aiCopy: "Copy the message", aiWhere: "Paste it into Claude, ChatGPT, Gemini…", aiPasteAnswer: "Paste its answer",
     aiNoLinks: "The assistant cannot open the link?", copyPromptFull: "Copy the message with the whole format",
     
@@ -376,7 +375,6 @@ fWhat: "Name", fWhatPh: "Name, address or link", fLocalAdd: "Name on the sign", 
     offlineReady: "Ready to work offline."
   },
   it: {
-    loadTrip: "Carica un file viaggio",
     tryDemo: "Prova il viaggio di esempio",
     installTitle: "Tienilo nella schermata Home", otherPhones: "Altri telefoni",
     welcomeHead: "La tua AI è il tuo agente di viaggio.", welcomeLine: "TIMP tiene il viaggio in tasca, giorno per giorno, anche offline.",
@@ -665,7 +663,7 @@ fWhat: "Nome", fWhatPh: "Nome, indirizzo o link", fLocalAdd: "Nome sull'insegna"
     aiPromptFull: "Scrivi un file viaggio per l'app TIMP, seguendo alla lettera il formato qui sopra. Scrivi i testi in italiano e metti \"lang\": \"it\".",
     unsavedBadge: "Modifiche non in un file", sharedEditBadge: "Condiviso con te", sharedReadBadge: "Condiviso con te, sola lettura", goneBadge: "Solo su questo telefono",
     tripMore: "{t}: altro", onThisPhone: "Su questo telefono", versionsOne: "1 versione", versionsN: "{n} versioni", removeAsk: "Elimina…", addTrip: "Aggiungi un viaggio",
-    aiRow: "Scrivilo con un assistente", aiSheetTitle: "Con un assistente", aiModeNew: "Un viaggio nuovo", aiModeEdit: "Cambia questo",
+    aiSheetTitle: "Con la tua AI", aiModeNew: "Un viaggio nuovo", aiModeEdit: "Cambia questo",
     aiCopy: "Copia il messaggio", aiWhere: "Incollalo in Claude, ChatGPT, Gemini…", aiPasteAnswer: "Incolla la risposta",
     aiNoLinks: "L'assistente non riesce ad aprire il link?", copyPromptFull: "Copia il messaggio con tutto il formato",
     

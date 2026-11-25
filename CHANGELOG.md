@@ -4,6 +4,24 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.13.0 · the first milestone
+
+**Your AI is your travel agent.** With this release TIMP is what it set out to be: a chat
+plans the trip, TIMP keeps it in your pocket, and a chat linked to your account changes it
+while you travel. What this release adds to make that whole:
+
+- **Your AI, linked**: the instructions TIMP gives a linked chat now say which tool takes
+  the trip or the changes, never "paste it" (that is for chats without an account).
+- **llms.txt, rewritten for chats**: what to do and what to hand over first, then the
+  format, then only the advice the format does not give, the format of changes where it
+  says how to update a trip, and a complete example. A third shorter, nothing said twice.
+- **One set of words**: "Plan it with your AI", "Load a file", "Paste trip" on Welcome and
+  Trips alike, and in every guide.
+- **The README and its pictures**, new: what TIMP is in two lines, the first screen as an
+  iPhone sees it, the forms, moving a day, the costs.
+- **The guides** follow the app as it is now: adding a stop, the day's own actions,
+  moving days, Your AI.
+
 ## 4.12.0
 
 - **Your AI**: "Linked chats" is now **Your AI**, first among the account's rows, saying which

@@ -29,7 +29,7 @@ cd TIMP
 python3 -m http.server 4173
 ```
 
-Open `http://localhost:4173/` and tap "Try the example trip". Any static server works.
+Open `http://localhost:4173/` and tap "See an example". Any static server works.
 
 There is nothing to install. Node 22 or later is needed only for the checks:
 
