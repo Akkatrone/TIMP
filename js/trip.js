@@ -336,7 +336,7 @@ export function formatBrief(){
   const kinds = new Set(["trip"]);
   for(const k of Object.keys(FIELDS)) for(const e of Object.entries(FIELDS[k]).filter(shown)) for(const x of [e[1].type, e[1].of]) if(FIELDS[x]) kinds.add(x);
   return [
-    `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block: double quotes, no comments, no trailing commas. Use only these fields; invent none.`,
+    `TIMP trip file, format "${FORMAT}". Answer with ONE JSON object in one code block, minified on a single line (no indentation, no line breaks): double quotes, no comments, no trailing commas. Use only these fields; invent none.`,
     "",
     ...Object.keys(FIELDS).filter(k => kinds.has(k)).map(block),
     "",

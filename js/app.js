@@ -354,7 +354,10 @@ function ownerNow(prefer){
 async function importChanges(data){
   const rec = data.trip ? S.records.find(r => r.id === data.trip) : S.rec;
   const fail = items => { S.importError = {title: t("changesFailed"), items: items.slice(0, 12), all: items}; render(); scrollToY(0); };
-  if(!rec) return fail([data.trip ? t("changesNoTrip", {id: data.trip}) : t("changesNoOpen")]);
+  // Not on this phone (a private window closed, the browser cleared): said as it is; what
+  // goes to the assistant asks for the whole trip, which its chat has.
+  if(!rec && data.trip){ S.importError = {title: t("changesNoTripTitle"), items: [t("changesNoTripWhy", {id: data.trip})], all: [], ai: t("changesNoTripAi", {id: data.trip}), help: t("changesNoTripHelp")}; render(); scrollToY(0); return; }
+  if(!rec) return fail([t("changesNoOpen")]);
   if(isLocked(rec) && data.changes.some(c => !Object.values(c || {}).some(x => x && x.private))) return fail([lockedText(rec, "lockedNoChanges", {t: rec.trip.title})]);
   // Written for the version the outline showed: when the trip changed since, applied
   // to that version and joined with what came after. A version this phone does not
@@ -1067,7 +1070,7 @@ function errorBox(){
   if(!e) return "";
   const more = e.all && e.all.length > e.items.length ? `<li>${esc(t("moreProblems", {n: e.all.length - e.items.length}))}</li>` : "";
   return `<div class="errbox" role="alert"><b>${esc(e.title)}</b><ul>${e.items.map(x => `<li>${esc(x)}</li>`).join("")}${more}</ul>` +
-    (e.all ? `<p class="aihelp">${esc(t("aiHelp"))}</p><div class="actions"><button type="button" class="btn small" data-act="copy-errors">${esc(t("copyForAi"))}</button></div>` : "") + `</div>`;
+    (e.all ? `<p class="aihelp">${esc(e.help || t("aiHelp"))}</p><div class="actions"><button type="button" class="btn small" data-act="copy-errors">${esc(t("copyForAi"))}</button></div>` : "") + `</div>`;
 }
 
 // How to have a trip written by an AI assistant: a short message to copy and fill in,
@@ -1157,7 +1160,8 @@ async function copyText(text, done){
 
 // The problems of a refused file, worded for the assistant that wrote it.
 function messageForAi(){
-  return t("aiFixPrompt") + versionLine() + "\n\n" + S.importError.all.map(x => "- " + x).join("\n");
+  const e = S.importError;
+  return e.ai ? e.ai + versionLine() : t("aiFixPrompt") + versionLine() + "\n\n" + e.all.map(x => "- " + x).join("\n");
 }
 
 function copyErrors(){

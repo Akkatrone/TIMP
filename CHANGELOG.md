@@ -4,6 +4,15 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.7.1
+
+- **Compact JSON from the assistants**: the format guide (`llms.txt`) and every message
+  for an assistant (a new trip, changes, corrections) ask for the JSON minified on a
+  single line: one line to copy, and the chat stays readable (tried with Gemini).
+- **Changes for a trip that is not on this phone** (a private window closed, the
+  browser's data cleared): said as it is, no longer as a mistake of the assistant; what
+  is copied for the assistant asks for the whole trip with its changes.
+
 ## 4.7.0
 
 - **What the group sees**, on a shared trip: two boxes in the trip's sheet (⋯), unticked

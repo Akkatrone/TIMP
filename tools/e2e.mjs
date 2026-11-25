@@ -837,6 +837,12 @@ await withApp(async ({run, until, reload, blocked}) => {
     await paste("Here you go:\n```json\n" + JSON.stringify(wrong) + "\n```");
     assert.match(await text("#app .errbox li"), /changes\[0\]: there is no stop "nowhere" on 2027-05-14/);
     assert.equal((await versionOnPhone()).id, before.id, "nothing changed");
+    // For a trip that is not on this phone (a private window closed): said as it is, and the
+    // assistant asked for the whole trip, compact.
+    await paste(JSON.stringify({...wrong, trip: "gone-trip"}));
+    assert.equal(await text("#app .errbox b"), "These changes are for a trip that is not on this phone");
+    await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; }; document.querySelector('[data-act="copy-errors"]').click(); await new Promise(r => setTimeout(r, 100));`);
+    assert.match(await run(`return window.__copied;`), /^The trip “gone-trip” is no longer on my phone\. Give me the whole trip file in the TIMP format, .* minified on a single line\./);
     const right = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [
       {add: {day: "2027-05-14", stop: {time: "16:00", title: "Ginjinha bar", type: "food", lat: 38.7139, lng: -9.1375}}},
       {update: {day: "2027-05-14", stop: "se", set: {tag: "Free entry"}}}
