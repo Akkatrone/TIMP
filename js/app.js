@@ -1,7 +1,7 @@
 import { validateTrip, upgrade, citiesOf, stayOf, placeQuery, formatBrief, FORMAT, TRAVEL, TYPES } from "./trip.js";
 import * as store from "./store.js";
 import { t, setLang, deviceLang, getLang, LANGS } from "./i18n.js";
-import { esc, rich, mapsUrl, dirUrl, dateParts as calendarParts, todayIn, jsonIn, weekdayName } from "./util.js";
+import { esc, rich, mapsUrl, dirUrl, dateParts as calendarParts, todayIn, jsonIn, cutShort, weekdayName } from "./util.js";
 import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
 import { daylight, partsOfDay, clockOf } from "./sun.js";
 import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
@@ -386,6 +386,8 @@ async function importText(text, name, {demo = false, said = ""} = {}){
   let data;
   try{ data = JSON.parse(text); }
   catch(e){
+    // Copied while the assistant was still writing it: nothing to fix, only to wait.
+    if(cutShort(text)){ S.importError = {title: t("jsonCutTitle"), items: [t("jsonCutWhy")]}; render(); scrollToY(0); return; }
     const why = t("notJson") + " " + String(e && e.message || "");
     S.importError = {title: t("importFailed"), items: [why], all: [why]};
     render(); scrollToY(0); return;

@@ -95,7 +95,7 @@ export function outline(trip, priv = null){
 export function changesBrief(){
   const stopFields = Object.keys(FIELDS.stop).filter(n => !FIELDS.stop[n].byApp).join(", ");
   return [
-    `To change an existing trip, answer with ONE JSON object in one code block, minified on a single line, format "${CHANGES}", listing only what changes:`,
+    `To change an existing trip, answer with ONE JSON object in one code block, minified on a single line, then one short line saying it is complete and ready to paste into TIMP; format "${CHANGES}", listing only what changes:`,
     "",
     `{"format": "${CHANGES}", "trip": "<the trip id>", "from": "<the version in the outline>", "changes": [ … ]}`,
     "",

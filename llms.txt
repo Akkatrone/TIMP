@@ -9,7 +9,7 @@
 > look for other files.
 > The format as a JSON Schema: https://frafal.github.io/TIMP/trip.schema.json
 
-**Version 4.7.1.** TIMP is under active development and this page changes with it.
+**Version 4.7.2.** TIMP is under active development and this page changes with it.
 Remember this version. Before you change a trip later in the conversation, or when a
 message from the app names a newer TIMP version, open this page again: if its version
 is newer, read "What's new" and use it. If you cannot open it, ask the traveller for
@@ -39,7 +39,7 @@ older version still load.
 ## The format, in short
 
 ```text
-TIMP trip file, format "travel-in-my-pocket/2". Answer with ONE JSON object in one code block, minified on a single line (no indentation, no line breaks): double quotes, no comments, no trailing commas. Use only these fields; invent none.
+TIMP trip file, format "travel-in-my-pocket/2". Answer with ONE JSON object in one code block, minified on one line, then a short line: it is complete, paste it into TIMP. Double quotes, no comments, no trailing commas; only these fields, invent none.
 
 trip:
   format (required): "travel-in-my-pocket/2"
@@ -112,7 +112,7 @@ When the traveller gives you an outline of their trip (lines like
 with the changes only.
 
 ```text
-To change an existing trip, answer with ONE JSON object in one code block, minified on a single line, format "travel-in-my-pocket/changes", listing only what changes:
+To change an existing trip, answer with ONE JSON object in one code block, minified on a single line, then one short line saying it is complete and ready to paste into TIMP; format "travel-in-my-pocket/changes", listing only what changes:
 
 {"format": "travel-in-my-pocket/changes", "trip": "<the trip id>", "from": "<the version in the outline>", "changes": [ … ]}
 

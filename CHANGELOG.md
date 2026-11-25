@@ -4,6 +4,15 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.7.2
+
+- **The assistant says when the trip is ready**: after the JSON (one line, which a chat
+  writes bit by bit) it adds a short line saying it is complete and can be pasted into
+  TIMP; the format guide and every message for an assistant ask for it.
+- **A trip copied before it was finished** is told apart: "The trip is cut short: wait
+  until the assistant says it is ready, then copy it again", not "not valid JSON", and
+  nothing to send back to the assistant.
+
 ## 4.7.1
 
 - **Compact JSON from the assistants**: the format guide (`llms.txt`) and every message

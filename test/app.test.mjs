@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { esc, rich, dateParts, mapsUrl, jsonIn } from "../js/util.js";
+import { esc, rich, dateParts, mapsUrl, jsonIn, cutShort } from "../js/util.js";
 import { zonesOf, routeUrl, zoneSVG, distKm, legsOf, bridgesOf, pinGone } from "../js/geo.js";
 import { TRAVEL, TYPES, FIELDS, validateTrip, placeQuery, formatBrief } from "../js/trip.js";
 import { STRINGS } from "../js/i18n.js";
@@ -279,4 +279,12 @@ test("instructions for assistants point to files that exist", () => {
     for(const p of paths) assert.ok(existsSync(join(ROOT, p)), `${doc} mentions ${p}`);
   }
   assert.match(readFileSync(join(ROOT, "CLAUDE.md"), "utf8"), /^@AGENTS\.md$/m);
+});
+
+test("a JSON cut short (copied while the assistant still wrote it) is told apart from a wrong one", () => {
+  const trip = '{"format":"travel-in-my-pocket/2","title":"A {brace} in \\"text\\"","days":[{"date":"2027-05-14","stops":[]}]}';
+  assert.equal(cutShort(trip), false);
+  assert.equal(cutShort(trip.slice(0, 40)), true, "cut in a string");
+  assert.equal(cutShort(trip.slice(0, trip.length - 3)), true, "cut before its brackets close");
+  assert.equal(cutShort('{"title": "x",}'), false, "wrong, not cut");
 });

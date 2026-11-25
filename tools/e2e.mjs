@@ -837,12 +837,17 @@ await withApp(async ({run, until, reload, blocked}) => {
     await paste("Here you go:\n```json\n" + JSON.stringify(wrong) + "\n```");
     assert.match(await text("#app .errbox li"), /changes\[0\]: there is no stop "nowhere" on 2027-05-14/);
     assert.equal((await versionOnPhone()).id, before.id, "nothing changed");
+    // Copied while the assistant was still writing (one line, coming bit by bit): cut short,
+    // only to wait; nothing for the assistant to fix.
+    await paste('{"format":"travel-in-my-pocket/2","title":"Rome","days":[{"date":"2027-05-01","stops":[{"title":"Colos');
+    assert.equal(await text("#app .errbox b"), "The trip is cut short");
+    assert.equal(await count('#app [data-act="copy-errors"]'), 0);
     // For a trip that is not on this phone (a private window closed): said as it is, and the
     // assistant asked for the whole trip, compact.
     await paste(JSON.stringify({...wrong, trip: "gone-trip"}));
     assert.equal(await text("#app .errbox b"), "These changes are for a trip that is not on this phone");
     await run(`window.__copied = null; navigator.clipboard.writeText = async t => { window.__copied = t; }; document.querySelector('[data-act="copy-errors"]').click(); await new Promise(r => setTimeout(r, 100));`);
-    assert.match(await run(`return window.__copied;`), /^The trip “gone-trip” is no longer on my phone\. Give me the whole trip file in the TIMP format, .* minified on a single line\./);
+    assert.match(await run(`return window.__copied;`), /^The trip “gone-trip” is no longer on my phone\. Give me the whole trip file in the TIMP format, .* minified on a single line, then tell me it is ready to paste into TIMP\.$/);
     const right = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [
       {add: {day: "2027-05-14", stop: {time: "16:00", title: "Ginjinha bar", type: "food", lat: 38.7139, lng: -9.1375}}},
       {update: {day: "2027-05-14", stop: "se", set: {tag: "Free entry"}}}

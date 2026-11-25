@@ -56,3 +56,16 @@ export function jsonIn(text){
   const a = s.indexOf("{"), b = s.lastIndexOf("}");
   return a >= 0 && b > a ? s.slice(a, b + 1) : s.trim();
 }
+
+/** Whether a JSON text was cut short: a brace or bracket left open (strings skipped). */
+export function cutShort(text){
+  let depth = 0, inString = false;
+  for(let i = 0; i < text.length; i++){
+    const c = text[i];
+    if(inString){ if(c === "\\") i++; else if(c === '"') inString = false; continue; }
+    if(c === '"') inString = true;
+    else if(c === "{" || c === "[") depth++;
+    else if(c === "}" || c === "]") depth--;
+  }
+  return depth > 0 || inString;
+}

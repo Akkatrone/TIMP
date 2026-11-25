@@ -263,17 +263,17 @@ export const STRINGS = {
     shareNeedsTrip: "Load a trip first, then share the place again.",
 
     importFailed: "This file cannot be used",
-    notJson: "The file is not valid JSON.",
+    notJson: "The file is not valid JSON.", jsonCutTitle: "The trip is cut short", jsonCutWhy: "It was copied before the assistant finished writing it. Wait until it says the trip is ready, then copy it again.",
     moreProblems: "…and {n} more", copyForAi: "Copy for the assistant",
     aiHelp: "Was it written by an AI assistant? Copy these problems, with a request to fix them, and paste them into the chat.",
-    aiFixPrompt: "TIMP, the travel app, refused the trip file you wrote. Fix every problem listed below, following the TIMP format, and give me the complete corrected JSON in one block, minified on a single line.\n\nProblems:",
+    aiFixPrompt: "TIMP, the travel app, refused the trip file you wrote. Fix every problem listed below, following the TIMP format, and give me the complete corrected JSON in one block, minified on a single line, then tell me it is ready to paste into TIMP.\n\nProblems:",
     copiedForAi: "Copied: paste it into the assistant's chat.", copyByHand: "Copy this text into the chat",
     pasteTrip: "Paste a trip", pasteLoad: "Load", pasteGo: "Continue", pasteAnyPh: "A Google Maps link, or the assistant's answer",
     aiVersion: "(TIMP {v}. The format guide: {url}. If you read an older version of it in this chat, read it again before answering.)",
     
     
     
-    aiPrompt: "Read {url} and follow it exactly: write a TIMP trip file, and give me the whole JSON in one block, minified on a single line.",
+    aiPrompt: "Read {url} and follow it exactly: write a TIMP trip file, and give me the whole JSON in one block, minified on a single line, then tell me it is ready to paste into TIMP.",
     aiTripLine: "My trip: {x}", aiTripPh: "[where, dates or number of days, who travels, what you like, how you get around].",
     aiTripLabel: "Your trip", aiTripHint: "Where, dates or how many days, who travels, what you like, how you get around",
     clearDraft: "Clear", copiedReady: "Copied: paste it into the assistant's chat and send it.",
@@ -288,11 +288,11 @@ export const STRINGS = {
     
     
     
-    aiEditPrompt: "Answer only with the changes to the trip outlined above, in the format above, in one JSON block minified on a single line. Change nothing else.",
+    aiEditPrompt: "Answer only with the changes to the trip outlined above, in the format above, in one JSON block minified on a single line, then tell me it is ready to paste into TIMP. Change nothing else.",
     aiEditLine: "Change my trip like this: {x}", aiEditPh: "[what to change].",
     aiEditLabel: "What to change", aiEditHint: "Add a day in Nara, move the castle to the morning, a dinner near the hotel…",
     
-    changesFailed: "These changes cannot be applied", changesNoTripTitle: "These changes are for a trip that is not on this phone", changesNoTripWhy: "\u201c{id}\u201d is not here (a private window closed, or the browser's data cleared, takes trips away).", changesNoTripHelp: "Was it written by an AI assistant? Copy the request for the whole trip, with its changes, and paste it into the chat.", changesNoTripAi: "The trip \u201c{id}\u201d is no longer on my phone. Give me the whole trip file in the TIMP format, with every change we made applied, as ONE JSON object in one code block, minified on a single line.", changesNoOpen: "Open the trip to change first.",
+    changesFailed: "These changes cannot be applied", changesNoTripTitle: "These changes are for a trip that is not on this phone", changesNoTripWhy: "\u201c{id}\u201d is not here (a private window closed, or the browser's data cleared, takes trips away).", changesNoTripHelp: "Was it written by an AI assistant? Copy the request for the whole trip, with its changes, and paste it into the chat.", changesNoTripAi: "The trip \u201c{id}\u201d is no longer on my phone. Give me the whole trip file in the TIMP format, with every change we made applied, as ONE JSON object in one code block, minified on a single line, then tell me it is ready to paste into TIMP.", changesNoOpen: "Open the trip to change first.",
     changesApplied: "Changes applied: {added} added, {changed} changed, {removed} removed · version {v}",
     changesJoined: "Changes applied to version {f} and joined with what changed since: {added} added, {changed} changed, {removed} removed · version {v}",
     changesOtherVersion: "These changes were written for version {v}, which this phone does not have: they were tried on the trip as it is now.",
@@ -618,17 +618,17 @@ export const STRINGS = {
     shareNeedsTrip: "Prima carica un viaggio, poi condividi di nuovo il luogo.",
 
     importFailed: "Questo file non si può usare",
-    notJson: "Il file non è un JSON valido.",
+    notJson: "Il file non è un JSON valido.", jsonCutTitle: "Il viaggio è tagliato", jsonCutWhy: "È stato copiato prima che l'assistente finisse di scriverlo. Aspetta che dica che il viaggio è pronto, poi copialo di nuovo.",
     moreProblems: "…e altri {n}", copyForAi: "Copia per l'assistente",
     aiHelp: "L'ha scritto un assistente AI? Copia questi problemi, con la richiesta di correggerli, e incollali nella chat.",
-    aiFixPrompt: "TIMP, l'app di viaggio, ha rifiutato il file viaggio che hai scritto. Correggi tutti i problemi elencati qui sotto, seguendo il formato di TIMP, e dammi il JSON completo e corretto in un unico blocco, compattato su una sola riga.\n\nProblemi:",
+    aiFixPrompt: "TIMP, l'app di viaggio, ha rifiutato il file viaggio che hai scritto. Correggi tutti i problemi elencati qui sotto, seguendo il formato di TIMP, e dammi il JSON completo e corretto in un unico blocco, compattato su una sola riga, poi dimmi che è pronto da incollare in TIMP.\n\nProblemi:",
     copiedForAi: "Copiato: incollalo nella chat dell'assistente.", copyByHand: "Copia questo testo nella chat",
     pasteTrip: "Incolla un viaggio", pasteLoad: "Carica", pasteGo: "Continua", pasteAnyPh: "Un link di Google Maps, o la risposta dell'assistente",
     aiVersion: "(TIMP {v}. La guida al formato: {url}. Se in questa chat ne hai letto una versione più vecchia, rileggila prima di rispondere.)",
     
     
     
-    aiPrompt: "Leggi {url} e seguilo alla lettera: scrivi un file viaggio TIMP, con i testi in italiano, e dammi il JSON completo in un unico blocco, compattato su una sola riga.",
+    aiPrompt: "Leggi {url} e seguilo alla lettera: scrivi un file viaggio TIMP, con i testi in italiano, e dammi il JSON completo in un unico blocco, compattato su una sola riga, poi dimmi che è pronto da incollare in TIMP.",
     aiTripLine: "Il mio viaggio: {x}", aiTripPh: "[dove, date o numero di giorni, chi viaggia, cosa ti piace, come ti sposti].",
     aiTripLabel: "Il tuo viaggio", aiTripHint: "Dove, date o quanti giorni, chi viaggia, cosa vi piace, come vi spostate",
     clearDraft: "Svuota", copiedReady: "Copiato: incollalo nella chat dell'assistente e invialo.",
@@ -643,11 +643,11 @@ export const STRINGS = {
     
     
     
-    aiEditPrompt: "Rispondi solo con le modifiche al viaggio riassunto qui sopra, nel formato qui sopra, in un unico blocco JSON compattato su una sola riga. Scrivi i testi in italiano. Non cambiare nient'altro.",
+    aiEditPrompt: "Rispondi solo con le modifiche al viaggio riassunto qui sopra, nel formato qui sopra, in un unico blocco JSON compattato su una sola riga, poi dimmi che è pronto da incollare in TIMP. Scrivi i testi in italiano. Non cambiare nient'altro.",
     aiEditLine: "Modifica il mio viaggio così: {x}", aiEditPh: "[cosa cambiare].",
     aiEditLabel: "Cosa cambiare", aiEditHint: "Aggiungi un giorno a Nara, sposta il castello alla mattina, una cena vicino all'hotel…",
     
-    changesFailed: "Queste modifiche non si possono applicare", changesNoTripTitle: "Queste modifiche sono per un viaggio che non è su questo telefono", changesNoTripWhy: "\u201c{id}\u201d non c'è (una finestra privata chiusa, o i dati del browser cancellati, portano via i viaggi).", changesNoTripHelp: "L'ha scritto un assistente AI? Copia la richiesta del viaggio completo, con le modifiche, e incollala nella chat.", changesNoTripAi: "Il viaggio \u201c{id}\u201d non è più sul mio telefono. Dammi il file viaggio completo nel formato TIMP, con tutte le modifiche fatte, come UN oggetto JSON in un unico blocco, compattato su una sola riga. Scrivi i testi in italiano.", changesNoOpen: "Apri prima il viaggio da modificare.",
+    changesFailed: "Queste modifiche non si possono applicare", changesNoTripTitle: "Queste modifiche sono per un viaggio che non è su questo telefono", changesNoTripWhy: "\u201c{id}\u201d non c'è (una finestra privata chiusa, o i dati del browser cancellati, portano via i viaggi).", changesNoTripHelp: "L'ha scritto un assistente AI? Copia la richiesta del viaggio completo, con le modifiche, e incollala nella chat.", changesNoTripAi: "Il viaggio \u201c{id}\u201d non è più sul mio telefono. Dammi il file viaggio completo nel formato TIMP, con tutte le modifiche fatte, come UN oggetto JSON in un unico blocco, compattato su una sola riga, poi dimmi che è pronto da incollare in TIMP. Scrivi i testi in italiano.", changesNoOpen: "Apri prima il viaggio da modificare.",
     changesApplied: "Modifiche applicate: {added} aggiunte, {changed} cambiate, {removed} tolte · versione {v}",
     changesJoined: "Modifiche applicate alla versione {f} e unite a quelle fatte dopo: {added} aggiunte, {changed} cambiate, {removed} tolte · versione {v}",
     changesOtherVersion: "Queste modifiche sono scritte per la versione {v}, che questo telefono non ha: le ho provate sul viaggio com'è ora.",
