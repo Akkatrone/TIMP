@@ -624,8 +624,9 @@ export function openMoveDay(o){
       : to >= 0 ? t("moveJoinNote", {k: from.stops.length, n: to + 1, m: o.dayIndex + 1}) : "";
     const sum = $("[data-sum]");
     sum.hidden = how !== "swap" || to < 0;
-    if(!sum.hidden) sum.innerHTML = `<div><b>${esc(from.title || from.city || "")}</b><small>${esc(dayShort(from))} → ${esc(dayShort(days[to]))}</small></div><span class="arrow" aria-hidden="true">⇄</span>` +
-      `<div><b>${esc(days[to].title || days[to].city || "")}</b><small>${esc(dayShort(days[to]))} → ${esc(dayShort(from))}</small></div><p class="foot">${esc(t("moveNights"))}</p>`;
+    const dates = (a, b) => `<small><span>${esc(dayShort(a))}</span> → <span>${esc(dayShort(b))}</span></small>`;
+    if(!sum.hidden) sum.innerHTML = `<div><b>${esc(from.title || from.city || "")}</b>${dates(from, days[to])}</div><span class="arrow" aria-hidden="true">⇄</span>` +
+      `<div><b>${esc(days[to].title || days[to].city || "")}</b>${dates(days[to], from)}</div><p class="foot">${esc(t("moveNights"))}</p>`;
     // What to know, a line per stop that has something: the swap's both ways (closed,
     // booked: their programmes go whole, no time is taken); a join, the time too.
     const lines = [];

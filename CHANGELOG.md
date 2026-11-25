@@ -4,6 +4,13 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.9.1
+
+- **Moving a day**: in the swap's summary a date no longer breaks in the middle ("Sun May /
+  16"); each date stays on one line.
+- **The README's screenshots retaken** from 4.9 (they were of before 4.x), with one more:
+  moving a day, with what to know. Their alt texts say what they show now.
+
 ## 4.9.0
 
 - **Moving days.** At the bottom of a day, "Move this day" (no more "+ Day": a new day

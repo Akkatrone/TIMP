@@ -54,7 +54,8 @@ await withApp(async ({run, until, theme, capture}) => {
   await until("day 1", `document.querySelectorAll(".stop").length === 6`);
   await run(`document.querySelector("[data-add-stop]").click();`);
   await until("the form", `document.querySelector("dialog.sheet[open]")`);
-  await run(`const el = document.getElementById("stop-src"); el.value = ${JSON.stringify(PLACE)}; el.dispatchEvent(new Event("change")); document.getElementById("stop-hh").value = "12"; document.getElementById("stop-mm").value = "15"; document.querySelector('[data-travel="metro"]').click(); document.getElementById("stop-text").value = "Custard tarts at the counter, three minutes from the square.";`);
+  await run(`const el = document.getElementById("stop-title"); el.value = ${JSON.stringify(PLACE)}; el.dispatchEvent(new Event("change", {bubbles: true})); document.getElementById("stop-hh").value = "12"; document.getElementById("stop-mm").value = "15"; document.querySelector('[data-type="food"]').click(); document.querySelector('[data-travel="metro"]').click(); const tx = document.getElementById("stop-text"); tx.value = "Custard tarts at the counter, three minutes from the square."; tx.dispatchEvent(new Event("input", {bubbles: true}));`);
+  await new Promise(r => setTimeout(r, 600)); // the small map's tiles
   await shoot("new-stop.png");
   await run(`document.querySelector(".sheet form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
 
@@ -68,16 +69,26 @@ await withApp(async ({run, until, theme, capture}) => {
   await run(`scrollTo(0, document.querySelector("[data-costs]").getBoundingClientRect().top + scrollY - document.querySelector(".strip").offsetHeight - 14);`);
   await shoot("costs.png");
 
-  // 6. A day with alternative plans, in the dark theme.
+  // 6. Moving a day: Porto's day swapped with Sunday's, what to know said before.
+  await run(`location.hash = "#day-4";`);
+  await until("day 4", `document.querySelector("[data-day-move]")`);
+  await run(`document.querySelector("[data-day-move]").click();`);
+  await until("the sheet", `document.querySelector('dialog.sheet[open] [data-to="2"]')`);
+  await run(`document.querySelector('dialog.sheet[open] [data-to="2"]').click();`);
+  await until("what to know", `!document.querySelector("dialog.sheet[open] [data-warns]").hidden`);
+  await shoot("move-day.png");
+  await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+
+  // 7. A day with alternative plans, in the dark theme.
   await theme("dark");
   await run(`location.hash = "#day-3";`);   // the map was closed before the new stop
   await until("day 3", `document.querySelector("[data-plan]")`);
   await run(`scrollTo(0, 0);`);
   await shoot("plans-dark.png");
 
-  // 7. Trips, in the dark theme: the version, and the reminder to save the changed trip.
+  // 8. Trips, in the dark theme: the open trip's card, with the sign that it changed since saved.
   await run(`location.hash = "#trips";`);
-  await until("the trips page", `document.querySelector(".unsaved")`);
+  await until("the trips page", `document.querySelector(".tripcard [data-unsaved]")`);
   await run(`scrollTo(0, 0);`);
   await shoot("trips-dark.png");
 }).catch(e => { console.error(e.message); process.exit(1); });

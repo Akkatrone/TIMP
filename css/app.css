@@ -428,6 +428,7 @@ button.crow{cursor:pointer}
 .swapsum div{display:grid;gap:var(--sp-1);min-width:0}
 .swapsum b{font-weight:600;overflow-wrap:anywhere}
 .swapsum small{color:var(--muted);font-size:var(--fs-s)}
+.swapsum small span{white-space:nowrap}
 .swapsum .arrow{color:var(--muted);font-size:var(--fs-l)}
 .swapsum .foot{grid-column:1 / -1;margin:0}
 .srows{display:grid;grid-template-columns:minmax(0,1fr);border-radius:var(--r-m);background:var(--card);overflow:hidden}

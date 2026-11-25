@@ -19,8 +19,9 @@ other phones, shared with the people you choose, and a chat like Claude can work
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/new-stop.png" width="24%" alt="The form to add a stop, filled in from a Google Maps link: name, day, time, how you get there, position">
-  <img src="docs/screenshots/trips-dark.png" width="24%" alt="The Trips page in the dark theme: the open trip on top, when it is, its version and a reminder to save it as a file">
+  <img src="docs/screenshots/new-stop.png" width="24%" alt="The form to add a stop, filled in from a Google Maps link: the name, the day chips, the time, then one row each for kind, how you get there, booking, cost, closing days and description, with the button Add to day 1 at the bottom">
+  <img src="docs/screenshots/move-day.png" width="24%" alt="Moving a day: swapped with Sunday, each programme with its new date, the nights staying with their dates, and what to know before: a restaurant closed on Sunday">
+  <img src="docs/screenshots/trips-dark.png" width="24%" alt="The Trips page in the dark theme: the trip's card with when it is, its dates and a sign that its changes are not in a file yet; below, load a file, paste, or write it with an assistant">
   <img src="docs/screenshots/costs.png" width="24%" alt="What the trip costs, at the end of the Info page: the total in dollars, done and still to do, day by day">
 </p>
 
@@ -31,8 +32,9 @@ other phones, shared with the people you choose, and a chat like Claude can work
   skip what you leave out.
 - **A map for every day**: interactive online (OpenStreetMap, or Google Maps), a sketch
   to scale offline. Map and Directions one tap away from every stop.
-- **Change it on the way**: add a stop by pasting what Google Maps shares, edit, move it
-  to another day.
+- **Change it on the way**: add a stop by its name or by pasting what Google Maps shares,
+  edit, move it to another day; swap two days or join one into another. What to know
+  (closed that day, already booked) is said before.
 - **Help with meals**: the name as on the sign, booking reminders, closing days, a link
   to the review site people use there (Tabelog, Naver, Yelp, TheFork).
 - **What it costs**: each stop's cost, the total in your currency at each day's rate;
