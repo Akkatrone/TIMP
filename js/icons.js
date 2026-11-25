@@ -77,3 +77,5 @@ export const partSign = part => PART_SIGNS[part] || "";
 
 /** A tick: a stop done, a place taken. */
 export const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// A pencil: to change something (a stop, a day, a date).
+export const EDIT = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';

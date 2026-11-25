@@ -24,5 +24,8 @@ export function openSheet({title, body, id = "sheet-" + (++n), form = false, cls
   dlg.addEventListener("click", e => { if(e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
   dlg.addEventListener("close", () => dlg.remove());
   dlg.showModal();
+  // A row of chips wider than the sheet fades at the edge it goes on past (ST2).
+  const edges = el => { el.classList.toggle("edge-r", el.scrollLeft + el.clientWidth < el.scrollWidth - 1); el.classList.toggle("edge-l", el.scrollLeft > 1); };
+  for(const el of dlg.querySelectorAll(".daychips")){ edges(el); el.addEventListener("scroll", () => edges(el), {passive: true}); }
   return dlg;
 }

@@ -4,6 +4,23 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.10.1
+
+From the owner's tries of 4.10.0:
+- **Italian**: a time in a warning reads right when it is a part of the day ("c'è già … nel
+  pomeriggio", no longer "alle pomeriggio"); moving days and an assistant's moves said the
+  part in English and the dates as 2027-05-17: now as the language says them. Also
+  "chiuso il …" for a date, "Giorno 2, sabato 15 maggio" over the warnings, "Aggiungi al
+  nuovo giorno 5", and no more "1 tappe".
+- **An expense paid "Before"**: the date starts at the day before the trip's first, and its
+  field shows a pencil to change it, not the phone's arrow.
+- **A stop's cost is the expense's block**: whose it is first ("For the trip" or "Only
+  mine", with who sees it), then how much, large; a private cost added below, set apart.
+- In Italian an expense's name is asked as "Per" (voli, hotel, …), no longer "Cos'era".
+- **A row of chips longer than the screen** (the trip's cities, the days of a long trip)
+  fades at the edge it goes on past, instead of being cut clean; with a sixth chip the row
+  shrank to a sliver (a class name it shared with the ⋯ button): fixed.
+
 ## 4.10.0
 
 - **A day's form, rethought** like the stop's: what the day is about and its city first;

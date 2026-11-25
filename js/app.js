@@ -6,7 +6,7 @@ import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
 import { daylight, partsOfDay, clockOf } from "./sun.js";
 import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
 import { clockMinutes } from "./edit.js";
-import { icon, partSign, CHECK } from "./icons.js";
+import { icon, partSign, CHECK, EDIT } from "./icons.js";
 import { AHEAD, placeOf, localHours, dayWeather, stopWeather } from "./weather.js";
 import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
@@ -36,7 +36,7 @@ import { asBase } from "./publish.js";
 import { syncTrip, syncPrivate, syncGroup, withGroup, whereOf, pendingTicks } from "./sync.js";
 import { openSignUp, openLinkedApps, openDevices, openRecover, accountError, recently } from "./account.js";
 import { searchTrip } from "./search.js";
-import { PARTS, partOf, minutesOf } from "./parts.js";
+import { PARTS, partOf, minutesOf, atTime } from "./parts.js";
 import { openSearch, closeSearch, searching } from "./search-sheet.js";
 
 // Where the number of a stop with a position is: a sign, crossed, for one without.
@@ -50,7 +50,6 @@ const DOTS = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8
 const LOCK = '<svg class="lock" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" fill="currentColor"/><path d="M5.5 7V5.2a2.5 2.5 0 015 0V7" stroke="currentColor" stroke-width="1.6"/></svg>';
 // Icons of the opened stop's actions, and of the signals: the level gives the colour,
 // the kind the icon (design/README.md, W5).
-const EDIT = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
 const SWAP = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 5h9.5M10 2.5L12.5 5 10 7.5M13 11H3.5M6 8.5L3.5 11 6 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const SKIP = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h8M8 4.5L11.5 8 8 11.5M13.5 3.5v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const DASH = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -397,8 +396,8 @@ function knowAfterChanges(before, res){
     const s = list.find(x => x.id === m.to);
     if(!s) continue;
     for(const w of moveWarnings(before, s, {date: m.toDate, plan: m.toPlan || null}, {date: m.date, plan: m.plan || null, id: m.from}))
-      lines.push(w.kind === "closed" ? t("mwClosed", {s: s.title, d: w.date ? m.toDate : weekdayName(w.weekday, getLang())})
-        : w.kind === "booked" ? t("mwBooked", {s: s.title, d: m.date}) : w.kind === "time" ? t("mwTime", {s: s.title, time: w.time, x: w.title}) : t("mwGroup", {s: s.title, g: w.name}));
+      lines.push(w.kind === "closed" ? (w.date ? t("mwClosedDate", {s: s.title, d: shortDay(m.toDate)}) : t("mwClosed", {s: s.title, d: weekdayName(w.weekday, getLang())}))
+        : w.kind === "booked" ? t("mwBooked", {s: s.title, d: shortDay(m.date)}) : w.kind === "time" ? t("mwTime", {s: s.title, when: atTime(w.time), x: w.title}) : t("mwGroup", {s: s.title, g: w.name}));
   }
   if(!lines.length || !S.rec || S.rec.trip === before) return;
   const after = S.rec.trip;

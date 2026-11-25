@@ -287,7 +287,8 @@ Adding a stop and changing one: the same sheet (`js/editor.js`).
   position, kind): the map closes and only it stays; its box again brings the others
   back. The name on the sign is small and optional, under the field.
 - **ST2** When: the trip's days as chips, "+" last for a new day; the time as hours and
-  minutes or a part of the day (a choice of two, T1); a day with plans, its plan.
+  minutes or a part of the day (a choice of two, T1); a day with plans, its plan. A row of
+  chips wider than the sheet fades at the edge it goes on past, never cut clean.
 - **ST3** The rest, a row each with its value ("+" when empty), opened in place, one at a
   time: kind, how you get there, booking, cost, closed on, description, position; Delete
   last, red, asking.
@@ -342,12 +343,14 @@ A day's own sheet (`openDayEditor`, `js/editor.js`), on the stop form's parts (S
 
 An expense outside the stops (`openExpenseEditor`), the same parts.
 
-- **EX1** Whose it is first: "For the trip" or "Only mine", with a line saying who sees it
-  (the stop form's cost uses the same words).
+- **EX1** Whose it is first: "For the trip" or "Only mine", with a line saying who sees it.
+  A stop's Cost row is the same block (whose, then how much, large), twice when the stop
+  has both a trip's cost and a private one.
 - **EX2** What it was, then how much: the amount large, its currency, what it makes at
   home at that day's rate.
 - **EX3** When it was paid: "Before" and the trip's days as chips (ST2's); "Before" opens
-  the date, today by default. Paid at a stop, said under them.
+  the date, the day before the first until changed, with a pencil (not the phone's
+  arrow). Paid at a stop, said under them.
 - **EX4** "Add expense" or "Save" at the bottom; Delete the last row, asking; an error
   under its own field.
 

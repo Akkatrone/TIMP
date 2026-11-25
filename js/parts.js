@@ -3,6 +3,8 @@
 // before ("Evening", "Pranzo", "Pomeriggio") are recognised and shown as their part; the
 // file is not rewritten. No DOM.
 
+import { t } from "./i18n.js";
+
 /** The parts, in the order of a day. */
 export const PARTS = ["sunrise", "morning", "midday", "afternoon", "sunset", "evening", "night"];
 
@@ -34,6 +36,15 @@ export function partOf(time){
   const f = fold(time);
   if(PARTS.includes(f)) return f;
   return BY_WORD.get(f) || null;
+}
+
+/**
+ * A stop's time inside a sentence: "at 12:30", or a part of the day as the language says
+ * it ("in the afternoon", "nel pomeriggio"), never "at afternoon".
+ */
+export function atTime(time){
+  const p = partOf(time);
+  return p ? t("at_" + p) : t("atClock", {t: time});
 }
 
 /**

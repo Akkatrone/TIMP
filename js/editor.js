@@ -11,9 +11,9 @@ import { newMap, miniMap } from "./livemap.js";
 import { icon } from "./icons.js";
 import { TRAVEL, TYPES } from "./trip.js";
 import { clockMinutes, dayAfter, moveWarnings } from "./edit.js";
-import { PARTS, partOf } from "./parts.js";
+import { PARTS, partOf, atTime } from "./parts.js";
 import { ask } from "./ask.js";
-import { CHECK } from "./icons.js";
+import { CHECK, EDIT } from "./icons.js";
 import { openSheet } from "./sheet.js";
 import { km, middleOf } from "./positions.js";
 import { closedOn } from "./places.js";
@@ -100,10 +100,10 @@ export function openStopEditor(o){
     b.textContent = t(money.kind() === "trip" ? "addPrivateCost" : "addTripCost");
   };
   const money = moneyField("stop-cost", o.money, hasCost ? s0.cost : mine ? mine.cost : undefined,
-    hasCost ? own(s0.currency, true) : mine ? own(mine.currency, true) : "", t("fCostHelp"),
-    {kind: first, onKind: k => { money2.setKind(other(k)); addCost(); }});
-  const money2 = moneyField("stop-cost2", o.money, both ? mine.cost : undefined, both ? own(mine.currency, true) : "", t("fCostHelp"),
-    {kind: other(first), label: t("fCostOther"), hidden: !both, onKind: k => { money.setKind(other(k)); addCost(); }});
+    hasCost ? own(s0.currency, true) : mine ? own(mine.currency, true) : "", t("tripCostHelp"),
+    {kind: first, kindApart: true, big: true, label: t("fHowMuch"), onKind: k => { money2.setKind(other(k)); addCost(); }});
+  const money2 = moneyField("stop-cost2", o.money, both ? mine.cost : undefined, both ? own(mine.currency, true) : "", t("tripCostHelp"),
+    {kind: other(first), kindApart: true, big: true, label: t("fHowMuch"), hidden: !both, onKind: k => { money.setKind(other(k)); addCost(); }});
   // The time: hour and minutes from two lists, or a part of the day from a list of seven
   // (design/README.md, T1). A word of before is shown as its part; one that names none
   // stays as it was, the first in the list. Not <input type="time">: Chrome on Android
@@ -189,7 +189,7 @@ export function openStopEditor(o){
       ${row("type", t("fType"), choice("type", TYPES, t("fType")))}
       ${row("travel", t("fTravel"), choice("travel", TRAVEL, t("fTravel")))}
       ${row("booking", t("fBooking"), choice("booking", ["advised", "required", "booked"], t("fBooking")))}
-      ${row("cost", t("fCost"), `${money.html}${money2.html}<div class="addcost"${both ? " hidden" : ""}><button type="button" class="tbtn" data-add-cost>${esc(t(first === "trip" ? "addPrivateCost" : "addTripCost"))}</button></div>`)}
+      ${row("cost", t("fCost"), `${money.kindHtml}${money.html}${money2.kindHtml}${money2.html}<div class="addcost"${both ? " hidden" : ""}><button type="button" class="tbtn" data-add-cost>${esc(t(first === "trip" ? "addPrivateCost" : "addTripCost"))}</button></div>`)}
       ${row("closed", t("fClosed"), `<div class="seg wrap week" role="group" aria-label="${esc(t("fClosed"))}">${WEEK.map(d => `<button type="button" data-closed="${d}" aria-pressed="${closed0.includes(d)}">${esc(weekdayName(d, lang, "short"))}</button>`).join("")}</div>`)}
       ${row("text", t("fText"), `<textarea id="stop-text" rows="3" aria-label="${esc(t("fText"))}">${esc(s0.text || "")}</textarea>`)}
       ${row("pos", t("fPosition"), `<p class="pos" data-pos></p>
@@ -423,7 +423,7 @@ export function openStopEditor(o){
   function warnText(w){
     if(w.kind === "closed") return w.date ? t("warnClosedDate") : t("warnClosed", {d: weekdayName(w.weekday, lang)});
     if(w.kind === "booked") return t("warnBooked");
-    if(w.kind === "time") return t("warnTime", {time: clockMinutes(w.time) === null && partOf(w.time) ? t("part_" + partOf(w.time)) : w.time, s: w.title});
+    if(w.kind === "time") return t("warnTime", {when: atTime(w.time), s: w.title});
     return t("warnGroup", {g: w.name});
   }
   function refresh(){
@@ -606,9 +606,9 @@ export function openMoveDay(o){
   const $ = sel => dlg.querySelector(sel);
   // A stop and what to know where it goes, in a line: "Castle: closed on Monday."
   const line = (s, w, leaving) => {
-    if(w.kind === "closed") return t("mwClosed", {s: s.title, d: w.date ? dayShort(days[to]) : weekdayName(w.weekday, lang)});
+    if(w.kind === "closed") return w.date ? t("mwClosedDate", {s: s.title, d: dayShort(days[to])}) : t("mwClosed", {s: s.title, d: weekdayName(w.weekday, lang)});
     if(w.kind === "booked") return t("mwBooked", {s: s.title, d: dayShort(leaving)});
-    if(w.kind === "time") return t("mwTime", {s: s.title, time: w.time, x: w.title});
+    if(w.kind === "time") return t("mwTime", {s: s.title, when: atTime(w.time), x: w.title});
     return t("mwGroup", {s: s.title, g: w.name});
   };
   function refresh(){
@@ -647,7 +647,7 @@ export function openMoveDay(o){
     box.innerHTML = !lines.length ? "" : `<p class="h">${esc(t("toKnow"))}</p>` + lines.map(l => `<p>${esc(l)}</p>`).join("");
     const go = $("[data-go]");
     go.disabled = to < 0;
-    go.textContent = to < 0 ? t("moveDayGo") : how === "swap" ? t("swapDaysGo", {a: Math.min(o.dayIndex, to) + 1, b: Math.max(o.dayIndex, to) + 1}) : t("joinDayGo", {k: from.stops.length, n: to + 1});
+    go.textContent = to < 0 ? t("moveDayGo") : how === "swap" ? t("swapDaysGo", {a: Math.min(o.dayIndex, to) + 1, b: Math.max(o.dayIndex, to) + 1}) : t("joinDayGo", {what: count(from.stops.length, "stopsOne", "stopsMany"), n: to + 1});
   }
   dlg.addEventListener("click", e => {
     const h = e.target.closest("[data-how]");
@@ -832,7 +832,7 @@ function moneyField(id, m, amount, currency, help, o = {}){
       <p class="foot money-hint" data-money-hint aria-live="polite"></p>
       ${o.kindApart ? "" : helpLine}
     </div>`;
-  const kindHtml = o.kindApart ? `<section data-money-kind="${id}">${kinds}${helpLine}</section>` : "";
+  const kindHtml = o.kindApart ? `<section data-money-kind="${id}"${o.hidden ? " hidden" : ""}>${kinds}${helpLine}</section>` : "";
   let dlg = null, dateOf = () => "";
   const $ = sel => dlg.querySelector(`[data-money="${id}"] ${sel}`);
   function setKind(k){
@@ -875,7 +875,7 @@ function moneyField(id, m, amount, currency, help, o = {}){
     update(){ update(); },
     kind: () => kind,
     setKind,
-    show(){ dlg.querySelector(`[data-money="${id}"]`).hidden = false; update(); },
+    show(){ dlg.querySelectorAll(`[data-money="${id}"], [data-money-kind="${id}"]`).forEach(x => { x.hidden = false; }); update(); },
     click(e){
       const k = e.target.closest(inField("[data-kind]"));
       if(k){
@@ -912,7 +912,7 @@ const shortDate = (date, lang) => new Intl.DateTimeFormat(lang, {day: "numeric",
  *   money                as for the stop form (local, home, convert)
  *   tripCurrency         the trip's currency, left out of the expense when it is that one
  *   days                 the trip's dates, as chips
- *   today                the date a new expense gets
+ *   today                a new expense's day, when it is one of the trip's
  *   stopTitle            the stop a private expense was paid at, said under the days
  *   onSave(expense, private)  {title, date, cost, currency, stop?}, and whether it is private
  *   onDelete()
@@ -922,8 +922,10 @@ export function openExpenseEditor(o){
   const x = o.expense || {}, editing = !!o.expense, lang = getLang();
   const $ = sel => dlg.querySelector(sel);
   const days = o.days || [], onDay = date => days.includes(date);
-  const date0 = editing ? x.date || "" : o.today || "";
-  const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", t("expenseTripHelp"),
+  // "Before": the day before the first, until changed (EX3).
+  const before = days.length ? new Date(Date.parse(days[0] + "T12:00:00Z") - 864e5).toISOString().slice(0, 10) : "";
+  const date0 = editing ? x.date || "" : onDay(o.today) ? o.today : before;
+  const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", t("tripCostHelp"),
     {kind: o.private ? "private" : "trip", kindApart: true, big: true, label: t("fHowMuch")});
   dlg = openSheet({title: t(editing ? "editExpenseTitle" : "newExpenseTitle"), form: true, body: `
     ${money.kindHtml}
@@ -938,7 +940,7 @@ export function openExpenseEditor(o){
         const p = dateParts(d, lang);
         return `<button type="button" data-paid="${d}" aria-pressed="${d === date0}" aria-label="${esc(`${t("day")} ${i + 1}, ${p.long}`)}"><small>${esc(p.dow)}</small>${i + 1}</button>`;
       }).join("")}</div>
-      <div class="field" data-other-date${onDay(date0) ? " hidden" : ""}><label class="sr" for="exp-date">${esc(t("fPaidOn"))}</label><input id="exp-date" type="date" value="${esc(date0)}"></div>
+      <div class="field datefield" data-other-date${onDay(date0) ? " hidden" : ""}><label class="sr" for="exp-date">${esc(t("fPaidOn"))}</label><input id="exp-date" type="date" value="${esc(date0)}">${EDIT}</div>
       ${x.stop && o.stopTitle ? `<p class="foot" data-at>${esc(t("paidAt", {s: o.stopTitle}))}</p>` : ""}
     </section>
     ${editing ? `<div class="srows">${dangerRow(t("deleteExpense"))}</div>` : ""}
@@ -957,7 +959,7 @@ export function openExpenseEditor(o){
     if(paid){
       dlg.querySelectorAll("[data-paid]").forEach(b => b.setAttribute("aria-pressed", String(b === paid)));
       $("[data-other-date]").hidden = !!paid.dataset.paid;
-      $("#exp-date").value = paid.dataset.paid || (onDay(dateNow()) ? (onDay(o.today) ? "" : o.today || "") : dateNow());
+      $("#exp-date").value = paid.dataset.paid || (onDay(dateNow()) || !dateNow() ? before : dateNow());
       dated();
       return;
     }

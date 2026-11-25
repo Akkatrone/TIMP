@@ -2,7 +2,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PARTS, partOf, windowOf, minutesOf, clockOfTime } from "../js/parts.js";
+import { PARTS, partOf, windowOf, minutesOf, clockOfTime, atTime } from "../js/parts.js";
+import { setLang } from "../js/i18n.js";
 
 test("seven parts, in the order of a day", () => {
   assert.deepEqual(PARTS, ["sunrise", "morning", "midday", "afternoon", "sunset", "evening", "night"]);
@@ -47,4 +48,15 @@ test("the format: a clock time or a part is fine, a word of before too; another 
   const trip = time => ({format: "travel-in-my-pocket/2", title: "T", days: [{date: "2027-04-10", stops: [{title: "A", time, lat: 1, lng: 1}]}]});
   for(const t of ["09:30", "sunset", "Evening", "Pranzo"]) assert.deepEqual(validateTrip(trip(t)).warnings, [], t);
   assert.match(validateTrip(trip("after the museum")).warnings.join(), /days\[0\]\.stops\[0\]\.time: should be/);
+});
+
+test("a time inside a sentence: a clock time after \"at\", a part of the day as the language says it", () => {
+  globalThis.document ??= {documentElement: {}};   // setLang marks the page's language
+  setLang("it");
+  assert.equal(atTime("12:30"), "alle 12:30");
+  assert.deepEqual(PARTS.map(atTime), ["all'alba", "al mattino", "a mezzogiorno", "nel pomeriggio", "al tramonto", "di sera", "di notte"]);
+  assert.equal(atTime("Pranzo"), "a mezzogiorno", "a word of before, as its part");
+  setLang("en");
+  assert.equal(atTime("afternoon"), "in the afternoon");
+  assert.equal(atTime("09:00"), "at 09:00");
 });
