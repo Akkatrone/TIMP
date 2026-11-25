@@ -59,7 +59,9 @@ await withApp(async ({run, until, reload, blocked}) => {
   const mapOn = () => run(`if(document.querySelector("[data-map]").getAttribute("aria-pressed") !== "true") document.querySelector("[data-map]").click(); await new Promise(r => setTimeout(r, 80));`);
   const offline = on => run(`window.dispatchEvent(new Event(${on ? '"offline"' : '"online"'})); await new Promise(r => setTimeout(r, 150));`);
 
-  await step("the example trip opens on its first day", async () => {
+  await step("welcome: your AI as the main action, the headline on one line; the example trip opens on its first day", async () => {
+    assert.deepEqual(await run(`const h = document.querySelector(".welcome .say h1"); return [h.textContent, h.scrollWidth <= h.clientWidth, document.querySelector(".welcome .big").dataset.act, [...document.querySelectorAll(".welcome .already .tbtn")].map(b => b.textContent)];`),
+      ["Your AI is your travel agent.", true, "assistant", ["See an example", "Load a file", "Paste trip"]]);
     await click('[data-act="demo"]');
     await until("the stops", `document.querySelectorAll(".stop").length === 6`);
     assert.equal(await run(`return document.documentElement.lang;`), "en");

@@ -354,6 +354,26 @@ An expense outside the stops (`openExpenseEditor`), the same parts.
 - **EX4** "Add expense" or "Save" at the bottom; Delete the last row, asking; an error
   under its own field.
 
+## Welcome and You
+
+Welcome is the first screen, with no trip (`renderWelcome`); You is the account and this
+phone's settings (`renderMe`). TIMP's business: your travel agent is your AI.
+
+- **WL1** The headline, on one line in every language (smaller when it is longer): "Your AI
+  is your travel agent."; one short line under it; the name and icon small above.
+- **WL2** One main action: Plan it with your AI (the assistant's sheet). No "by hand": the
+  app pushes to an AI; the example shows what a trip is.
+- **WL3** The account as two plain buttons right under it, Create account and Sign in, no
+  text (only with the service; signed in, Welcome is not shown).
+- **WL4** The rest in one quiet row of text buttons: See an example · Load a file · Paste trip.
+- **WL5** Keep it on your Home Screen only when TIMP is not installed, this phone's steps
+  first, the other phone's folded ("Other phones").
+- **YO1** You: the account first, as its card and rows.
+- **YO2** This phone's settings as rows with their value, opened in place, one at a time:
+  language, theme, your currency, the map (its key inside).
+- **YO3** Keep it on your Home Screen as a row, only when not installed.
+- **YO4** About last, small.
+
 ## Sheets
 
 A sheet comes up over the page for what is done apart: a form, the history, finding

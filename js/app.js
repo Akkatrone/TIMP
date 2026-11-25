@@ -1166,7 +1166,8 @@ function openAssistant(){
   const dlg = openSheet({title: t("aiSheetTitle"), cls: "assistant", body: (canEdit ? `<div class="seg" role="group" aria-label="${esc(t("aiSheetTitle"))}">` +
       `<button type="button" data-ai-mode="new" aria-pressed="true">${esc(t("aiModeNew"))}</button>` +
       `<button type="button" data-ai-mode="edit" aria-pressed="false">${esc(t("aiModeEdit"))}</button></div>` : "") +
-    `<div class="ai-panes">${pane(false, "new")}${canEdit ? pane(true, "edit:" + S.rec.id) : ""}</div>`});
+    `<div class="ai-panes">${pane(false, "new")}${canEdit ? pane(true, "edit:" + S.rec.id) : ""}</div>` +
+    (hasService() ? `<p class="foot">${esc(t("aiLinkChat"))}</p>` : "")});
   dlg.addEventListener("input", e => {
     if(!e.target.matches("[data-draft]")) return;
     setDraft(e.target.dataset.draft, e.target.value);
@@ -1268,20 +1269,29 @@ function pasteTrip(any = false){
   if(!any) area.focus();
 }
 
+// Installed, or open in a browser tab; and which phone, only to say its steps first.
+const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const phoneOs = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "ios"
+  : /Android/.test(navigator.userAgent) ? "android" : "";
+// Adding TIMP to the Home Screen (WL5, YO3): this phone's steps; the other phone's folded.
 function installSteps(){
-  return `<section class="sec"><h2>${esc(t("installTitle"))}</h2><ol class="steps"><li>${rich(t("installIos"))}</li><li>${rich(t("installAndroid"))}</li><li>${rich(t("installOnce"))}</li></ol></section>`;
+  const os = phoneOs(), step = k => `<li>${rich(t(k))}</li>`;
+  const mine = os === "ios" ? ["installIos"] : os === "android" ? ["installAndroid"] : ["installIos", "installAndroid"];
+  const other = os === "ios" ? "installAndroid" : os === "android" ? "installIos" : "";
+  return `<ol class="steps">${mine.map(step).join("")}${step("installOnce")}</ol>` +
+    (other ? `<details class="others"><summary class="tbtn quiet">${esc(t("otherPhones"))}</summary><ol class="steps">${step(other)}</ol></details>` : "");
 }
 
 function langPicker(){
   const options = [["auto", t("langAuto")], ...Object.entries(LANGS)];
-  return `<section class="sec"><h2>${esc(t("language"))}</h2><div class="seg" role="group" aria-label="${esc(t("language"))}">${options.map(([id, name]) =>
-    `<button type="button" data-lang="${esc(id)}" aria-pressed="${S.langPref === id}">${esc(name)}</button>`).join("")}</div></section>`;
+  return `<div class="seg" role="group" aria-label="${esc(t("language"))}">${options.map(([id, name]) =>
+    `<button type="button" data-lang="${esc(id)}" aria-pressed="${S.langPref === id}">${esc(name)}</button>`).join("")}</div>`;
 }
 
 function themePicker(){
   const options = [["auto", t("themeAuto")], ["light", t("themeLight")], ["dark", t("themeDark")]];
-  return `<section class="sec"><h2>${esc(t("theme"))}</h2><div class="seg" role="group" aria-label="${esc(t("theme"))}">${options.map(([id, name]) =>
-    `<button type="button" data-theme-choice="${id}" aria-pressed="${S.theme === id}">${esc(name)}</button>`).join("")}</div></section>`;
+  return `<div class="seg" role="group" aria-label="${esc(t("theme"))}">${options.map(([id, name]) =>
+    `<button type="button" data-theme-choice="${id}" aria-pressed="${S.theme === id}">${esc(name)}</button>`).join("")}</div>`;
 }
 
 // The traveller's own currency: what costs are converted into.
@@ -1290,31 +1300,24 @@ function homePicker(){
   const common = ["EUR", "USD", "GBP", "CHF", "JPY"];
   const all = [...new Set([S.home, ...common, ...currencies()])];
   const opt = c => `<option value="${c}"${c === S.home ? " selected" : ""}>${esc(c + " · " + currencyName(c, lang))}</option>`;
-  return `<section class="sec"><h2>${esc(t("homeCurrency"))}</h2><div class="field">
+  return `<div class="field">
     <select id="home-cur" aria-label="${esc(t("homeCurrency"))}">${all.map(opt).join("")}</select>
-    <p class="foot">${esc(t("homeCurrencyHelp"))}</p></div></section>`;
+    <p class="foot">${esc(t("homeCurrencyHelp"))}</p></div>`;
 }
 
+// Welcome, for whoever comes first (WL1–WL5): your AI is your travel agent; the account in
+// sight; the rest in a quiet row; the Home Screen's steps only when not installed.
 function renderWelcome(){
-  return `
-  <section class="hero">
-    <img src="icons/icon.svg" width="72" height="72" alt="">
-    <h1>TIMP</h1>
-    <p class="lead name">Travel in my pocket</p>
-    <p class="lead">${esc(t("tagline"))}</p>
-    <p class="lead">${esc(t(hasService() ? "welcomeLeadShare" : "welcomeLead"))}</p>
-  </section>
-  ${errorBox()}
-  <div class="actions">
-    <button type="button" class="btn primary" data-act="pick">${esc(t("loadTrip"))}</button>
-    <button type="button" class="btn" data-act="paste">${esc(t("pasteTrip"))}</button>
-    <button type="button" class="btn" data-act="demo">${esc(t("tryDemo"))}</button>
-  </div>
-  ${S.account ? syncLine() : accountSection()}
-  ${assistantRow()}
-  ${installSteps()}
-  ${REPO_URL ? `<p class="foot"><a href="${esc(REPO_URL)}#create-your-own-trip" target="_blank" rel="noopener">${esc(t("makeYourOwn"))} ↗</a></p>` : ""}
-  ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}`;
+  return `<section class="welcome">
+    <div class="brand"><img src="icons/icon.svg" width="44" height="44" alt=""><div><b>TIMP</b><small>Travel in my pocket</small></div></div>
+    <div class="say"><h1>${esc(t("welcomeHead"))}</h1><p>${esc(t("welcomeLine"))}</p></div>
+    ${errorBox()}
+    <button type="button" class="btn primary big" data-act="assistant">${esc(t("planWithAi"))}</button>
+    ${S.account ? syncLine() : hasService() ? `<div class="two"><button type="button" class="btn" data-act="signup">${esc(t("signUp"))}</button><button type="button" class="btn" data-act="signin">${esc(t("signIn"))}</button></div>` : ""}
+    <div class="already"><button type="button" class="tbtn" data-act="demo">${esc(t("seeExample"))}</button><span aria-hidden="true">·</span><button type="button" class="tbtn" data-act="pick">${esc(t("loadFile"))}</button><span aria-hidden="true">·</span><button type="button" class="tbtn" data-act="paste">${esc(t("pasteTripShort"))}</button></div>
+    ${installed() ? "" : `<section class="install"><h2>${esc(t("installTitle"))}</h2>${installSteps()}</section>`}
+    ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}
+  </section>`;
 }
 
 // The account with the sharing service, on You (and on the welcome screen, for a new
@@ -1346,20 +1349,26 @@ function syncLine(){
     (S.hidden.size ? `<button type="button" class="btn small" data-act="unhide">${esc(t("hiddenBack", {n: S.hidden.size}))}</button>` : "") + `</span></section>`;
 }
 
-// You: the account, then the settings of this device, then the app.
+// You (YO1–YO4): the account, then this phone's settings as rows with their value (the
+// open one kept across redraws), then the app, small.
+const meRow = (k, label, value, body) => `<div class="srow"><button type="button" class="dhead${value ? " set" : ""}" data-me-row="${k}" aria-expanded="${S.meRow === k}" aria-controls="me-${k}"><span>${esc(label)}</span><span class="v">${esc(value || "")}</span></button>` +
+  `<div class="dbody" id="me-${k}"${S.meRow === k ? "" : " hidden"}>${body}</div></div>`;
 function renderMe(){
+  const lang = S.langPref === "auto" ? `${t("langAuto")} · ${LANGS[getLang()]}` : LANGS[S.langPref];
+  const theme = t({auto: "themeAuto", light: "themeLight", dark: "themeDark"}[S.theme] || "themeAuto");
   return `
   <h1>${esc(t("meTitle"))}</h1>
   ${errorBox()}
   ${accountSection()}
   <h2 class="part">${esc(t("settings"))}</h2>
-  ${mapSettings()}
-  ${langPicker()}
-  ${themePicker()}
-  ${homePicker()}
-  ${installSteps()}
-  <section class="sec"><h2>${esc(t("about"))}</h2>
-    <p class="foot">TIMP · Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
+  <div class="srows">
+    ${meRow("lang", t("language"), lang, langPicker())}
+    ${meRow("theme", t("theme"), theme, themePicker())}
+    ${meRow("home", t("homeCurrency"), S.home, homePicker())}
+    ${meRow("map", t("mapProvider"), S.useGoogle ? "Google Maps" : "OpenStreetMap", mapSettings())}
+    ${installed() ? "" : meRow("install", t("installTitle"), "", installSteps())}
+  </div>
+  <section class="sec about"><p class="foot">TIMP · Travel in my pocket${S.version ? " · " + esc(t("version", {v: S.version})) : ""}${REPO_URL ? ` · <a href="${esc(REPO_URL)}" target="_blank" rel="noopener">GitHub ↗</a>` : ""}</p>
     <p class="foot">${esc(t("wxCredit"))}</p>
     ${store.isPersistent() ? "" : `<p class="foot">${esc(t("storageWarn"))}</p>`}
   </section>`;
@@ -1800,8 +1809,7 @@ function mapSettings(){
     : !key ? "statusNoKey"
     : googleRefusedKey(key) ? "statusRefused"
     : S.deviceKey ? "statusGoogleDevice" : "statusGoogleTrip";
-  return `<section class="sec"><h2>${esc(t("mapProvider"))}</h2>
-    <div class="seg" role="group" aria-label="${esc(t("mapProvider"))}">
+  return `<div class="seg" role="group" aria-label="${esc(t("mapProvider"))}">
       <button type="button" data-provider="google" aria-pressed="${S.useGoogle}">Google Maps</button>
       <button type="button" data-provider="osm" aria-pressed="${!S.useGoogle}">OpenStreetMap</button>
     </div>
@@ -1811,8 +1819,7 @@ function mapSettings(){
       <p class="foot">${esc(t("googleKeyHelp"))}${tripKey() ? " " + esc(t("googleKeyFromTrip")) : ""}</p>
       <input id="gkey" name="gkey" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(S.deviceKey)}" placeholder="AIza…">
       <div class="actions"><button type="submit" class="btn small">${esc(t("save"))}</button></div>
-    </form>
-  </section>`;
+    </form>`;
 }
 
 // A line of the Info page that is only a phone number becomes a link to call it.
@@ -2441,6 +2448,16 @@ function nowOf(day, planId, list){
 }
 const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
 
+// Welcome's headline on one line in every language (WL1): smaller when it is longer.
+function fitHeadline(){
+  const h = document.querySelector(".welcome .say h1");
+  if(!h) return;
+  h.style.fontSize = "";
+  // Text does not shrink in proportion everywhere (Safari): measured again until it fits.
+  for(let i = 0; i < 4 && h.scrollWidth > h.clientWidth; i++)
+    h.style.fontSize = Math.floor(parseFloat(getComputedStyle(h).fontSize) * h.clientWidth / h.scrollWidth * 0.98 * 10) / 10 + "px";
+}
+
 // The day's line ends at the last stop's sign (R15): a group last in the day ends it at
 // its last option's circle, or at its chosen stop's number, measured once drawn.
 function markTail(){
@@ -2735,6 +2752,7 @@ function render(){
   watchNext();
   syncLive(wanted);
   markTail();
+  fitHeadline();
   $app.style.minHeight = "";
   if(scrollTop() !== y) scrollToY(y);
   askRates();
@@ -2869,6 +2887,13 @@ $app.addEventListener("click", e => {
     saveUi();
     render();
     refocus("[data-expand]");
+    return;
+  }
+  const meRowBtn = e.target.closest("[data-me-row]");
+  if(meRowBtn){
+    S.meRow = S.meRow === meRowBtn.dataset.meRow ? null : meRowBtn.dataset.meRow;
+    render();
+    refocus(`[data-me-row="${meRowBtn.dataset.meRow}"]`);
     return;
   }
   const themeBtn = e.target.closest("[data-theme-choice]");
@@ -3160,7 +3185,7 @@ window.addEventListener("hashchange", () => {
 // A tap outside the app's content (the strip of days, the + button) closes the menu.
 // The path is the one at the time of the tap: the page may have been redrawn since.
 document.addEventListener("click", e => { if(S.menuFor && !e.composedPath().includes($app)) closeMenu(); });
-window.addEventListener("resize", markTail);
+window.addEventListener("resize", () => { markTail(); fitHeadline(); });
 window.addEventListener("online", () => { S.online = true; retryRates(); render(); syncSoon(200); });
 // Back in the app after a while, on the day itself: the list goes to now again (R14).
 let hiddenAt = 0;

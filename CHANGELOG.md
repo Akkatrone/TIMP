@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.11.0
+
+- **Welcome, for whoever comes first**: "Your AI is your travel agent.", on one line in every
+  language; one main action, **Plan it with your AI**; Create account and Sign in as two
+  plain buttons right under it; then See an example · Load a file · Paste trip in a quiet
+  row. The Home Screen's steps only when TIMP is not installed, this phone's first.
+- **You**: the account first; this phone's settings as rows with their value (language,
+  theme, your currency, the map with its key), opened in place; the Home Screen's steps as
+  a row only when not installed; About small at the end.
+- The assistant's sheet says that with an account the chat can be linked and change the
+  trip itself.
+
 ## 4.10.1
 
 From the owner's tries of 4.10.0:

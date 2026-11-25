@@ -90,6 +90,15 @@ try{
   s0.title = "A stop with a name long enough to need two lines on a phone held upright";
   // Pasted, as from a chat: WebKitGTK cannot be handed a file the way Chrome is.
   await until("the app", `document.querySelector('[data-act="demo"]')`);
+  await check("welcome: the headline on one line, in English and in Italian (WL1)", async () => {
+    for(const lang of ["en", "it"]){
+      const fits = await run(`const {setLang, t} = await import(new URL("js/i18n.js", location.href)); setLang(${JSON.stringify(lang)});
+        const h = document.querySelector(".welcome .say h1"); h.textContent = t("welcomeHead"); window.dispatchEvent(new Event("resize")); await new Promise(r => setTimeout(r, 100));
+        return [h.scrollWidth, h.clientWidth];`);
+      ok(fits[0] <= fits[1], `${lang}: the headline is ${fits[0]}px in ${fits[1]}`);
+    }
+    await run(`const {setLang} = await import(new URL("js/i18n.js", location.href)); setLang("en");`);
+  });
   await run(`document.querySelector('[data-act="demo"]').click();`);
   await until("the example trip", `document.querySelector(".stop")`);
   await run(`location.hash = "#trips";`);
