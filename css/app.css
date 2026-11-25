@@ -281,13 +281,6 @@ span.costbtn{cursor:auto}
 /* how to have a trip written by an AI assistant */
 .errbox b{font-weight:600}
 
-/* bottom right: + (a stop on the day on screen), the one coloured button, in both themes */
-.fabs{position:fixed;right:calc(max(16px,env(safe-area-inset-right,0px)));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:15;display:flex;align-items:center;gap:10px}
-.fab{width:52px;height:52px;border-radius:50%;border:0;background:var(--accent);color:var(--bg);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px -2px rgba(0,0,0,.35);padding:0}
-.fab svg{width:24px;height:24px}
-.fab:active{transform:scale(.96)}
-body.has-fab main.gutter{padding-bottom:96px}
-body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 
 /* the stop form, a sheet over the page */
 .sheet{border:0;padding:0;background:var(--surface);color:var(--ink);width:min(560px,100vw);max-width:100vw;max-height:min(92vh,100%);margin:auto auto 0;border-radius:16px 16px 0 0;box-shadow:0 -6px 30px rgba(0,0,0,.3)}
@@ -295,7 +288,8 @@ body.has-fab #toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 /* a sheet whose content comes from far is tall from the start: it arrives inside (SH2) */
 .sheet.tall{height:min(92vh,100%)}
 .sheet::backdrop{background:rgba(10,12,14,.45)}
-.sheet-form{display:grid;gap:14px;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
+.sheet-form > *{min-width:0}
+.sheet-form{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
 /* A long title wraps beside the ×; the × keeps its size, at the top. */
 .sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .sheet-head h2{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;font:700 1.2rem/1.2 var(--f-display);margin:0;padding-top:6px}
@@ -407,12 +401,16 @@ button.crow{cursor:pointer}
 .tbtn.quiet{color:var(--muted);font-weight:500}
 .sheet .local{justify-self:start;display:flex;align-items:center;min-height:var(--touch);padding:0;border:0;background:none;color:var(--muted);font:400 var(--fs-m) var(--f-body);text-align:start;cursor:pointer}
 .hits{display:grid;gap:var(--sp-2)}
-.hit{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);align-items:center;width:100%;text-align:start;padding:var(--sp-3);border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);color:var(--ink);font:inherit;cursor:pointer}
-.hit[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
-.hit b{font-weight:600;overflow-wrap:anywhere}
-.hit small{grid-column:2;color:var(--muted);font-size:var(--fs-s);overflow-wrap:anywhere}
-.hit .km{grid-row:1 / span 2;grid-column:3;color:var(--muted);font-size:var(--fs-s)}
-.hit .ty{grid-row:1 / span 2;width:var(--sp-5);height:var(--sp-5);border-radius:var(--r-full);background:var(--pc)}
+.hit{display:flex;align-items:stretch;gap:var(--sp-3);border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg)}
+.hit.shown{border-color:var(--ink)}
+.hit .flag{flex:none;align-self:center;display:grid;place-items:center;width:var(--touch);height:var(--touch);margin-left:var(--sp-1);padding:0;border:0;background:none;color:var(--bg);cursor:pointer}
+.hit .flag::before{content:"";grid-area:1 / 1;width:22px;height:22px;border:2px solid var(--line-strong);border-radius:var(--r-s);background:var(--surface)}
+.hit .flag[aria-pressed="true"]::before{border-color:var(--ink);background:var(--ink)}
+.hit .flag svg{grid-area:1 / 1;width:14px;height:14px;position:relative}
+.hbody{flex:1 1 auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);align-items:center;min-width:0;padding:var(--sp-3) var(--sp-3) var(--sp-3) 0;border:0;background:none;color:var(--ink);font:inherit;text-align:start;cursor:pointer}
+.hbody b{font-weight:600;overflow-wrap:anywhere}
+.hbody small{grid-column:1;color:var(--muted);font-size:var(--fs-s);overflow-wrap:anywhere}
+.hbody .km{grid-row:1 / span 2;grid-column:2;color:var(--muted);font-size:var(--fs-s)}
 .daychips{display:flex;gap:var(--sp-2);overflow-x:auto;scrollbar-width:none;padding-bottom:var(--sp-1)}
 .daychips::-webkit-scrollbar{display:none}
 .daychips button{flex:0 0 auto;display:grid;justify-items:center;gap:var(--sp-1);min-width:var(--touch);min-height:var(--touch);padding:var(--sp-2) var(--sp-3);border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);color:var(--ink);font:600 var(--fs-base) var(--f-body);cursor:pointer}
@@ -421,11 +419,12 @@ button.crow{cursor:pointer}
 .daychips [aria-pressed="true"] small{color:inherit}
 .daychips .new{border-style:dashed}
 .sheet .timeway{display:inline-flex;justify-self:start}
-.srows{display:grid;border-radius:var(--r-m);background:var(--card);overflow:hidden}
-.srow{display:grid;border-top:1px solid var(--line)}
+.srows{display:grid;grid-template-columns:minmax(0,1fr);border-radius:var(--r-m);background:var(--card);overflow:hidden}
+.srow{display:grid;grid-template-columns:minmax(0,1fr);border-top:1px solid var(--line)}
 .srow:first-child{border-top:0}
 .dhead{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:48px;padding:var(--sp-3) var(--sp-4);border:0;background:none;color:var(--ink);font:600 var(--fs-base) var(--f-body);text-align:start;cursor:pointer}
-.dhead .v{margin-left:auto;min-width:0;max-width:60%;color:var(--muted);font-weight:400;font-size:var(--fs-m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dhead > span:first-child{flex:none}
+.dhead .v{flex:1 1 0;text-align:right;margin-left:auto;min-width:0;color:var(--muted);font-weight:400;font-size:var(--fs-m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dhead::after{content:"+";flex:none;color:var(--muted);font-weight:400}
 .dhead.set::after{content:"›"}
 .dhead[aria-expanded="true"]::after{content:"−"}
@@ -590,10 +589,13 @@ main.gutter{gap:var(--sp-4)}
 /* the weather of the day (design/README.md, WX1) */
 .dayhead .wx{display:inline-flex;align-items:center;gap:var(--sp-1)}
 .dayhead .wx svg{width:15px;height:15px;flex:none}
+.dayhead .wx.was{color:var(--muted)}
 .dayhead .dsub b{color:var(--ink);font-weight:600}
 .cityp{display:inline-flex;align-items:center;gap:var(--sp-2);font-weight:600;color:var(--ink)}
 .cityp::before{content:"";width:14px;height:var(--line-w);border-radius:var(--r-full);background:var(--c)}
 .dayhead .sun{display:inline-flex;align-items:center;gap:var(--sp-2);font-variant-numeric:tabular-nums}
+/* the hours of light: the sun's arc over the horizon, never the weather's sun with rays */
+.dayhead .sun svg{width:30px;height:12px;flex:none}
 .dayhead .progress{font-variant-numeric:tabular-nums}
 
 /* The day's line (W1–W5): the most important and "+N"; opened, one per row. */
@@ -833,7 +835,7 @@ mark{background:var(--warn-bg);background:color-mix(in srgb,var(--accent) 22%,tr
 .search-panel .search-n{margin-block:0 var(--sp-2);font:500 var(--fs-s)/1.4 var(--f-body);color:var(--muted)}
 .search-panel .search-n:empty{display:none}
 html.searching body{overflow:hidden}
-html.searching :is(.fabs,.nextbar){display:none}
+html.searching .nextbar{display:none}
 /* One ✕ only: the lens's. The browser's own "clear" in the field goes. */
 .search-q::-webkit-search-cancel-button,.search-q::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
 

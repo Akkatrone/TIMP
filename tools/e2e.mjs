@@ -444,7 +444,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#day-1";`);
     await until("day 1", `document.querySelectorAll(".stop").length === 6`);
     const before = await versionOnPhone();
-    await run(`document.querySelector(".fab").click();`);
+    await run(`document.querySelector("[data-add-stop]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open]")`);
     await fill("#stop-title", PLACE);
     assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastelaria Exemplo");
@@ -490,8 +490,8 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("a short link keeps the link, has no position, and says what to add", async () => {
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
-    await run(`document.querySelector(".fab").click();`);
+    await until("day 1", `document.querySelector("[data-add-stop]")`);
+    await run(`document.querySelector("[data-add-stop]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open]")`);
     await fill("#stop-title", "https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
     assert.match(await run(`return document.querySelector("[data-src-note]").textContent;`), /Short Google Maps link/);
@@ -511,11 +511,11 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("the stop form: a name searched, places around the day, the first taken; the day as chips; moving says what to know first (ST1–ST6)", async () => {
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
+    await until("day 1", `document.querySelector("[data-add-stop]")`);
     await run(`window.__geo2 = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo2.push(String(u)), Promise.resolve(new Response(JSON.stringify([
-      {lat: "38.6975", lon: "-9.2032", category: "amenity", type: "cafe", name: "Pastéis de Belém", display_name: "Pastéis de Belém, Rua de Belém 84, Lisboa"},
+      {lat: "38.6975", lon: "-9.2032", category: "amenity", type: "cafe", name: "Pastéis de Belém", display_name: "Pastéis de Belém, Rua de Belém 84, Santa Maria de Belém, Lisboa, 1300-085, Portugal"},
       {lat: "41.15", lon: "-8.61", category: "shop", type: "bakery", name: "Pastelaria Belém", display_name: "Pastelaria Belém, Rua Exemplo, Porto"}])))) : real(u, o);`);
-    await run(`document.querySelector(".fab").click();`);
+    await run(`document.querySelector("[data-add-stop]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] [data-search]")`);
     // The name as on the sign: small, and only if asked (ST1).
     assert.equal(await run(`return document.querySelector("[data-local-field]").hidden && !document.querySelector("[data-local-add]").hidden;`), true);
@@ -525,10 +525,20 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-search]").click();`);
     await until("the places", `document.querySelectorAll("dialog.sheet[open] [data-hit]").length === 2`, 10000);
     assert.equal(new URL(await run(`return window.__geo2[0];`)).searchParams.get("limit"), "3");
-    assert.deepEqual(await run(`return [...document.querySelectorAll("[data-hit]")].map(b => [b.querySelector("b").textContent, b.getAttribute("aria-pressed")]);`), [["Pastéis de Belém", "true"], ["Pastelaria Belém", "false"]]);
-    assert.match(await run(`return document.querySelectorAll("[data-hit] .km")[1].textContent;`), /^\d+ km$/, "how far, for the one in another town");
-    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastéis de Belém", "the first taken: its name");
+    assert.deepEqual(await run(`return [...document.querySelectorAll(".hit")].map(r => [r.querySelector("b").textContent, r.querySelector("[data-hit]").getAttribute("aria-pressed")]);`), [["Pastéis de Belém", "false"], ["Pastelaria Belém", "false"]]);
+    assert.match(await run(`return document.querySelectorAll(".hit .km")[1].textContent;`), /^\d+ km$/, "how far, for the one in another town");
+    assert.equal(await run(`return document.querySelector("[data-hit-map]").hidden;`), false, "the first shown on the small map");
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "pasteis de belem", "nothing taken yet");
+    // Its box takes it: name and kind; the map closes, only it stays; again, the others back.
+    await run(`document.querySelector('[data-hit="0"]').click();`);
+    assert.equal(await run(`return document.getElementById("stop-title").value;`), "Pastéis de Belém");
     assert.equal(await run(`return document.querySelector('[data-v="type"]').textContent;`), "Food", "and its kind, shown in its row");
+    assert.deepEqual(await run(`return [document.querySelectorAll(".hit").length, document.querySelector("[data-hit-map]").hidden, document.querySelector('[data-hit="0"]').getAttribute("aria-pressed")];`), [1, true, "true"]);
+    await run(`document.querySelector('[data-hit="0"]').click();`);
+    assert.equal(await run(`return document.querySelectorAll(".hit").length;`), 2, "its box again: the others back");
+    await run(`document.querySelector('[data-hit="0"]').click();`);
+    // Nothing in the sheet wider than the screen once the place is in its rows (Android, 25 November).
+    assert.deepEqual(await run(`const d = document.querySelector("dialog.sheet[open]"); return [...d.querySelectorAll(".sheet-form > *, .srow, .dhead, .hit, .daychips")].filter(e => e.getBoundingClientRect().right > d.getBoundingClientRect().right + 1).map(e => e.className);`), []);
     // The day as chips; the button says where it goes; a new day says so (ST2, ST4, ST6).
     assert.equal(await run(`return document.querySelector("dialog.sheet[open] [data-go]").textContent;`), "Add to day 1");
     await run(`document.querySelector('[data-day-chip="4"]').click();`);
@@ -549,10 +559,10 @@ await withApp(async ({run, until, reload, blocked}) => {
 
   await step("an address shared on its own is searched around the trip; the pin can be put on a map", async () => {
     await run(`location.hash = "#day-1";`);
-    await until("day 1", `document.querySelector(".fab") && !document.querySelector(".fab").hidden`);
+    await until("day 1", `document.querySelector("[data-add-stop]")`);
     // No request leaves the test: Nominatim answers from here.
     await run(`window.__geo = []; const real = window.fetch; window.fetch = (u, o) => String(u).includes("nominatim") ? (window.__geo.push(String(u)), Promise.resolve(new Response('[{"lat":"38.71","lon":"-9.1366","category":"tourism","type":"museum"}]'))) : real(u, o);`);
-    await run(`document.querySelector(".fab").click();`);
+    await run(`document.querySelector("[data-add-stop]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open]")`);
     assert.equal(await run(`return getComputedStyle(document.documentElement).overflow;`), "hidden", "the page under the form does not scroll");
     await fill("#stop-title", "Rua Augusta, 24https://maps.app.goo.gl/AbCdEfGh123456789?g_st=ac");
@@ -948,10 +958,10 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`location.hash = "#trips";`);
     await until("the Paste button", `document.querySelector('[data-act="paste-any"]')`);
     // Nothing floats outside a day (TR5): no Paste, no +.
-    assert.equal(await run(`return document.querySelector(".fab").hidden && !document.querySelector(".fab-paste");`), true);
+    assert.equal(await run(`return !document.querySelector(".fab, .fab-paste");`), true, "nothing floats (R3)");
     await run(`location.hash = "#info";`);
     await until("the Info page", `document.querySelector("#app .sec")`);
-    assert.equal(await run(`return document.querySelector(".fab").hidden;`), true);
+    assert.equal(await run(`return !document.querySelector(".fab");`), true);
     await run(`location.hash = "#trips";`);
     await until("the Paste button", `document.querySelector('[data-act="paste-any"]')`);
     // Paste opens the sheet first: nothing is read until Paste in it is tapped.
@@ -1282,7 +1292,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     // The day: said so, no + button.
     await run(`${card}.querySelector('[data-act="open"]') && ${card}.querySelector('[data-act="open"]').click(); location.hash = "#day-1";`);
     await until("the day", `document.querySelector(".dayline [data-locked]")`);
-    assert.equal(await run(`return document.querySelector(".fabs .fab").hidden;`), true);
+    assert.equal(await run(`return !document.querySelector("[data-add-stop]");`), true, "locked: nothing to add");
     // Changes pasted (an assistant's): not taken.
     const changes = {format: "travel-in-my-pocket/changes", trip: "demo-lisbon", changes: [{update: {day: "2027-05-14", stop: "comercio", set: {time: "09:45"}}}]};
     await run(`location.hash = "#trips"; await new Promise(r => setTimeout(r, 200)); document.querySelector('[data-act="paste-any"]').click(); await new Promise(r => setTimeout(r, 200)); document.querySelector("#paste-text").value = ${JSON.stringify(JSON.stringify(changes))}; document.querySelector("#paste-text").closest("form").requestSubmit(); await new Promise(r => setTimeout(r, 600));`);
@@ -1301,7 +1311,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return !!${card}.querySelector("[data-locked]");`), false);
     await run(`location.hash = "#day-1";`);
     await until("the day", `document.querySelector(".stop")`);
-    assert.equal(await run(`return document.querySelector(".fabs .fab").hidden || !!document.querySelector(".dayline [data-locked]");`), false);
+    assert.equal(await run(`return !document.querySelector("[data-add-stop]") || !!document.querySelector(".dayline [data-locked]");`), false);
   });
 
   await step("Trips: the open trip on top; the others a line each, grouped by when, sorted, found; a card opens its trip", async () => {
@@ -1379,7 +1389,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.equal(await run(`return document.querySelector(".stops .now + .stop").classList.contains("next");`), true, "now, then the next stop");
     assert.match(await text(".stops .now .nt"), /^\d\d:\d\d · .+ in \d+ min$/);
     assert.equal(await run(`return document.querySelector(".stop.next [data-open]").getAttribute("aria-expanded");`), "true", "the next stop is open");
-    assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "no + floating on the day itself");
+    assert.equal(await run(`return !document.querySelector(".fab");`), true, "nothing floats (R3)");
     assert.equal(await count(".addrow [data-add-stop]"), 1, "adding is the last row");
     // The next stop's bar: hidden while its card shows; there when it leaves the screen.
     await run(`document.querySelector(".stop.next").scrollIntoView({block: "center"});`);
@@ -2101,7 +2111,7 @@ async function accountSteps({run, until, reload, page, blocked, service}){
     // Read only: no +, and the day says whose it is.
     await run(`location.hash = "#day-1";`);
     await until("its day", `document.querySelector(".stop")`);
-    assert.equal(await run(`return document.querySelector(".fab").hidden;`), true, "nothing to add");
+    assert.equal(await run(`return !document.querySelector("[data-add-stop]");`), true, "nothing to add");
     assert.match(await text(".dayline [data-locked]"), /^This trip is @fra's, read only/);
     // On Trips, apart, with its month only (its dates were not published).
     await run(`location.hash = "#trips";`);

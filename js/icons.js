@@ -74,3 +74,6 @@ const PART_SIGNS = (() => {
 })();
 /** The sign of a part of the day, as SVG text ("" for none). */
 export const partSign = part => PART_SIGNS[part] || "";
+
+/** A tick: a stop done, a place taken. */
+export const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';

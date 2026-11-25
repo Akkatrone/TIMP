@@ -52,7 +52,7 @@ await withApp(async ({run, until, theme, capture}) => {
   const PLACE = "https://www.google.com/maps/place/Pastelaria+Exemplo,+Rua+Augusta+10,+Lisboa/@38.7101,-9.1375,18z/data=!4m6!3m5!1s0x0:0x0!8m2!3d38.71012!4d-9.13751";
   await run(`document.querySelector("[data-map]").click(); location.hash = "#day-1";`);
   await until("day 1", `document.querySelectorAll(".stop").length === 6`);
-  await run(`document.querySelector(".fab").click();`);
+  await run(`document.querySelector("[data-add-stop]").click();`);
   await until("the form", `document.querySelector("dialog.sheet[open]")`);
   await run(`const el = document.getElementById("stop-src"); el.value = ${JSON.stringify(PLACE)}; el.dispatchEvent(new Event("change")); document.getElementById("stop-hh").value = "12"; document.getElementById("stop-mm").value = "15"; document.querySelector('[data-travel="metro"]').click(); document.getElementById("stop-text").value = "Custard tarts at the counter, three minutes from the square.";`);
   await shoot("new-stop.png");

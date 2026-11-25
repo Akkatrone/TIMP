@@ -13,6 +13,7 @@ import { TRAVEL, TYPES } from "./trip.js";
 import { clockMinutes, dayAfter, moveWarnings } from "./edit.js";
 import { PARTS, partOf } from "./parts.js";
 import { ask } from "./ask.js";
+import { CHECK } from "./icons.js";
 import { openSheet } from "./sheet.js";
 import { km, middleOf } from "./positions.js";
 import { closedOn } from "./places.js";
@@ -175,7 +176,7 @@ export function openStopEditor(o){
       ${row("type", t("fType"), choice("type", TYPES, t("fType")))}
       ${row("travel", t("fTravel"), choice("travel", TRAVEL, t("fTravel")))}
       ${row("booking", t("fBooking"), choice("booking", ["advised", "required", "booked"], t("fBooking")))}
-      ${row("cost", t("fCost"), `${money.html}${money2.html}<div class="addcost"${both ? " hidden" : ""}><button type="button" class="tbtn" data-add-cost>+ ${esc(t(first === "trip" ? "addPrivateCost" : "addTripCost"))}</button></div>`)}
+      ${row("cost", t("fCost"), `${money.html}${money2.html}<div class="addcost"${both ? " hidden" : ""}><button type="button" class="tbtn" data-add-cost>${esc(t(first === "trip" ? "addPrivateCost" : "addTripCost"))}</button></div>`)}
       ${row("closed", t("fClosed"), `<div class="seg wrap week" role="group" aria-label="${esc(t("fClosed"))}">${WEEK.map(d => `<button type="button" data-closed="${d}" aria-pressed="${closed0.includes(d)}">${esc(weekdayName(d, lang, "short"))}</button>`).join("")}</div>`)}
       ${row("text", t("fText"), `<textarea id="stop-text" rows="3" aria-label="${esc(t("fText"))}">${esc(s0.text || "")}</textarea>`)}
       ${row("pos", t("fPosition"), `<p class="pos" data-pos></p>
@@ -347,40 +348,64 @@ export function openStopEditor(o){
   // The place's address, without its name in front.
   const shortLabel = h => { const l = h.label || ""; return h.name && l.startsWith(h.name + ", ") ? l.slice(h.name.length + 2) : l; };
 
-  // What was typed, searched (ST1): up to three places around the day, the first taken.
-  let hits = [], hitMap = null, hitTurn = 0;
+  // What was typed, searched (ST1): up to three places around the day; a tap on one shows
+  // it on a small map, its box takes it (name, position, address, kind): the map closes and
+  // only it stays. Its box again: the others back.
+  let hits = [], hitMap = null, hitTurn = 0, shown = 0, chosen = -1, asked = "";
   async function search(){
     const text = $("#stop-title").value.trim();
     if(!text) return;
     if(isSource(text)){ readSource(text); return; }
     if(navigator.onLine === false){ note(t("posOffline")); return; }
     note(t("posSearching"));
+    asked = text;
     hits = await searchPlaces(text, {googleKey: o.googleKey, lang, near: area()});
     note(hits.length ? "" : t("whatNotFound"));
+    shown = 0; chosen = -1;
+    drawHits();
+    if(hits.length) showHit(0);
+  }
+  function drawHits(){
     const mid = middleOf(placed()), box = $("[data-hits]");
     box.hidden = !hits.length;
-    box.innerHTML = hits.map((h, i) => `<button type="button" class="hit" data-hit="${i}" aria-pressed="false">` +
-      `<span class="ty" style="--pc:var(--t-${esc(h.type || "none")}, var(--muted))" aria-hidden="true"></span><b>${esc(h.name || text)}</b>` +
-      `<small>${esc([shortLabel(h), h.type ? t("type_" + h.type) : ""].filter(Boolean).join(" · "))}</small>` +
-      (mid ? `<span class="km">${esc(t("kmAway", {d: fmtKm(km(mid, h))}))}</span>` : "") + `</button>`).join("");
-    if(hits.length) take(0);
+    box.innerHTML = (chosen >= 0 ? [chosen] : hits.map((_, i) => i)).map(i => {
+      const h = hits[i], on = i === chosen;
+      return `<div class="hit${i === shown && !on ? " shown" : ""}">` +
+        `<button type="button" class="flag" data-hit="${i}" aria-pressed="${on}" aria-label="${esc(t(on ? "hitChosen" : "hitChoose", {s: h.name || asked}))}">${on ? CHECK : ""}</button>` +
+        `<button type="button" class="hbody" data-hit-show="${i}"><b>${esc(h.name || asked)}</b>` +
+        `<small>${esc([shortLabel(h), h.type ? t("type_" + h.type) : ""].filter(Boolean).join(" · "))}</small>` +
+        (mid ? `<span class="km">${esc(t("kmAway", {d: fmtKm(km(mid, h))}))}</span>` : "") + `</button></div>`;
+    }).join("");
   }
-  // One of them taken: its name, position, address and kind, on a small map.
-  async function take(i){
-    const h = hits[i], turn = ++hitTurn;
-    if(!h) return;
-    dlg.querySelectorAll("[data-hit]").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.hit === i)));
+  // A place on the small map, with the day's stops around it.
+  async function showHit(i){
+    const h = hits[i], turn = ++hitTurn, box = $("[data-hit-map]");
+    shown = i;
+    dlg.querySelectorAll(".hit").forEach(r => r.classList.toggle("shown", r.querySelector(`[data-hit-show="${i}"]`) !== null && chosen < 0));
+    box.hidden = false;
+    if(hitMap){ hitMap.remove(); hitMap = null; }
+    box.innerHTML = `<div class="msg">${esc(t("mapLoading"))}</div>`;
+    try{
+      const map = await miniMap(box, h, placed());
+      if(turn !== hitTurn || !dlg.open || chosen >= 0) map.remove(); else hitMap = map;
+    }catch(err){ if(turn === hitTurn) box.innerHTML = `<div class="msg">${esc(t("mapFailed"))}</div>`; }
+  }
+  function hideHitMap(){
+    hitTurn++;
+    if(hitMap){ hitMap.remove(); hitMap = null; }
+    $("[data-hit-map]").hidden = true;
+  }
+  // Its box: taken (or, taken already, the others back).
+  function take(i){
+    if(chosen === i){ chosen = -1; drawHits(); showHit(i); return; }
+    const h = hits[i];
+    chosen = i;
     if(h.name) $("#stop-title").value = h.name;
     st.lat = h.lat; st.lng = h.lng; st.source = h.source; st.address = shortLabel(h);
     if(h.type) setChoice("type", h.type);
+    hideHitMap();
+    drawHits();
     showPos(); movePick(); fitSource(); refresh();
-    const box = $("[data-hit-map]");
-    box.hidden = false;
-    if(hitMap){ hitMap.remove(); hitMap = null; box.innerHTML = `<div class="msg">${esc(t("mapLoading"))}</div>`; }
-    try{
-      const map = await miniMap(box, h, placed());
-      if(turn !== hitTurn || !dlg.open) map.remove(); else hitMap = map;
-    }catch(err){ if(turn === hitTurn) box.innerHTML = `<div class="msg">${esc(t("mapFailed"))}</div>`; }
   }
 
   // One row of details open at a time (ST3); null closes them.
@@ -442,6 +467,8 @@ export function openStopEditor(o){
     if(e.target.closest("[data-search]")){ search(); return; }
     const hit = e.target.closest("[data-hit]");
     if(hit){ take(+hit.dataset.hit); return; }
+    const look = e.target.closest("[data-hit-show]");
+    if(look){ if(chosen < 0) showHit(+look.dataset.hitShow); return; }
     const head = e.target.closest(".dhead[aria-controls]");
     if(head){ openRow(head.getAttribute("aria-expanded") === "true" ? null : head); return; }
     const day = e.target.closest("[data-closed]");
@@ -480,7 +507,7 @@ export function openStopEditor(o){
     if(e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); search(); }
   });
   dlg.addEventListener("input", e => { if(e.target.closest(".dbody")) refresh(); });
-  dlg.addEventListener("close", () => { closePicker(); if(hitMap) hitMap.remove(); }, {once: true});
+  dlg.addEventListener("close", () => { closePicker(); hideHitMap(); }, {once: true});
   dlg.addEventListener("change", e => { if(e.target.matches("#stop-hh, #stop-mm, #stop-time-words, #stop-plan")) refresh(); });
   $("#stop-day").addEventListener("change", () => { fillPlans(); refresh(); });
   const dateNow = () => days[+$("#stop-day").value].date;

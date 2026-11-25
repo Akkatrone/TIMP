@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.8.1
+
+From the owner's tries of 4.8.0:
+- **The search's places have a box**: a tap on a place shows it on the small map; its box
+  takes it, the map closes and only it stays; its box again brings the others back.
+- **On Android the form went wider than the screen** once a place was taken (a long
+  address in its row): fixed, and checked by the tests with a long address.
+- **No floating "+"** on a day: "+ Add a stop" is the last row of the list, every day (it
+  was missing on the day itself, and covered the stops on the others).
+- The form says **Name**, **Kind** and **Name on the sign**; one "+" in "+ Add a private cost".
+- **A day gone shows its weather's sign and highest**, quiet, without "was".
+- **The hours of light have their own sign** (the sun's arc over the horizon), no longer
+  the same sun as the weather beside them.
+
 ## 4.8.0
 
 - **Adding a stop, rethought.** One field, "Name, address or link": a link or a place

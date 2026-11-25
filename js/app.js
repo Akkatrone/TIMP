@@ -6,7 +6,7 @@ import { zonesOf, routeUrl, zoneSVG, painter, TYPE_COLORS } from "./geo.js";
 import { daylight, partsOfDay, clockOf } from "./sun.js";
 import { reviewSite, closedOn, regionOf, localLang } from "./places.js";
 import { clockMinutes } from "./edit.js";
-import { icon, partSign } from "./icons.js";
+import { icon, partSign, CHECK } from "./icons.js";
 import { AHEAD, placeOf, localHours, dayWeather, stopWeather } from "./weather.js";
 import { createLiveMap } from "./livemap.js";
 import { googleNeedsReload, googleRefusedKey } from "./google.js";
@@ -123,7 +123,6 @@ function keepWeather(date, w){
   store.setKV("wxlog:" + S.rec.id, S.wxLog).catch(() => {});
 }
 let uid = 0;   // ids for aria-controls, unique on the page
-const CHECK = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const S = {
   records: [],            // [{id, trip, importedAt, fileName, exported, priv, privUnsaved}]
@@ -2426,7 +2425,7 @@ function renderDay(i){
   const w = dayWx && dayWeather(dayWx.hours, d.date), was = ahead < 0 && S.wxLog[d.date];
   if(w) keepWeather(d.date, w);
   const wxHead = w ? `<span class="wx" role="img" aria-label="${esc(t("wxHead", {k: t("wx_" + w.kind), a: w.min, b: w.max}))}">${WX_ICON[w.kind]}${w.min}–${w.max}°</span>`
-    : was ? `<span class="wx">${esc(t("wxWas", {b: was.max, k: t("wx_" + was.kind).toLowerCase()}))}</span>` : "";
+    : was ? `<span class="wx was" role="img" aria-label="${esc(t("wxWas", {b: was.max, k: t("wx_" + was.kind).toLowerCase()}))}">${WX_ICON[was.kind] || ""}${was.max}°</span>` : "";
   // The colours of this day's pins, lines and numbers (js/geo.js).
   const paint = painter(cityColor(d.city), parts);
   const dp = dateParts(d.date, lang), ti = todayIndex();
@@ -2440,7 +2439,7 @@ function renderDay(i){
   <header class="dayhead" style="--c:${color}">
     <p class="dmeta">${esc(t("day"))} ${i + 1}${i === ti ? " · " + esc(t("today")) : ""} · ${esc(dp.long)}</p>
     <h1>${esc(d.title || city || dp.long)}</h1>
-    <p class="dsub">${cityLine}${light ? `<span class="sun" role="img" aria-label="${esc(t("sunTimes", {r: hhmm(light.sunrise), s: hhmm(light.sunset)}))}">${icon("sun", 13)}${hhmm(light.sunrise)}–${hhmm(light.sunset)}</span>` : ""}${wxHead}</p>
+    <p class="dsub">${cityLine}${light ? `<span class="sun" role="img" aria-label="${esc(t("sunTimes", {r: hhmm(light.sunrise), s: hhmm(light.sunset)}))}">${partSign("midday")}${hhmm(light.sunrise)}–${hhmm(light.sunset)}</span>` : ""}${wxHead}</p>
     <p class="dsub">${stay ? `<span>${esc(t("night"))} · <b>${esc(stay.name)}</b>${typeof d.stay === "object" ? ` <a class="maplink" href="${esc(mapsUrl(stay.address || stay.name))}" target="_blank" rel="noopener">${esc(t("mapLink"))}</a>` : ""}</span>` : ""}<span class="progress">${esc(t("doneCount", {a: doneCount, b: list.length}))}${skipCount ? " · " + esc(skipCount === 1 ? t("skippedOne") : t("skippedCount", {n: skipCount})) : ""}${dayTotal(costsToday)}</span></p>
   </header>`;
 
@@ -2539,14 +2538,6 @@ function syncLive(wanted){
   live.handle.setRoute(true);
 }
 
-// The buttons at the bottom right: Paste on every page of an open trip, + on a day.
-const $fabs = document.createElement("div");
-$fabs.className = "fabs";
-$fabs.hidden = true;
-$fabs.innerHTML = `<button type="button" class="fab">${PLUS}</button>`;
-document.body.appendChild($fabs);
-const $fab = $fabs.querySelector(".fab");
-$fab.addEventListener("click", () => newStop());
 // List | Map in the top bar (M2): Map is pressed while the map shows.
 $strip.addEventListener("click", e => {
   if(e.target.closest("#search-btn")){ if(searching()) closeSearch(); else openSearchHere(); return; }
@@ -2656,14 +2647,6 @@ function goToNow(smooth = false){
 function render(){
   const r = route();
   renderStrip(r);
-  $fabs.hidden = r.name === "welcome" || r.name === "me";
-  // On a day, pasting is in the last row; on the day itself (today) the next stop's bar
-  // floats instead of + (R3, V2): one thing at a time.
-  const isToday = r.name === "day" && r.i === todayIndex();
-  $fab.hidden = r.name !== "day" || isLocked(S.rec) || isToday;
-  $fab.setAttribute("aria-label", t("addStop"));
-  $fab.title = t("addStop");
-  document.body.classList.toggle("has-fab", !$fab.hidden);
   // While the page is rebuilt the interactive map is out of it, and the page is shorter
   // by its height: a browser that lays the page out in that moment pulls the scroll up
   // (a tap on ⋯ or Edit under an open map jumped by the map's height). The page keeps

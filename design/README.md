@@ -31,9 +31,10 @@ never mixed**: "Go" (leaves the app, ↗) above, "Change" (stays in the app) bel
 line, quieter. At most four per zone.
 
 **R3. One main action per screen, and it depends on the moment.** One filled element in
-the accent colour, one thing floating. On a day: before and after the trip, **+**; on
-the day itself, **going to the next stop**. Adding is always also the last row of the
-list.
+the accent colour. On a day, adding is the last row of the list ("+ Add a stop ·
+Paste"), every day; on the day itself the next stop's bar is the one thing floating.
+Nothing else floats (the owner, 25 November: a "+" over the stops covered them and said
+again what the last row says).
 
 **R4. Three weights of button; the weight says the consequence.** Filled: the main
 action. Outlined: an action that changes the trip. Text: add, open, cancel. Changes for
@@ -209,7 +210,8 @@ A signal like the others (W1–W5), from MET Norway through TIMP's service (`js/
 
 - **WX1** The day's head says the day's weather next to sunrise and sunset: the sign of the
   worst sky from 8:00 to 20:00 and the lowest and highest temperature, in °C ("14–19°");
-  words for a screen reader. Nothing to tap.
+  words for a screen reader. Nothing to tap. The hours of light have the sun's arc over
+  the horizon (T3), never the weather's sun with rays: two signs, never one for both.
 - **WX2** A warning only where it changes something: a park, a view or a walk, at its time
   (a clock time and the hour after; a part of the day, its window; all day, 9:00 to
   19:00). Storm, rain (1 mm in an hour), strong wind (10 m/s): attention; heat (35°) and
@@ -219,8 +221,9 @@ A signal like the others (W1–W5), from MET Norway through TIMP's service (`js/
 - **WX4** Only today and the next 3 days. Further away, nothing, not an empty place.
 - **WX5** A forecast is asked again after an hour and trusted 12 hours; older, nothing.
   MET Norway is named under You, About.
-- **WX6** A day gone keeps the last forecast it had, quiet in its head ("was 21°, sun"):
-  a memory, on this phone, never a warning.
+- **WX6** A day gone keeps the last forecast it had, quiet in its head: its sign and its
+  highest ("☀ 21°", muted), "was 21°, sun" for a screen reader; a memory, on this phone,
+  never a warning.
 - **WX7** Only a place rounded to about 10 km leaves the phone, through the service, which
   asks MET at most once every 3 hours per place: never the trip, the account or who asks.
 
@@ -273,8 +276,9 @@ Adding a stop and changing one: the same sheet (`js/editor.js`).
 - **ST1** What, found: one field for a name, an address or a link. A link or coordinates
   pasted are read at once; a name is searched with Search or Enter, never while typing
   (OpenStreetMap's rules), around the day first: up to three places, with their kind and
-  how far, the first taken (name, address, position, kind) and shown on a small map. The
-  name as on the sign is small and optional, under the field.
+  how far; a tap on one shows it on a small map; its box (SH5) takes it (name, address,
+  position, kind): the map closes and only it stays; its box again brings the others
+  back. The name on the sign is small and optional, under the field.
 - **ST2** When: the trip's days as chips, "+" last for a new day; the time as hours and
   minutes or a part of the day (a choice of two, T1); a day with plans, its plan.
 - **ST3** The rest, a row each with its value ("+" when empty), opened in place, one at a
