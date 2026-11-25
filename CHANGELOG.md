@@ -4,6 +4,23 @@ Versions follow [Semantic Versioning](https://semver.org/). The trip file format
 its own version: `travel-in-my-pocket/2` since 3.0. Files in `travel-in-my-pocket/1`
 (1.0 to 2.4) still load: the app converts them.
 
+## 4.10.0
+
+- **A day's form, rethought** like the stop's: what the day is about and its city first;
+  under the city, the trip's cities as chips (one tap, one spelling, so the day keeps its
+  colour). Where you sleep and the notes are a row each, with their value; the night gets
+  its note (check-in, a door code), and "Same as day 3: …" takes the night before in one
+  tap. Cancel and Save stay at the bottom; Delete is the last row and says what goes with
+  the day, counted.
+- **Deleting a day** leaves the private expenses paid there in place, no longer at a stop
+  (they kept pointing at a stop that was gone).
+- **An expense's form, rethought**: whose it is first ("For the trip" or "Only mine", the
+  same words as a stop's cost), what it was, the amount large, then when it was paid as
+  chips: "Before" (with its date, today at first) or a day of the trip. A private expense
+  paid at a stop says where. "Add expense" and Cancel at the bottom; an error shows under
+  its own field.
+- The day chips centre their text, also with a single word ("Before", a city).
+
 ## 4.9.1
 
 - **Moving a day**: in the swap's summary a date no longer breaks in the middle ("Sun May /

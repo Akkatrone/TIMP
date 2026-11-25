@@ -1013,6 +1013,9 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-day-edit]").click();`);
     await until("the day form", `document.querySelector("dialog.sheet[open] #day-title")`);
     assert.equal(await run(`return document.getElementById("day-city").value;`), "Lisboa");
+    // The trip's cities as chips, the day's own pressed (DY1); the night as the day before's: nothing to offer (DY3).
+    assert.deepEqual(await run(`return [...document.querySelectorAll("[data-city]")].map(b => b.textContent + ":" + b.getAttribute("aria-pressed"));`), ["Lisboa:true", "Sintra:false", "Porto:false"]);
+    assert.equal(await run(`return document.querySelector("[data-same-night]").hidden;`), true);
     // A note is a field of its own: two added, each with its ✕.
     await run(`document.getElementById("day-title").value = "Belém slowly"; for(const n of ["Pastéis before ten", "Tram 15 from Praça da Figueira"]){ document.querySelector("[data-note-add]").click(); document.querySelector("#day-notes li:last-child textarea").value = n; } document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
     assert.equal(await text(".dayhead h1"), "Belém slowly");
@@ -1021,9 +1024,20 @@ await withApp(async ({run, until, reload, blocked}) => {
     // One of them taken away with its ✕: the other stays.
     await run(`document.querySelector("[data-day-edit]").click();`);
     await until("the day form", `document.querySelectorAll("dialog.sheet[open] #day-notes textarea").length === 2`);
+    assert.equal(await text('[data-v="notes"]'), "2 notes");
     await run(`document.querySelector("#day-notes [data-note-remove]").click(); document.querySelector("dialog.sheet[open] form").requestSubmit(); await new Promise(r => setTimeout(r, 400));`);
     assert.deepEqual(await run(`const h = document.querySelector(".dayline [data-notes]"); if(h && h.getAttribute("aria-expanded") === "false") h.click(); await new Promise(r => setTimeout(r, 100)); return [...document.querySelectorAll(".dayline li .tx")].map(d => d.textContent).slice(-1);`), ["Tram 15 from Praça da Figueira"]);
     assert.equal(await run(`return [...document.querySelectorAll(".dayline li .tx")].some(d => d.textContent === "Pastéis before ten");`), false, "taken away");
+    // Day 4 slept elsewhere than day 3: its night in one tap (DY3), not saved here.
+    await run(`location.hash = "#day-4";`);
+    await until("day 4", `document.querySelector(".dayhead h1") && document.querySelector(".dayhead h1").textContent === "Porto in a day"`);
+    await run(`document.querySelector("[data-day-edit]").click();`);
+    await until("the day form", `document.querySelector("dialog.sheet[open] #day-title")`);
+    assert.equal(await text("[data-same-night]"), "Same as day 3: Casa do Exemplo (invented)");
+    await run(`document.querySelector("[data-same-night]").click();`);
+    assert.equal(await run(`return document.getElementById("day-stay").value;`), "Casa do Exemplo (invented)");
+    assert.equal(await run(`return document.querySelector("[data-same-night]").hidden;`), true);
+    await run(`document.querySelector("dialog.sheet[open] [data-close]").click(); await new Promise(r => setTimeout(r, 300));`);
     // Add a day: no "+ Day" (MV1); the stop form's "+" chip, a new day after the last (ST6).
     assert.equal(await count("[data-day-add]"), 0);
     await run(`document.querySelector("[data-add-stop]").click();`);
@@ -1041,7 +1055,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     await until("the day form", `document.querySelector("dialog.sheet[open] [data-delete]")`);
     await run(`document.querySelector("[data-delete]").click();`);
     await until("the question", `document.querySelector("dialog.ask[open]")`);
-    assert.match(await run(`return document.querySelector("dialog.ask p").textContent;`), /Day 5, .* goes from the trip with all its stops/);
+    assert.match(await run(`return document.querySelector("dialog.ask p").textContent;`), /Day 5, .* goes with 1 stop\. The days after it keep their dates/);
     await run(`document.querySelector('dialog.ask [data-answer="yes"]').click(); await new Promise(r => setTimeout(r, 500));`);
     assert.equal(await count(".dchip:not(.info)"), 4);
     assert.equal(await run(`return location.hash;`), "#day-4");
@@ -1181,7 +1195,11 @@ await withApp(async ({run, until, reload, blocked}) => {
     await run(`document.querySelector("[data-expense-add]").click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #exp-title")`);
     await run(`document.getElementById("exp-title").value = "Travel insurance"; const a = document.getElementById("exp-cost-amount"); a.value = "40";`);
+    // When it was paid: a day of the trip as a chip, the date field only for "Before" (EX3).
+    await run(`document.querySelector('[data-paid="2027-05-15"]').click();`);
+    assert.equal(await run(`return document.querySelector("[data-other-date]").hidden;`), true);
     await submit();
+    assert.equal(await run(`return await new Promise(r => { const q = indexedDB.open("travel-in-my-pocket"); q.onsuccess = () => { const g = q.result.transaction("trips").objectStore("trips").get("demo-lisbon"); g.onsuccess = () => r(g.result.trip.expenses.find(e => e.title === "Travel insurance").date); }; });`), "2027-05-15");
     await run(`document.querySelector('[data-cost-view="sum"]').click();`);
     const added = await run(`return [...document.querySelectorAll('[data-expense]')].find(b => b.textContent.includes("Travel insurance")).dataset.expense;`);
     await run(`document.querySelector('[data-expense="${added}"]').click();`);
@@ -1216,7 +1234,7 @@ await withApp(async ({run, until, reload, blocked}) => {
     // Under the amount: the trip's or private. A second cost for the same stop, private.
     await run(`document.querySelector('[data-edit="${ID("castelo")}"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #stop-cost-amount")`);
-    assert.deepEqual(await run(`return [...document.querySelectorAll('[data-money="stop-cost"] [data-kind]')].map(b => b.textContent + ":" + b.getAttribute("aria-checked"));`), ["Trip:true", "Private:false"]);
+    assert.deepEqual(await run(`return [...document.querySelectorAll('[data-money="stop-cost"] [data-kind]')].map(b => b.textContent + ":" + b.getAttribute("aria-checked"));`), ["For the trip:true", "Only mine:false"]);
     assert.equal(await run(`return document.querySelector('[data-money="stop-cost2"]').hidden;`), true);
     await run(`document.querySelector("[data-add-cost]").click();`);
     assert.equal(await run(`return document.querySelector('[data-money="stop-cost2"] [data-kind="private"]').getAttribute("aria-checked");`), "true");
@@ -1250,14 +1268,14 @@ await withApp(async ({run, until, reload, blocked}) => {
     assert.ok((await privRows()).includes("Azulejo tiles to take home (invented)"));
     await run(`document.querySelector('[data-private-expense="azulejo-tiles-to-take-home-invented"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #exp-title")`);
-    assert.equal(await run(`return document.querySelector('[data-money="exp-cost"] [data-kind="private"]').getAttribute("aria-checked");`), "true");
-    await run(`document.querySelector('[data-money="exp-cost"] [data-kind="trip"]').click();`);
+    assert.equal(await run(`return document.querySelector('[data-money-kind="exp-cost"] [data-kind="private"]').getAttribute("aria-checked");`), "true");
+    await run(`document.querySelector('[data-money-kind="exp-cost"] [data-kind="trip"]').click();`);
     await submit();
     assert.equal((await privRows()).length, 2);
     const moved = await run(`return [...document.querySelectorAll("[data-expense]")].find(b => b.textContent.includes("Azulejo")).dataset.expense;`);
     await run(`document.querySelector('[data-expense="${moved}"]').click();`);
     await until("the form", `document.querySelector("dialog.sheet[open] #exp-title")`);
-    await run(`document.querySelector('[data-money="exp-cost"] [data-kind="private"]').click();`);
+    await run(`document.querySelector('[data-money-kind="exp-cost"] [data-kind="private"]').click();`);
     await submit();
     assert.equal((await privRows()).length, 3);
     assert.equal((await rec("demo-lisbon")).trip.expenses.length, 2, "back out of the trip");

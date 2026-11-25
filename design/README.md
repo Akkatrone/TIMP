@@ -322,6 +322,35 @@ A day's programme moves whole (`js/edit.js`, `swapDays`, `moveDayStops`).
 - **MV6** An assistant's changes that move stops: what to know, said once applied, with
   Undo.
 
+## A day's form
+
+A day's own sheet (`openDayEditor`, `js/editor.js`), on the stop form's parts (ST3, ST4).
+
+- **DY1** What the day is about and its city first, always open. Under the city, the
+  trip's cities as chips (two or more, five at most): one tap, one spelling, so a day
+  keeps its city's colour in the strip.
+- **DY2** The rest a row each with its value: where you sleep (name, address, its note:
+  check-in, a door code), the notes (how many; one field each, ✕ takes one away, "+ Add a
+  note" a text button).
+- **DY3** The night of the day before, in one tap, when this day's is empty or different:
+  "Same as day 3: Casa do Exemplo".
+- **DY4** Cancel and Save at the bottom; Delete the last row, red, asking what goes with
+  it, counted (its stops, the ticked ones); private expenses paid there stay, no longer at
+  a stop; the days after it keep their dates.
+
+## An expense's form
+
+An expense outside the stops (`openExpenseEditor`), the same parts.
+
+- **EX1** Whose it is first: "For the trip" or "Only mine", with a line saying who sees it
+  (the stop form's cost uses the same words).
+- **EX2** What it was, then how much: the amount large, its currency, what it makes at
+  home at that day's rate.
+- **EX3** When it was paid: "Before" and the trip's days as chips (ST2's); "Before" opens
+  the date, today by default. Paid at a stop, said under them.
+- **EX4** "Add expense" or "Save" at the bottom; Delete the last row, asking; an error
+  under its own field.
+
 ## Sheets
 
 A sheet comes up over the page for what is done apart: a form, the history, finding

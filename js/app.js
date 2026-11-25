@@ -656,13 +656,19 @@ function newStop(prefill, newDay = false){
       .catch(err => toast(String(err.message || err)))});
 }
 
-// The day on screen: its city, title, night and notes, or deleted with its stops.
+// The day on screen: its city, title, night and notes, or deleted with its stops (DY1–DY4);
+// the private expenses paid there stay, no longer at a stop.
+const stopsOfDay = d => d.plans ? d.plans.flatMap(p => p.stops) : d.stops;
 function editDay(){
   if(!editable()) return;
-  const i = currentPlace().dayIndex, d = trip().days[i];
-  openDayEditor({day: d, number: i + 1, canDelete: trip().days.length > 1,
+  const tr = trip(), i = currentPlace().dayIndex, d = tr.days[i];
+  const ids = stopsOfDay(d).map(s => s.id), priv = privOf();
+  const goes = {stops: ids.length, done: Object.keys(S.state.done || {}).filter(k => k.startsWith(d.date + "|")).length,
+    priv: priv ? priv.expenses.filter(x => x.date === d.date && ids.includes(x.stop)).length : 0};
+  openDayEditor({day: d, number: i + 1, canDelete: tr.days.length > 1, goes,
+    cities: [...new Set(tr.days.map(x => x.city).filter(Boolean))], before: i ? tr.days[i - 1].stay : undefined,
     onSave: set => applyEdit(tr => ({trip: updateDay(tr, d.date, set)}), "daySaved", {}, "privSaved", {form: true}).catch(err => toast(String(err.message || err))),
-    onDelete: () => applyEdit(tr => ({trip: removeDay(tr, d.date)}), "dayDeleted")
+    onDelete: () => applyEdit(tr => ({trip: removeDay(tr, d.date), priv: ids.reduce((p, id) => unlinkStop(p, d.date, id), privOf())}), "dayDeleted")
       .then(() => { location.hash = "#day-" + Math.max(1, Math.min(i + 1, trip().days.length)); })
       .catch(err => toast(String(err.message || err)))});
 }
@@ -906,7 +912,10 @@ function editExpense(id, isPrivate = false){
   const x = id ? list.find(e => e.id === id) : null;
   if(id && !x) return;
   const fail = err => toast(String(err.message || err));
+  const at = x && x.stop && tr.days.find(d => d.date === x.date);
+  const stop = at && stopsOfDay(at).find(s => s.id === x.stop);
   openExpenseEditor({expense: x, private: isPrivate, money: moneyOptions(), tripCurrency: tr.currency || "", today: tripToday(),
+    days: tr.days.map(d => d.date), stopTitle: stop ? stop.title : "",
     onSave: (e, toPrivate) => applyEdit(cur => {
       let next = cur, priv = privOf();
       const {stop, ...shared} = e;

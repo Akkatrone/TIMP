@@ -32,6 +32,21 @@ function timeNow(timezone){
 // The days of the week on the buttons for closing days, Monday first.
 const WEEK = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
+// A form's rows (ST3): a label, its value at the right ("+" when empty), its fields
+// opened in place, one row at a time; Delete last, red.
+const row = (k, label, body) => `<div class="srow" data-row="${k}"><button type="button" class="dhead" aria-expanded="false" aria-controls="row-${k}"><span>${esc(label)}</span><span class="v" data-v="${k}"></span></button><div class="dbody" id="row-${k}" hidden>${body}</div></div>`;
+const dangerRow = label => `<div class="srow"><button type="button" class="dhead danger" data-delete><span>${esc(label)}</span></button></div>`;
+function openRow(dlg, head){
+  dlg.querySelectorAll(".dhead[aria-controls]").forEach(h => { const on = h === head; h.setAttribute("aria-expanded", String(on)); dlg.querySelector("#" + h.getAttribute("aria-controls")).hidden = !on; });
+}
+function rowValue(dlg, k, text){
+  const el = dlg.querySelector(`[data-v="${k}"]`);
+  el.textContent = text || "";
+  el.closest(".dhead").classList.toggle("set", !!text);
+}
+// The actions at the bottom of a form (ST4): Cancel, and the main one saying what it does.
+const formActions = go => `<div class="sheet-actions fixed"><span class="grow"></span><button type="button" class="btn" data-close>${esc(t("cancel"))}</button><button type="submit" class="btn primary" data-go>${esc(go)}</button></div>`;
+
 
 /**
  * Opens the form.
@@ -125,8 +140,6 @@ export function openStopEditor(o){
       </div>
     </div>`;
 
-  // The rest, one row each (ST3): its label, its value, and its field opened in place.
-  const row = (k, label, body) => `<div class="srow" data-row="${k}"><button type="button" class="dhead" aria-expanded="false" aria-controls="row-${k}"><span>${esc(label)}</span><span class="v" data-v="${k}"></span></button><div class="dbody" id="row-${k}" hidden>${body}</div></div>`;
   const local0 = s0.local || "";
 
   dlg = openSheet({title: alt ? (alt.fixed ? t("altFormTitle", {g: alt.group}) : t("altFormTitleNew", {s: alt.of})) : t(editing ? "editStopTitle" : "newStopTitle"), form: true, cls: "stopform", body: `
@@ -189,16 +202,12 @@ export function openStopEditor(o){
           <p class="foot">${esc(t("posPickHelp"))}</p>
           <div class="live pick"><div class="msg">${esc(t("mapLoading"))}</div></div>
         </div>`)}
-      ${editing ? `<div class="srow"><button type="button" class="dhead danger" data-delete><span>${esc(t("deleteStop"))}</span></button></div>` : ""}
+      ${editing ? dangerRow(t("deleteStop")) : ""}
     </div>
 
     <p class="errbox" data-error role="alert" hidden></p>
 
-    <div class="sheet-actions fixed">
-      <span class="grow"></span>
-      <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
-      <button type="submit" class="btn primary" data-go>${esc(t("save"))}</button>
-    </div>`});
+    ${formActions(t("save"))}`});
 
   const $ = sel => dlg.querySelector(sel);
   const form = $("form");
@@ -248,7 +257,7 @@ export function openStopEditor(o){
   // A small map to put the pin where it belongs, when the search got it wrong.
   let pick = null;
   async function openPicker(){
-    openRow($('.dhead[aria-controls="row-pos"]'));
+    openRow(dlg, $('.dhead[aria-controls="row-pos"]'));
     const box = $("[data-pick-box]");
     if(!box.hidden){ closePicker(); return; }
     if(navigator.onLine === false){ note(t("posOffline")); return; }
@@ -408,10 +417,6 @@ export function openStopEditor(o){
     showPos(); movePick(); fitSource(); refresh();
   }
 
-  // One row of details open at a time (ST3); null closes them.
-  function openRow(head){
-    dlg.querySelectorAll(".dhead[aria-controls]").forEach(h => { const on = h === head; h.setAttribute("aria-expanded", String(on)); $("#" + h.getAttribute("aria-controls")).hidden = !on; });
-  }
 
   // What follows the day, the time and the fields: the chips, the new day's line, what
   // to know before it goes there (ST5), the rows' values (ST3), what the button says (ST4).
@@ -433,7 +438,7 @@ export function openStopEditor(o){
     const box = $("[data-warns]");
     box.hidden = !ws.length;
     box.innerHTML = !ws.length ? "" : `<p class="h">${esc(t(moved ? "warnMoving" : "warnOn", {d: when, n: i + 1}))}</p>` + ws.map(w => `<p>${esc(warnText(w))}</p>`).join("");
-    const v = (k, text) => { const el = $(`[data-v="${k}"]`); el.textContent = text || ""; el.closest(".dhead").classList.toggle("set", !!text); };
+    const v = (k, text) => rowValue(dlg, k, text);
     v("type", st.type ? t("type_" + st.type) : "");
     v("travel", st.travel ? t("travel_" + st.travel) : "");
     v("booking", st.booking ? t("booking_" + st.booking) : "");
@@ -470,7 +475,7 @@ export function openStopEditor(o){
     const look = e.target.closest("[data-hit-show]");
     if(look){ if(chosen < 0) showHit(+look.dataset.hitShow); return; }
     const head = e.target.closest(".dhead[aria-controls]");
-    if(head){ openRow(head.getAttribute("aria-expanded") === "true" ? null : head); return; }
+    if(head){ openRow(dlg, head.getAttribute("aria-expanded") === "true" ? null : head); return; }
     const day = e.target.closest("[data-closed]");
     if(day){ day.setAttribute("aria-pressed", String(day.getAttribute("aria-pressed") !== "true")); refresh(); return; }
     if(money.click(e) || money2.click(e)) return;
@@ -660,11 +665,15 @@ export function openMoveDay(o){
 }
 
 /**
- * The form to change a day: its city, title, where the night is spent, notes. The
- * date and the stops stay: stops are changed one by one, with their own form.
+ * The form to change a day (DY1–DY4): what it is about and its city, open; where the
+ * night is spent and the notes, a row each; Delete last, asked. The date and the stops
+ * stay: stops are changed one by one, with their own form.
  * @param {object} o
  *   day                  the day as it is
  *   number               its number in the trip, for the title
+ *   cities               the trip's cities, offered as chips when two or more (DY1)
+ *   before               the night of the day before, offered when this one differs (DY3)
+ *   goes                 {stops, done, priv}: what deleting it takes, for the question
  *   canDelete            false for the only day of a trip
  *   onSave(set)          the fields as filled in; an empty one is removed
  *   onDelete()           remove the day and its stops
@@ -676,51 +685,72 @@ function noteRow(text){
   return `<li><label class="sr" for="${id}">${esc(t("fNote"))}</label><textarea id="${id}" rows="2">${esc(text)}</textarea>` +
     `<button type="button" class="iconbtn" data-note-remove aria-label="${esc(t("fNoteRemove"))}" title="${esc(t("fNoteRemove"))}">×</button></li>`;
 }
+const stayOf = s => typeof s === "string" ? {name: s} : (s || {});
+const count = (n, one, many) => t(n === 1 ? one : many, {n});
 
 export function openDayEditor(o){
   let dlg;
   const d = o.day, lang = getLang();
   const $ = sel => dlg.querySelector(sel);
-  const stay = typeof d.stay === "string" ? {name: d.stay} : (d.stay || {});
+  const stay = stayOf(d.stay), before = stayOf(o.before);
   const p = dateParts(d.date, lang);
+  const cities = (o.cities || []).length > 1 ? o.cities.slice(0, 5) : [];
+  const field = (id, label, value, ph = "") => `<label class="sr" for="${id}">${esc(label)}</label><input id="${id}" type="text" autocomplete="off" placeholder="${esc(ph)}" value="${esc(value || "")}">`;
   dlg = openSheet({title: t("editDayTitle", {n: o.number}), form: true, body: `
     <p class="foot">${esc(p.long)}</p>
-    <div class="field">
-      <label for="day-city">${esc(t("fCity"))}</label>
-      <input id="day-city" type="text" autocomplete="off" value="${esc(d.city || "")}">
-    </div>
     <div class="field">
       <label for="day-title">${esc(t("fDayTitle"))}</label>
       <input id="day-title" type="text" autocomplete="off" value="${esc(d.title || "")}">
     </div>
-    <div class="field">
-      <label for="day-stay">${esc(t("fStay"))}</label>
-      <input id="day-stay" type="text" autocomplete="off" placeholder="${esc(t("fStayPh"))}" value="${esc(stay.name || "")}">
+    <section>
+      <div class="field">
+        <label for="day-city">${esc(t("fCity"))}</label>
+        <input id="day-city" type="text" autocomplete="off" value="${esc(d.city || "")}">
+      </div>
+      ${cities.length ? `<div class="daychips" role="group" aria-label="${esc(t("tripCities"))}">${cities.map(c => `<button type="button" data-city="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join("")}</div>` : ""}
+    </section>
+    <div class="srows">
+      ${row("stay", t("fStay"), `${field("day-stay", t("fStayName"), stay.name, t("fStayPh"))}
+        ${field("day-stay-address", t("fStayAddress"), stay.address, t("fStayAddress"))}
+        <label class="sr" for="day-stay-note">${esc(t("fStayNote"))}</label><textarea id="day-stay-note" rows="2" placeholder="${esc(t("fStayNotePh"))}">${esc(stay.note || "")}</textarea>
+        ${before.name ? `<button type="button" class="tbtn" data-same-night>${esc(t("sameNight", {n: o.number - 1, s: before.name}))}</button>` : ""}`)}
+      ${row("notes", t("fNotes"), `<ol class="notes-l" id="day-notes">${(d.notes || []).map(noteRow).join("")}</ol>
+        <button type="button" class="tbtn" data-note-add>${esc(t("fNoteAdd"))}</button>`)}
+      ${o.canDelete ? dangerRow(t("deleteDay")) : ""}
     </div>
-    <div class="field">
-      <label for="day-stay-address">${esc(t("fStayAddress"))}</label>
-      <input id="day-stay-address" type="text" autocomplete="off" value="${esc(stay.address || "")}">
-    </div>
-    <fieldset class="field notes-f">
-      <legend>${esc(t("fNotes"))}</legend>
-      <ol class="notes-l" id="day-notes">${(d.notes || []).map(noteRow).join("")}</ol>
-      <button type="button" class="btn small" data-note-add>${esc(t("fNoteAdd"))}</button>
-    </fieldset>
-    <div class="sheet-actions">
-      ${o.canDelete ? `<button type="button" class="btn small danger" data-delete>${esc(t("deleteDay"))}</button>` : ""}
-      <span class="grow"></span>
-      <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
-      <button type="submit" class="btn primary">${esc(t("save"))}</button>
-    </div>`});
+    ${formActions(t("save"))}`});
+
+  const val = id => $("#" + id).value.trim();
+  function refresh(){
+    const notes = [...dlg.querySelectorAll("#day-notes textarea")].filter(x => x.value.trim()).length;
+    rowValue(dlg, "stay", val("day-stay"));
+    rowValue(dlg, "notes", notes ? count(notes, "notesOne", "notesMany") : "");
+    dlg.querySelectorAll("[data-city]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.city === val("day-city"))));
+    const same = $("[data-same-night]");
+    if(same) same.hidden = val("day-stay") === before.name && val("day-stay-address") === (before.address || "") && val("day-stay-note") === (before.note || "");
+  }
+  dlg.addEventListener("input", refresh);
 
   dlg.onclick = async e => {
     if(e.target === dlg) return;
     if(e.target.closest("[data-close]")) return;
+    const head = e.target.closest(".dhead[aria-controls]");
+    if(head){ openRow(dlg, head.getAttribute("aria-expanded") === "true" ? null : head); return; }
+    const city = e.target.closest("[data-city]");
+    if(city){ $("#day-city").value = city.dataset.city; refresh(); return; }
+    // The night of the day before, in one tap (DY3).
+    if(e.target.closest("[data-same-night]")){
+      $("#day-stay").value = before.name; $("#day-stay-address").value = before.address || ""; $("#day-stay-note").value = before.note || "";
+      refresh();
+      $("#day-stay").focus();
+      return;
+    }
     // A note taken away, or one more: each note is a field of its own.
     const gone = e.target.closest("[data-note-remove]");
     if(gone){
       const li = gone.closest("li"), next = li.nextElementSibling || li.previousElementSibling;
       li.remove();
+      refresh();
       (next ? next.querySelector("textarea") : $("[data-note-add]")).focus();
       return;
     }
@@ -730,7 +760,11 @@ export function openDayEditor(o){
       return;
     }
     if(e.target.closest("[data-delete]")){
-      const answer = await ask({title: t("deleteDayTitle"), text: t("deleteDayText", {n: o.number, d: p.long}),
+      // What goes with it, counted (DY4); private expenses paid there stay, unlinked.
+      const g = {stops: 0, done: 0, priv: 0, ...o.goes};
+      const what = count(g.stops, "stopsOne", "stopsMany") + (g.done ? ` (${count(g.done, "tickedOne", "tickedMany")})` : "");
+      const text = t("deleteDayText", {n: o.number, d: p.long, what}) + (g.priv ? " " + count(g.priv, "deleteDayPrivOne", "deleteDayPrivMany") : "");
+      const answer = await ask({title: t("deleteDayTitle"), text,
         actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("deleteDay"), kind: "danger"}]});
       if(answer !== "yes") return;
       dlg.close();
@@ -739,23 +773,24 @@ export function openDayEditor(o){
   };
   $("form").addEventListener("submit", e => {
     e.preventDefault();
-    const name = $("#day-stay").value.trim(), address = $("#day-stay-address").value.trim();
-    // Where the night is spent: a place (with its address, or as it was) or plain text
-    // ("Night train"), as the file had it. No name, no stay.
+    const name = val("day-stay"), address = val("day-stay-address"), note = val("day-stay-note");
+    // Where the night is spent: a place (with its address and note, or as it was) or
+    // plain text ("Night train"), as the file had it. No name, no stay.
     let nextStay;
     if(name){
-      if(address || typeof d.stay === "object") nextStay = Object.fromEntries(Object.entries({...stay, name, address: address || undefined}).filter(([, v]) => v !== undefined));
+      if(address || note || typeof d.stay === "object") nextStay = Object.fromEntries(Object.entries({...stay, name, address: address || undefined, note: note || undefined}).filter(([, v]) => v !== undefined));
       else nextStay = name;
     }
     const same = JSON.stringify(nextStay) === JSON.stringify(d.stay);
     dlg.close();
     o.onSave({
-      city: $("#day-city").value.trim(),
-      title: $("#day-title").value.trim(),
+      city: val("day-city"),
+      title: val("day-title"),
       ...(same ? {} : {stay: nextStay}),
       notes: [...dlg.querySelectorAll("#day-notes textarea")].map(x => x.value.trim()).filter(Boolean)
     });
   });
+  refresh();
 }
 
 /* ---------- money ---------- */
@@ -769,6 +804,8 @@ export function openDayEditor(o){
  *   o.kind: "trip" or "private": shows the choice between the two, the trip's cost or
  *     the traveller's own (js/private.js); o.onKind(kind) when the traveller changes it.
  *   o.label: the field's name; o.hidden: it starts hidden (the second cost of a stop).
+ *   o.kindApart: the choice of whose it is, with its line, in kindHtml, to put elsewhere
+ *     (at the top of the expense's form, EX1); o.big: the amount large (EX2).
  */
 function moneyField(id, m, amount, currency, help, o = {}){
   const lang = getLang();
@@ -781,23 +818,27 @@ function moneyField(id, m, amount, currency, help, o = {}){
   let kind = o.kind || "";
   const helpOf = () => kind === "private" ? t("privateHelp") : help;
   const kinds = kind ? `<div class="seg kind" role="radiogroup" aria-label="${esc(t("fKind"))}">${["trip", "private"].map(k => `<button type="button" role="radio" data-kind="${k}" aria-checked="${k === kind}"><span>${esc(t(k === "trip" ? "kindTrip" : "kindPrivate"))}</span></button>`).join("")}</div>` : "";
-  const html = `<div class="field money" data-money="${id}"${o.hidden ? " hidden" : ""}>
+  const helpLine = `<p class="foot" data-money-help${helpOf() ? "" : " hidden"}>${esc(helpOf())}</p>`;
+  // Its parts are found in the field, or in the choice put apart.
+  const inField = sel => `[data-money="${id}"] ${sel}, [data-money-kind="${id}"] ${sel}`;
+  const html = `<div class="field money${o.big ? " big" : ""}" data-money="${id}"${o.hidden ? " hidden" : ""}>
       <label for="${id}-amount">${esc(o.label || t("fCost"))}</label>
       <div class="amount"><span class="sym" aria-hidden="true" data-sym>${esc(symbolOf(cur, lang))}</span><input id="${id}-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(formatPlain(amount, lang))}"></div>
       <div class="seg wrap" role="radiogroup" aria-label="${esc(t("fCurrency"))}">
         ${quick.map(c => `<button type="button" role="radio" data-cur="${c}" aria-checked="${!other && c === cur}"><span>${esc(label(c))}</span></button>`).join("")}<button type="button" role="radio" data-cur="" aria-checked="${other}"><span>${esc(t("otherCurrency"))}</span></button>
       </div>
       <select id="${id}-other" aria-label="${esc(t("fCurrency"))}"${other ? "" : " hidden"}>${all.map(c => `<option value="${c}"${c === cur ? " selected" : ""}>${esc(c + " · " + currencyName(c, lang))}</option>`).join("")}</select>
-      ${kinds}
+      ${o.kindApart ? "" : kinds}
       <p class="foot money-hint" data-money-hint aria-live="polite"></p>
-      <p class="foot" data-money-help${helpOf() ? "" : " hidden"}>${esc(helpOf())}</p>
+      ${o.kindApart ? "" : helpLine}
     </div>`;
+  const kindHtml = o.kindApart ? `<section data-money-kind="${id}">${kinds}${helpLine}</section>` : "";
   let dlg = null, dateOf = () => "";
   const $ = sel => dlg.querySelector(`[data-money="${id}"] ${sel}`);
   function setKind(k){
     kind = k;
-    dlg.querySelectorAll(`[data-money="${id}"] [data-kind]`).forEach(b => b.setAttribute("aria-checked", String(b.dataset.kind === k)));
-    const h = $("[data-money-help]");
+    dlg.querySelectorAll(inField("[data-kind]")).forEach(b => b.setAttribute("aria-checked", String(b.dataset.kind === k)));
+    const h = dlg.querySelector(inField("[data-money-help]"));
     h.textContent = helpOf();
     h.hidden = !helpOf();
   }
@@ -823,6 +864,7 @@ function moneyField(id, m, amount, currency, help, o = {}){
   }
   return {
     html,
+    kindHtml,
     wire(d, when){
       dlg = d; dateOf = when;
       $("input").addEventListener("input", update);
@@ -835,7 +877,7 @@ function moneyField(id, m, amount, currency, help, o = {}){
     setKind,
     show(){ dlg.querySelector(`[data-money="${id}"]`).hidden = false; update(); },
     click(e){
-      const k = e.target.closest(`[data-money="${id}"] [data-kind]`);
+      const k = e.target.closest(inField("[data-kind]"));
       if(k){
         if(k.dataset.kind !== kind){ setKind(k.dataset.kind); if(o.onKind) o.onKind(kind); }
         return true;
@@ -862,46 +904,63 @@ function moneyField(id, m, amount, currency, help, o = {}){
 const shortDate = (date, lang) => new Intl.DateTimeFormat(lang, {day: "numeric", month: "short", timeZone: "UTC"}).format(new Date(date + "T12:00:00Z"));
 
 /**
- * The form for an expense outside the stops: what it was, when it was paid, how much.
+ * The form for an expense outside the stops (EX1–EX4): whose it is, first; what it was;
+ * how much; when it was paid, as the trip's days or "Before".
  * @param {object} o
  *   expense              the expense to change (absent: a new one)
  *   private              true for one of the traveller's private expenses
  *   money                as for the stop form (local, home, convert)
  *   tripCurrency         the trip's currency, left out of the expense when it is that one
+ *   days                 the trip's dates, as chips
  *   today                the date a new expense gets
+ *   stopTitle            the stop a private expense was paid at, said under the days
  *   onSave(expense, private)  {title, date, cost, currency, stop?}, and whether it is private
  *   onDelete()
  */
 export function openExpenseEditor(o){
   let dlg;
-  const x = o.expense || {}, editing = !!o.expense;
+  const x = o.expense || {}, editing = !!o.expense, lang = getLang();
   const $ = sel => dlg.querySelector(sel);
-  const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", t("fCostHelp"), {kind: o.private ? "private" : "trip"});
+  const days = o.days || [], onDay = date => days.includes(date);
+  const date0 = editing ? x.date || "" : o.today || "";
+  const money = moneyField("exp-cost", o.money, x.cost, x.currency || (editing && o.tripCurrency) || "", t("expenseTripHelp"),
+    {kind: o.private ? "private" : "trip", kindApart: true, big: true, label: t("fHowMuch")});
   dlg = openSheet({title: t(editing ? "editExpenseTitle" : "newExpenseTitle"), form: true, body: `
-    <p class="foot">${esc(t("expenseHelp"))}</p>
+    ${money.kindHtml}
     <div class="field">
       <label for="exp-title">${esc(t("fExpense"))}</label>
       <input id="exp-title" type="text" autocomplete="off" placeholder="${esc(t("fExpensePh"))}" value="${esc(x.title || "")}">
     </div>
-    <div class="field">
-      <label for="exp-date">${esc(t("fPaidOn"))}</label>
-      <input id="exp-date" type="date" value="${esc(x.date || o.today || "")}">
-    </div>
     ${money.html}
+    <section>
+      <span class="label" id="exp-when">${esc(t("fPaidOn"))}</span>
+      <div class="daychips" role="group" aria-labelledby="exp-when"><button type="button" data-paid="" aria-pressed="${!onDay(date0)}">${esc(t("paidBefore"))}</button>${days.map((d, i) => {
+        const p = dateParts(d, lang);
+        return `<button type="button" data-paid="${d}" aria-pressed="${d === date0}" aria-label="${esc(`${t("day")} ${i + 1}, ${p.long}`)}"><small>${esc(p.dow)}</small>${i + 1}</button>`;
+      }).join("")}</div>
+      <div class="field" data-other-date${onDay(date0) ? " hidden" : ""}><label class="sr" for="exp-date">${esc(t("fPaidOn"))}</label><input id="exp-date" type="date" value="${esc(date0)}"></div>
+      ${x.stop && o.stopTitle ? `<p class="foot" data-at>${esc(t("paidAt", {s: o.stopTitle}))}</p>` : ""}
+    </section>
+    ${editing ? `<div class="srows">${dangerRow(t("deleteExpense"))}</div>` : ""}
     <p class="errbox" data-error role="alert" hidden></p>
-    <div class="sheet-actions">
-      ${editing ? `<button type="button" class="btn small danger" data-delete>${esc(t("deleteExpense"))}</button>` : ""}
-      <span class="grow"></span>
-      <button type="button" class="btn" data-close>${esc(t("cancel"))}</button>
-      <button type="submit" class="btn primary">${esc(t("save"))}</button>
-    </div>`});
-  const dateNow = () => $("#exp-date").value || o.today || "";
+    ${formActions(t(editing ? "save" : "addExpenseGo"))}`});
+  const dateNow = () => $("#exp-date").value || "";
+  const dated = () => { money.update(); const at = $("[data-at]"); if(at) at.hidden = dateNow() !== x.date; };
   money.wire(dlg, dateNow);
-  $("#exp-date").addEventListener("change", () => money.update());
+  $("#exp-date").addEventListener("change", dated);
   dlg.onclick = async e => {
     if(e.target === dlg) return;
     if(e.target.closest("[data-close]")) return;
     if(money.click(e)) return;
+    // A day of the trip, or "Before": its date, today unless today is in the trip (EX3).
+    const paid = e.target.closest("[data-paid]");
+    if(paid){
+      dlg.querySelectorAll("[data-paid]").forEach(b => b.setAttribute("aria-pressed", String(b === paid)));
+      $("[data-other-date]").hidden = !!paid.dataset.paid;
+      $("#exp-date").value = paid.dataset.paid || (onDay(dateNow()) ? (onDay(o.today) ? "" : o.today || "") : dateNow());
+      dated();
+      return;
+    }
     if(e.target.closest("[data-delete]")){
       const answer = await ask({title: t("deleteExpenseTitle"), text: t("deleteExpenseText", {t: x.title}),
         actions: [{id: "no", label: t("cancel")}, {id: "yes", label: t("deleteExpense"), kind: "danger"}]});
@@ -913,11 +972,12 @@ export function openExpenseEditor(o){
   $("form").addEventListener("submit", e => {
     e.preventDefault();
     const title = $("#exp-title").value.trim(), cost = money.read();
-    const fail = (text, focus) => { const box = $("[data-error]"); box.textContent = text; box.hidden = false; $(focus).focus(); };
+    // An error under its own field (EX4).
+    const fail = (text, focus) => { const box = $("[data-error]"); box.textContent = text; box.hidden = false; $(focus).closest(".field").after(box); $(focus).focus(); };
     if(!title) return fail(t("expenseTitleRequired"), "#exp-title");
     if(cost.error) return fail(cost.error, "#exp-cost-amount");
     if(cost.cost === undefined) return fail(t("costRequired"), "#exp-cost-amount");
-    const date = $("#exp-date").value;
+    const date = dateNow();
     dlg.close();
     // Paid at a stop: still there if it stays private, on the same day.
     const stop = cost.private && x.stop && date === x.date ? x.stop : undefined;

@@ -33,7 +33,7 @@
     <a href="#principles">Principles</a><a href="#colour">Colour</a><a href="#type">Type</a>
     <a href="#space">Space, shape, motion</a><a href="#line">The line of the day</a>
     <a href="#stop">A stop</a><a href="#groups">Alternatives</a><a href="#day">The day</a>
-    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a><a href="#stopform">A stop's form</a><a href="#sheets">Sheets</a><a href="#trips">Trips</a><a href="#group">The group</a>
+    <a href="#time">Time</a><a href="#today">On the day</a><a href="#map">The map</a><a href="#signals">Signals</a><a href="#search">Search</a><a href="#stopform">A stop's form</a><a href="#dayform">A day's form</a><a href="#sheets">Sheets</a><a href="#trips">Trips</a><a href="#group">The group</a>
     <a href="#a11y">Accessibility</a>
   </nav>
 
@@ -264,6 +264,38 @@
         </div>
         <button type="button" class="tbtn quiet">+ Name on the sign</button>
         <div class="sheet-actions"><span class="grow"></span><button type="button" class="btn">Cancel</button><button type="button" class="btn primary">Move to day 3</button></div>
+      </div></div>
+    </div></div>
+  </section>
+
+  <section id="dayform">
+    <h2>A day's form, an expense's form</h2>
+    <p>The stop form's parts: what matters first, open; the rest a row each with its value;
+    the days as chips; Delete the last row; the actions at the bottom. A day offers the
+    trip's cities and the night before; an expense asks whose it is first.</p>
+    <div class="ds-row"><div class="ds-phone">
+      <div class="sheet ds-sheet"><div class="sheet-form">
+        <div class="sheet-head"><h2>Day 4</h2><button type="button" class="iconbtn" aria-label="Cancel">×</button></div>
+        <p class="foot">Monday, May 17</p>
+        <section><div class="field"><label>City or area</label><input type="text" value="Porto"></div>
+          <div class="daychips" role="group" aria-label="The trip's cities"><button type="button" aria-pressed="false">Lisboa</button><button type="button" aria-pressed="false">Sintra</button><button type="button" aria-pressed="true">Porto</button></div></section>
+        <div class="srows">
+          <div class="srow"><button type="button" class="dhead set" aria-expanded="true"><span>Where you sleep</span><span class="v"></span></button>
+            <div class="dbody"><input type="text" value="On the way home" aria-label="Its name"><button type="button" class="tbtn">Same as day 3: Casa do Exemplo (invented)</button></div></div>
+          <div class="srow"><button type="button" class="dhead set" aria-expanded="false"><span>Notes</span><span class="v">2 notes</span></button></div>
+          <div class="srow"><button type="button" class="dhead danger"><span>Delete day</span></button></div>
+        </div>
+        <div class="sheet-actions"><span class="grow"></span><button type="button" class="btn">Cancel</button><button type="button" class="btn primary">Save</button></div>
+      </div></div>
+    </div><div class="ds-phone">
+      <div class="sheet ds-sheet"><div class="sheet-form">
+        <div class="sheet-head"><h2>New expense</h2><button type="button" class="iconbtn" aria-label="Cancel">×</button></div>
+        <section><div class="seg kind" role="radiogroup" aria-label="For the trip or only mine"><button type="button" role="radio" aria-checked="true"><span>For the trip</span></button><button type="button" role="radio" aria-checked="false"><span>Only mine</span></button></div>
+          <p class="foot">In the trip's costs, seen by whoever has the trip.</p></section>
+        <div class="field money big"><label>How much</label><div class="amount"><span class="sym" aria-hidden="true">€</span><input type="text" value="240"></div></div>
+        <section><span class="label">When it was paid</span>
+          <div class="daychips" role="group" aria-label="When it was paid"><button type="button" aria-pressed="true">Before</button><button type="button" aria-pressed="false"><small>Fri</small>1</button><button type="button" aria-pressed="false"><small>Sat</small>2</button><button type="button" aria-pressed="false"><small>Sun</small>3</button><button type="button" aria-pressed="false"><small>Mon</small>4</button></div></section>
+        <div class="sheet-actions"><span class="grow"></span><button type="button" class="btn">Cancel</button><button type="button" class="btn primary">Add expense</button></div>
       </div></div>
     </div></div>
   </section>

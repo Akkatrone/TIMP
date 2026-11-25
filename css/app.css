@@ -390,13 +390,14 @@ button.crow{cursor:pointer}
 .money .amount{position:relative}
 .money .amount .sym{position:absolute;left:12px;top:50%;transform:translateY(-50%);font:600 1rem var(--f-mono);color:var(--muted);pointer-events:none}
 .sheet .money .amount input{padding-left:34px;font:600 1rem var(--f-mono);font-variant-numeric:tabular-nums}
+.sheet .money.big .amount input{font-size:var(--fs-xxl)}
 .money-hint{font-family:var(--f-mono)}
 .money-hint:empty{display:none}
 .money-hint.bad{color:var(--err)}
 /* Whose a cost is: the trip's, or the traveller's own */
-.sheet .money .seg.kind{display:inline-flex;border-radius:999px}
-.sheet .money .seg.kind button{border-radius:999px;padding:6px 16px}
-.sheet .money .seg.kind button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.sheet .seg.kind{display:inline-flex;border-radius:999px}
+.sheet .seg.kind button{border-radius:999px;padding:6px 16px}
+.sheet .seg.kind button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
 /* the stop form (ST1–ST8): what, found; when, at a glance; the rest a row each, opened in
    place; what to know before it goes there; the actions always at the bottom */
 .tbtn{display:inline-flex;align-items:center;gap:var(--sp-2);justify-self:start;min-height:var(--touch);padding:0 var(--sp-1);border:0;background:none;color:var(--ink);font:600 var(--fs-m) var(--f-body);cursor:pointer}
@@ -415,7 +416,7 @@ button.crow{cursor:pointer}
 .hbody .km{grid-row:1 / span 2;grid-column:2;color:var(--muted);font-size:var(--fs-s)}
 .daychips{display:flex;gap:var(--sp-2);overflow-x:auto;scrollbar-width:none;padding-bottom:var(--sp-1)}
 .daychips::-webkit-scrollbar{display:none}
-.daychips button{flex:0 0 auto;display:grid;justify-items:center;gap:var(--sp-1);min-width:var(--touch);min-height:var(--touch);padding:var(--sp-2) var(--sp-3);border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);color:var(--ink);font:600 var(--fs-base) var(--f-body);cursor:pointer}
+.daychips button{flex:0 0 auto;display:grid;justify-items:center;align-content:center;gap:var(--sp-1);min-width:var(--touch);min-height:var(--touch);padding:var(--sp-2) var(--sp-3);border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);color:var(--ink);font:600 var(--fs-base) var(--f-body);cursor:pointer}
 .daychips small{font:500 var(--fs-xs) var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .daychips [aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .daychips [aria-pressed="true"] small{color:inherit}
@@ -861,6 +862,7 @@ html{touch-action:pan-x pan-y}
 .notes-f{border:0;padding:0;margin:0;display:grid;gap:var(--sp-3)}
 .notes-f legend{padding:0;margin-bottom:var(--sp-2);font-weight:600}
 .notes-l{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-3)}
+.notes-l:empty{display:none}
 .notes-l li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-2);align-items:start}
 .notes-f [data-note-add]{justify-self:start}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

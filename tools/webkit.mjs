@@ -160,16 +160,24 @@ try{
     ok(await run(`return !document.querySelector("dialog.sheet");`), "closed, it is still on the page");
   });
 
-  await check("a stop's form: its buttons at the bottom of the sheet, as wide as the screen at most (ST4)", async () => {
-    await run(`location.hash = "#day-2"; await new Promise(r => setTimeout(r, 300)); document.querySelector("[data-add-stop]").click(); await new Promise(r => setTimeout(r, 400));`);
-    const out = await run(`const d = document.querySelector("dialog.sheet[open]"), bar = d && d.querySelector(".sheet-actions.fixed"); if(!bar) return null;
-      const db = d.getBoundingClientRect(), bb = bar.getBoundingClientRect();
-      return {gap: Math.round(db.bottom - bb.bottom), wide: Math.round(Math.max(db.right, ...[...d.querySelectorAll(".daychips, .srows, .field")].map(e => e.getBoundingClientRect().right))), w: innerWidth, title: getComputedStyle(document.getElementById("stop-title")).fontSize};`);
-    ok(out, "no stop form");
-    ok(Math.abs(out.gap) <= 2, `the buttons ${out.gap}px from the sheet's bottom`);
-    ok(out.wide <= out.w + 1, `something ends at ${out.wide}, the screen is ${out.w}`);
-    ok(parseFloat(out.title) >= 16, `the What field's text is ${out.title}: Safari zooms into less than 16`);
-    await run(`document.querySelector("dialog.sheet[open] [data-close]").click();`);
+  await check("a stop's, a day's and an expense's form: the buttons at the bottom of the sheet, as wide as the screen at most (ST4, DY4, EX4)", async () => {
+    const open = {
+      stop: `location.hash = "#day-2"; await new Promise(r => setTimeout(r, 300)); document.querySelector("[data-add-stop]").click();`,
+      day: `location.hash = "#day-2"; await new Promise(r => setTimeout(r, 300)); document.querySelector("[data-day-edit]").click();`,
+      expense: `location.hash = "#info"; await new Promise(r => setTimeout(r, 300)); const c = document.querySelector("[data-costs]"); if(!c.open) c.querySelector("summary").click(); await new Promise(r => setTimeout(r, 300)); document.querySelector("[data-expense-add]").click();`
+    };
+    for(const [form, js] of Object.entries(open)){
+      await run(`${js} await new Promise(r => setTimeout(r, 400));`);
+      const out = await run(`const d = document.querySelector("dialog.sheet[open]"), bar = d && d.querySelector(".sheet-actions.fixed"); if(!bar) return null;
+        const db = d.getBoundingClientRect(), bb = bar.getBoundingClientRect();
+        return {gap: Math.round(db.bottom - bb.bottom), wide: Math.round(Math.max(db.right, ...[...d.querySelectorAll(".daychips, .srows, .field, .seg")].map(e => e.getBoundingClientRect().right))), w: innerWidth, text: getComputedStyle(d.querySelector("input[type=text], textarea")).fontSize};`);
+      ok(out, `no ${form} form`);
+      ok(Math.abs(out.gap) <= 2, `${form}: the buttons ${out.gap}px from the sheet's bottom`);
+      ok(out.wide <= out.w + 1, `${form}: something ends at ${out.wide}, the screen is ${out.w}`);
+      ok(parseFloat(out.text) >= 16, `${form}: the first field's text is ${out.text}: Safari zooms into less than 16`);
+      await run(`document.querySelector("dialog.sheet[open] [data-close]").click(); await new Promise(r => setTimeout(r, 200));`);
+    }
+    await run(`location.hash = "#day-2"; await new Promise(r => setTimeout(r, 300));`);
   });
 
   await check("search: a field Safari does not zoom into, results fixed under the bar", async () => {
